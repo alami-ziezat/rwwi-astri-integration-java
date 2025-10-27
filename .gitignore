@@ -22,3 +22,7 @@ TestClient.java
 *.bak
 *.swp
 *~
+#*#
+
+# Emacs backup files
+\#*\#

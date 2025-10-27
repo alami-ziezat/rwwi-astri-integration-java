@@ -1,0 +1,516 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## KML Parser for ASTRI Integration
+## Extracts Placemark objects from KML content into property_lists
+##
+## Based on rwi_kml_data_loader pattern
+
+remex(:astri_kml_parser)
+$
+
+def_slotted_exemplar(:astri_kml_parser,
+	{
+		{:kml_content, _unset}
+	})
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_parser.new(_optional kml_file_path)
+	## Create new KML parser instance
+	##
+	## Parameters:
+	##   kml_file_path (optional): Path to KML file
+	##
+	## Returns: New astri_kml_parser instance
+
+	>> _clone.init(kml_file_path)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_parser.init(_optional kml_file_path)
+	## Initialize parser with optional KML file path
+
+	.kml_content << kml_file_path
+	>> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_parser.kml_file_path << file_path
+	## Set KML file path to parse
+
+	.kml_content << file_path
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_parser.parse()
+	## Parse KML file and extract all Placemark objects
+	##
+	## Returns: rope of property_lists, each containing:
+	##   :name       - Placemark name
+	##   :desc       - Description (from <description> tag)
+	##   :coord      - Coordinates string (lon,lat,elevation format)
+	##   :type       - Geometry type ("point", "line", or "area")
+	##   :id         - Placemark id attribute (if present, _unset otherwise)
+	##   :parent     - Parent folder path (e.g. "Folder1|Folder2|Folder3")
+	##   :extended   - Extended data property_list (from ExtendedData)
+
+	_if .kml_content _is _unset
+	_then
+		condition.raise(:error, :string, "No KML file path set. Use kml_file_path<< first.")
+	_endif
+
+	>> _self.extract_placemarks_from_file(.kml_content)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_parser.parse_from_file(kml_file_path)
+	## Parse KML from file path and return rope of property_lists
+	##
+	## Parameters:
+	##   kml_file_path: Path to KML file
+	##
+	## Returns: rope of property_lists
+
+	.kml_content << kml_file_path
+	>> _self.parse()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.extract_placemarks_from_file(kml_file_path)
+	## Extract Placemark elements from KML file
+	##
+	## Parameters:
+	##   kml_file_path: Path to KML file
+	##
+	## Returns: rope of property_lists
+
+	_constant C_DOCUMENT << "Document"
+	_constant C_FOLDER << "Folder"
+	_constant C_PLACEMARK << "Placemark"
+
+	result_rope << rope.new()
+	sxml << simple_xml.new()
+
+	_try
+		# Parse KML content from file (like rwi_kml_data_loader)
+		# IMPORTANT: read_elements_from() returns all top-level elements including
+		# Document AND its children. We must ONLY process Document to avoid duplicates.
+		# Document will recursively process all its children (Folders, Placemarks).
+		_for element _over sxml.read_elements_from(kml_file_path)
+		_loop
+			_if element.class_name.write_string.matches?("simple_xml_document")
+			_then
+				_continue
+			_endif
+
+			elem_type << element.type.write_string
+
+			# ONLY process Document element at top level
+			# Document will recursively handle all Folders and Placemarks
+			# This prevents duplicates from processing Folders twice
+			_if elem_type.matches?(C_DOCUMENT)
+			_then
+				# Process Document and all its children recursively
+				_self.process_element(element, "", result_rope)
+				# Stop after processing Document - don't process other top-level elements
+				_leave
+			_endif
+		_endloop
+
+	_when error
+		condition.raise(:error, :string,
+			"Failed to parse KML file: " + condition.report_contents_string)
+	_endtry
+
+	>> result_rope
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.process_element(element, parent_path, result_rope)
+	## Recursively process KML element (Document, Folder, or Placemark)
+	##
+	## Parameters:
+	##   element      - simple_xml element to process
+	##   parent_path  - Current folder path (e.g. "Folder1|Folder2")
+	##   result_rope  - rope to accumulate placemark property_lists
+
+	_constant C_DOCUMENT << "Document"
+	_constant C_FOLDER << "Folder"
+	_constant C_PLACEMARK << "Placemark"
+	_constant C_NAME << "name"
+
+	elem_type << element.type.write_string
+
+	# Handle Document - process children with same parent path
+	_if elem_type.matches?(C_DOCUMENT)
+	_then
+		_for child _over element.xml_elements.fast_elements()
+		_loop
+			_if child _isnt _unset
+			_then
+				_self.process_element(child, parent_path, result_rope)
+			_endif
+		_endloop
+
+	# Handle Folder - extract name and process children with updated path
+	_elif elem_type.matches?(C_FOLDER)
+	_then
+		folder_name << ""
+
+		# Extract folder name first
+		_for child _over element.xml_elements.fast_elements()
+		_loop
+			_if child _isnt _unset _andif
+			    child.type.write_string.matches?(C_NAME)
+			_then
+				name_elem << child.xml_elements.an_element()
+				_if name_elem _isnt _unset
+				_then
+					folder_name << name_elem.write_string
+				_endif
+				_leave
+			_endif
+		_endloop
+
+		# Build new parent path
+		new_parent_path << parent_path
+		_if folder_name ~= ""
+		_then
+			_if new_parent_path = ""
+			_then
+				new_parent_path << folder_name
+			_else
+				new_parent_path << new_parent_path + "|" + folder_name
+			_endif
+		_endif
+
+		# Process all children with new parent path
+		_for child _over element.xml_elements.fast_elements()
+		_loop
+			_if child _isnt _unset
+			_then
+				_self.process_element(child, new_parent_path, result_rope)
+			_endif
+		_endloop
+
+	# Handle Placemark - parse and add to result
+	_elif elem_type.matches?(C_PLACEMARK)
+	_then
+		placemark_pl << _self.parse_placemark(element, parent_path)
+		_if placemark_pl _isnt _unset
+		_then
+			result_rope.add_last(placemark_pl)
+		_endif
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.parse_placemark(placemark_element, parent_path)
+	## Parse a single Placemark element into property_list
+	##
+	## Parameters:
+	##   placemark_element: simple_xml element for Placemark
+	##   parent_path: Parent folder path (e.g. "Folder1|Folder2")
+	##
+	## Returns: property_list with placemark data
+
+	_constant C_NAME << "name"
+	_constant C_DESC << "description"
+	_constant C_COORD << "coordinates"
+	_constant C_POINT << "Point"
+	_constant C_LINESTR << "LineString"
+	_constant C_POLYG << "Polygon"
+	_constant C_MULTIGEOM << "MultiGeometry"
+	_constant C_LINRING << "LinearRing"
+	_constant C_OUTBOUND << "outerBoundaryIs"
+	_constant C_EXTDATA << "ExtendedData"
+	_constant C_SCHEMADATA << "SchemaData"
+	_constant C_SIMPLEDATA << "SimpleData"
+
+	# Initialize property_list for this placemark
+	pl << property_list.new_with(
+		:name, "unnamed",
+		:desc, "",
+		:coord, "",
+		:type, "unknown",
+		:id, _unset,
+		:parent, parent_path,
+		:extended, property_list.new())
+
+	# Extract id attribute if present
+	_if placemark_element.attributes _isnt _unset
+	_then
+		id_attr << placemark_element.attributes[:id]
+		_if id_attr _isnt _unset
+		_then
+			pl[:id] << id_attr
+		_endif
+	_endif
+
+	_try
+		# Iterate through child elements
+		_for child _over placemark_element.xml_elements.fast_elements()
+		_loop
+			_if child _is _unset
+			_then
+				_continue
+			_endif
+
+			elem_type << child.type.write_string
+
+			# Extract name
+			_if elem_type.matches?(C_NAME)
+			_then
+				name_text << child.xml_elements.an_element().write_string
+				_if name_text.size > 250
+				_then
+					name_text << name_text.as_sliced_string(250)
+				_endif
+				pl[:name] << name_text
+
+			# Extract description
+			_elif elem_type.matches?(C_DESC)
+			_then
+				_try
+					desc_elem << child.xml_elements.an_element()
+					_if desc_elem _isnt _unset
+					_then
+						desc_text << desc_elem.write_string
+						_if desc_text.size > 250
+						_then
+							desc_text << desc_text.as_sliced_string(250)
+						_endif
+						pl[:desc] << desc_text
+					_endif
+				_when error
+					# Skip if description is empty or malformed
+				_endtry
+
+			# Extract Point geometry
+			_elif elem_type.matches?(C_POINT)
+			_then
+				_self.extract_point_coords(child, pl)
+
+			# Extract LineString geometry
+			_elif elem_type.matches?(C_LINESTR)
+			_then
+				_self.extract_linestring_coords(child, pl)
+
+			# Extract Polygon geometry
+			_elif elem_type.matches?(C_POLYG)
+			_then
+				_self.extract_polygon_coords(child, pl)
+
+			# Extract MultiGeometry
+			_elif elem_type.matches?(C_MULTIGEOM)
+			_then
+				_self.extract_multigeometry_coords(child, pl)
+
+			# Extract ExtendedData
+			_elif elem_type.matches?(C_EXTDATA)
+			_then
+				_self.extract_extended_data(child, pl)
+			_endif
+		_endloop
+
+	_when error
+		# Skip problematic placemarks
+		write("Warning: Failed to parse placemark: ", condition.report_contents_string)
+		>> _unset
+	_endtry
+
+	>> pl
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.extract_point_coords(point_elem, pl)
+	## Extract Point coordinates
+
+	_constant C_COORD << "coordinates"
+
+	_for child _over point_elem.xml_elements.fast_elements()
+	_loop
+		_if child _isnt _unset _andif
+		    child.type.write_string.matches?(C_COORD)
+		_then
+			pl[:coord] << child.xml_elements.an_element().write_string
+			pl[:type] << "point"
+			_leave
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.extract_linestring_coords(linestr_elem, pl)
+	## Extract LineString coordinates
+
+	_constant C_COORD << "coordinates"
+
+	coord_elem << _unset
+	_if linestr_elem.xml_elements.size = 1
+	_then
+		coord_elem << linestr_elem.xml_elements.an_element()
+	_elif linestr_elem.xml_elements.size > 1
+	_then
+		coord_elem << linestr_elem.xml_elements[2]
+	_endif
+
+	_if coord_elem _isnt _unset
+	_then
+		pl[:coord] << coord_elem.xml_elements.an_element().write_string
+		pl[:type] << "line"
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.extract_polygon_coords(polygon_elem, pl)
+	## Extract Polygon coordinates from outerBoundaryIs
+
+	_constant C_COORD << "coordinates"
+	_constant C_LINRING << "LinearRing"
+	_constant C_OUTBOUND << "outerBoundaryIs"
+
+	_for child _over polygon_elem.xml_elements.fast_elements()
+	_loop
+		_if child _isnt _unset _andif
+		    child.type.write_string.matches?(C_OUTBOUND)
+		_then
+			linring << child.xml_elements.an_element()
+			pl[:coord] << linring.xml_elements.an_element().xml_elements.an_element().write_string
+			pl[:type] << "area"
+			_leave
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.extract_multigeometry_coords(multigeom_elem, pl)
+	## Extract coordinates from MultiGeometry (first geometry found)
+
+	_constant C_COORD << "coordinates"
+	_constant C_POINT << "Point"
+	_constant C_LINESTR << "LineString"
+	_constant C_POLYG << "Polygon"
+	_constant C_LINRING << "LinearRing"
+	_constant C_OUTBOUND << "outerBoundaryIs"
+
+	_for child _over multigeom_elem.xml_elements.fast_elements()
+	_loop
+		_if child _is _unset
+		_then
+			_continue
+		_endif
+
+		elem_type << child.type.write_string
+
+		# Handle Polygon in MultiGeometry
+		_if elem_type.matches?(C_POLYG)
+		_then
+			_self.extract_polygon_coords(child, pl)
+			_leave
+
+		# Handle LineString in MultiGeometry
+		_elif elem_type.matches?(C_LINESTR)
+		_then
+			_self.extract_linestring_coords(child, pl)
+			_leave
+
+		# Handle Point in MultiGeometry
+		_elif elem_type.matches?(C_POINT)
+		_then
+			_self.extract_point_coords(child, pl)
+			_leave
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.extract_extended_data(extdata_elem, pl)
+	## Extract ExtendedData into property_list
+	## Supports two patterns:
+	##   1. SchemaData/SimpleData (ASTRI standard format)
+	##   2. Data/value (Google Earth format)
+
+	_constant C_SCHEMADATA << "SchemaData"
+	_constant C_SIMPLEDATA << "SimpleData"
+	_constant C_DATA << "Data"
+	_constant C_VALUE << "value"
+
+	_for child _over extdata_elem.xml_elements.fast_elements()
+	_loop
+		_if child _is _unset
+		_then
+			_continue
+		_endif
+
+		elem_type << child.type.write_string
+
+		# Pattern 1: SchemaData/SimpleData (ASTRI format)
+		_if elem_type.matches?(C_SCHEMADATA)
+		_then
+			# Extract all SimpleData elements
+			_for simple_data _over child.xml_elements.fast_elements()
+			_loop
+				_if simple_data _isnt _unset _andif
+				    simple_data.type.write_string.matches?(C_SIMPLEDATA)
+				_then
+					# Get attribute "name"
+					attr_name << simple_data.attributes[:name]
+					_if attr_name _isnt _unset
+					_then
+						# Get value
+						value_elem << simple_data.xml_elements.an_element()
+						_if value_elem _isnt _unset
+						_then
+							value << value_elem.write_string
+							# Store in extended property_list as symbol
+							pl[:extended][attr_name.as_symbol()] << value
+						_endif
+					_endif
+				_endif
+			_endloop
+
+		# Pattern 2: Data/value (Google Earth format)
+		_elif elem_type.matches?(C_DATA)
+		_then
+			# Get attribute "name"
+			attr_name << child.attributes[:name]
+			_if attr_name _isnt _unset
+			_then
+				# Find value element
+				_for value_elem _over child.xml_elements.fast_elements()
+				_loop
+					_if value_elem _isnt _unset _andif
+					    value_elem.type.write_string.matches?(C_VALUE)
+					_then
+						# Get value text
+						value_text_elem << value_elem.xml_elements.an_element()
+						_if value_text_elem _isnt _unset
+						_then
+							value << value_text_elem.write_string
+							# Store in extended property_list as symbol
+							pl[:extended][attr_name.as_symbol()] << value
+						_endif
+						_leave
+					_endif
+				_endloop
+			_endif
+		_endif
+	_endloop
+_endmethod
+$

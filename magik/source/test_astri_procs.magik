@@ -1,0 +1,525 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## Test procedures for ASTRI API integration (v2.0)
+## These demonstrate how to call the annotated Java procedures directly
+##
+## The @MagikProc annotation creates global procedures automatically:
+##
+## Work Order APIs:
+## - astri_get_work_orders(limit, offset, _optional filters) - Get list of work orders
+## - astri_get_work_order(uuid) - Get single work order by UUID
+## - astri_update_work_order(number, latest_status_name, detail) - Update work order status
+##
+## Price List API:
+## - astri_get_price_list(_optional filters) - Get price list with optional filters
+##
+## KMZ Download APIs:
+## - astri_download_cluster_kmz(uuid, _optional output_dir) - Download cluster KMZ document
+## - astri_download_subfeeder_kmz(uuid, _optional output_dir) - Download subfeeder KMZ document
+## - astri_download_feeder_kmz(uuid, _optional output_dir) - Download feeder KMZ document
+## - astri_download_olt_site_kmz(uuid, _optional output_dir) - Download OLT site KMZ document
+##
+## Vendor API:
+## - astri_get_vendor_list(limit, offset, _optional name, _optional subcont_vendor_name,
+##                         _optional label, _optional sap_vendor_code) - Get vendor list
+##
+## BOQ DRM API:
+## - astri_add_boq_drm_cluster(cluster_code, vendor_name, subcont_vendor_name, equipment_name,
+##                             description, quantity_material, quantity_service, remarks, phase,
+##                             area, area_plant_code, override_price_material,
+##                             override_price_service) - Add BOQ DRM cluster
+##
+## OLT Rollout API:
+## - astri_get_olt_list(limit, offset, _optional device_code, _optional name,
+##                      _optional label) - Get OLT rollout list
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_work_orders << _proc()
+	## Test Work Order API - basic call
+
+	write("=" * 60)
+	write("Testing ASTRI Work Order API")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc directly - returns JSON string
+		json_result << astri_get_work_orders(10, 0)
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_price_list << _proc()
+	## Test Price List API
+
+	write("=" * 60)
+	write("Testing ASTRI Price List API")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc directly
+		json_result << astri_get_price_list()
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_work_order_single << _proc()
+	## Test Get Single Work Order API
+
+	write("=" * 60)
+	write("Testing ASTRI Get Single Work Order API")
+	write("=" * 60)
+
+	_try
+		# Replace with actual UUID
+		uuid << "example-uuid-here"
+
+		# Call the @MagikProc directly
+		json_result << astri_get_work_order(uuid)
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_kmz_download_cluster << _proc()
+	## Test Cluster KMZ Download
+
+	write("=" * 60)
+	write("Testing ASTRI Cluster KMZ Download")
+	write("=" * 60)
+
+	_try
+		uuid << "2989eecc-3fd0-402c-bd81-99e02caa7ef5"
+
+		# Call the @MagikProc directly
+		kml_path << astri_download_cluster_kmz(uuid)
+
+		write("KML file path: ", kml_path)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_kmz_download_subfeeder << _proc()
+	## Test Subfeeder KMZ Download
+
+	write("=" * 60)
+	write("Testing ASTRI Subfeeder KMZ Download")
+	write("=" * 60)
+
+	_try
+		# Replace with actual UUID
+		uuid << "example-subfeeder-uuid"
+
+		# Call the @MagikProc directly
+		xml_result << astri_download_subfeeder_kmz(uuid)
+
+		write("Response: ", xml_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_kmz_download_feeder << _proc()
+	## Test Feeder KMZ Download
+
+	write("=" * 60)
+	write("Testing ASTRI Feeder KMZ Download")
+	write("=" * 60)
+
+	_try
+		# Replace with actual UUID
+		uuid << "example-feeder-uuid"
+
+		# Call the @MagikProc directly
+		xml_result << astri_download_feeder_kmz(uuid)
+
+		write("Response: ", xml_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_kmz_download_olt_site << _proc()
+	## Test OLT Site KMZ Download
+
+	write("=" * 60)
+	write("Testing ASTRI OLT Site KMZ Download")
+	write("=" * 60)
+
+	_try
+		# Replace with actual UUID
+		uuid << "example-olt-site-uuid"
+
+		# Call the @MagikProc directly
+		xml_result << astri_download_olt_site_kmz(uuid)
+
+		write("Response: ", xml_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_kml_parser << _proc(_optional p_uuid)
+	## Test KML Parser - parses KML content into rope of property_lists
+	##
+	## Parameters:
+	##   p_uuid (optional): Document UUID to download
+	##                      If not provided, uses default test UUID
+
+	write("=" * 60)
+	write("Testing ASTRI KML Parser")
+	write("=" * 60)
+
+	_try
+		# Use provided UUID or default
+		_if p_uuid _is _unset _orif p_uuid = ""
+		_then
+			uuid << "2989eecc-3fd0-402c-bd81-99e02caa7ef5"
+			write("Using default UUID: ", uuid)
+		_else
+			uuid << p_uuid
+			write("Using provided UUID: ", uuid)
+		_endif
+
+		# Download KMZ and get KML file path (returns simple string)
+		write("Downloading KMZ for UUID: ", uuid)
+		java_result << astri_download_cluster_kmz(uuid)
+
+		# Convert Java String to Magik string
+		_if java_result _is _unset
+		_then
+			write("ERROR: Download failed, no result returned")
+			_return
+		_endif
+
+		# Convert to Magik string using write_string
+		kml_file_path << write_string(java_result)
+
+		# Check if download was successful
+		_if kml_file_path _is _unset _orif kml_file_path = ""
+		_then
+			write("ERROR: Download failed, empty file path returned")
+			_return
+		_endif
+
+		write("KML file path: ", kml_file_path)
+
+		# Parse KML file directly using astri_kml_parser
+		write("Parsing KML file...")
+		parser << astri_kml_parser.new(kml_file_path)
+		placemarks << parser.parse()
+
+		write("✓ Parsed ", placemarks.size, " placemarks")
+		write("")
+
+		# Display first 3 placemarks as examples
+		_if placemarks.size > 0
+		_then
+			write("Sample placemarks:")
+			write("-" * 60)
+			_for i, pm _over placemarks.fast_keys_and_elements()
+			_loop
+				_if i > 20
+				_then
+					_leave
+				_endif
+
+				write("Placemark #", i, ":")
+				write("  Name: ", pm[:name])
+				write("  Type: ", pm[:type])
+				write("  Parent: ", pm[:parent])
+
+				# Display coordinates (truncate if too long)
+				coord_str << pm[:coord]
+				_if coord_str.size > 50
+				_then
+					coord_str << coord_str.subseq(1, 50) + "..."
+				_endif
+				write("  Coords: ", coord_str)
+
+				# Display description (truncate if too long)
+				desc_str << pm[:desc]
+				_if desc_str.size > 50
+				_then
+					desc_str << desc_str.subseq(1, 50) + "..."
+				_endif
+				write("  Description: ", desc_str)
+
+				_if pm[:extended].size > 0
+				_then
+					write("  Extended data:")
+					_for key, val _over pm[:extended].fast_keys_and_elements()
+					_loop
+						write("    ", key, ": ", val)
+					_endloop
+				_endif
+				write("")
+			_endloop
+		_endif
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_vendor_list << _proc()
+	## Test Vendor List API
+
+	write("=" * 60)
+	write("Testing ASTRI Vendor List API")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc directly - returns JSON string
+		# Test with basic pagination
+		json_result << astri_get_vendor_list(10, 0)
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_vendor_list_with_filters << _proc()
+	## Test Vendor List API with filters
+
+	write("=" * 60)
+	write("Testing ASTRI Vendor List API with Filters")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc with optional filters
+		json_result << astri_get_vendor_list(10, 0, "PT Test", _unset, _unset, _unset)
+
+		write("Response with name filter: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_add_boq_drm << _proc()
+	## Test Add BOQ DRM Cluster API
+
+	write("=" * 60)
+	write("Testing ASTRI Add BOQ DRM Cluster API")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc with test data
+		json_result << astri_add_boq_drm_cluster(
+			"TEST-CLUSTER-001",      # cluster_code
+			"PT Test Vendor",        # vendor_name
+			"PT Subcont Vendor",     # subcont_vendor_name
+			"Test Equipment",        # equipment_name
+			"Test Description",      # description
+			100,                     # quantity_material
+			50,                      # quantity_service
+			"Test remarks",          # remarks
+			"Phase 1",              # phase
+			"Test Area",            # area
+			"AREA-001",             # area_plant_code
+			1000000,                # override_price_material
+			500000                  # override_price_service
+		)
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_update_work_order << _proc()
+	## Test Update Work Order API
+
+	write("=" * 60)
+	write("Testing ASTRI Update Work Order API")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc with test data
+		json_result << astri_update_work_order(
+			"WO-TEST-001",          # number
+			"In Progress",          # latest_status_name
+			"Test update detail"    # detail
+		)
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_olt_list << _proc()
+	## Test OLT List API
+
+	write("=" * 60)
+	write("Testing ASTRI OLT List API")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc directly - returns JSON string
+		# Test with basic pagination
+		json_result << astri_get_olt_list(10, 0)
+
+		write("Response: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_olt_list_with_filters << _proc()
+	## Test OLT List API with filters
+
+	write("=" * 60)
+	write("Testing ASTRI OLT List API with Filters")
+	write("=" * 60)
+
+	_try
+		# Call the @MagikProc with optional filters
+		json_result << astri_get_olt_list(10, 0, _unset, "Test OLT", _unset)
+
+		write("Response with name filter: ", json_result)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global test_all_astri_apis << _proc()
+	## Run all ASTRI API tests
+
+	write("")
+	write("#" * 60)
+	write("## ASTRI API Integration Test Suite (v2.0)")
+	write("## Using @MagikProc annotation pattern")
+	write("#" * 60)
+	write("")
+
+	# Work Order APIs
+	test_astri_work_orders()
+	test_astri_work_order_single()
+
+	# Price List API
+	test_astri_price_list()
+
+	# KMZ Download APIs
+	test_astri_kmz_download_cluster()
+	test_astri_kmz_download_subfeeder()
+	test_astri_kmz_download_feeder()
+	test_astri_kmz_download_olt_site()
+
+	# KML Parser
+	test_astri_kml_parser()
+
+	# Vendor APIs
+	test_astri_vendor_list()
+	test_astri_vendor_list_with_filters()
+
+	# BOQ DRM API
+	test_astri_add_boq_drm()
+
+	# Work Order Update API
+	test_astri_update_work_order()
+
+	# OLT APIs
+	test_astri_olt_list()
+	test_astri_olt_list_with_filters()
+
+	write("#" * 60)
+	write("## All tests completed")
+	write("#" * 60)
+	write("")
+_endproc
+$

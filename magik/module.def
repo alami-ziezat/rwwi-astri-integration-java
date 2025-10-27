@@ -1,0 +1,16 @@
+rwwi_astri_integration	1
+
+description
+	ASTRI API integration using proper Magik-Java interop.
+	Provides global procedures for Work Order API, Price List API, and KMZ downloads.
+end
+
+requires
+	base
+end
+
+requires_java
+	rwwi.astri.integration
+end
+
+language en_gb
