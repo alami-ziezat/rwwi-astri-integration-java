@@ -1,0 +1,24 @@
+# Maven build artifacts
+target/
+*.class
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files (optional - keep if needed)
+TestClient.java
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
