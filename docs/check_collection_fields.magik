@@ -1,0 +1,88 @@
+# Collection Field Inspector
+# Run this in Smallworld session to check actual field names
+
+_block
+	write("=" * 70)
+	write("COLLECTION FIELD INSPECTOR")
+	write("=" * 70)
+	write("")
+
+	_local db << gis_program_manager.databases[:gis]
+
+	_if db _is _unset
+	_then
+		write("ERROR: GIS database not available")
+		write("Available databases:")
+		_for db_name, db_obj _over gis_program_manager.databases.fast_keys_and_elements()
+		_loop
+			write("  ", db_name, " => ", db_obj)
+		_endloop
+		_return
+	_endif
+
+	write("Database: ", db)
+	write("")
+
+	# Check each collection
+	_local coll_names << {:rw_point, :rw_line, :rw_area}
+
+	_for coll_name _over coll_names.fast_elements()
+	_loop
+		write("-" * 70)
+		write("Collection: ", coll_name)
+		write("-" * 70)
+
+		_local coll << db.collections[coll_name]
+
+		_if coll _is _unset
+		_then
+			write("  ERROR: Collection not found!")
+			write("")
+			_continue
+		_endif
+
+		write("  Collection object: ", coll)
+		write("  Fields:")
+
+		_for fd _over coll.physical_fields.fast_elements()
+		_loop
+			write("    [", fd.name, "]")
+			write("      Type: ", fd.class_name)
+			write("      External name: ", fd.external_name)
+			_if fd.responds_to?(:unset_value)
+			_then
+				write("      Unset value: ", fd.unset_value)
+			_endif
+		_endloop
+
+		write("")
+	_endloop
+
+	write("=" * 70)
+	write("SUGGESTED FIELD MAPPINGS")
+	write("=" * 70)
+	write("")
+	write("Based on the fields above, you need to map:")
+	write("")
+	write("For UUID field, look for fields named:")
+	write("  :uuid, :kmz_uuid, :doc_id, :external_id, :document_id")
+	write("")
+	write("For Name field, look for fields named:")
+	write("  :name, :object_name, :label, :description")
+	write("")
+	write("For Parent/Folder field, look for fields named:")
+	write("  :folders, :parent, :category, :group, :folder_path")
+	write("")
+	write("For Location field (rw_point), look for fields named:")
+	write("  :location, :position, :geometry, :point")
+	write("")
+	write("For Route field (rw_line), look for fields named:")
+	write("  :route, :geometry, :centreline, :line")
+	write("")
+	write("For Area field (rw_area), look for fields named:")
+	write("  :area, :geometry, :boundary, :polygon")
+	write("")
+	write("=" * 70)
+
+_endblock
+$

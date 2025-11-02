@@ -1,0 +1,65 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## ASTRI Work Order Plugin
+## Plugin entry point for work order management UI
+
+def_slotted_exemplar(:rwwi_astri_workorder_plugin,
+{
+	{:dialog, _unset}
+}, :plugin)
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_plugin.init_actions()
+	## Initialize plugin actions
+
+	_super.init_actions()
+
+	_self.add_action(
+		sw_action.new(:activate_workorder,
+			:engine, _self,
+			:enabled?, _true,
+			:caption, "ASTRI Work Orders...",
+			:tooltip, "Open ASTRI Work Order Manager",
+			:action_message, :|activate_workorder()|))
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_plugin.activate_workorder()
+	## Show work order dialog
+
+	write("Activating ASTRI Work Order Manager...")
+
+	_if .dialog _is _unset
+	_then
+		.dialog << rwwi_astri_workorder_dialog.new(_self)
+	_endif
+
+	_if .dialog.active?.not
+	_then
+		.dialog.activate()
+	_else
+		write("Dialog already active")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_plugin.sw_databus_data_available(data_type_name, data)
+	## Handle databus events
+
+	_if data_type_name _is :design_change
+	_then
+		write("Design changed - refreshing work order data")
+
+		_if .dialog _isnt _unset _andif .dialog.active?
+		_then
+			.dialog.refresh_data()
+		_endif
+	_endif
+_endmethod
+$

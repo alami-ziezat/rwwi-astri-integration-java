@@ -9,6 +9,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Internal HTTP client for ASTRI Work Order API.
@@ -34,14 +36,18 @@ public class WorkOrderClient {
 
     /**
      * Get work orders from API with pagination and optional filters.
+     * Returns XML format for easier parsing in Magik with simple_xml.
      *
      * @param limit Number of records to fetch
      * @param offset Starting offset
      * @param filterParams Filter query string (e.g. "category_name=cluster_boq&latest_status_name=in_progress")
-     * @return JSON string from API response
+     * @return XML string converted from API JSON response
      */
     public String getWorkOrders(int limit, int offset, String filterParams) throws IOException, InterruptedException {
+        
         String baseUrl = config.getApiBaseUrl();
+        System.out.println("  [WorkOrderClient] Base URL: " + baseUrl);
+
         // Correct endpoint from ASTRI API documentation
         String path = "/work-order/cluster/boq/simple/list/all/" + limit + "/" + offset;
 
@@ -49,7 +55,12 @@ public class WorkOrderClient {
         String url = baseUrl + path;
         if (filterParams != null && !filterParams.isEmpty()) {
             url += "?" + filterParams;
+            System.out.println("  [WorkOrderClient] Added filter params: " + filterParams);
+        } else {
+            System.out.println("  [WorkOrderClient] No filter params to add");
         }
+
+        System.out.println("  [WorkOrderClient] URL: " + url);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
@@ -58,15 +69,29 @@ public class WorkOrderClient {
             .GET()
             .build();
 
+        System.out.println("  [WorkOrderClient] Sending HTTP GET request...");
+
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        return response.body();
+        String jsonResponse = response.body();
+
+        System.out.println("  [WorkOrderClient] Response status: " + response.statusCode());
+        System.out.println("  [WorkOrderClient] Response body length: " + (jsonResponse != null ? jsonResponse.length() : 0));
+
+        // Convert JSON to XML for Magik simple_xml parsing
+        System.out.println("  [WorkOrderClient] Converting JSON to XML...");
+        String xmlResult = convertJsonToXml(jsonResponse);
+        System.out.println("  [WorkOrderClient] XML length: " + (xmlResult != null ? xmlResult.length() : 0));
+        System.out.println("  [WorkOrderClient.getWorkOrders] END");
+
+        return xmlResult;
     }
 
     /**
      * Get single work order by UUID.
+     * Returns XML format for easier parsing in Magik.
      *
      * @param uuid Work order UUID
-     * @return JSON string from API response
+     * @return XML string converted from API JSON response
      */
     public String getWorkOrder(String uuid) throws IOException, InterruptedException {
         String baseUrl = config.getApiBaseUrl();
@@ -80,7 +105,202 @@ public class WorkOrderClient {
             .build();
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        return response.body();
+        String jsonResponse = response.body();
+
+        // Convert JSON to XML for Magik simple_xml parsing
+        return convertJsonToXml(jsonResponse);
+    }
+
+    /**
+     * Convert JSON response to XML format for Magik simple_xml parsing.
+     *
+     * Converts JSON structure:
+     * {
+     *   "success": true,
+     *   "count": 50,
+     *   "count_all": 127,
+     *   "data": [
+     *     {
+     *       "uuid": "d35ed679-0b5e-4c33-953c-2740b5cc7772",
+     *       "number": "WO/ALL/2025/DOCU/16/54556",
+     *       ...
+     *     }
+     *   ]
+     * }
+     *
+     * To XML:
+     * <response>
+     *   <success>true</success>
+     *   <count>50</count>
+     *   <count_all>127</count_all>
+     *   <data>
+     *     <workorder>
+     *       <uuid>d35ed679-0b5e-4c33-953c-2740b5cc7772</uuid>
+     *       <number>WO/ALL/2025/DOCU/16/54556</number>
+     *       ...
+     *     </workorder>
+     *   </data>
+     * </response>
+     */
+    private String convertJsonToXml(String json) {
+        try {
+            StringBuilder xml = new StringBuilder();
+            xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            xml.append("<response>\n");
+
+            // Extract top-level fields
+            String success = extractJsonValue(json, "success");
+            String count = extractJsonValue(json, "count");
+            String countAll = extractJsonValue(json, "count_all");
+            String error = extractJsonValue(json, "error");
+
+            if (success != null && !success.isEmpty()) {
+                xml.append("  <success>").append(escapeXml(success)).append("</success>\n");
+            }
+            if (count != null && !count.isEmpty()) {
+                xml.append("  <count>").append(escapeXml(count)).append("</count>\n");
+            }
+            if (countAll != null && !countAll.isEmpty()) {
+                xml.append("  <count_all>").append(escapeXml(countAll)).append("</count_all>\n");
+            }
+            if (error != null && !error.isEmpty()) {
+                xml.append("  <error>").append(escapeXml(error)).append("</error>\n");
+            }
+
+            // Extract data array and convert work orders
+            String dataArray = extractDataArray(json);
+            if (dataArray != null && !dataArray.isEmpty()) {
+                xml.append("  <data>\n");
+
+                // Split into individual work order objects
+                String[] workOrders = splitJsonObjects(dataArray);
+                for (String woJson : workOrders) {
+                    if (woJson.trim().isEmpty()) continue;
+
+                    xml.append("    <workorder>\n");
+
+                    // Extract all work order fields
+                    appendXmlField(xml, woJson, "uuid", 6);
+                    appendXmlField(xml, woJson, "number", 6);
+                    appendXmlField(xml, woJson, "target_cluster_code", 6);
+                    appendXmlField(xml, woJson, "target_cluster_name", 6);
+                    appendXmlField(xml, woJson, "category_label", 6);
+                    appendXmlField(xml, woJson, "category_name", 6);
+                    appendXmlField(xml, woJson, "latest_status_name", 6);
+                    appendXmlField(xml, woJson, "target_cluster_topology", 6);
+                    appendXmlField(xml, woJson, "assigned_vendor_label", 6);
+                    appendXmlField(xml, woJson, "assigned_vendor_name", 6);
+                    appendXmlField(xml, woJson, "created_at", 6);
+                    appendXmlField(xml, woJson, "updated_at", 6);
+                    appendXmlField(xml, woJson, "kmz_uuid", 6);
+
+                    xml.append("    </workorder>\n");
+                }
+
+                xml.append("  </data>\n");
+            }
+
+            xml.append("</response>");
+            return xml.toString();
+
+        } catch (Exception e) {
+            // Return error as XML
+            return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                   "<response>\n" +
+                   "  <success>false</success>\n" +
+                   "  <error>" + escapeXml(e.getMessage()) + "</error>\n" +
+                   "</response>";
+        }
+    }
+
+    /**
+     * Extract a JSON field value.
+     */
+    private String extractJsonValue(String json, String fieldName) {
+        Pattern pattern = Pattern.compile("\"" + fieldName + "\"\\s*:\\s*\"?([^,}\"\\n]+)\"?");
+        Matcher matcher = pattern.matcher(json);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        return null;
+    }
+
+    /**
+     * Extract the data array from JSON response.
+     */
+    private String extractDataArray(String json) {
+        int dataStart = json.indexOf("\"data\"");
+        if (dataStart == -1) return null;
+
+        int arrayStart = json.indexOf("[", dataStart);
+        if (arrayStart == -1) return null;
+
+        int level = 0;
+        int arrayEnd = -1;
+        for (int i = arrayStart; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '[') level++;
+            else if (c == ']') {
+                level--;
+                if (level == 0) {
+                    arrayEnd = i;
+                    break;
+                }
+            }
+        }
+
+        if (arrayEnd == -1) return null;
+        return json.substring(arrayStart + 1, arrayEnd);
+    }
+
+    /**
+     * Split JSON array into individual objects.
+     */
+    private String[] splitJsonObjects(String jsonArray) {
+        java.util.List<String> objects = new java.util.ArrayList<>();
+        int level = 0;
+        int start = -1;
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+            char c = jsonArray.charAt(i);
+            if (c == '{') {
+                if (level == 0) start = i;
+                level++;
+            } else if (c == '}') {
+                level--;
+                if (level == 0 && start != -1) {
+                    objects.add(jsonArray.substring(start + 1, i));
+                    start = -1;
+                }
+            }
+        }
+
+        return objects.toArray(new String[0]);
+    }
+
+    /**
+     * Append XML field from JSON object.
+     */
+    private void appendXmlField(StringBuilder xml, String json, String fieldName, int indent) {
+        String value = extractJsonValue(json, fieldName);
+        if (value != null && !value.isEmpty()) {
+            String spaces = " ".repeat(indent);
+            xml.append(spaces).append("<").append(fieldName).append(">")
+               .append(escapeXml(value))
+               .append("</").append(fieldName).append(">\n");
+        }
+    }
+
+    /**
+     * Escape XML special characters.
+     */
+    private String escapeXml(String str) {
+        if (str == null) return "";
+        return str.replace("&", "&amp;")
+                  .replace("<", "&lt;")
+                  .replace(">", "&gt;")
+                  .replace("\"", "&quot;")
+                  .replace("'", "&apos;");
     }
 
     /**

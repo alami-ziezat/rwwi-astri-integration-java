@@ -80,7 +80,10 @@ public class AstriBoqProcs {
             );
 
             System.out.println("=== DEBUG: BOQ DRM Cluster added successfully ===");
-            return jsonResponse;
+
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
+            return magikString;
 
         } catch (Exception e) {
             System.err.println("=== DEBUG: ERROR in addBoqDrmCluster ===");

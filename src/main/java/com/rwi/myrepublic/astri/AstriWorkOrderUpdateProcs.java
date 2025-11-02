@@ -42,7 +42,10 @@ public class AstriWorkOrderUpdateProcs {
             String jsonResponse = client.updateWorkOrder(numberStr, statusNameStr, detailStr);
 
             System.out.println("=== DEBUG: Work order updated successfully ===");
-            return jsonResponse;
+
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
+            return magikString;
 
         } catch (Exception e) {
             System.err.println("=== DEBUG: ERROR in updateWorkOrder ===");

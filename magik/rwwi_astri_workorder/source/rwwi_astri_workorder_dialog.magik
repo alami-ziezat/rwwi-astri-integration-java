@@ -1,0 +1,932 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## ASTRI Work Order Dialog
+## UI layer for work order management using SW_SWIFT components
+
+remex(:rwwi_astri_workorder_dialog)
+$
+
+def_slotted_exemplar(:rwwi_astri_workorder_dialog,
+{
+	{:engine,     _unset, :writable},       # Engine instance
+	{:items,      _unset, :writable},       # UI components cache
+	{:plugin,     _unset, :writable},       # Parent plugin
+	{:filters,    _unset, :writable},       # Current filter values
+	{:selected_wo, _unset, :writable},      # Currently selected work order
+	{:wo_cache,   _unset, :writable}        # Cache to store work orders by row number
+}, :model)
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.new(plugin)
+	## Create new dialog
+	>> _clone.init(plugin)
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.init(plugin)
+	## Initialize dialog
+
+	.plugin << plugin
+	.engine << rwwi_astri_workorder_engine.new()
+	.engine.dialog << _self
+	.items << property_list.new()
+	.filters << property_list.new()
+	.wo_cache << equality_hash_table.new()
+
+	# Initialize default filters
+	.filters[:source] << :api
+	.filters[:limit] << 50
+	.filters[:offset] << 0
+
+	>> _super.init()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.activate_in(frame)
+	## Build and activate UI in frame using SW_SWIFT components
+
+	frame.title << "ASTRI Work Order Manager"
+
+	# Create top-level sw_canvas_container (required for SWIFT)
+	.items[:top] << top_c << sw_canvas_container.new(
+		frame, 3, 1,
+		:width, 900,
+		:height, 600,
+		:outer_spacing, 5,
+		:row_spacing, 5,
+		:identifier, :top_container,
+		:model, _self)
+
+	# Create outer container with flexible row sizing
+	.items[:outer] << outer << sw_container.new(top_c, 3, 1,
+		:row_resize_values, {0, 1, 0})  # Toolbar fixed, Table flexible, Detail fixed
+
+	# Build toolbar with filters
+	_self.build_toolbar(outer)
+
+	# Build work order table
+	_self.build_table(outer)
+
+	# Build detail panel
+	_self.build_detail_panel(outer)
+
+	# Initial data load
+	_self.changed(:workorder_list, :refresh)
+
+	# Return the top-level container (required)
+	_return top_c
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
+	## Build toolbar with source selector and filters using SW_SWIFT components
+
+	# Create sw_toolbar_container with separator styling
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
+
+	# Get the actual toolbar to add items to
+	a_toolbar << toolbar_con.create_toolbar()
+
+	# Row 1: Refresh button, Source selector, Record count
+	sw_button_item.new(a_toolbar,
+		:image, {:refresh, :ui_resources},
+		:model, _self,
+		:selector, :refresh_data|()|,
+		:tooltip, "Refresh work order data")
+
+	sw_label_item.new(a_toolbar, "  Source:  ")
+
+	.items[:source] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 25,
+		:editable?, _false,
+		:change_selector, {:|source_selection()|})
+	.items[:source].text_items << {"ASTRI API", "Database (Construction)"}
+	.items[:source].value << "ASTRI API"
+
+	.items[:record_count] << sw_label_item.new(a_toolbar, "  Total Records: 0  ")
+
+	# Create second toolbar for filters
+	filter_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(filter_toolbar, "  Filters:  ")
+
+	sw_label_item.new(filter_toolbar, "Category:  ")
+	.items[:filter_category] << sw_text_item.new(filter_toolbar,
+		:model, _self,
+		:display_length, 15,
+		:editable?, _false)
+	.items[:filter_category].text_items << {"All", "Cluster BOQ", "Installation", "Maintenance"}
+	.items[:filter_category].value << "All"
+
+	sw_label_item.new(filter_toolbar, "  Status:  ")
+	.items[:filter_status] << sw_text_item.new(filter_toolbar,
+		:model, _self,
+		:display_length, 15,
+		:editable?, _false)
+	.items[:filter_status].text_items << {"All", "draft", "in_progress", "completed", "cancelled"}
+	.items[:filter_status].value << "All"
+
+	sw_label_item.new(filter_toolbar, "  Topology:  ")
+	.items[:filter_topology] << sw_text_item.new(filter_toolbar,
+		:model, _self,
+		:display_length, 10,
+		:editable?, _false)
+	.items[:filter_topology].text_items << {"All", "AE", "UG", "OH"}
+	.items[:filter_topology].value << "All"
+
+	# Create third toolbar for cluster filter and pagination
+	pagination_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(pagination_toolbar, "  Cluster Code:  ")
+	.items[:filter_cluster] << sw_text_item.new(pagination_toolbar,
+		:model, _self,
+		:display_length, 20,
+		:editable?, _true)
+
+	sw_label_item.new(pagination_toolbar, "  Limit:  ")
+	.items[:filter_limit] << sw_text_item.new(pagination_toolbar,
+		:model, _self,
+		:display_length, 5,
+		:editable?, _false)
+	.items[:filter_limit].text_items << {"10", "25", "50", "100", "200"}
+	.items[:filter_limit].value << "50"
+
+	sw_label_item.new(pagination_toolbar, "  Offset:  ")
+	.items[:filter_offset] << sw_text_item.new(pagination_toolbar,
+		:model, _self,
+		:display_length, 8,
+		:editable?, _true)
+	.items[:filter_offset].value << "0"
+
+	sw_button_item.new(pagination_toolbar,
+		:label, "Apply Filters",
+		:model, _self,
+		:selector, :apply_filters|()|,
+		:tooltip, "Apply current filters")
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_table(parent)
+	## Build work order table using sw_table
+
+	# Create sw_table with proper configuration
+	.items[:table] << sw_table.new(parent,
+		:row_height, 22,
+		:selection_type, :row,
+		:selection_mode, :one,
+		:model, _self,
+		:aspect, :workorder_list,
+		:row_lines?, _true,
+		:column_lines?, _true,
+		:row_stripes?, _true,
+		:data_selector, :|workorder_list_data()|,
+		:selection_notifier, :workorder_selection|()|,
+		:enable_manage_columns?, _true,
+		:min_height, 300)
+
+	# Set column labels
+	.items[:table].set_column_labels({
+		"No", "WO Number", "Cluster Code", "Cluster Name",
+		"Category", "Status", "Topology", "Vendor", "Created", "KMZ UUID"})
+
+	# Set column resize values (relative widths)
+	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1.5, 1.5, 1, 2.5, 1.5, 2}
+
+	# Enable column filtering
+	.items[:table].enable_column_filter(2, _true)  # WO Number
+	.items[:table].enable_column_filter(3, _true)  # Cluster Code
+	.items[:table].enable_column_filter(4, _true)  # Cluster Name
+	.items[:table].enable_column_filter(6, _true)  # Status
+
+	# Enable sorting after columns are configured
+	.items[:table].enable_sort? << _true
+
+	# Set selection notifier - receives (table, selection_rope) as arguments
+	#.items[:table].selection_notifier << {:|workorder_selection()|, _self, _unset, _unset}
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_detail_panel(parent)
+	## Build detail panel for selected work order
+
+	write("build_detail_panel")
+	detail_con << sw_container.new(parent, _unset, 1,
+		:outer_spacing, 5,
+		:row_spacing, 3)
+
+	sw_label_item.new(detail_con, "Selected Work Order Details:")
+
+	.items[:detail_uuid] << sw_label_item.new(detail_con, "UUID: ")
+	.items[:detail_cluster] << sw_label_item.new(detail_con, "Cluster: ")
+	.items[:detail_vendor] << sw_label_item.new(detail_con, "Vendor: ")
+	.items[:detail_info] << sw_label_item.new(detail_con, "Info: ")
+
+	# Action buttons container
+	button_con << sw_container.new(detail_con, 1, _unset,
+		:col_spacing, 10)
+
+	.items[:detail_btn] << sw_button_item.new(button_con,
+		:label, "View Details",
+		:model, _self,
+		:selector, :view_details|()|)
+	.items[:detail_btn].enabled? << _false
+
+	.items[:kmz_btn] << sw_button_item.new(button_con,
+		:label, "Download KMZ",
+		:model, _self,
+		:selector, :download_kmz|()|)
+	.items[:kmz_btn].enabled? << _false
+
+	.items[:migrate_design_btn] << sw_button_item.new(button_con,
+		:label, "Migrate to Design",
+		:model, _self,
+		:selector, :migrate_to_design|()|)
+	.items[:migrate_design_btn].enabled? << _false
+
+	.items[:migrate_temp_btn] << sw_button_item.new(button_con,
+		:label, "Migrate as Temporary",
+		:model, _self,
+		:selector, :migrate_as_temporary|()|)
+	.items[:migrate_temp_btn].enabled? << _false
+
+	.items[:construction_btn] << sw_button_item.new(button_con,
+		:label, "Mark Construction",
+		:model, _self,
+		:selector, :mark_construction|()|)
+	.items[:construction_btn].enabled? << _false
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.workorder_list_data()
+	## Populate table with work order data using sw_table methods
+
+	_try
+		# Clear cache before populating new data
+		.wo_cache.empty()
+
+		# Get data from engine based on current source
+		_local workorders << _if .filters[:source] _is :api
+		_then
+			>> .engine.get_workorders_from_api(
+				.filters[:limit],
+				.filters[:offset],
+				_self.build_filter_params())
+		_else
+			>> .engine.get_workorders_from_db(_self.build_filter_params())
+		_endif
+
+		# Populate table using sw_table methods
+		_local row << 0
+		_for wo _over workorders.fast_elements()
+		_loop
+			row +<< 1
+
+			# Add cells to table
+			.items[:table].add_label(row, 1, row.write_string)
+			.items[:table].add_label(row, 2, wo[:wo_number].default(""))
+			.items[:table].add_label(row, 3, wo[:cluster_code].default(""))
+			.items[:table].add_label(row, 4, wo[:cluster_name].default(""))
+			.items[:table].add_label(row, 5, wo[:category].default(""))
+			.items[:table].add_label(row, 6, wo[:status].default(""))
+			.items[:table].add_label(row, 7, wo[:topology].default(""))
+			.items[:table].add_label(row, 8, wo[:vendor].default(""))
+			.items[:table].add_label(row, 9, wo[:created_at].default(""))
+			.items[:table].add_label(row, 10, wo[:kmz_uuid].default(""))
+
+			# Store work order data in cache by row number
+			.wo_cache[row] << wo
+		_endloop
+
+		# Update record count
+		.items[:record_count].value << write_string("  Total Records: ", row, "  ")
+
+	_when error
+		write("ERROR in workorder_list_data:", condition.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.refresh_data()
+	## Refresh table data from current source
+
+	write("Refreshing work order data...")
+	_self.changed(:workorder_list, :renew)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.source_selection()
+	## Handle source dropdown change
+
+	_local source_text << .items[:source].value
+
+	.filters[:source] << _if source_text = "ASTRI API"
+	_then
+		>> :api
+	_else
+		>> :db
+	_endif
+
+	write("Source changed to:", .filters[:source])
+	_self.refresh_data()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.apply_filters()
+	## Apply current filter selections
+
+	write("Applying filters...")
+
+	# Update filters from UI
+	_local limit_str << .items[:filter_limit].value
+	.filters[:limit] << limit_str.as_number().default(10)
+
+	_local offset_str << .items[:filter_offset].value
+	.filters[:offset] << offset_str.as_number().default(0)
+
+	# Refresh data with new filters
+	_self.refresh_data()
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_filter_params()
+	## Build filter property list from UI controls
+
+	_local filters << property_list.new()
+
+	# Category filter
+	_local category << .items[:filter_category].value
+	_if category _isnt _unset _and category <> "All"
+	_then
+		# Map display label to API field name
+		_local category_map << equality_hash_table.new_with(
+			"Cluster BOQ", "cluster_boq",
+			"Installation", "installation",
+			"Maintenance", "maintenance")
+
+		_local category_name << category_map[category]
+		_if category_name _isnt _unset
+		_then
+			filters[:category_name] << category_name
+		_endif
+	_endif
+
+	# Status filter
+	_local status << .items[:filter_status].value
+	_if status _isnt _unset _and status <> "All"
+	_then
+		filters[:latest_status_name] << status
+	_endif
+
+	# Topology filter
+	_local topology << .items[:filter_topology].value
+	_if topology _isnt _unset _and topology <> "All"
+	_then
+		filters[:target_cluster_topology] << topology
+	_endif
+
+	# Cluster code filter
+	_local cluster << .items[:filter_cluster].value
+	_if cluster _isnt _unset _and cluster.size > 0
+	_then
+		filters[:target_cluster_code] << cluster
+	_endif
+
+	_return filters
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
+	## Handle work order selection in table
+	##
+	## Parameters:
+	##   table (sw_table) - The table widget
+	##   selection (rope) - Rope of selected row numbers
+
+	_if selection _is _unset _orif selection.size = 0
+	_then
+		.selected_wo << _unset
+		_self.update_detail_panel(_unset)
+		_return
+	_endif
+	_local selected_row << selection.an_element()
+	_local wo << .wo_cache[selected_row]
+
+	.selected_wo << wo
+	_self.update_detail_panel(wo)
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
+	## Update detail panel with selected work order
+
+	_if wo _is _unset
+	_then
+		.items[:detail_uuid].value << "UUID: "
+		.items[:detail_cluster].value << "Cluster: "
+		.items[:detail_vendor].value << "Vendor: "
+		.items[:detail_info].value << "Info: "
+
+		.items[:detail_btn].enabled? << _false
+		.items[:kmz_btn].enabled? << _false
+		.items[:migrate_design_btn].enabled? << _false
+		.items[:migrate_temp_btn].enabled? << _false
+		.items[:construction_btn].enabled? << _false
+	_else
+		.items[:detail_uuid].value << write_string("UUID: ", wo[:uuid].default(""))
+		.items[:detail_cluster].value << write_string("Cluster: ",
+			wo[:cluster_code].default(""), " - ", wo[:cluster_name].default(""))
+		.items[:detail_vendor].value << write_string("Vendor: ", wo[:vendor].default(""))
+		.items[:detail_info].value << write_string("Topology: ", wo[:topology].default(""),
+			"  |  Category: ", wo[:category].default(""),
+			"  |  Status: ", wo[:status].default(""))
+
+		# Always enable detail and construction buttons
+		.items[:detail_btn].enabled? << _true
+		.items[:construction_btn].enabled? << _true
+
+		# Enable KMZ-related buttons only if kmz_uuid is present
+		_local kmz_uuid << wo[:kmz_uuid]
+		_local has_kmz << kmz_uuid _isnt _unset _andif kmz_uuid <> ""
+
+		.items[:kmz_btn].enabled? << has_kmz
+		.items[:migrate_design_btn].enabled? << has_kmz
+		.items[:migrate_temp_btn].enabled? << has_kmz
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.view_details()
+	## View detailed information for selected work order
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+
+	_local msg << write_string(
+		"Work Order Details", %newline,
+		"==================", %newline,
+		"Number: ", wo[:wo_number].default(""), %newline,
+		"UUID: ", wo[:uuid].default(""), %newline,
+		"Cluster Code: ", wo[:cluster_code].default(""), %newline,
+		"Cluster Name: ", wo[:cluster_name].default(""), %newline,
+		"Category: ", wo[:category].default(""), %newline,
+		"Status: ", wo[:status].default(""), %newline,
+		"Topology: ", wo[:topology].default(""), %newline,
+		"Vendor: ", wo[:vendor].default(""), %newline,
+		"Created: ", wo[:created_at].default(""))
+
+	_self.user_info(msg)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.download_kmz()
+	## Download KMZ file for selected work order using kmz_uuid
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local kmz_uuid << wo[:kmz_uuid]
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		_self.user_info("No KMZ UUID available for this work order")
+		_return
+	_endif
+
+	write("Downloading KMZ for UUID:", kmz_uuid)
+
+	_try
+		# Call ASTRI KMZ download API with kmz_uuid
+		# astri_download_cluster_kmz(uuid, outputDir)
+		_local output_dir << system.getenv("TEMP").default("C:\temp")
+		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.user_error("Failed to download KMZ file")
+			_return
+		_endif
+
+		# Parse XML response to get file path
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if success_elem _isnt _unset _andif
+		    success_elem.xml_result = "true" _andif
+		    file_path_elem _isnt _unset
+		_then
+			_local file_path << file_path_elem.xml_result
+			_self.user_info(write_string("KMZ downloaded successfully:", %newline, file_path))
+		_else
+			_local error_elem << xml_doc.element_matching_name(:error)
+			_local error_msg << _if error_elem _isnt _unset
+					    _then >> error_elem.xml_result
+					    _else >> "Unknown error"
+					    _endif
+			_self.user_error(write_string("Failed to download KMZ:", %newline, error_msg))
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error downloading KMZ:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.migrate_to_design()
+	## Migrate KML data to real Smallworld design objects
+	##
+	## Uses file download approach (Scenario 2) to avoid large XML string issues
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local kmz_uuid << wo[:kmz_uuid]
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		_self.user_info("No KMZ UUID available for this work order")
+		_return
+	_endif
+
+	write("Migrating KML to Design objects for UUID:", kmz_uuid)
+
+	_try
+		# Use Scenario 2: Download files to disk, then read KML file
+		_local output_dir << system.getenv("TEMP").default("C:\temp")
+		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.user_error("Failed to download KML file")
+			_return
+		_endif
+
+		# Parse XML response to get file path
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local kml_file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if success_elem _isnt _unset _andif
+		    success_elem.xml_result = "true" _andif
+		    kml_file_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_file_path_elem.xml_result
+			write("KML file downloaded to:", kml_file_path)
+
+			# Parse KML file using astri_kml_parser
+			write("Parsing KML file...")
+			_local parser << astri_kml_parser.new(kml_file_path)
+			_local placemarks << parser.parse()
+
+			write("KML parsing complete. Found", placemarks.size, "placemarks")
+
+			# Get migration context from work order
+			_local pop_name << wo[:pop_name].default("Unknown")
+			_local wo_number << wo[:wo_number].default("WO_" + kmz_uuid.subseq(1, 8))
+			_local cluster_code << wo[:cluster_code].default("CLUSTER_" + kmz_uuid.subseq(1, 8))
+			_local cluster_name << wo[:cluster_name].default("Cluster_" + kmz_uuid.subseq(1, 8))
+
+			# Get project ID and segment ID from work order
+			_local prj_id << wo[:uuid]         # Work order UUID field
+			_local segment_id << wo[:kmz_uuid]  # Work order KMZ UUID field
+
+			# Create design migrator
+			write("Creating design migrator...")
+			_local database << gis_program_manager.databases[:gis]
+
+			_if database _is _unset
+			_then
+				_self.user_error("GIS database not available")
+				_return
+			_endif
+
+			_local migrator << astri_design_migrator.new(database, prj_id, segment_id, pop_name)
+
+			# Create project and design
+			write("Initiate: Creating project and design...")
+			_local (project, scheme) << migrator.create_project_and_design(
+				placemarks,     # Boundary extracted from placemarks
+				wo_number,      # Project name
+				cluster_code,   # Project title
+				cluster_name    # Design name
+			)
+
+			# Migrate placemarks to design
+			write("Migrating objects to design...")
+			_local stats << migrator.migrate_placemarks(placemarks)
+
+			# Display results
+			_local total_objs << stats[:aerial_routes] + stats[:poles] + stats[:sheaths] +
+			                      stats[:sling_wires] + stats[:demand_points] +
+			                      stats[:micro_cells] + stats[:areas_created]
+
+			_local msg << write_string(
+				"=== Design Migration Complete! ===", %newline,
+				"File: ", kml_file_path, %newline,
+				"Project: ", wo_number, " (", cluster_code, ") - ID: ", project.id, %newline,
+				"Design: ", cluster_name, " - ID: ", scheme.id, %newline,
+				"=" * 50, %newline,
+				"Aerial Routes:   ", stats[:aerial_routes], %newline,
+				"Poles:           ", stats[:poles], %newline,
+				"Sheaths:         ", stats[:sheaths], %newline,
+				"Sling Wires:     ", stats[:sling_wires], %newline,
+				"Demand Points:   ", stats[:demand_points], %newline,
+				"Micro Cells:     ", stats[:micro_cells], %newline,
+				"Other Areas:     ", stats[:areas_created], %newline,
+				"Errors:          ", stats[:errors], %newline,
+				"Skipped:         ", stats[:skipped], %newline,
+				"=" * 50, %newline,
+				"Total objects:   ", total_objs, %newline,
+				"=" * 50, %newline,
+				%newline,
+				"All objects have been created in the design alternative.", %newline,
+				"Object tagging:", %newline,
+				"  - prj_id:     ", prj_id, %newline,
+				"  - segment_id: ", segment_id, %newline,
+				"  - uuid:       ", segment_id, %newline,
+				"Boundary area (parent=null) was used for project extent only.", %newline,
+				"The design is now active. You can review and modify objects before posting.")
+
+			_self.user_info(msg)
+		_else
+			_local error_elem << xml_doc.element_matching_name(:error)
+			_local error_msg << _if error_elem _isnt _unset
+					    _then >> error_elem.xml_result
+					    _else >> "Unknown error"
+					    _endif
+			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error migrating to design:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.migrate_as_temporary()
+	## Migrate KML data to temporary Smallworld objects (preview mode)
+	##
+	## Uses file download approach (Scenario 2) to avoid large XML string issues
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local kmz_uuid << wo[:kmz_uuid]
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		_self.user_info("No KMZ UUID available for this work order")
+		_return
+	_endif
+
+	write("Migrating KML to Temporary objects for UUID:", kmz_uuid)
+
+	_try
+		# Use Scenario 2: Download files to disk, then read KML file
+		_local output_dir << system.getenv("TEMP").default("C:\temp")
+		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.user_error("Failed to download KML file")
+			_return
+		_endif
+
+		# Parse XML response to get file path
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local kml_file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if success_elem _isnt _unset _andif
+		    success_elem.xml_result = "true" _andif
+		    kml_file_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_file_path_elem.xml_result
+			write("KML file downloaded to:", kml_file_path)
+
+			# Parse KML file using astri_kml_parser
+			write("Parsing KML file...")
+			_local parser << astri_kml_parser.new(kml_file_path)
+			_local placemarks << parser.parse()
+
+			write("KML parsing complete. Found", placemarks.size, "placemarks")
+
+			# Migrate placemarks to temporary Smallworld objects
+			write("Creating temporary objects...")
+			_local database << gis_program_manager.databases[:gis]
+
+			_if database _is _unset
+			_then
+				_self.user_error("GIS database not available. Cannot create temporary objects.")
+				_return
+			_endif
+
+			# Create migrator and run migration
+			_local migrator << astri_kml_migrator.new(database, kmz_uuid)
+			_local stats << migrator.migrate_placemarks(placemarks)
+
+			# Display results
+			_local total_created << stats[:points_created] + stats[:lines_created] + stats[:areas_created]
+			_local total_updated << stats[:points_updated] + stats[:lines_updated] + stats[:areas_updated]
+
+			_local msg << write_string(
+				"=== Temporary Migration Complete! ===", %newline,
+				"File: ", kml_file_path, %newline,
+				"=" * 50, %newline,
+				"Points created:  ", stats[:points_created], %newline,
+				"Points updated:  ", stats[:points_updated], %newline,
+				"Lines created:   ", stats[:lines_created], %newline,
+				"Lines updated:   ", stats[:lines_updated], %newline,
+				"Areas created:   ", stats[:areas_created], %newline,
+				"Areas updated:   ", stats[:areas_updated], %newline,
+				"Errors:          ", stats[:errors], %newline,
+				"Skipped:         ", stats[:skipped], %newline,
+				"=" * 50, %newline,
+				"Total created:   ", total_created, %newline,
+				"Total updated:   ", total_updated, %newline,
+				"Total objects:   ", total_created + total_updated, %newline,
+				"=" * 50)
+
+			_self.user_info(msg)
+		_else
+			_local error_elem << xml_doc.element_matching_name(:error)
+			_local error_msg << _if error_elem _isnt _unset
+					    _then >> error_elem.xml_result
+					    _else >> "Unknown error"
+					    _endif
+			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error migrating as temporary:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.read_kml_file(file_path)
+	## Read KML file content from disk
+	##
+	## Parameters:
+	##   file_path (string) - Full path to KML file
+	##
+	## Returns:
+	##   string - KML file content, or _unset if failed
+
+	_try
+		_local input_stream << external_text_input_stream.new(file_path)
+		_local kml_content << ""
+
+		_protect
+			_loop
+				_local line << input_stream.get_line()
+				_if line _is _unset
+				_then
+					_leave
+				_endif
+				kml_content << kml_content + line + %newline
+			_endloop
+		_protection
+			input_stream.close()
+		_endprotect
+
+		write("Successfully read KML file:", file_path)
+		write("Content size:", kml_content.size, "characters")
+
+		_return kml_content
+
+	_when error
+		write("ERROR reading KML file:", condition.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.format_placemark_display(index, pm)
+	## Format placemark data for display
+	##
+	## Parameters:
+	##   index (integer) - Display index number
+	##   pm (property_list) - Placemark data
+	##
+	## Returns:
+	##   string - Formatted display string
+
+	_local msg << write_string(
+		"[", index, "] ", pm[:name].default("unnamed"), %newline,
+		"    Type: ", pm[:type].default("unknown"),
+		"  |  Parent: ", pm[:parent].default(""), %newline,
+		"    Coords: ", pm[:coord].default("").subseq(1, 50.min(pm[:coord].size)),
+		_if pm[:coord].size > 50 _then >> "..." _else >> "" _endif, %newline)
+
+	# Show extended data if present
+	_if pm[:extended].size > 0
+	_then
+		msg << msg + write_string("    Extended: ")
+		_local ext_count << 0
+		_for key, val _over pm[:extended].fast_keys_and_elements()
+		_loop
+			ext_count +<< 1
+			_if ext_count > 3 _then _leave _endif
+			msg << msg + write_string(key, "=", val.default(""), " ")
+		_endloop
+		msg << msg + %newline
+	_endif
+
+	>> msg
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.mark_construction()
+	## Mark selected work order as under construction
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local uuid << wo[:uuid]
+
+	_if uuid _is _unset _orif uuid = ""
+	_then
+		_self.user_error("No UUID available for this work order")
+		_return
+	_endif
+
+	write("Marking work order as construction:", uuid)
+
+	_try
+		_local success << .engine.mark_as_construction(uuid)
+
+		_if success
+		_then
+			_self.user_info("Work order marked as under construction successfully")
+			_self.refresh_data()
+		_else
+			_self.user_error("Failed to mark work order as under construction")
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error marking work order:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.user_info(message)
+	## Display informational message to user
+
+	write("INFO:", message)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.user_error(message)
+	## Display error message to user
+
+	write("ERROR:", message)
+_endmethod
+$

@@ -3,6 +3,7 @@ package com.rwi.myrepublic.astri;
 import com.gesmallworld.magik.commons.interop.annotations.MagikProc;
 import com.gesmallworld.magik.commons.interop.annotations.Name;
 import com.gesmallworld.magik.commons.interop.annotations.Optional;
+import com.gesmallworld.magik.interop.MagikInteropUtils;
 import com.rwi.myrepublic.astri.internal.PriceListClient;
 
 /**
@@ -37,8 +38,9 @@ public class AstriPriceListProcs {
             client = new PriceListClient();
             String jsonResponse = client.getPriceList(filterParams);
 
-            // Return JSON string - Magik will parse it
-            return jsonResponse;
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
+            return magikString;
 
         } catch (Exception e) {
             // Return error as JSON string

@@ -51,7 +51,10 @@ public class AstriOltProcs {
             String jsonResponse = client.getOltList(limitInt, offsetInt, deviceCodeStr, nameStr, labelStr);
 
             System.out.println("=== DEBUG: OLT list retrieved successfully ===");
-            return jsonResponse;
+
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
+            return magikString;
 
         } catch (Exception e) {
             System.err.println("=== DEBUG: ERROR in getOltList ===");

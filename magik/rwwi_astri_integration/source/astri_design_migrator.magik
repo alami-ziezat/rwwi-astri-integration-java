@@ -1,0 +1,746 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## ASTRI Design Migrator
+## Migrates parsed KML placemarks directly to real Smallworld design objects
+## Creates project and design, uses boundary area for project extent
+##
+## Based on cluster_astri (1).magik reference
+
+remex(:astri_design_migrator)
+$
+
+def_slotted_exemplar(:astri_design_migrator,
+{
+	{:database,        _unset, :writable},   # GIS database
+	{:ace_view,        _unset, :writable},   # For coordinate system
+	{:transform,       _unset, :writable},   # WGS84 → local CS transform
+	{:uuid,            _unset, :writable},   # KMZ UUID (used for uuid field)
+
+	# Design management
+	{:project,         _unset, :writable},   # swg_dsn_project
+	{:scheme,          _unset, :writable},   # swg_dsn_scheme (design)
+	{:design_manager,  _unset, :writable},   # swg_dsn_design_manager
+
+	# Collection references
+	{:ar_col,          _unset, :writable},   # aerial_route
+	{:pole_col,        _unset, :writable},   # pole
+	{:sheath_col,      _unset, :writable},   # sheath_with_loc
+	{:sw_col,          _unset, :writable},   # sling_wire
+	{:dp_col,          _unset, :writable},   # ftth!demand_point
+	{:os_col,          _unset, :writable},   # optical_splitter
+	{:cell_col,        _unset, :writable},   # ftth!zone
+
+	# Migration context
+	{:pop_name,        _unset, :writable},   # POP name
+	{:prj_id,          _unset, :writable},   # Project ID (from wo[:uuid])
+	{:segment_id,      _unset, :writable},   # Segment ID (from wo[:kmz_uuid])
+
+	# Statistics
+	{:stats,           _unset, :writable}    # Migration results
+})
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_design_migrator.new(database, prj_id, segment_id, pop_name)
+	## Create new design migrator
+	##
+	## Parameters:
+	##   database - GIS database (e.g., gis_program_manager.databases[:gis])
+	##   prj_id - Project ID from work order uuid field
+	##   segment_id - Segment ID from work order kmz_uuid field
+	##   pop_name - POP name from work order
+	##
+	## Returns: New astri_design_migrator instance
+
+	>> _clone.init(database, prj_id, segment_id, pop_name)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.init(database, prj_id, segment_id, pop_name)
+	## Initialize migrator
+
+	.database << database
+	.uuid << segment_id     # uuid field = wo[:kmz_uuid]
+	.pop_name << pop_name
+	.prj_id << prj_id       # From wo[:uuid]
+	.segment_id << segment_id  # From wo[:kmz_uuid]
+	.ace_view << gis_program_manager.ace_view
+
+	# Get design manager
+	.design_manager << swg_dsn_admin_engine
+	#gis_program_manager.cached_dataset(:design_admin).actual_dataset
+
+	# Setup coordinate system transformation
+	_local cs_local << .database.world.coordinate_system
+	_local cs_wgs84 << .ace_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	.transform << transform.new_converting_cs_to_cs(cs_wgs84, cs_local)
+
+	# Setup collection references
+	.ar_col << .database.collections[:aerial_route]
+	.pole_col << .database.collections[:pole]
+	.sheath_col << .database.collections[:sheath_with_loc]
+	.sw_col << .database.collections[:sling_wire]
+	.dp_col << .database.collections[:ftth!demand_point]
+	.os_col << .database.collections[:optical_splitter]
+	.cell_col << .database.collections[:ftth!zone]
+
+	# Initialize statistics
+	.stats << property_list.new_with(
+		:aerial_routes, 0,
+		:poles, 0,
+		:sheaths, 0,
+		:sling_wires, 0,
+		:demand_points, 0,
+		:micro_cells, 0,
+		:areas_created, 0,
+		:errors, 0,
+		:skipped, 0
+	)
+
+	>> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_boundary_area?(pm)
+	## Check if placemark is the project boundary area
+	## Boundary area has parent = null or empty AND type = "area"
+	##
+	## Parameters:
+	##   pm (property_list) - Placemark data
+	##
+	## Returns:
+	##   boolean - True if this is the boundary area
+
+	_local parent << pm[:parent]
+	_local type << pm[:type]
+
+	>> type = "area" _andif (parent _is _unset _orif parent = "")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.extract_boundary_area(placemarks)
+	## Extract boundary area placemark from placemarks
+	## The boundary area is an area with parent = null or empty
+	##
+	## Parameters:
+	##   placemarks (rope) - All placemarks
+	##
+	## Returns:
+	##   property_list - Boundary area placemark, or _unset if not found
+
+	_for pm _over placemarks.fast_elements()
+	_loop
+		_if _self.is_boundary_area?(pm)
+		_then
+			write("  Found boundary area: ", pm[:name])
+			_return pm
+		_endif
+	_endloop
+
+	write("  WARNING: No boundary area found (area with parent=null/empty)")
+	_return _unset
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_design_migrator.create_project_and_design(placemarks, wo_number, cluster_code, cluster_name)
+	## Create new project and design for migration
+	##
+	## Parameters:
+	##   placemarks (rope) - All placemarks (to extract boundary from)
+	##   wo_number (string) - Work order number -> project name
+	##   cluster_code (string) - Cluster code -> project title
+	##   cluster_name (string) - Cluster name -> design name
+	##
+	## Returns:
+	##   (project, scheme) - Created project and scheme objects
+
+	!traceback!()
+	write("Creating project and design...")
+	_local sch
+
+ 	_local prj << .design_manager.find_project_or_scheme(wo_number, :project)
+	_if prj _isnt _unset 
+	_then
+		# Check design is exist or not
+		sch << prj.top_schemes.an_element()
+	_endif
+
+        # Get all GIS dataset names
+	_local dsnames << set.new()
+	_for i _over swg_dsn_project.configuration[:initial_dataset_names].default("").split_by(%,).fast_elements()
+	_loop
+		dsname << i.as_symbol()
+		_if gis_program_manager.cached_dataset(dsname) _isnt _unset
+		_then
+			dsnames.add(dsname)
+		_endif
+	_endloop 
+
+	_if prj _is _unset 
+	_then
+	# Extract boundary area from placemarks
+	_local boundary_pm << _self.extract_boundary_area(placemarks)
+	_local area_sr << _unset
+	_global wo,dsn,ageo,attr
+
+	_if boundary_pm _isnt _unset
+	_then
+		# Parse boundary area geometry
+		_try
+			area_sr << _self.parse_line_geometry(boundary_pm[:coord])
+			# Ensure it's closed
+			_if area_sr.closed? _is _false
+			_then
+				write("  WARNING: Boundary area not closed, using world bounds")
+				area_sr << _unset
+			_endif
+		_when error
+			write("  ERROR parsing boundary area: ", condition.report_contents_string)
+			area_sr << _unset
+		_endtry
+	_endif
+
+	# Fallback to world bounds if no valid boundary area
+	_if area_sr _is _unset
+	_then
+		write("  Using database world bounds for project area")
+		_local bounds << .database.world.bounds
+		area_sr << sector_rope.new_with(
+			coordinate.new(bounds.xmin, bounds.ymin),
+			coordinate.new(bounds.xmax, bounds.ymin),
+			coordinate.new(bounds.xmax, bounds.ymax),
+			coordinate.new(bounds.xmin, bounds.ymax),
+			coordinate.new(bounds.xmin, bounds.ymin)
+		)
+	_endif
+
+	# Create project
+	# project_name = WO number
+	# project_title = cluster code
+	_local prj_attrs << property_list.new_with(
+		:job_title, cluster_code,
+		:job_type, "Physical NI Design Job",
+		:asset_owner, "Owned")
+	prj << .design_manager.create_project(
+		wo_number,       # Project name from WO number
+		dsnames,
+		area_sr,
+		prj_attrs
+	)
+	write("  Project created: ", wo_number, " (Title: ", cluster_code, ", ID: ", prj.id, ")")
+
+	_endif 
+
+	_if sch _is _unset 
+	_then
+	# Create scheme (design)
+	# design_name = cluster name
+	_local area_sch << prj.project_areas.an_element().area
+	_local sch_attrs << property_list.new()
+	sch << .design_manager.create_scheme(
+		prj,                  # Parent project
+		_unset,               # No parent scheme
+		cluster_name,         # Scheme name from cluster name
+		dsnames,              # Dataset names
+		prj.design_partition, # Design partition
+		sch_attrs             # Additional attributes
+	)
+	write("  Design created: ", cluster_name, " (ID: ", sch.id, ")")
+	_endif 
+
+	# Activate the design
+	.design_manager.activate_design(sch)
+	write("  Design activated")
+
+	# Store references
+	.project << prj
+	.scheme << sch
+
+	_return prj, sch
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_design_migrator.migrate_placemarks(placemarks)
+	## Migrate placemarks to design objects
+	## NOTE: Design must be activated before calling this method
+	## NOTE: Boundary area (parent=null/empty) is automatically excluded
+	##
+	## Parameters:
+	##   placemarks (rope) - Rope of property_lists from astri_kml_parser
+	##
+	## Returns:
+	##   property_list - Migration statistics
+
+	write("Starting design migration of ", placemarks.size, " placemarks...")
+
+	_if .scheme _is _unset
+	_then
+		condition.raise(:error, :string, "Design not activated. Call create_project_and_design() first.")
+	_endif
+
+	# All object creation automatically goes into the activated design alternative
+	# No need for database mode switching
+
+	# First pass: Create poles (needed for cable snapping)
+	write("  Pass 1: Creating poles...")
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Skip boundary area
+		_if _self.is_boundary_area?(pm)
+		_then
+			_continue
+		_endif
+
+		_if _self.is_pole?(pm)
+		_then
+			write(pm[:type])
+			_self.create_pole(pm)
+			placemarks.remove(pm)
+		_endif
+	_endloop
+
+	# Second pass: Create cables/aerial routes
+	write("  Pass 2: Creating cables and aerial routes...")
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Skip boundary area
+		_if _self.is_boundary_area?(pm)
+		_then
+			_continue
+		_endif
+
+		_if _self.is_cable?(pm)
+		_then
+			write(pm[:type])
+			_self.create_aerial_route(pm)
+			placemarks.remove(pm)
+		_endif
+	_endloop
+
+	# Third pass: Create other objects (demand points, splices, zones, etc.)
+	write("  Pass 3: Creating demand points, splices, and area-based objects...")
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Skip boundary area (ONLY areas with parent=null/empty)
+		_if _self.is_boundary_area?(pm)
+		_then
+			_continue
+		_endif
+
+		# Demand pointmzs
+		_if _self.is_demand_point?(pm)
+		_then
+			_self.create_demand_point(pm)
+			placemarks.remove(pm)
+
+		# Sheath splices (area-based)
+		_elif _self.is_splice?(pm)
+		_then
+			_self.create_sheath(pm)
+			placemarks.remove(pm)
+
+		# Micro cells / zones (area-based with parent folders)
+		_elif _self.is_micro_cell?(pm)
+		_then
+			_self.create_micro_cell(pm)
+			placemarks.remove(pm)
+
+		# Other area-based objects with parent folders
+		# (These are migrated according to cluster_astri (1).magik logic)
+		_elif pm[:type] = "area" _andif pm[:parent] _isnt _unset _andif pm[:parent] <> ""
+		_then
+			_self.create_area_based_object(pm)
+			placemarks.remove(pm)
+		_endif
+	_endloop
+
+	_self.print_statistics()
+	>> .stats
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.parse_point_geometry(coord_string)
+	## Convert "lon,lat,elevation" to local coordinate
+
+	!print_float_precision! << 16
+	_local coord_parts << coord_string.split_by(",")
+	_local lon << coord_parts[1].as_number()
+	_local lat << coord_parts[2].as_number()
+
+	_local wgs84_coord << coordinate.new(lon, lat)
+	_local local_coord << .transform.convert(wgs84_coord)
+
+	_local point << pseudo_point.new(local_coord)
+	point.world << .database.world
+
+	>> point
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.parse_line_geometry(coord_string)
+	## Convert "lon1,lat1,0 lon2,lat2,0 ..." to sector_rope
+
+	!print_float_precision! << 16	
+	_local coord_pairs << coord_string.split_by(",0")
+	_local sect << sector.new()
+
+	_for coord_pair _over coord_pairs.fast_elements()
+	_loop
+		_local parts << coord_pair.split_by(",")
+		_if parts.size >= 2
+		_then
+			_local lon << parts[1].as_number()
+			_local lat << parts[2].as_number()
+
+			_local wgs84_coord << coordinate.new(lon, lat)
+			_local local_coord << .transform.convert(wgs84_coord)
+			sect.add_last(local_coord)
+		_endif
+	_endloop
+
+	_local sector_rope << sect.as_sector_rope()
+	_return sector_rope
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.parse_area_geometry(coord_string)
+	## Convert area coordinates to pseudo_area
+	!print_float_precision! << 16
+	_local sector_rope << _self.parse_line_geometry(coord_string)
+
+	_if sector_rope.closed? _is _false
+	_then
+		condition.raise(:area_not_closed)
+	_endif
+
+	_local p_area << pseudo_area.new(sector_rope)
+	p_area.world << .database.world
+
+	>> p_area
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_pole?(pm)
+	## Check if placemark is a pole based on parent folder
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> parent.matches?("pole") _orif
+	   parent.matches?("new pole") _orif
+	   parent.matches?("existing pole")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_cable?(pm)
+	## Check if placemark is a cable
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> parent.matches?("cable") _orif
+	   parent.matches?("kabel") _orif
+	   parent.matches?("distribution cable") _orif
+	   parent.matches?("sling wire")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_demand_point?(pm)
+	## Check if placemark is a demand point (home pass)
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> parent.matches?("homepass") _orif
+	   parent.matches?("home pass") _orif
+	   parent.matches?("hp")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_splice?(pm)
+	## Check if placemark is a splice/sheath (area-based)
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> pm[:type] = "area" _andif
+	   (parent.matches?("splice") _orif
+	    parent.matches?("closure") _orif
+	    parent.matches?("joint"))
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_micro_cell?(pm)
+	## Check if placemark is a micro cell / zone (area-based)
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> pm[:type] = "area" _andif
+	   (parent.matches?("micro cell") _orif
+	    parent.matches?("zone") _orif
+	    parent.matches?("cell") _orif
+	    parent.matches?("coverage"))
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_pole(pm)
+	## Create pole object from placemark
+
+	_try
+		# Parse geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+
+		# Determine pole type from folder name (simplified)
+		_local pole_type << "Pole 7-4"  # Default
+
+		# Create new pole
+		_local prop_values << property_list.new_with(
+			:location, location,
+			:telco_pole_tag, pm[:name],
+			:usage, "Telco",
+			:material_type, "Steel",
+			:type, pole_type,
+			:folders, pm[:parent],
+			:fttx_network_type, "Cluster",
+			:segment, .segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:project, .prj_id,
+			:uuid, .uuid,
+			:construction_status, "Proposed"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.pole_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:poles] +<< 1
+		write("  ✓ Pole created: ", pm[:name])
+		>> result
+
+	_when error
+		write("  ERROR creating pole ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_aerial_route(pm)
+	## Create aerial route (cable) from placemark
+
+	_try
+		# Parse geometry
+		_local route << _self.parse_line_geometry(pm[:coord])
+
+		# Check minimum length
+		_local length << route.line_length
+		_if length < 0.4 _then _return _endif
+
+		# Simplified: assume 24 core cable
+		_local fiber_count << 24
+
+		# Create aerial route
+		_local prop_values << property_list.new_with(
+			:construction_status, "Proposed",
+			:name, pm[:name],
+			:asset_ownership, "Owned",
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:fiber_count, fiber_count,
+			:fttx_network_type, "Cluster",
+			:segment, .segment_id,
+			:folders, pm[:parent],
+			:route, route,
+			:uuid, .uuid,
+			:project, .prj_id
+		)
+
+		_local rec_trans << record_transaction.new_insert(.ar_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:aerial_routes] +<< 1
+		write("  ✓ Aerial route created: ", pm[:name])
+		>> result
+
+	_when error
+		write("  ERROR creating aerial route ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_demand_point(pm)
+	## Create demand point (home pass) from placemark
+
+	_try
+		# Parse geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+
+		# Create demand point
+		_local prop_values << property_list.new_with(
+			:identification, pm[:name],
+			:name, pm[:name],
+			:status, "Active",
+			:mdu?, _false,
+			:type, "Type 1",
+			:segment, .segment_id,
+			:fttx_network_type, "Cluster",
+			:folders, pm[:parent],
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:notes, .prj_id,
+			:location, location,
+			:uuid, .uuid
+		)
+
+		_local rec_trans << record_transaction.new_insert(.dp_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:demand_points] +<< 1
+		write("  ✓ Demand point created: ", pm[:name])
+		>> result
+
+	_when error
+		write("  ERROR creating demand point ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_sheath(pm)
+	## Create sheath splice from area placemark WITH parent folder
+
+	_try
+		_local parent << pm[:parent].default("")
+
+		# Only process areas WITH parent folders
+		_if parent = "" _orif parent _is _unset
+		_then
+			_return  # Skip boundary areas
+		_endif
+
+		# Parse area geometry
+		_local area << _self.parse_area_geometry(pm[:coord])
+
+		# Create sheath (simplified)
+		write("  → Sheath/splice area: ", pm[:name], " (folder: ", parent, ")")
+
+		.stats[:sheaths] +<< 1
+
+	_when error
+		write("  ERROR creating sheath ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_micro_cell(pm)
+	## Create micro cell / zone from area placemark WITH parent folder
+
+	_try
+		_local parent << pm[:parent].default("")
+
+		# Only process areas WITH parent folders
+		_if parent = "" _orif parent _is _unset
+		_then
+			_return  # Skip boundary areas
+		_endif
+
+		# Parse area geometry
+		_local area << _self.parse_area_geometry(pm[:coord])
+
+		# Create micro cell / zone
+		_local prop_values << property_list.new_with(
+			:name, pm[:name],
+			:area, area,
+			:folders, parent,
+			:fttx_network_type, "Cluster",
+			:segment, .segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:uuid, .uuid
+		)
+
+		_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:micro_cells] +<< 1
+		write("  ✓ Micro cell created: ", pm[:name])
+		>> result
+
+	_when error
+		write("  ERROR creating micro cell ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_area_based_object(pm)
+	## Create area-based object from placemark WITH parent folder
+	## This is a catchall for other area types
+
+	_try
+		_local parent << pm[:parent].default("")
+
+		# Safety check: Only process areas WITH parent folders
+		_if parent = "" _orif parent _is _unset
+		_then
+			_return  # Skip boundary areas
+		_endif
+
+		# Parse area geometry
+		_local area << _self.parse_area_geometry(pm[:coord])
+
+		write("  → Other area object: ", pm[:name], " (folder: ", parent, ")")
+
+		.stats[:areas_created] +<< 1
+
+	_when error
+		write("  ERROR creating area object ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_design_migrator.print_statistics()
+	## Print migration statistics
+
+	write("")
+	write("=" * 60)
+	write("Design Migration Statistics")
+	write("=" * 60)
+	write("Aerial Routes:   ", .stats[:aerial_routes])
+	write("Poles:           ", .stats[:poles])
+	write("Sheaths:         ", .stats[:sheaths])
+	write("Sling Wires:     ", .stats[:sling_wires])
+	write("Demand Points:   ", .stats[:demand_points])
+	write("Micro Cells:     ", .stats[:micro_cells])
+	write("Other Areas:     ", .stats[:areas_created])
+	write("Errors:          ", .stats[:errors])
+	write("Skipped:         ", .stats[:skipped])
+	write("")
+	_local total_created << .stats[:aerial_routes] + .stats[:poles] + .stats[:sheaths] +
+	                         .stats[:sling_wires] + .stats[:demand_points] +
+	                         .stats[:micro_cells] + .stats[:areas_created]
+	write("Total objects:   ", total_created)
+	write("=" * 60)
+_endmethod
+$

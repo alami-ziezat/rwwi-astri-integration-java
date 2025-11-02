@@ -1,0 +1,440 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## ASTRI KML Migrator
+## Converts parsed KML placemarks to Smallworld temporary objects
+##
+## Based on test_astri_kml_parser logic
+
+remex(:astri_kml_migrator)
+$
+
+def_slotted_exemplar(:astri_kml_migrator,
+{
+	{:database,        _unset, :writable},   # Target database
+	{:ace_view,        _unset, :writable},   # Ace view for CS
+	{:transform,       _unset, :writable},   # WGS84 → local CS transform
+	{:point_col,       _unset, :writable},   # Point collection
+	{:line_col,        _unset, :writable},   # Line collection
+	{:area_col,        _unset, :writable},   # Area collection
+	{:uuid,            _unset, :writable},   # Current KMZ UUID
+	{:stats,           _unset, :writable},   # Migration statistics
+	{:was_readonly,    _unset, :writable}    # Track original readonly state
+})
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_migrator.new(database, uuid)
+	## Create new migrator instance
+	##
+	## Parameters:
+	##   database - GIS database (e.g., gis_program_manager.databases[:gis])
+	##   uuid - KMZ document UUID
+	##
+	## Returns: New astri_kml_migrator instance
+
+	>> _clone.init(database, uuid)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_migrator.init(database, uuid)
+	## Initialize migrator with database and coordinate system setup
+
+	.database << database
+	.uuid << uuid
+	.ace_view << gis_program_manager.ace_view
+
+	# Setup collections
+	.point_col << .database.collections[:rw_point]
+	.line_col << .database.collections[:rw_line]
+	.area_col << .database.collections[:rw_area]
+
+	# Setup coordinate system transformation
+	_local cs_local << .database.world.coordinate_system
+	_local cs_wgs84 << .ace_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	.transform << transform.new_converting_cs_to_cs(cs_wgs84, cs_local)
+
+	# Initialize statistics
+	.stats << property_list.new_with(
+		:points_created, 0,
+		:points_updated, 0,
+		:lines_created, 0,
+		:lines_updated, 0,
+		:areas_created, 0,
+		:areas_updated, 0,
+		:errors, 0,
+		:skipped, 0
+	)
+
+	# Setup dynamic globals
+	_dynamic !current_dsview! << .database
+	_dynamic !current_world! << .database.world
+	_dynamic !current_coordinate_system! << .database.world.coordinate_system
+
+	# Check if database is readonly and switch to writable if needed
+	.was_readonly << .database.mode _is :readonly
+
+	_if .was_readonly
+	_then
+		write("Database is readonly. Switching to writable mode...")
+		.database.switch(:write)
+		write("Database switched to writable mode")
+	_else
+		write("Database is already writable")
+	_endif
+
+	>> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_migrator.migrate_placemarks(placemarks)
+	## Migrate all placemarks to temporary Smallworld objects
+	##
+	## Parameters:
+	##   placemarks (rope) - Rope of property_lists from astri_kml_parser
+	##
+	## Returns:
+	##   property_list - Migration statistics
+
+	write("Starting migration of ", placemarks.size, " placemarks...")
+
+	_protect
+		_for i, pm _over placemarks.fast_keys_and_elements()
+		_loop
+			_try
+				_local action << _unset
+
+				_if pm[:type] = "point"
+				_then
+					action << _self.create_or_update_point(pm)
+					_if action = :created
+					_then
+						.stats[:points_created] +<< 1
+					_elif action = :updated
+					_then
+						.stats[:points_updated] +<< 1
+					_endif
+
+				_elif pm[:type] = "area"
+				_then
+					action << _self.create_or_update_area(pm)
+					_if action = :created
+					_then
+						.stats[:areas_created] +<< 1
+					_elif action = :updated
+					_then
+						.stats[:areas_updated] +<< 1
+					_endif
+
+				_elif pm[:type] = "line"
+				_then
+					action << _self.create_or_update_line(pm)
+					_if action = :created
+					_then
+						.stats[:lines_created] +<< 1
+					_elif action = :updated
+					_then
+						.stats[:lines_updated] +<< 1
+					_endif
+
+				_else
+					write("WARNING: Unknown type '", pm[:type], "' for placemark: ", pm[:name])
+					.stats[:skipped] +<< 1
+				_endif
+
+			_when error
+				write("ERROR creating object for placemark ", i, " (", pm[:name], "): ",
+				      condition.report_contents_string)
+				.stats[:errors] +<< 1
+			_endtry
+
+			# Progress indicator every 100 placemarks
+			_if i _mod 100 = 0
+			_then
+				write("  Progress: ", i, "/", placemarks.size, " placemarks processed")
+			_endif
+		_endloop
+
+		write("Migration complete!")
+		_self.print_statistics()
+
+	_protection
+		# Restore database to original mode
+		_if .was_readonly
+		_then
+			.database.commit()
+			write("Restoring database to readonly mode...")
+			.database.switch(:readonly)
+			write("Database switched back to readonly")
+		_endif
+	_endprotect
+
+	>> .stats
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_migrator.find_existing_record(collection, name, parent)
+	## Find existing record with matching uuid, name, and parent
+	##
+	## Parameters:
+	##   collection - Database collection to search
+	##   name - Placemark name
+	##   parent - Parent folder path
+	##
+	## Returns:
+	##   Existing record or _unset if not found
+
+	_return _unset 
+
+	## UNDER CONSTRUCTION ## LET ME THINK LATER
+	_local pred << predicate.new(:uuid, :eq, .uuid) _and
+		       predicate.new(:name, :eq, name)
+
+	_if parent <> "" _and parent _isnt _unset  
+	_then
+		pred << pred _and predicate.new(:folders, :eq, parent)
+	_endif	      
+
+	_local existing_recs << collection.select(pred)
+
+	_if existing_recs.size > 0
+	_then
+		_return existing_recs.an_element()
+	_else
+		_return _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_migrator.create_or_update_point(pm)
+	## Create or update point object from placemark
+	## If record with same uuid, name, and parent exists, update location
+	## Otherwise, create new record
+	##
+	## Parameters:
+	##   pm (property_list) - Placemark data with :coord, :name, :parent
+	##
+	## Returns:
+	##   :created or :updated
+
+	_dynamic !print_float_precision! << 16
+
+	# Parse coordinates: "lon,lat,elevation"
+	_local coord_parts << pm[:coord].split_by(",")
+	_local lon << coord_parts[1].as_number()
+	_local lat << coord_parts[2].as_number()
+
+	# Transform from WGS84 to local coordinate system
+	_local wgs84_coord << coordinate.new(lon, lat)
+	_local local_coord << .transform.convert(wgs84_coord)
+
+	# Check if record already exists (same uuid, name, and parent)
+	_local existing_rec << _self.find_existing_record(.point_col, pm[:name], pm[:parent])
+	_if existing_rec _isnt _unset
+	_then
+		# Update existing record's location
+		_local rec_trans << record_transaction.new_update(existing_rec,
+			property_list.new_with(:location, local_coord))
+		rec_trans.run()
+
+		write("  ↻ Point updated: ", pm[:name])
+		_return :updated
+	_else
+		# Create new record
+		_local prop_values << property_list.new_with(
+			:location, local_coord,
+			:name, pm[:name],
+			:folders, pm[:parent],
+			:uuid, .uuid
+						    )
+		#plg << prop_values
+
+		_local rec_trans << record_transaction.new_insert(.point_col, prop_values)
+		rec_trans.run()
+
+		write("  ✓ Point created: ", pm[:name])
+		_return :created
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_migrator.create_or_update_area(pm)
+	## Create or update area object from placemark
+	## If record with same uuid, name, and parent exists, update area geometry
+	## Otherwise, create new record
+	##
+	## Parameters:
+	##   pm (property_list) - Placemark data with :coord, :name, :parent
+	##
+	## Returns:
+	##   :created or :updated
+
+	_dynamic !print_float_precision! << 16
+
+	# Parse coordinates: "lon1,lat1,0 lon2,lat2,0 ..."
+	# Split by ",0" to remove elevations
+	_local coord_pairs << pm[:coord].split_by(",0")
+
+	# Create sector from coordinates
+	_local sect << sector.new()
+	_for coord_pair _over coord_pairs.fast_elements()
+	_loop
+		_local parts << coord_pair.split_by(",")
+		_if parts.size >= 2
+		_then
+			_local lon << parts[1].as_number()
+			_local lat << parts[2].as_number()
+
+			_local wgs84_coord << coordinate.new(lon, lat)
+			_local local_coord << .transform.convert(wgs84_coord)
+			sect.add_last(local_coord)
+		_endif
+	_endloop
+
+	# Convert to sector_rope
+	_local sector_rope << sect.as_sector_rope()
+
+	# Validate closure
+	_if sector_rope.closed? _is _false
+	_then
+		write("  ⚠ Area not closed, skipping: ", pm[:name])
+		condition.raise(:area_not_closed, :name, pm[:name])
+	_endif
+
+	# Create pseudo_area
+	_local p_area << pseudo_area.new(sector_rope)
+	p_area.world << .database.world
+
+	# Check if record already exists (same uuid, name, and parent)
+	_local existing_rec << _self.find_existing_record(.area_col, pm[:name], pm[:parent])
+
+	_if existing_rec _isnt _unset
+	_then
+		# Update existing record's area geometry
+		_local rec_trans << record_transaction.new_update(existing_rec,
+			property_list.new_with(:area, p_area))
+		rec_trans.run()
+
+		write("  ↻ Area updated: ", pm[:name])
+		_return :updated
+	_else
+		# Create new record
+		_local prop_values << property_list.new_with(
+			:area, p_area,
+			:name, pm[:name],
+			:folders, pm[:parent],
+			:uuid, .uuid
+		)
+
+		_local rec_trans << record_transaction.new_insert(.area_col, prop_values)
+		rec_trans.run()
+
+		write("  ✓ Area created: ", pm[:name])
+		_return :created
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_migrator.create_or_update_line(pm)
+	## Create or update line object from placemark
+	## If record with same uuid, name, and parent exists, update route geometry
+	## Otherwise, create new record
+	##
+	## Parameters:
+	##   pm (property_list) - Placemark data with :coord, :name, :parent
+	##
+	## Returns:
+	##   :created or :updated
+
+	_dynamic !print_float_precision! << 16
+
+	# Parse coordinates: "lon1,lat1,0 lon2,lat2,0 ..."
+	# Split by ",0" to remove elevations
+	_local coord_pairs << pm[:coord].split_by(",0")
+
+	# Create sector from coordinates
+	_local sect << sector.new()
+	_for coord_pair _over coord_pairs.fast_elements()
+	_loop
+		_local parts << coord_pair.split_by(",")
+		_if parts.size >= 2
+		_then
+			_local lon << parts[1].as_number()
+			_local lat << parts[2].as_number()
+
+			_local wgs84_coord << coordinate.new(lon, lat)
+			_local local_coord << .transform.convert(wgs84_coord)
+			sect.add_last(local_coord)
+		_endif
+	_endloop
+
+	# Convert to sector_rope
+	_local sector_rope << sect.as_sector_rope()
+
+	# Create pseudo_chain
+	_local p_chain << pseudo_chain.new(sector_rope)
+	p_chain.world << .database.world
+
+	# Check if record already exists (same uuid, name, and parent)
+	_local existing_rec << _self.find_existing_record(.line_col, pm[:name], pm[:parent])
+
+	_if existing_rec _isnt _unset
+	_then
+		# Update existing record's route geometry
+		_local rec_trans << record_transaction.new_update(existing_rec,
+			property_list.new_with(:route, p_chain))
+		rec_trans.run()
+
+		write("  ↻ Line updated: ", pm[:name])
+		_return :updated
+	_else
+		# Create new record
+		_local prop_values << property_list.new_with(
+			:route, p_chain,
+			:name, pm[:name],
+			:folders, pm[:parent],
+			:uuid, .uuid
+		)
+
+		_local rec_trans << record_transaction.new_insert(.line_col, prop_values)
+		rec_trans.run()
+
+		write("  ✓ Line created: ", pm[:name])
+		_return :created
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_kml_migrator.print_statistics()
+	## Print migration statistics
+
+	write("")
+	write("=" * 60)
+	write("Migration Statistics")
+	write("=" * 60)
+	write("Points created:  ", .stats[:points_created])
+	write("Points updated:  ", .stats[:points_updated])
+	write("Lines created:   ", .stats[:lines_created])
+	write("Lines updated:   ", .stats[:lines_updated])
+	write("Areas created:   ", .stats[:areas_created])
+	write("Areas updated:   ", .stats[:areas_updated])
+	write("Errors:          ", .stats[:errors])
+	write("Skipped:         ", .stats[:skipped])
+	write("")
+	_local total_created << .stats[:points_created] + .stats[:lines_created] + .stats[:areas_created]
+	_local total_updated << .stats[:points_updated] + .stats[:lines_updated] + .stats[:areas_updated]
+	write("Total created:   ", total_created)
+	write("Total updated:   ", total_updated)
+	write("Total objects:   ", total_created + total_updated)
+	write("=" * 60)
+_endmethod
+$

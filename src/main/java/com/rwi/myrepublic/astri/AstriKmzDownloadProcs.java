@@ -49,7 +49,9 @@ public class AstriKmzDownloadProcs {
             System.out.println("=== DEBUG: Download successful, returning XML response ===");
             System.out.println("Response length: " + xmlResponse.length() + " characters");
 
-            return xmlResponse;
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(xmlResponse);
+            return magikString;
 
         } catch (Exception e) {
             System.err.println("=== DEBUG: ERROR in downloadClusterKmz ===");
@@ -94,7 +96,9 @@ public class AstriKmzDownloadProcs {
             client = new KmzDownloadClient();
             String xmlResponse = client.downloadSubfeederDocument(uuidStr, dirStr);
 
-            return xmlResponse;
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(xmlResponse);
+            return magikString;
 
         } catch (Exception e) {
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><response><success>false</success><error>" +
@@ -127,7 +131,9 @@ public class AstriKmzDownloadProcs {
             client = new KmzDownloadClient();
             String xmlResponse = client.downloadFeederDocument(uuidStr, dirStr);
 
-            return xmlResponse;
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(xmlResponse);
+            return magikString;
 
         } catch (Exception e) {
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><response><success>false</success><error>" +
@@ -160,7 +166,9 @@ public class AstriKmzDownloadProcs {
             client = new KmzDownloadClient();
             String xmlResponse = client.downloadOltSiteDocument(uuidStr, dirStr);
 
-            return xmlResponse;
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(xmlResponse);
+            return magikString;
 
         } catch (Exception e) {
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><response><success>false</success><error>" +

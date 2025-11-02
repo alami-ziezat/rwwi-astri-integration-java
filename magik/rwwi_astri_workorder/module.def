@@ -1,0 +1,13 @@
+rwwi_astri_workorder 1
+
+description
+	ASTRI Work Order Manager
+	Displays work orders from API and database with filtering capabilities.
+end
+
+requires
+	base
+	rwwi_astri_integration
+end
+
+language en_gb

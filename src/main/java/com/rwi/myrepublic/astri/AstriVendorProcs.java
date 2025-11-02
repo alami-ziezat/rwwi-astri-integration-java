@@ -54,7 +54,10 @@ public class AstriVendorProcs {
             String jsonResponse = client.getVendorList(limitInt, offsetInt, nameStr, subcontStr, labelStr, sapCodeStr);
 
             System.out.println("=== DEBUG: Vendor list retrieved successfully ===");
-            return jsonResponse;
+
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
+            return magikString;
 
         } catch (Exception e) {
             System.err.println("=== DEBUG: ERROR in getVendorList ===");

@@ -1,0 +1,40 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## Custom conditions for ASTRI Work Order module
+
+condition.define_condition(
+	:astri_workorder!api_call_failed,
+	:mit!user_error,
+	{:api_name, :error_message},
+	write_string("API Call Failed", %newline,
+		"API: #1", %newline,
+		"Error:  #2"))
+$
+
+condition.define_condition(
+	:astri_workorder!xml_parse_error,
+	:mit!user_error,
+	{:xml_string},
+	write_string("Failed to parse XML response", %newline,
+		"XML: #1"))
+$
+
+condition.define_condition(
+	:astri_workorder!db_query_failed,
+	:mit!user_error,
+	{:query, :error_message},
+	write_string("Database Query Failed", %newline,
+		"Query: #1", %newline,
+		"Error: #2"))
+$
+
+condition.define_condition(
+	:astri_workorder!no_data_source,
+	:mit!user_error,
+	{},
+	write_string("No data source configured", %newline,
+		"Please configure ASTRI API or database connection"))
+$

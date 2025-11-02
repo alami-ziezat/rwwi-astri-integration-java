@@ -1,0 +1,387 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## ASTRI Work Order Engine
+## Data access layer for work order retrieval from API and database
+
+def_slotted_exemplar(:rwwi_astri_workorder_engine,
+{
+	{:vda,         _unset, :writable},   # View/Design Admin (dataset)
+	{:dialog,      _unset, :writable},   # Parent dialog reference
+	{:current_source, :api, :writable},  # Current data source (:api or :db)
+	{:cache,       _unset, :writable}    # Cached data
+}, :engine_model)
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.new()
+	## Create new engine instance
+	>> _clone.init()
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_engine.init()
+	## Initialize engine
+
+	.vda << gis_program_manager.cached_dataset(:design_admin)
+	.cache << property_list.new()
+
+	>> _super.init()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_workorders_from_api(
+		limit, offset, _optional filters)
+	## Get work orders from ASTRI API
+	##
+	## Parameters:
+	##   limit (integer) - Maximum records to retrieve
+	##   offset (integer) - Starting offset
+	##   filters (property_list) - Optional filters:
+	##     :category_name - Category filter (e.g., "cluster_boq")
+	##     :latest_status_name - Status filter (e.g., "in_progress")
+	##     :assigned_vendor_name - Vendor name filter
+	##     :target_cluster_topology - Topology filter (AE/UG/OH)
+	##     :target_cluster_code - Cluster code filter
+	##
+	## Returns:
+	##   rope of property_lists with work order data
+	##
+	## Note: Filters use API field names (not label fields)
+	## Note: Demo mode - Prepends dummy data with KMZ UUID for testing
+	write(@FILTER, limit, offset)
+	print(filters)
+
+	_try _with cond
+		# Call Java @MagikProc global procedure - now returns XML as Magik string
+		xml_result << astri_get_work_orders(limit, offset, filters)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			condition.raise(:astri_workorder!api_call_failed,
+				:api_name, "astri_get_work_orders",
+				:error_message, "Empty response from API")
+			_return rope.new()
+		_endif
+
+		# Convert to string if needed (handles both Magik string and java_string)
+		_if xml_result.is_kind_of?(char16_vector)
+		_then
+			# Already a Magik string
+			write("XML result is Magik string (char16_vector)")
+		_else
+			# Convert java_string or other types
+			write("XML result type:", xml_result.class_name, "- converting to string")
+			xml_result << xml_result.write_string
+		_endif
+
+		# Parse XML response using simple_xml
+		workorders << _self.parse_xml_response(xml_result)
+
+		# DEMO MODE: Prepend dummy data with KMZ UUID
+		dummy_data << _self.create_dummy_workorder_data()
+		_if dummy_data _isnt _unset
+		_then
+			write("=== DEMO MODE: Adding dummy work order as first record ===")
+			# Create new rope with dummy data first, then API results
+			combined_rope << rope.new()
+			combined_rope.add(dummy_data)
+			combined_rope.add_all_last(workorders)
+			workorders << combined_rope
+		_endif
+
+		# Cache the result
+		.cache[:last_api_result] << workorders
+		.cache[:last_api_time] << date_time.now()
+
+		_return workorders
+
+	_when error
+		write("ERROR in get_workorders_from_api:", cond.report_contents_string)
+		condition.raise(:astri_workorder!api_call_failed,
+			:api_name, "astri_get_work_orders",
+			:error_message, cond.report_contents_string)
+		_return rope.new()
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_engine.create_dummy_workorder_data()
+	## Create dummy work order data for demo/testing purposes
+	##
+	## Returns:
+	##   property_list - Dummy work order with KMZ UUID
+	##
+	## Demo Data Specification:
+	##   - kmz_uuid: 2989eecc-3fd0-402c-bd81-99e02caa7ef5
+	##   - cluster_name: PRE ABD_KEBON PALA RW 09_873 HP
+	##   - cluster_code: JKT00001
+	##   - Other fields: Representative values for testing
+
+	_try
+		_local dummy << property_list.new_with(
+			# Primary identifiers
+			:uuid, "demo-wo-00001",
+			:wo_number, "WO/JKT/2025/DEMO/00001",
+
+			# KMZ UUID for download testing
+			:kmz_uuid, "2989eecc-3fd0-402c-bd81-99e02caa7ef5",
+
+			# Cluster information
+			:cluster_code, "JKT00001",
+			:cluster_name, "PRE ABD_KEBON PALA RW 09_873 HP",
+			:topology, "AE",
+
+			# Work order metadata
+			:category, "Cluster BOQ",
+			:status, "in_progress",
+			:vendor, "Demo Vendor Ltd",
+
+			# Timestamps
+			:created_at, date_time.now().write_string)
+
+		write("Created dummy work order data:")
+		write("  UUID: ", dummy[:uuid])
+		write("  WO Number: ", dummy[:wo_number])
+		write("  KMZ UUID: ", dummy[:kmz_uuid])
+		write("  Cluster: ", dummy[:cluster_code], " - ", dummy[:cluster_name])
+
+		_return dummy
+
+	_when error
+		write("WARNING: Failed to create dummy work order data:", condition.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.parse_xml_response(xml_string)
+	## Parse XML string response to rope of property_lists
+	##
+	## Expected XML structure:
+	## <response>
+	##   <success>true</success>
+	##   <count>50</count>
+	##   <count_all>127</count_all>
+	##   <data>
+	##     <workorder>
+	##       <uuid>d35ed679-0b5e-4c33-953c-2740b5cc7772</uuid>
+	##       <number>WO/ALL/2025/DOCU/16/54556</number>
+	##       <target_cluster_code>MNA000033</target_cluster_code>
+	##       <target_cluster_name>PADANG SIALANG RT 01, 02, 03...</target_cluster_name>
+	##       <category_label>Cluster BOQ</category_label>
+	##       <latest_status_name>in_progress</latest_status_name>
+	##       <target_cluster_topology>AE</target_cluster_topology>
+	##       <assigned_vendor_label>Yangtze Optical Fible and Cable</assigned_vendor_label>
+	##       <created_at>2025-10-28 14:28:08</created_at>
+	##     </workorder>
+	##   </data>
+	## </response>
+
+	_local result_rope << rope.new()
+	_global xmls
+	xmls << xml_string
+	_try _with cond
+		# Parse XML using simple_xml
+		_local xml_root << simple_xml.read_element_string(xml_string)
+		 xml_doc_g << xml_root
+		 
+		# Check for error response
+		_local error_elem << xml_root.element_matching_name(:error)
+		_if error_elem _isnt _unset
+		_then
+			_local error_msg << error_elem.elements.an_element()
+			write("API returned error:", error_msg)
+			>> result_rope
+		_endif
+
+		# Get data element
+		_local data_elem << xml_root.element_matching_name(:data)
+		_if data_elem _is _unset
+		_then
+			write("WARNING: No 'data' element found in XML response")
+			>> result_rope
+		_endif
+
+		# Iterate through workorder elements
+		_for wo_elem _over data_elem.elements_matching_name(:workorder)
+		_loop
+			_local pl << property_list.new()
+
+			# Extract all work order fields
+			pl[:uuid] << _self.get_xml_element_value(wo_elem, :uuid)
+			pl[:wo_number] << _self.get_xml_element_value(wo_elem, :number)
+			pl[:cluster_code] << _self.get_xml_element_value(wo_elem, :target_cluster_code)
+			pl[:cluster_name] << _self.get_xml_element_value(wo_elem, :target_cluster_name)
+			pl[:category] << _self.get_xml_element_value(wo_elem, :category_label)
+			pl[:status] << _self.get_xml_element_value(wo_elem, :latest_status_name)
+			pl[:topology] << _self.get_xml_element_value(wo_elem, :target_cluster_topology)
+			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
+			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
+			pl[:kmz_uuid] << _self.get_xml_element_value(wo_elem, :kmz_uuid)
+			
+			result_rope.add(pl)
+		_endloop
+
+		_return result_rope
+
+	_when error
+		write("ERROR parsing XML:", cond.report_contents_string)
+		_local max_len << 100.min(xml_string.size)
+		_local xml_preview << xml_string.subseq(1, max_len)
+		condition.raise(:astri_workorder!xml_parse_error,
+			:xml_string, xml_preview)
+		_return rope.new()
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_engine.get_xml_element_value(parent_elem, element_name)
+	## Extract text value from XML element
+	##
+	## Parameters:
+	##   parent_elem (simple_xml_thing) - Parent XML element
+	##   element_name (string) - Name of child element to extract
+	##
+	## Returns:
+	##   string - Element text value or empty string
+
+	_try
+		_local elem << parent_elem.element_matching_name(element_name)
+		_if elem _is _unset
+		_then
+			_return ""
+		_endif
+
+		_return elem.xml_result
+
+	_when error
+		_return ""
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_workorders_from_db(_optional filters)
+	## Get work orders from database where construction_status = true
+	##
+	## Parameters:
+	##   filters (property_list) - Optional filters
+	##
+	## Returns:
+	##   rope of property_lists with work order data
+
+	_local result_rope << rope.new()
+
+	_try _with cond
+		# Access work order collection in database
+		# This assumes a work_order table exists with construction_status field
+
+		_if .vda _is _unset
+		_then
+			write("WARNING: vda (design_admin) not initialized")
+			_return result_rope
+		_endif
+
+		_local wo_col << .vda.collections[:work_order]
+
+		_if wo_col _is _unset
+		_then
+			write("WARNING: work_order collection not found in database")
+			_return result_rope
+		_endif
+
+		# Predicate for construction status
+		_local pred << predicate.eq(:construction_status, _true)
+
+		# Apply additional filters if provided
+		_if filters _isnt _unset
+		_then
+			_if filters[:category_name] _isnt _unset
+			_then
+				pred << pred _and predicate.eq(:category_name, filters[:category_name])
+			_endif
+
+			_if filters[:latest_status_name] _isnt _unset
+			_then
+				pred << pred _and predicate.eq(:latest_status_name, filters[:latest_status_name])
+			_endif
+		_endif
+
+		# Query database
+		_for wo_rec _over wo_col.select(pred).fast_elements()
+		_loop
+			wo << property_list.new_with(
+				:uuid, wo_rec.uuid,
+				:wo_number, wo_rec.number,
+				:cluster_code, wo_rec.target_cluster_code,
+				:cluster_name, wo_rec.target_cluster_name,
+				:category, wo_rec.category_label,
+				:status, wo_rec.latest_status_name,
+				:topology, wo_rec.target_cluster_topology,
+				:vendor, wo_rec.assigned_vendor_label,
+				:created_at, wo_rec.created_at,
+				:construction_status, wo_rec.construction_status)
+
+			result_rope.add(wo)
+		_endloop
+
+		>> result_rope
+
+	_when error
+		write("ERROR querying database:", cond.report_contents_string)
+		condition.raise(:astri_workorder!db_query_failed,
+			:query, "work_order collection query",
+			:error_message, cond.report_contents_string)
+		>> rope.new()
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.mark_as_construction(wo_uuid)
+	## Mark work order as under construction in database
+	##
+	## Parameters:
+	##   wo_uuid (string) - Work order UUID
+	##
+	## Returns:
+	##   boolean - success flag
+
+	_try _with cond
+		_local wo_col << .vda.collections[:work_order]
+
+		_if wo_col _is _unset
+		_then
+			write("WARNING: work_order collection not found")
+			_return _false
+		_endif
+
+		# Find work order by UUID
+		_local pred << predicate.eq(:uuid, wo_uuid)
+		_local wo_rec << wo_col.select(pred).an_element()
+
+		_if wo_rec _is _unset
+		_then
+			write("WARNING: Work order not found:", wo_uuid)
+			_return _false
+		_endif
+
+		# Update construction status
+		wo_rec.construction_status << _true
+		wo_rec.updated_at << date_time.now()
+
+		write("Work order marked as construction:", wo_uuid)
+		>> _true
+
+	_when error
+		write("ERROR marking as construction:", cond.report_contents_string)
+		>> _false
+	_endtry
+_endmethod
+$
