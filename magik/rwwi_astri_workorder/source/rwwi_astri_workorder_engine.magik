@@ -296,11 +296,16 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 
 		# Build field names dynamically based on infrastructure type
 		# cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
-		# subfeeder: target_subfeeder_code, target_subfeeder_name, target_subfeeder_topology
-		# feeder:    target_feeder_code, target_feeder_name, target_feeder_topology
+		# subfeeder: target_subfeeder_code, target_subfeeder_name (no topology)
+		# feeder:    target_feeder_code, target_feeder_name (no topology)
 		_local code_field << write_string("target_", infrastructure_type, "_code").as_symbol()
 		_local name_field << write_string("target_", infrastructure_type, "_name").as_symbol()
-		_local topology_field << write_string("target_", infrastructure_type, "_topology").as_symbol()
+
+		# Topology field only exists for cluster infrastructure type
+		_local topology_field << _if infrastructure_type = "cluster"
+		                         _then >> write_string("target_", infrastructure_type, "_topology").as_symbol()
+		                         _else >> _unset
+		                         _endif
 
 		# Iterate through workorder elements
 		_for wo_elem _over data_elem.elements_matching_name(:workorder)
@@ -314,13 +319,20 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			# Extract infrastructure-specific fields using dynamic field names
 			pl[:cluster_code] << _self.get_xml_element_value(wo_elem, code_field)
 			pl[:cluster_name] << _self.get_xml_element_value(wo_elem, name_field)
-			pl[:topology] << _self.get_xml_element_value(wo_elem, topology_field)
+
+			# Extract topology only for cluster infrastructure type
+			pl[:topology] << _if topology_field _isnt _unset
+			                 _then >> _self.get_xml_element_value(wo_elem, topology_field)
+			                 _else >> ""
+			                 _endif
 
 			pl[:category] << _self.get_xml_element_value(wo_elem, :category_label)
 			pl[:status] << _self.get_xml_element_value(wo_elem, :latest_status_name)
 			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
 			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
-			pl[:kmz_uuid] << _self.get_xml_element_value(wo_elem, :kmz_uuid)
+
+			# KMZ UUID will be retrieved from database, not from API
+			pl[:kmz_uuid] << ""
 
 			result_rope.add(pl)
 		_endloop

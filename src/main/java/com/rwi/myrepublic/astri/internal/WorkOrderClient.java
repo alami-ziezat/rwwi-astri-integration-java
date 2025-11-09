@@ -67,16 +67,15 @@ public class WorkOrderClient {
 
         System.out.println("  [WorkOrderClient] URL: " + url);
 
-        // Build POST request with empty body (API uses POST method)
+        // Build GET request
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("Authorization", authHeader)
-            .header("Content-Type", "application/json")
             .timeout(Duration.ofMillis(config.getRequestTimeout()))
-            .POST(HttpRequest.BodyPublishers.ofString("{}"))
+            .GET()
             .build();
 
-        System.out.println("  [WorkOrderClient] Sending HTTP POST request...");
+        System.out.println("  [WorkOrderClient] Sending HTTP GET request...");
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         String jsonResponse = response.body();
@@ -211,16 +210,19 @@ public class WorkOrderClient {
                     appendXmlField(xml, woJson, "assigned_vendor_name", 6);
                     appendXmlField(xml, woJson, "created_at", 6);
                     appendXmlField(xml, woJson, "updated_at", 6);
-                    appendXmlField(xml, woJson, "kmz_uuid", 6);
 
                     // Extract infrastructure-specific fields based on type
                     // cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
-                    // subfeeder: target_subfeeder_code, target_subfeeder_name, target_subfeeder_topology
-                    // feeder:    target_feeder_code, target_feeder_name, target_feeder_topology
+                    // subfeeder: target_subfeeder_code, target_subfeeder_name (no topology)
+                    // feeder:    target_feeder_code, target_feeder_name (no topology)
                     String targetPrefix = "target_" + infrastructureType;
                     appendXmlField(xml, woJson, targetPrefix + "_code", 6);
                     appendXmlField(xml, woJson, targetPrefix + "_name", 6);
-                    appendXmlField(xml, woJson, targetPrefix + "_topology", 6);
+
+                    // Only include topology for cluster infrastructure type
+                    if ("cluster".equals(infrastructureType)) {
+                        appendXmlField(xml, woJson, targetPrefix + "_topology", 6);
+                    }
 
                     xml.append("    </workorder>\n");
                 }
