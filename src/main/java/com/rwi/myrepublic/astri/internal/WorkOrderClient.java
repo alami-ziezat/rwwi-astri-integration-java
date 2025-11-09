@@ -38,18 +38,23 @@ public class WorkOrderClient {
      * Get work orders from API with pagination and optional filters.
      * Returns XML format for easier parsing in Magik with simple_xml.
      *
+     * @param infrastructureType Infrastructure type: "cluster", "subfeeder", or "feeder"
      * @param limit Number of records to fetch
      * @param offset Starting offset
      * @param filterParams Filter query string (e.g. "category_name=cluster_boq&latest_status_name=in_progress")
      * @return XML string converted from API JSON response
      */
-    public String getWorkOrders(int limit, int offset, String filterParams) throws IOException, InterruptedException {
-        
+    public String getWorkOrders(String infrastructureType, int limit, int offset, String filterParams) throws IOException, InterruptedException {
+
         String baseUrl = config.getApiBaseUrl();
         System.out.println("  [WorkOrderClient] Base URL: " + baseUrl);
+        System.out.println("  [WorkOrderClient] Infrastructure Type: " + infrastructureType);
 
-        // Correct endpoint from ASTRI API documentation
-        String path = "/work-order/cluster/boq/simple/list/all/" + limit + "/" + offset;
+        // Build endpoint based on infrastructure type
+        // cluster:   /work-order/cluster/boq/simple/list/all/{limit}/{offset}
+        // subfeeder: /work-order/subfeeder/boq/simple/list/all/{limit}/{offset}
+        // feeder:    /work-order/feeder/boq/simple/list/all/{limit}/{offset}
+        String path = "/work-order/" + infrastructureType + "/boq/simple/list/all/" + limit + "/" + offset;
 
         // Build URL with optional filter query parameters
         String url = baseUrl + path;
@@ -62,14 +67,16 @@ public class WorkOrderClient {
 
         System.out.println("  [WorkOrderClient] URL: " + url);
 
+        // Build POST request with empty body (API uses POST method)
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("Authorization", authHeader)
+            .header("Content-Type", "application/json")
             .timeout(Duration.ofMillis(config.getRequestTimeout()))
-            .GET()
+            .POST(HttpRequest.BodyPublishers.ofString("{}"))
             .build();
 
-        System.out.println("  [WorkOrderClient] Sending HTTP GET request...");
+        System.out.println("  [WorkOrderClient] Sending HTTP POST request...");
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         String jsonResponse = response.body();
@@ -79,7 +86,7 @@ public class WorkOrderClient {
 
         // Convert JSON to XML for Magik simple_xml parsing
         System.out.println("  [WorkOrderClient] Converting JSON to XML...");
-        String xmlResult = convertJsonToXml(jsonResponse);
+        String xmlResult = convertJsonToXml(jsonResponse, infrastructureType);
         System.out.println("  [WorkOrderClient] XML length: " + (xmlResult != null ? xmlResult.length() : 0));
         System.out.println("  [WorkOrderClient.getWorkOrders] END");
 
@@ -108,7 +115,19 @@ public class WorkOrderClient {
         String jsonResponse = response.body();
 
         // Convert JSON to XML for Magik simple_xml parsing
-        return convertJsonToXml(jsonResponse);
+        // Default to "cluster" for single work order retrieval
+        return convertJsonToXml(jsonResponse, "cluster");
+    }
+
+    /**
+     * Convert JSON response to XML format for Magik simple_xml parsing.
+     * Overload for backward compatibility - defaults to "cluster" infrastructure type.
+     *
+     * @param json JSON response from API
+     * @return XML string
+     */
+    private String convertJsonToXml(String json) {
+        return convertJsonToXml(json, "cluster");
     }
 
     /**
@@ -141,8 +160,11 @@ public class WorkOrderClient {
      *     </workorder>
      *   </data>
      * </response>
+     *
+     * @param json JSON response from API
+     * @param infrastructureType Infrastructure type (cluster, subfeeder, feeder)
      */
-    private String convertJsonToXml(String json) {
+    private String convertJsonToXml(String json, String infrastructureType) {
         try {
             StringBuilder xml = new StringBuilder();
             xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -179,20 +201,26 @@ public class WorkOrderClient {
 
                     xml.append("    <workorder>\n");
 
-                    // Extract all work order fields
+                    // Extract common fields
                     appendXmlField(xml, woJson, "uuid", 6);
                     appendXmlField(xml, woJson, "number", 6);
-                    appendXmlField(xml, woJson, "target_cluster_code", 6);
-                    appendXmlField(xml, woJson, "target_cluster_name", 6);
                     appendXmlField(xml, woJson, "category_label", 6);
                     appendXmlField(xml, woJson, "category_name", 6);
                     appendXmlField(xml, woJson, "latest_status_name", 6);
-                    appendXmlField(xml, woJson, "target_cluster_topology", 6);
                     appendXmlField(xml, woJson, "assigned_vendor_label", 6);
                     appendXmlField(xml, woJson, "assigned_vendor_name", 6);
                     appendXmlField(xml, woJson, "created_at", 6);
                     appendXmlField(xml, woJson, "updated_at", 6);
                     appendXmlField(xml, woJson, "kmz_uuid", 6);
+
+                    // Extract infrastructure-specific fields based on type
+                    // cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
+                    // subfeeder: target_subfeeder_code, target_subfeeder_name, target_subfeeder_topology
+                    // feeder:    target_feeder_code, target_feeder_name, target_feeder_topology
+                    String targetPrefix = "target_" + infrastructureType;
+                    appendXmlField(xml, woJson, targetPrefix + "_code", 6);
+                    appendXmlField(xml, woJson, targetPrefix + "_name", 6);
+                    appendXmlField(xml, woJson, targetPrefix + "_topology", 6);
 
                     xml.append("    </workorder>\n");
                 }

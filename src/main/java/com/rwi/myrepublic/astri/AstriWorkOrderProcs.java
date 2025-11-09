@@ -16,14 +16,19 @@ public class AstriWorkOrderProcs {
     /**
      * Get work orders from ASTRI API.
      *
-     * Creates global Magik procedure: astri_get_work_orders(limit, offset, _optional filters)
+     * Creates global Magik procedure: astri_get_work_orders(infrastructure_type, limit, offset, _optional filters)
      *
      * @param proc The Magik proc object (always first parameter for @MagikProc)
+     * @param infrastructureType Infrastructure type: "cluster", "subfeeder", or "feeder" (Magik string)
      * @param limit Number of records to fetch (Magik integer)
      * @param offset Starting offset (Magik integer)
      * @param filters Optional Magik property_list with filter parameters:
-     *                :category_name, :latest_status_name, :assigned_vendor_name,
-     *                :target_cluster_topology, :target_cluster_code
+     *                For cluster: :category_name, :latest_status_name, :assigned_vendor_name,
+     *                             :target_cluster_topology, :target_cluster_code
+     *                For subfeeder: :category_name, :latest_status_name, :assigned_vendor_name,
+     *                               :target_subfeeder_topology, :target_subfeeder_code
+     *                For feeder: :category_name, :latest_status_name, :assigned_vendor_name,
+     *                            :target_feeder_topology, :target_feeder_code
      * @return String - XML response converted from API JSON for easy parsing in Magik with simple_xml.
      *         XML structure:
      *         <response>
@@ -37,11 +42,20 @@ public class AstriWorkOrderProcs {
      *         </response>
      */
     @MagikProc(@Name("astri_get_work_orders"))
-    public static Object getWorkOrders(Object proc, Object limit, Object offset,
+    public static Object getWorkOrders(Object proc, Object infrastructureType, Object limit, Object offset,
                                        @Optional Object filters) {
         WorkOrderClient client = null;
         try {
             System.out.println("====== ASTRI GET WORK ORDERS - START ======");
+
+            // Convert Magik string to Java String for infrastructure type
+            String infraType = MagikInteropUtils.fromMagikString(infrastructureType);
+            System.out.println("Infrastructure Type: " + infraType);
+
+            // Validate infrastructure type
+            if (!infraType.equals("cluster") && !infraType.equals("subfeeder") && !infraType.equals("feeder")) {
+                throw new IllegalArgumentException("Invalid infrastructure_type: '" + infraType + "'. Must be 'cluster', 'subfeeder', or 'feeder'");
+            }
 
             // Convert Magik integers to Java int
             int limitInt = MagikInteropUtils.fromMagikInteger(limit);
@@ -60,7 +74,7 @@ public class AstriWorkOrderProcs {
             // Create client and make API call
             client = new WorkOrderClient();
             System.out.println("Calling API with filter params: '" + filterParams + "'");
-            String xmlResponse = client.getWorkOrders(limitInt, offsetInt, filterParams);
+            String xmlResponse = client.getWorkOrders(infraType, limitInt, offsetInt, filterParams);
 
             System.out.println("API call successful, response length: " + (xmlResponse != null ? xmlResponse.length() : 0));
 

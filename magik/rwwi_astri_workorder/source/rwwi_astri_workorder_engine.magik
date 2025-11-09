@@ -34,30 +34,35 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_engine.get_workorders_from_api(
-		limit, offset, _optional filters)
+		infrastructure_type, limit, offset, _optional filters)
 	## Get work orders from ASTRI API
 	##
 	## Parameters:
+	##   infrastructure_type (string) - Infrastructure type: "cluster", "subfeeder", or "feeder"
 	##   limit (integer) - Maximum records to retrieve
 	##   offset (integer) - Starting offset
 	##   filters (property_list) - Optional filters:
-	##     :category_name - Category filter (e.g., "cluster_boq")
-	##     :latest_status_name - Status filter (e.g., "in_progress")
-	##     :assigned_vendor_name - Vendor name filter
-	##     :target_cluster_topology - Topology filter (AE/UG/OH)
-	##     :target_cluster_code - Cluster code filter
+	##     Common filters:
+	##       :category_name - Category filter (e.g., "cluster_boq", "subfeeder_boq", "feeder_boq")
+	##       :latest_status_name - Status filter (e.g., "in_progress")
+	##       :assigned_vendor_name - Vendor name filter
+	##     Infrastructure-specific filters:
+	##       For cluster: :target_cluster_topology, :target_cluster_code
+	##       For subfeeder: :target_subfeeder_topology, :target_subfeeder_code
+	##       For feeder: :target_feeder_topology, :target_feeder_code
 	##
 	## Returns:
 	##   rope of property_lists with work order data
 	##
 	## Note: Filters use API field names (not label fields)
 	## Note: Demo mode - Prepends dummy data with KMZ UUID for testing
-	write(@FILTER, limit, offset)
+	write(@FILTER, infrastructure_type, limit, offset)
 	print(filters)
 
 	_try _with cond
 		# Call Java @MagikProc global procedure - now returns XML as Magik string
-		xml_result << astri_get_work_orders(limit, offset, filters)
+		# Uses POST method internally
+		xml_result << astri_get_work_orders(infrastructure_type, limit, offset, filters)
 
 		_if xml_result _is _unset _orif xml_result = ""
 		_then
@@ -79,7 +84,7 @@ _method rwwi_astri_workorder_engine.get_workorders_from_api(
 		_endif
 
 		# Parse XML response using simple_xml
-		workorders << _self.parse_xml_response(xml_result)
+		workorders << _self.parse_xml_response(xml_result, infrastructure_type)
 
 		# DEMO MODE: Prepend dummy data with KMZ UUID
 		dummy_data << _self.create_dummy_workorder_data()
@@ -237,8 +242,12 @@ _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
-_method rwwi_astri_workorder_engine.parse_xml_response(xml_string)
+_method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructure_type)
 	## Parse XML string response to rope of property_lists
+	##
+	## Parameters:
+	##   xml_string (string) - XML response from API
+	##   infrastructure_type (string) - Infrastructure type: "cluster", "subfeeder", or "feeder"
 	##
 	## Expected XML structure:
 	## <response>
@@ -249,11 +258,11 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string)
 	##     <workorder>
 	##       <uuid>d35ed679-0b5e-4c33-953c-2740b5cc7772</uuid>
 	##       <number>WO/ALL/2025/DOCU/16/54556</number>
-	##       <target_cluster_code>MNA000033</target_cluster_code>
-	##       <target_cluster_name>PADANG SIALANG RT 01, 02, 03...</target_cluster_name>
+	##       <target_[infra]_code>MNA000033</target_[infra]_code>
+	##       <target_[infra]_name>PADANG SIALANG RT 01, 02, 03...</target_[infra]_name>
 	##       <category_label>Cluster BOQ</category_label>
 	##       <latest_status_name>in_progress</latest_status_name>
-	##       <target_cluster_topology>AE</target_cluster_topology>
+	##       <target_[infra]_topology>AE</target_[infra]_topology>
 	##       <assigned_vendor_label>Yangtze Optical Fible and Cable</assigned_vendor_label>
 	##       <created_at>2025-10-28 14:28:08</created_at>
 	##     </workorder>
@@ -267,7 +276,7 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string)
 		# Parse XML using simple_xml
 		_local xml_root << simple_xml.read_element_string(xml_string)
 		 xml_doc_g << xml_root
-		 
+
 		# Check for error response
 		_local error_elem << xml_root.element_matching_name(:error)
 		_if error_elem _isnt _unset
@@ -285,6 +294,14 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string)
 			>> result_rope
 		_endif
 
+		# Build field names dynamically based on infrastructure type
+		# cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
+		# subfeeder: target_subfeeder_code, target_subfeeder_name, target_subfeeder_topology
+		# feeder:    target_feeder_code, target_feeder_name, target_feeder_topology
+		_local code_field << write_string("target_", infrastructure_type, "_code").as_symbol()
+		_local name_field << write_string("target_", infrastructure_type, "_name").as_symbol()
+		_local topology_field << write_string("target_", infrastructure_type, "_topology").as_symbol()
+
 		# Iterate through workorder elements
 		_for wo_elem _over data_elem.elements_matching_name(:workorder)
 		_loop
@@ -293,15 +310,18 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string)
 			# Extract all work order fields
 			pl[:uuid] << _self.get_xml_element_value(wo_elem, :uuid)
 			pl[:wo_number] << _self.get_xml_element_value(wo_elem, :number)
-			pl[:cluster_code] << _self.get_xml_element_value(wo_elem, :target_cluster_code)
-			pl[:cluster_name] << _self.get_xml_element_value(wo_elem, :target_cluster_name)
+
+			# Extract infrastructure-specific fields using dynamic field names
+			pl[:cluster_code] << _self.get_xml_element_value(wo_elem, code_field)
+			pl[:cluster_name] << _self.get_xml_element_value(wo_elem, name_field)
+			pl[:topology] << _self.get_xml_element_value(wo_elem, topology_field)
+
 			pl[:category] << _self.get_xml_element_value(wo_elem, :category_label)
 			pl[:status] << _self.get_xml_element_value(wo_elem, :latest_status_name)
-			pl[:topology] << _self.get_xml_element_value(wo_elem, :target_cluster_topology)
 			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
 			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
 			pl[:kmz_uuid] << _self.get_xml_element_value(wo_elem, :kmz_uuid)
-			
+
 			result_rope.add(pl)
 		_endloop
 

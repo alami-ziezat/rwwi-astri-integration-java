@@ -39,6 +39,7 @@ _private _method rwwi_astri_workorder_dialog.init(plugin)
 
 	# Initialize default filters
 	.filters[:source] << :api
+	.filters[:infrastructure_type] << "cluster"
 	.filters[:limit] << 50
 	.filters[:offset] << 0
 
@@ -119,7 +120,15 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 
 	sw_label_item.new(filter_toolbar, "  Filters:  ")
 
-	sw_label_item.new(filter_toolbar, "Category:  ")
+	sw_label_item.new(filter_toolbar, "Infrastructure:  ")
+	.items[:filter_infrastructure] << sw_text_item.new(filter_toolbar,
+		:model, _self,
+		:display_length, 12,
+		:editable?, _false)
+	.items[:filter_infrastructure].text_items << {"cluster", "subfeeder", "feeder"}
+	.items[:filter_infrastructure].value << "cluster"
+
+	sw_label_item.new(filter_toolbar, "  Category:  ")
 	.items[:filter_category] << sw_text_item.new(filter_toolbar,
 		:model, _self,
 		:display_length, 15,
@@ -278,6 +287,7 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		_local workorders << _if .filters[:source] _is :api
 		_then
 			>> .engine.get_workorders_from_api(
+				.filters[:infrastructure_type].default("cluster"),
 				.filters[:limit],
 				.filters[:offset],
 				_self.build_filter_params())
@@ -350,6 +360,8 @@ _method rwwi_astri_workorder_dialog.apply_filters()
 	write("Applying filters...")
 
 	# Update filters from UI
+	.filters[:infrastructure_type] << .items[:filter_infrastructure].value.default("cluster")
+
 	_local limit_str << .items[:filter_limit].value
 	.filters[:limit] << limit_str.as_number().default(10)
 
