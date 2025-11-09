@@ -6,6 +6,9 @@ $
 ## ASTRI Work Order Plugin
 ## Plugin entry point for work order management UI
 
+remex(:rwwi_astri_workorder_plugin)
+$
+
 def_slotted_exemplar(:rwwi_astri_workorder_plugin,
 {
 	{:dialog, _unset}

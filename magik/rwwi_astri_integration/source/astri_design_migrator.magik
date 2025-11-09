@@ -16,7 +16,7 @@ def_slotted_exemplar(:astri_design_migrator,
 {
 	{:database,        _unset, :writable},   # GIS database
 	{:ace_view,        _unset, :writable},   # For coordinate system
-	{:transform,       _unset, :writable},   # WGS84 → local CS transform
+	{:transform,       _unset, :writable},   # WGS84 >> local CS transform
 	{:uuid,            _unset, :writable},   # KMZ UUID (used for uuid field)
 
 	# Design management
@@ -28,15 +28,21 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:ar_col,          _unset, :writable},   # aerial_route
 	{:pole_col,        _unset, :writable},   # pole
 	{:sheath_col,      _unset, :writable},   # sheath_with_loc
+	{:sc_col,          _unset, :writable},   # sheath_splice
+	{:fe_col,          _unset, :writable},   # figure_eight
 	{:sw_col,          _unset, :writable},   # sling_wire
 	{:dp_col,          _unset, :writable},   # ftth!demand_point
 	{:os_col,          _unset, :writable},   # optical_splitter
 	{:cell_col,        _unset, :writable},   # ftth!zone
+	{:cs_col,          _unset, :writable},   # ftth!customer_premise
+	{:pol_col,         _unset, :writable},   # pol_boundary
+	{:bld_col,         _unset, :writable},   # building
+	{:olt_col,         _unset, :writable},   # mit_hub (OLT)
+	{:ap_col,          _unset, :writable},   # access_point
 
 	# Migration context
 	{:pop_name,        _unset, :writable},   # POP name
 	{:prj_id,          _unset, :writable},   # Project ID (from wo[:uuid])
-	{:segment_id,      _unset, :writable},   # Segment ID (from wo[:kmz_uuid])
 
 	# Statistics
 	{:stats,           _unset, :writable}    # Migration results
@@ -44,30 +50,28 @@ def_slotted_exemplar(:astri_design_migrator,
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_design_migrator.new(database, prj_id, segment_id, pop_name)
+_method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name)
 	## Create new design migrator
 	##
 	## Parameters:
 	##   database - GIS database (e.g., gis_program_manager.databases[:gis])
 	##   prj_id - Project ID from work order uuid field
-	##   segment_id - Segment ID from work order kmz_uuid field
 	##   pop_name - POP name from work order
 	##
 	## Returns: New astri_design_migrator instance
 
-	>> _clone.init(database, prj_id, segment_id, pop_name)
+	>> _clone.init(database, prj_id, kml_uuid, pop_name)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.init(database, prj_id, segment_id, pop_name)
+_private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name)
 	## Initialize migrator
 
 	.database << database
-	.uuid << segment_id     # uuid field = wo[:kmz_uuid]
+	.uuid << kml_uuid     # uuid field = wo[:kmz_uuid]
 	.pop_name << pop_name
 	.prj_id << prj_id       # From wo[:uuid]
-	.segment_id << segment_id  # From wo[:kmz_uuid]
 	.ace_view << gis_program_manager.ace_view
 
 	# Get design manager
@@ -83,19 +87,34 @@ _private _method astri_design_migrator.init(database, prj_id, segment_id, pop_na
 	.ar_col << .database.collections[:aerial_route]
 	.pole_col << .database.collections[:pole]
 	.sheath_col << .database.collections[:sheath_with_loc]
+	.sc_col << .database.collections[:sheath_splice]
+	.fe_col << .database.collections[:figure_eight]
 	.sw_col << .database.collections[:sling_wire]
 	.dp_col << .database.collections[:ftth!demand_point]
 	.os_col << .database.collections[:optical_splitter]
 	.cell_col << .database.collections[:ftth!zone]
+	.cs_col << .database.collections[:ftth!customer_premise]
+	.pol_col << .database.collections[:pol_boundary]
+	.bld_col << .database.collections[:building]
+	.olt_col << .database.collections[:mit_hub]
+	.ap_col << .database.collections[:access_point]
 
 	# Initialize statistics
 	.stats << property_list.new_with(
 		:aerial_routes, 0,
 		:poles, 0,
 		:sheaths, 0,
+		:sheath_splices, 0,
+		:optical_splitters, 0,
+		:figure_eights, 0,
 		:sling_wires, 0,
 		:demand_points, 0,
+		:customer_premises, 0,
+		:buildings, 0,
 		:micro_cells, 0,
+		:olts, 0,
+		:risers, 0,
+		:access_points, 0,
 		:areas_created, 0,
 		:errors, 0,
 		:skipped, 0
@@ -290,25 +309,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	# No need for database mode switching
 
 	# First pass: Create poles (needed for cable snapping)
-	write("  Pass 1: Creating poles...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Skip boundary area
-		_if _self.is_boundary_area?(pm)
-		_then
-			_continue
-		_endif
-
-		_if _self.is_pole?(pm)
-		_then
-			write(pm[:type])
-			_self.create_pole(pm)
-			placemarks.remove(pm)
-		_endif
-	_endloop
 
 	# Second pass: Create cables/aerial routes
-	write("  Pass 2: Creating cables and aerial routes...")
+	write("  Pass 1: Creating cables and aerial routes...: ",placemarks.size)
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -319,12 +322,26 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 		_if _self.is_cable?(pm)
 		_then
-			write(pm[:type])
 			_self.create_aerial_route(pm)
-			placemarks.remove(pm)
 		_endif
 	_endloop
 
+
+	write("  Pass 2: Creating poles...: ",placemarks.size)
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Skip boundary area
+		_if _self.is_boundary_area?(pm)
+		_then
+			_continue
+		_endif
+
+		_if _self.is_pole?(pm)
+		_then
+			_self.create_pole(pm)
+		_endif
+	_endloop
+	
 	# Third pass: Create other objects (demand points, splices, zones, etc.)
 	write("  Pass 3: Creating demand points, splices, and area-based objects...")
 	_for pm _over placemarks.fast_elements()
@@ -335,30 +352,57 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_continue
 		_endif
 
-		# Demand pointmzs
-		_if _self.is_demand_point?(pm)
+		_if _self.is_splice?(pm)
+		_then
+			_self.create_sheath_splice(pm)
+
+		# Figure eights (point-based: slack, coil)
+		_elif _self.is_figure_eight?(pm)
+		_then
+			_self.create_figure_eight(pm)
+
+		# OLT (point-based: name contains "*OLT*")
+		_elif _self.is_olt?(pm)
+		_then
+			_self.create_olt(pm)
+
+		# Demand points
+		_elif _self.is_demand_point?(pm[:parent])
 		_then
 			_self.create_demand_point(pm)
-			placemarks.remove(pm)
+		_endif 
+	_endloop
 
-		# Sheath splices (area-based)
-		_elif _self.is_splice?(pm)
-		_then
-			_self.create_sheath(pm)
-			placemarks.remove(pm)
-
+	# Fourth: Create macro and micro cell
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Sheath splices (point-based: Join Closure, FDT, FAT)
 		# Micro cells / zones (area-based with parent folders)
-		_elif _self.is_micro_cell?(pm)
+		_if _self.is_micro_cell?(pm)
 		_then
 			_self.create_micro_cell(pm)
-			placemarks.remove(pm)
+		_endif
+	_endloop
 
-		# Other area-based objects with parent folders
-		# (These are migrated according to cluster_astri (1).magik logic)
-		_elif pm[:type] = "area" _andif pm[:parent] _isnt _unset _andif pm[:parent] <> ""
+	# Fifth pass: Create risers (point-based: vertical cables to buildings)
+	write("  Pass 5: Creating risers...")
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Riser cables (point-based: name contains "*riser*")
+		_if _self.is_riser?(pm)
 		_then
-			_self.create_area_based_object(pm)
-			placemarks.remove(pm)
+			_self.create_riser(pm)
+		_endif
+	_endloop
+
+	# Sixth pass: Create access points (catch-all for remaining points)
+	write("  Pass 6: Creating access points...")
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# Access points (point-based: catch-all for points not matching other types)
+		_if _self.is_access_point?(pm)
+		_then
+			_self.create_access_point(pm)
 		_endif
 	_endloop
 
@@ -371,18 +415,17 @@ _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.parse_point_geometry(coord_string)
 	## Convert "lon,lat,elevation" to local coordinate
 
-	!print_float_precision! << 16
+	_dynamic !print_float_precision! << 16
+
 	_local coord_parts << coord_string.split_by(",")
 	_local lon << coord_parts[1].as_number()
 	_local lat << coord_parts[2].as_number()
-
 	_local wgs84_coord << coordinate.new(lon, lat)
 	_local local_coord << .transform.convert(wgs84_coord)
 
 	_local point << pseudo_point.new(local_coord)
 	point.world << .database.world
-
-	>> point
+	_return point
 _endmethod
 $
 
@@ -390,7 +433,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.parse_line_geometry(coord_string)
 	## Convert "lon1,lat1,0 lon2,lat2,0 ..." to sector_rope
 
-	!print_float_precision! << 16	
+	_dynamic !print_float_precision! << 16	
 	_local coord_pairs << coord_string.split_by(",0")
 	_local sect << sector.new()
 
@@ -416,7 +459,7 @@ $
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.parse_area_geometry(coord_string)
 	## Convert area coordinates to pseudo_area
-	!print_float_precision! << 16
+	_dynamic !print_float_precision! << 16
 	_local sector_rope << _self.parse_line_geometry(coord_string)
 
 	_if sector_rope.closed? _is _false
@@ -434,12 +477,11 @@ $
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_pole?(pm)
 	## Check if placemark is a pole based on parent folder
+	## Folder must contain "|pole|" pattern (case-insensitive)
 
 	_local parent << pm[:parent].default("").lowercase
 
-	>> parent.matches?("pole") _orif
-	   parent.matches?("new pole") _orif
-	   parent.matches?("existing pole")
+	>> parent.matches?("*|pole|*")
 _endmethod
 $
 
@@ -449,73 +491,1986 @@ _private _method astri_design_migrator.is_cable?(pm)
 
 	_local parent << pm[:parent].default("").lowercase
 
-	>> parent.matches?("cable") _orif
-	   parent.matches?("kabel") _orif
-	   parent.matches?("distribution cable") _orif
-	   parent.matches?("sling wire")
+	>> parent.matches?("*cable*") _orif
+	   parent.matches?("*kabel*") _orif
+	   parent.matches?("*distribution cable*") _orif
+	   parent.matches?("*sling wire*")
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.is_demand_point?(pm)
-	## Check if placemark is a demand point (home pass)
+_private _method astri_design_migrator.is_demand_point?(folders)
+	## Check if placemark is a demand point based on multi-level folder patterns
+	## Checks at three levels: fsize (last), fparent, fgp (grandparent)
+	## Uses simplified wildcard patterns: "*homepass*", "*hp*", "*reduce*", "*customer*"
 
-	_local parent << pm[:parent].default("").lowercase
+	_if folders _is _unset _orif folders = ""
+	_then
+		_return _false
+	_endif
 
-	>> parent.matches?("homepass") _orif
-	   parent.matches?("home pass") _orif
-	   parent.matches?("hp")
+	# STEP 1: Convert entire folder string to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Parse folder hierarchy
+	_local fol << folders_lc.split_by("|")
+	_local fsize << fol.size
+
+	_if fsize = 0
+	_then
+		_return _false
+	_endif
+
+	# Determine folder levels (fsize = last, fparent = 2nd last, fgp = 3rd last)
+	_local fparent << _if fsize >= 2 _then >> fsize - 1 _else >> fsize _endif
+	_local fgp << _if fsize >= 3 _then >> fparent - 1 _else >> fparent _endif
+
+	# STEP 3: Check simplified patterns at all three levels
+	_for fs _over {fol[fsize], fol[fparent], fol[fgp]}.fast_elements()
+	_loop
+		_if fs.default("").matches?("*homepass*") _orif
+		   fs.default("").matches?("*hp*") _orif
+		   fs.default("").matches?("*reduce*") _orif
+		   fs.default("").matches?("*customer*")
+		_then
+			_return _true
+		_endif
+	_endloop
+
+	_return _false
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_splice?(pm)
-	## Check if placemark is a splice/sheath (area-based)
+	## Check if placemark is a point-based sheath splice
+	## Checks for: CLOSURE, JOINT CLOSURE, FAT, FDT patterns
+	## IMPORTANT: This is for POINT type (not area)
 
-	_local parent << pm[:parent].default("").lowercase
+	_local folders << pm[:parent].default("")
 
-	>> pm[:type] = "area" _andif
-	   (parent.matches?("splice") _orif
-	    parent.matches?("closure") _orif
-	    parent.matches?("joint"))
+	_if folders = "" _orif folders _is _unset
+	_then
+		_return _false
+	_endif
+
+	# STEP 1: Convert to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Check if it's a POINT type (not area)
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# STEP 3: Check simplified wildcard patterns
+	>> folders_lc.matches?("*closure*") _orif
+	   folders_lc.matches?("*joint*") _orif
+	   folders_lc.matches?("*fdt*") _orif
+	   folders_lc.matches?("*fat*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_figure_eight?(pm)
+	## Check if placemark is a point-based figure_eight (slack, coil)
+	## Checks for: SLACK, SLACK HANGER, COIL patterns
+	## IMPORTANT: This is for POINT type (not area/line)
+
+	_local folders << pm[:parent].default("")
+
+	_if folders = "" _orif folders _is _unset
+	_then
+		_return _false
+	_endif
+
+	# STEP 1: Convert to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Check if it's a POINT type (not area/line)
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# STEP 3: Check simplified wildcard patterns
+	>> folders_lc.matches?("*slack*") _orif
+	   folders_lc.matches?("*slack hanger*") _orif
+	   folders_lc.matches?("*coil*")
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_micro_cell?(pm)
 	## Check if placemark is a micro cell / zone (area-based)
+	## Accepts ALL area types - validation happens in create_micro_cell()
+	## - Areas WITHOUT folders = Macro Cell (boundary areas)
+	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
 
-	_local parent << pm[:parent].default("").lowercase
+	>> pm[:type] = "area"
+_endmethod
+$
 
-	>> pm[:type] = "area" _andif
-	   (parent.matches?("micro cell") _orif
-	    parent.matches?("zone") _orif
-	    parent.matches?("cell") _orif
-	    parent.matches?("coverage"))
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_olt?(pm)
+	## Check if placemark is an OLT (Optical Line Terminal)
+	## - Point type placemark
+	## - Name contains "*OLT*" (case-sensitive)
+	##
+	## Parameters:
+	##   pm - placemark property_list
+	## Returns:
+	##   _true if OLT, _false otherwise
+
+	# Must be point type
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# Check if name contains "OLT" (case-sensitive)
+	_local name << pm[:name].default("")
+	_if name = "" _orif name _is _unset
+	_then
+		_return _false
+	_endif
+
+	>> name.matches?("*OLT*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_riser?(pm)
+	## Check if placemark is a riser cable
+	## - Point type placemark
+	## - Name contains "*riser*" (case-insensitive - lowercase conversion)
+	##
+	## Parameters:
+	##   pm - placemark property_list
+	## Returns:
+	##   _true if riser, _false otherwise
+
+	# Must be point type
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# Check if name contains "riser" (case-insensitive)
+	_local name << pm[:name].default("")
+	_if name = "" _orif name _is _unset
+	_then
+		_return _false
+	_endif
+
+	_local name_lc << name.lowercase
+	>> name_lc.matches?("*riser*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_access_point?(pm)
+	## Check if placemark is an access point
+	## - Point type placemark
+	## - Catch-all for point placemarks that don't match other specific types
+	##   (pole, splice, figure_eight, OLT, riser, demand_point)
+	##
+	## Parameters:
+	##   pm - placemark property_list
+	## Returns:
+	##   _true if access_point, _false otherwise
+
+	# Must be point type
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# Check if it matches other specific point types
+	# If it matches any of these, it's NOT an access point
+	_if _self.is_pole?(pm) _orif
+	    _self.is_splice?(pm) _orif
+	    _self.is_figure_eight?(pm) _orif
+	    _self.is_olt?(pm) _orif
+	    _self.is_riser?(pm) _orif
+	    _self.is_demand_point?(pm[:parent])
+	_then
+		_return _false
+	_endif
+
+	# It's a point and doesn't match other types - it's an access point
+	>> _true
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_pole_type(fs)
+	## Extract pole type from folder string using wildcard matching
+	## Returns: "Pole 7-3", "Pole 7-4", "Pole 7-5", "Pole 9-4", "Pole 9-5"
+	
+	# Match patterns with wildcards (* = any character)
+	_local pole_type <<
+	_if fs.matches?("*7*3*")
+	_then
+		>> "Pole 7-3"
+	_elif fs.matches?("*7*4*")
+	_then
+		>> "Pole 7-4"
+	_elif fs.matches?("*7*5*")
+	_then
+		>> "Pole 7-5"
+	_elif fs.matches?("*9*4*")
+	_then
+		>> "Pole 9-4"
+	_elif fs.matches?("*9*5*")
+	_then
+		>> "Pole 9-5"
+	_else
+		>> "Pole 7-4"  # Default
+	_endif
+	_return pole_type
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_pole_status(fs)
+	## Determine pole status using nested wildcard matching
+	## Returns: "New", "Existing", "New Partner", "Existing Partner", "New EMR", "Existing EMR"
+
+	# Check for EXISTING variations
+	_local pole_status <<
+	_if fs.matches?("ex*")
+	_then
+		# Check sub-types within EXISTING
+		_if fs.matches?("*partner*")
+		_then
+			>> "Existing Partner"
+		_elif fs.matches?("*emr*")
+		_then
+			>> "Existing EMR"
+		_else
+			>> "Existing"
+		_endif
+
+	# Check for NEW variations
+	_elif fs.matches?("new*")
+	_then
+		# Check sub-types within NEW
+		_if fs.matches?("*partner*")
+		_then
+			>> "New Partner"
+		_elif fs.matches?("*emr*")
+		_then
+			>> "New EMR"
+		_else
+			>> "New"
+		_endif
+
+	_else
+		# Default to New
+		>> "New"
+	_endif
+	_return pole_status
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_line(fs)
+	## Extract line designation from folder string
+	## Returns: "LINE A", "LINE B", etc. or _unset
+
+	# Match line patterns (with space between "line" and letter)
+	fs << fs.lowercase
+	_local line <<
+	_if fs.matches?("*line a*")
+	_then
+		>> "Line A"
+	_elif fs.matches?("*line b*")
+	_then
+		>> "Line B"
+	_elif fs.matches?("*line c*")
+	_then
+		>> "Line C"
+	_elif fs.matches?("*line d*")
+	_then
+		>> "Line D"
+	_elif fs.matches?("*line e*")
+	_then
+		>> "Line E"
+	_elif fs.matches?("*line f*")
+	_then
+		>> "Line, F"
+	_else
+		>> _unset
+	_endif
+	_return line
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_segment(fs)
+	## Extract segment designation from folder string
+	## Returns: "SEGMENT 1", "SEGMENT 2", etc. or _unset
+
+	# Match segment patterns
+	_local segment <<
+	_if fs.matches?("*seg*1*") _orif fs.matches?("*segmen*1*")
+	_then
+		>> "SEGMENT 1"
+	_elif fs.matches?("*seg*2*") _orif fs.matches?("*segmen*2*")
+	_then
+		>> "SEGMENT 2"
+	_else
+		>> _unset
+	_endif
+	_return segment
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.scan_pole_st(location, radius)
+	## Search for existing pole within radius
+	## Parameters:
+	##   location - coordinate or pseudo_point
+	##   radius - search radius in meters
+	## Returns:
+	##   (boolean, pole_record) - (_true, pole) if found, (_false, _unset) if not found
+
+	_local coord << _if location.responds_to?(:coord)
+	                _then >> location.coord
+	                _else >> location
+	                _endif
+
+	_local pa << pseudo_point.new(coord)
+	pa.world << .database.world
+
+	_local buff << pa.buffer(radius)
+	buff.world << .database.world
+
+	_local pred << predicate.interacts(:location, {buff})
+	_local poles << .pole_col.select(pred)
+
+	_if poles.size > 0
+	_then
+		# Found existing pole - return nearest one
+		_local nearest_pole << poles.an_element()
+		_return _true, nearest_pole
+	_else
+		# No pole found
+		_return _false, _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.scan_olt(location, radius)
+	## Search for existing OLT (mit_hub) within radius
+	## Parameters:
+	##   location - coordinate or pseudo_point
+	##   radius - search radius in meters
+	## Returns:
+	##   (boolean, olt_record) - (_true, olt) if found, (_false, _unset) if not found
+
+	_local coord << _if location.responds_to?(:coord)
+	                _then >> location.coord
+	                _else >> location
+	                _endif
+
+	_local pa << pseudo_point.new(coord)
+	pa.world << .database.world
+
+	_local buff << pa.buffer(radius)
+	buff.world << .database.world
+
+	_local pred << predicate.interacts(:location, {buff})
+	_local olts << .olt_col.select(pred)
+
+	_if olts.size > 0
+	_then
+		# Found existing OLT - return nearest one
+		_local nearest_olt << olts.an_element()
+		_return _true, nearest_olt
+	_else
+		# No OLT found
+		_return _false, _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.scan_ar_on_design(location)
+	## Search for aerial route near location for snapping
+	## Parameters:
+	##   location - coordinate or pseudo_point
+	## Returns:
+	##   (boolean, aerial_route, snap_location) - (_true, route, location) if found, (_false, _unset, _unset) if not found
+
+	_local coord << _if location.responds_to?(:coord)
+	                _then >> location.coord
+	                _else >> location
+	                _endif
+
+	_local pa << pseudo_point.new(coord)
+	pa.world << .database.world
+
+	_local buff << pa.buffer(500)
+	buff.world << .database.world
+
+	_local pred << predicate.interacts(:route, {buff})
+	_local routes << .ar_col.select(pred)
+
+	_if routes.size > 0
+	_then
+		# Found aerial route - snap to nearest point
+		_local ar << routes.an_element()
+		_local pc << pseudo_chain.new(ar.route)
+		pc.world << .database.world
+		_local snap_loc << pc.segpoint_location_near(pa)
+
+		_return _true, ar, snap_loc
+	_else
+		# No aerial route found
+		_return _false, _unset, _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.splitter_inside_cell(area)
+	## Find optical splitter inside cell area using spatial intersection
+	## Parameters:
+	##   area - pseudo_area geometry
+	## Returns:
+	##   splitter name (string) or _unset if not found
+
+	_try
+		# Create spatial predicate for intersection
+		_local pred << predicate.interacts(:location, {area})
+
+		# Query optical_splitter collection
+		_local splitters << .os_col.select(pred)
+
+		_if splitters.size > 0
+		_then
+			# Return first splitter name found
+			_local sp << splitters.an_element()
+			_return sp.name
+		_else
+			# No splitter found in cell
+			_return _unset
+		_endif
+
+	_when error
+		# Return _unset on error
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_cable_core(cable_name)
+	## Extract fiber count from cable name using wildcard matching
+	## Returns: "12", "24", "36", "48", "72", "96", "144", "288", "576", or "24" (default)
+	## IMPORTANT: Check larger numbers FIRST to avoid false matches
+	## (e.g., check 576 before 57, check 288 before 28, check 144 before 14)
+
+	_local cn << cable_name.lowercase
+
+	_local cable_core <<
+	# Check largest numbers first
+	_if cn.matches?("*fo*576*")
+	_then
+		>> "576"
+	_elif cn.matches?("*fo*288*")
+	_then
+		>> "288"
+	_elif cn.matches?("*fo*144*")
+	_then
+		>> "144"
+	_elif cn.matches?("*fo*96*")
+	_then
+		>> "96"
+	_elif cn.matches?("*fo*72*")
+	_then
+		>> "72"
+	_elif cn.matches?("*fo*48*")
+	_then
+		>> "48"
+	_elif cn.matches?("*fo*36*")
+	_then
+		>> "36"
+	_elif cn.matches?("*fo*24*")
+	_then
+		>> "24"
+	_elif cn.matches?("*fo*12*")
+	_then
+		>> "12"
+	_else
+		>> "24"  # Default to 24 cores
+	_endif
+	_return cable_core
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_sling_wire?(folders)
+	## Check if this is a sling wire based on folder pattern
+	## Returns: boolean
+
+	_local fs << folders.lowercase
+
+	>> fs.matches?("*sling wire*") _orif
+	   fs.matches?("*sling_wire*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.get_latlong(coord)
+	## Convert local coordinate to WGS84 latitude/longitude strings
+	## Parameters:
+	##   coord - Local coordinate
+	## Returns:
+	##   (latitude_string, longitude_string)
+
+	# Get WGS84 coordinate system
+	_local cs_wgs84 << .ace_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	_local cs_local << .database.world.coordinate_system
+
+	# Create transform from local to WGS84
+	_local transform << transform.new_converting_cs_to_cs(cs_local, cs_wgs84)
+
+	# Convert coordinate
+	_local wgs84_coord << transform.convert(coord)
+
+	# Format as strings with precision
+	_dynamic !print_float_precision! << 12
+	_local lat << wgs84_coord.y.write_string
+	_local long << wgs84_coord.x.write_string
+
+	_return lat, long
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.truncate_folders(folders, max_length)
+	## Truncate folder string to maximum length
+	## Parameters:
+	##   folders - Folder string
+	##   max_length - Maximum length
+	## Returns:
+	##   Truncated folder string
+
+	_if folders _is _unset
+	_then
+		_return ""
+	_endif
+
+	_if folders.size > max_length
+	_then
+		_return folders.slice(1, max_length)
+	_else
+		_return folders
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_closure_type(folders)
+	## Determine closure type from folder string
+	## Order: CLOSURE/JOINT >> FAT >> FDT
+	## Returns: "Join Closure", "FAT", or "FDT"
+
+	# STEP 1: Convert to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Check patterns in order
+	# Priority 1: CLOSURE or JOINT CLOSURE
+	_if folders_lc.matches?("*closure*") _orif folders_lc.matches?("*joint*")
+	_then
+		>> "Join Closure"
+
+	# Priority 2: FAT
+	_elif folders_lc.matches?("*fat*")
+	_then
+		>> "FAT"
+
+	# Priority 3: FDT
+	_elif folders_lc.matches?("*fdt*")
+	_then
+		>> "FDT"
+
+	_else
+		>> "Join Closure"  # Default
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_core(name)
+	## Extract core count from name using wildcard matching
+	## Used for BOTH Join Closure and FDT
+	## Returns: "576", "288", "144", "96", "72", "48", "36", "24", or _unset
+
+	_if name _is _unset _orif name = ""
+	_then
+		_return _unset
+	_endif
+
+	# STEP 1: Convert to lowercase FIRST
+	_local name_lc << name.lowercase
+
+	# STEP 2: Check larger numbers FIRST to prevent false matches
+	# (e.g., "*28*" would match 288, "*14*" would match 144)
+	_if name_lc.matches?("*576*")
+	_then
+		>> "576"
+	_elif name_lc.matches?("*288*")
+	_then
+		>> "288"
+	_elif name_lc.matches?("*144*")
+	_then
+		>> "144"
+	_elif name_lc.matches?("*96*")
+	_then
+		>> "96"
+	_elif name_lc.matches?("*72*")
+	_then
+		>> "72"
+	_elif name_lc.matches?("*48*")
+	_then
+		>> "48"
+	_elif name_lc.matches?("*36*")
+	_then
+		>> "36"
+	_elif name_lc.matches?("*24*")
+	_then
+		>> "24"
+	_else
+		>> _unset  # No core count detected
+	_endif
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.create_pole(pm)
-	## Create pole object from placemark
+	## Create pole object from placemark with advanced type detection,
+	## cable snapping, and duplicate detection
 
-	_try
-		# Parse geometry
+	_try _with errCon
+		# Step 0: Validate folder contains "pole" pattern
+		_local folders << pm[:parent].default("")
+		_if folders = "" _orif folders _is _unset
+		_then
+			write("  WARNING: Skipping - no folder information")
+			_return
+		_endif
+
+		# Check if this is a pole (folder must contain "|pole|" case-insensitive)
+		_local folders_lc << folders.lowercase
+		_if _not folders_lc.matches?("*|pole|*")
+		_then
+			write("  WARNING: Skipping - not a pole (folder doesn't contain '|pole|'): ", folders)
+			_return
+		_endif
+
+		# Step 1: Parse folder hierarchy
+		_local fol << folders.split_by("|")
+		_local fsize << fol.size
+
+		_if fsize < 2
+		_then
+			write("  WARNING: Skipping - folder hierarchy too shallow: ", folders)
+			_return
+		_endif
+
+		# Step 2: Parse pole attributes from folder names
+		_local pole_type << _self.match_pole_type(folders_lc)
+		_local pole_emr_status << _self.match_pole_status(folders_lc)
+		_local line_type << _self.match_line(folders_lc)
+		_local segment_id<< _self.match_segment(folders)
+
+		# Map pole type to STF item code
+		_local stf_item_code << _unset
+		_if pole_type = "Pole 7-3"
+		_then
+			stf_item_code << "200001055"
+		_elif pole_type = "Pole 7-4"
+		_then
+			stf_item_code << "200001183"
+		_elif pole_type = "Pole 7-5"
+		_then
+			stf_item_code << "200000187"
+		_elif pole_type = "Pole 9-4"
+		_then
+			stf_item_code << "200001181"
+		_elif pole_type = "Pole 9-5"
+		_then
+			stf_item_code << "200000169"
+		_endif
+
+		write(folders_lc,"--",pole_type,"|",pole_emr_status,"|",line_type,"|",stf_item_code)
+
+		# Step 3: Parse original geometry
+		_local original_location << _self.parse_point_geometry(pm[:coord])
+		
+		_local coord << original_location.as_coord()
+		
+		# Step 4: Perform cable snapping
+		_local pa << pseudo_point.new(coord)
+		pa.world << .database.world
+
+		_local buff << pa.buffer(500)
+		buff.world << .database.world
+
+		_local pred << predicate.interacts(:route, {buff})
+		_local aerial_routes << .ar_col.select(pred)
+
+		_local final_location << _unset
+		_if aerial_routes.size > 0
+		_then
+			# Aerial route found - snap to nearest point on route
+			_local ar << aerial_routes.an_element()
+			_local q_sec << pseudo_chain.new(ar.route)
+			q_sec.world << .database.world
+			_local cp << q_sec.segpoint_near(pa)
+
+			_local snapped_point << pseudo_point.new(cp)
+			snapped_point.world << .database.world
+			final_location << snapped_point
+
+			write("  >> Pole snapped to aerial route")
+		_else
+			# No aerial route - use original location
+			final_location << original_location
+		_endif
+
+		# Step 5: Check for duplicate poles within 200m
+		_local (h, existing_pole) << _self.scan_pole_st(final_location, 200)
+		_global pl_pole
+		_if h _is _true _andif existing_pole _isnt _unset
+		_then
+			write("existing pole...")
+			# Found existing pole - check if it's a placeholder
+			_if existing_pole.telco_pole_tag = "Existing Pole AR"
+			_then
+				# Update placeholder pole
+				write("  [UPDATE] Updating existing placeholder pole: ", existing_pole.id)
+
+				existing_pole.telco_pole_tag << pm[:name]
+				existing_pole.pop << .pop_name
+				existing_pole.olt << .pop_name
+				existing_pole.type << pole_type
+				existing_pole.pole_emr_status << pole_emr_status
+				existing_pole.folders << folders
+				existing_pole.fttx_network_type << "Cluster"
+				existing_pole.segment << segment_id
+				existing_pole.project << .prj_id
+
+				_if stf_item_code _isnt _unset
+				_then
+					existing_pole.stf_item_code << stf_item_code
+				_endif
+
+				_if line_type _isnt _unset
+				_then
+					existing_pole.line_type << line_type
+				_endif
+
+				# Recreate annotation
+				_try
+					existing_pole.unset_geometry(:annotation_3)
+					_local anno << existing_pole.make_geometry(:annotation_3,
+						final_location.location, existing_pole.telco_pole_tag)
+				_when error
+					# Annotation may not exist or may fail - continue
+				_endtry
+
+				.stats[:poles] +<< 1
+				write("  [OK] Pole updated: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
+				_return existing_pole
+			_else
+				# Existing pole is not a placeholder - skip creation
+				write("  WARNING: Pole already exists nearby (", existing_pole.telco_pole_tag, ") - skipping")
+				.stats[:skipped] +<< 1
+				_return
+			_endif
+		_else
+			# No existing pole - create new one
+
+			# Determine construction status based on pole_emr_status
+			_local pole_const_status <<
+			_if pole_emr_status.matches?("New*")
+			_then
+				>> "Proposed"
+			_elif pole_emr_status.matches?("Existing*")
+			_then
+				>> "In Service"
+			_else
+				>> "Proposed"  # Default to Proposed
+			_endif
+
+			_local prop_values << property_list.new_with(
+				:location, final_location,
+				:telco_pole_tag, pm[:name],
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, pole_type,
+				:pole_emr_status, pole_emr_status,
+				:folders, folders,
+				:fttx_network_type, "Cluster",
+				:segment, segment_id,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:project, .prj_id,
+				:uuid, .uuid,
+				:construction_status, pole_const_status
+			)
+
+			# Add optional fields if available
+			_if stf_item_code _isnt _unset
+			_then
+				prop_values[:stf_item_code] << stf_item_code
+			_endif
+
+			_if line_type _isnt _unset
+			_then
+				prop_values[:line_type] << line_type
+			_endif
+			_local rec_trans << record_transaction.new_insert(.pole_col, prop_values)
+			_local result << rec_trans.run()
+
+			.stats[:poles] +<< 1
+			write("  [OK] Pole created: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
+			_return result
+		_endif
+
+	_when error
+		write("  ERROR creating pole ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_aerial_route(pm)
+	## Create aerial route (cable) from placemark with advanced mode:
+	## - Cable folder validation (CABLE, KABEL, CABEL, DISTRIBUTION CABLE)
+	## - Sling wire special handling
+	## - Cable core detection (12-576 cores) from name
+	## - Pole detection at start/end points (500m radius)
+	## - Placeholder pole creation when poles not found
+	## - Additional AR segments to connect to poles
+	## - Sheath creation with structure placement
+
+	_try _with errCon
+		# Step 0: Parse folders
+		_local folders << pm[:parent].default("")
+		_local fol << _unset
+		_local fsize << 0
+		_local fparent << 0
+
+		_if folders _isnt _unset _andif folders <> ""
+		_then
+			fol << folders.split_by("|")
+			fsize << fol.size
+			_if fsize > 1
+			_then
+				fparent << fsize - 1
+			_else
+				fparent << fsize
+			_endif
+		_else
+			_return  # No folders - skip
+		_endif
+
+		# Step 1: Validate cable folder pattern
+		_if fol[fsize] <> "KABEL" _andif
+		   fol[fsize] <> "CABLE" _andif
+		   fol[fsize] <> "CABEL" _andif
+		   fol[fsize] <> "DISTRIBUTION CABLE" _andif
+		   fol[fsize] <> "SLING WIRE"
+		_then
+			_return  # Not a cable - skip
+		_endif
+
+		write("  Processing aerial route: ", pm[:name])
+
+		# Step 2: Parse route geometry
+		_local route << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
+		_local t_len << pc.line_length
+
+		# Check minimum length
+		_if t_len < 0.4
+		_then
+			write("    WARNING: Route too short (", t_len, "m) - skipping")
+			_return
+		_endif
+
+		# Step 3: Detect cable core count
+		_local m_cbl << _self.match_cable_core(pm[:name])
+		_local fb_c << m_cbl
+		_local s_sp << _unset
+		_local s_cd << _unset
+
+		# Map fiber count to spec_id and STF code
+		_if m_cbl = "12"
+		_then
+			s_sp << "SM G652D-ADSS 12C"
+			s_cd << ""
+		_elif m_cbl = "24"
+		_then
+			s_sp << "SM G652D-ADSS 24C"
+			s_cd << "200000100"
+		_elif m_cbl = "36"
+		_then
+			s_sp << "SM G652D-ADSS 36C"
+			s_cd << "200000975"
+		_elif m_cbl = "48"
+		_then
+			s_sp << "SM G652D-ADSS 48C"
+			s_cd << "200001038"
+		_elif m_cbl = "72"
+		_then
+			s_sp << "SM G652D-ADSS 72C"
+			s_cd << "FO_INV_FTTX_0796"
+		_elif m_cbl = "96"
+		_then
+			s_sp << "SM G652D-ADSS 96C"
+			s_cd << "200001630"
+		_elif m_cbl = "144"
+		_then
+			s_sp << "SM G652D-ADSS 144C"
+			s_cd << "200001030"
+		_elif m_cbl = "288"
+		_then
+			s_sp << "SM G652D-ADSS 288C"
+			s_cd << "200001015"
+		_elif m_cbl = "576"
+		_then
+			s_sp << "SM G652D-ADSS 576C"
+			s_cd << ""
+		_else
+			s_sp << "SM G652D-ADSS 24C"
+			s_cd << "200000100"
+			fb_c << "24"
+		_endif
+
+		write("    >> Detected fiber count: ", fb_c, " cores")
+
+		# Step 4: Detect line type
+		_local m_line << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment_id << _self.match_segment(folders)
+
+		write("    >> Detected line: ", m_line)
+		# Step 5: Check for SLING WIRE - special handling
+		_if fol[fsize] = "SLING WIRE"
+		_then
+			_if t_len > 0.6
+			_then
+				write("    >> Creating sling wire (", t_len, "m)")
+				_local prop_values_sw << property_list.new_with(
+					:status, "Proposed",
+					:name, pm[:name],
+					:pop, .pop_name,
+					:olt, .pop_name,
+					:segment, segment_id,
+					:fttx_network_type, "Cluster",
+					:line_type, m_line,
+					:route, route,
+					:uuid, .uuid,
+					:construction_status, "Proposed"
+				)
+				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
+				_local result_sw << rec_trans_sw.run()
+
+				.stats[:sling_wires] +<< 1
+				write("    [OK] Sling wire created: ", pm[:name])
+				_return result_sw
+			_else
+				write("    WARNING: Sling wire too short - skipping")
+				_return
+			_endif
+		_endif
+
+		# Step 6: Create main aerial route
+		write("     [OK] Creating aerial route...") 
+		_local l_prop_values << property_list.new_with(
+			:construction_status, "Proposed",
+			:name, pm[:name],
+			:asset_ownership, "Owned",
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:fiber_count, fb_c,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:line_type, m_line,
+			:folders, folders,
+			:route, route,
+			:uuid, .uuid
+		)
+
+		_local l_rec_trans << record_transaction.new_insert(.ar_col, l_prop_values)
+		_local l_result << l_rec_trans.run()
+
+		.stats[:aerial_routes] +<< 1
+		write("    [OK] Main aerial route created: ", pm[:name], " (", fb_c, " cores)")
+
+		# Step 7: Handle START POINT
+		_local l_location_start << route.first_coord
+		_local pp << pseudo_point.new(l_location_start)
+		pp.world << .database.world
+
+		_local l_result_ar << _unset
+		_local l_result_pl << _unset
+		_local n_coord << _unset
+		_local fs << _unset
+
+		_local (k1, a_hub) << _self.scan_pole_st(pp, 500)
+
+		_if k1 _is _true
+		_then
+			# Pole found at start
+			n_coord << a_hub.location.coord
+			_local ff << route.as_sector_rope()
+			_local bb << sector.new_with(n_coord, ff.first_coord)
+			_local bbb << pseudo_chain.new(bb)
+			bbb.world << .database.world
+			_local dist << bbb.line_length
+
+			_if dist > 0.6
+			_then
+				# Create additional AR segment from pole to start
+				write("    >> Creating start AR segment (", dist, "m)")
+				_local l_prop_values_ar << property_list.new_with(
+					:construction_status, "Proposed",
+					:name, pm[:name],
+					:asset_ownership, "Owned",
+					:pop, .pop_name,
+					:olt, .pop_name,
+					:fiber_count, fb_c,
+					:fttx_network_type, "Cluster",
+					:segment, segment_id,
+					:line_type, m_line,
+					:folders, folders,
+					:route, bbb,
+					:uuid, .uuid
+				)
+				_local l_rec_trans_ar << record_transaction.new_insert(.ar_col, l_prop_values_ar)
+				l_result_ar << l_rec_trans_ar.run()
+
+				.stats[:aerial_routes] +<< 1
+				fs << ff
+			_endif
+
+			l_result_pl << a_hub
+			write("    >> Using existing pole at start: ", a_hub.telco_pole_tag)
+		_else
+			# No pole found - create placeholder
+			fs << route.as_sector_rope()
+			n_coord << route.first_coord
+
+			write("    >> Creating placeholder pole at start")
+			_local l_prop_values_pl << property_list.new_with(
+				:location, n_coord,
+				:telco_pole_tag, "Existing Pole AR",
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, "T7",
+				:folders, folders,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:line_type, m_line,
+				:fttx_network_type, "Cluster",
+				:segment, segment_id,
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
+			l_result_pl << l_rec_trans_pl.run()
+
+			.stats[:poles] +<< 1
+		_endif
+
+		# Step 8: Handle END POINT
+		_local l_location_end << route.last_coord
+		_local ppr << pseudo_point.new(l_location_end)
+		ppr.world << .database.world
+
+		_local l_result_ar2 << _unset
+		_local l_result_pl2 << _unset
+		_local e_coord << _unset
+
+		_local (k2, b_hub) << _self.scan_pole_st(ppr, 500)
+
+		_if k2 _is _true
+		_then
+			# Pole found at end
+			_local rr << fs
+			_if rr _isnt _unset
+			_then
+				_local bn << rr.sectors[1]
+				_local pss << pseudo_chain.new(bn)
+				pss.world << .database.world
+
+				e_coord << b_hub.location.coord
+				_local sec << sector.new_with(pss.last_coord, e_coord)
+				_local ps << pseudo_chain.new(sec)
+				ps.world << .database.world
+				_local dist << ps.line_length
+
+				_if dist > 0.6
+				_then
+					# Create additional AR segment from end to pole
+					write("    >> Creating end AR segment (", dist, "m)")
+					_local l_prop_values_ar2 << property_list.new_with(
+						:construction_status, "Proposed",
+						:name, pm[:name],
+						:asset_ownership, "Owned",
+						:fttx_network_type, "Cluster",
+						:segment, segment_id,
+						:pop, .pop_name,
+						:olt, .pop_name,
+						:line_type, m_line,
+						:fiber_count, fb_c,
+						:folders, folders,
+						:route, ps,
+						:uuid, .uuid
+					)
+					_local l_rec_trans_ar2 << record_transaction.new_insert(.ar_col, l_prop_values_ar2)
+					l_result_ar2 << l_rec_trans_ar2.run()
+
+					.stats[:aerial_routes] +<< 1
+				_endif
+			_endif
+
+			l_result_pl2 << b_hub
+			write("    >> Using existing pole at end: ", b_hub.telco_pole_tag)
+		_else
+			# No pole found - create placeholder
+			e_coord << route.last_coord
+
+			write("    >> Creating placeholder pole at end")
+			_local l_prop_values_pl2 << property_list.new_with(
+				:location, e_coord,
+				:telco_pole_tag, "Existing Pole AR",
+				:usage, "Telco",
+				:material_type, "Steel",
+				:fttx_network_type, "Cluster",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:line_type, m_line,
+				:segment, segment_id,
+				:type, "T7",
+				:folders, folders,
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+			_local l_rec_trans_pl2 << record_transaction.new_insert(.pole_col, l_prop_values_pl2)
+			l_result_pl2 << l_rec_trans_pl2.run()
+
+			.stats[:poles] +<< 1
+		_endif
+
+		# Step 9: Collect all structures
+		_local l_structures << rope.new()
+		l_structures.add(l_result_pl)
+
+		_if l_result_ar _isnt _unset
+		_then
+			l_structures.add(l_result_ar)
+		_endif
+
+		l_structures.add(l_result)
+
+		_if l_result_ar2 _isnt _unset
+		_then
+			l_structures.add(l_result_ar2)
+		_endif
+
+		l_structures.add(l_result_pl2)
+
+		# Step 10: Create sheath with structure placement
+		_local ftri << _if fsize >= 3 _then >> fol[3] _else >> fol[fsize] _endif
+		_local rtr << _if ftri.size > 120 _then >> ftri.slice(1, 120) _else >> ftri _endif
+
+		write("    >> Creating sheath with ", l_structures.size, " structures")
+		_local l_prop_values_swl << property_list.new_with(
+			:name, pm[:name],
+			:spec_id, s_sp,
+			:construction_status, "Proposed",
+			:sheath_network_type, "Cluster",
+			:folders, folders,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:line_type, m_line,
+			:segment, segment_id,
+			:cluster, rtr,
+			:asset_owner, "Owned",
+			:uuid, .uuid
+		)
+
+		_local l_rec_trans_swl << record_transaction.new_insert(.sheath_col, l_prop_values_swl)
+		_local l_result_swl << l_rec_trans_swl.run()
+
+		# Place sheath in structures
+		l_result_swl.place_in_structures(l_structures)
+
+		.stats[:sheaths] +<< 1
+		write("    [OK] Sheath created and placed in structures")
+
+		_return  l_result
+
+	_when error
+		write("  ERROR creating aerial route ", pm[:name], ": ", errCon)
+		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_demand_point(pm)
+	## Create demand point (home pass) from placemark with advanced mode:
+	## - Multi-level folder validation
+	## - Annotation creation
+	## - Micro cell detection for splitter_id
+	## - Optical splitter lookup for splice coordinates
+	## - Boundary intersection for administrative data
+	## - Customer premise creation with full attributes
+	## - Optional building creation for GEDUNG type
+
+	_try _with errCon
+		# Step 0: Validate demand point folder pattern
+		_local folders << pm[:parent].default("")
+		_if _not _self.is_demand_point?(folders)
+		_then
+			write("  WARNING: Skipping - not a demand point: ", folders)
+			_return
+		_endif
+
+		# Step 1: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 2: Truncate folders to 100 characters
+		_local ff << _self.truncate_folders(folders, 100)
+
+		# Step 3: Parse geometry
 		_local location << _self.parse_point_geometry(pm[:coord])
 
-		# Determine pole type from folder name (simplified)
-		_local pole_type << "Pole 7-4"  # Default
-
-		# Create new pole
+		# Step 4: Create demand point
 		_local prop_values << property_list.new_with(
-			:location, location,
-			:telco_pole_tag, pm[:name],
-			:usage, "Telco",
-			:material_type, "Steel",
-			:type, pole_type,
-			:folders, pm[:parent],
+			:identification, pm[:name],
+			:name, pm[:name],
+			:status, "Active",
+			:mdu?, _false,
+			:type, "Type 1",
+			:segment, segment_id,
 			:fttx_network_type, "Cluster",
-			:segment, .segment_id,
+			:folders, ff,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:notes, .prj_id,
+			:location, location,
+			:uuid, .uuid
+			:construction_status, "Proposed"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.dp_col, prop_values)
+		_local l_result << rec_trans.run()
+
+		.stats[:demand_points] +<< 1
+		write("  [OK] Demand point created: ", pm[:name])
+
+		# Step 4: Create annotation geometry
+		_try
+			l_result.unset_geometry(:annotation)
+			l_result.unset_geometry(:annotation_2)
+			_local anno << l_result.make_geometry(:annotation,
+				coordinate.new(l_result.location.coord.x, l_result.location.coord.y),
+				l_result.identification)
+			write("    >> Annotation created")
+		_when error
+			# Continue if annotation fails
+		_endtry
+
+		# Step 5: Find intersecting micro cell for splitter_id
+		_local sp_id << _unset
+		_local c_ll << ""
+		_try
+			_local a_point << pseudo_point.new(l_result.location.coord)
+			a_point.world << .database.world
+
+			_local a_predicate << predicate.interacts(:location, {a_point})
+			_local s_cell << .cell_col.select(a_predicate)
+
+			_if s_cell.size > 0
+			_then
+				_local a_cell << s_cell.an_element()
+				sp_id << a_cell.splitter_id
+
+				_if sp_id <> "" _andif sp_id _isnt _unset
+				_then
+					write("    >> Found micro cell, splitter: ", sp_id)
+
+					# Step 6: Lookup optical splitter for splice coordinates
+					_try
+						_local pred_sp << predicate.eq(:name, sp_id)
+						_local s_sp << .os_col.select(pred_sp)
+
+						_if s_sp.size > 0
+						_then
+							_local a_sp << s_sp.an_element()
+							_local l_sp << a_sp.get_splice()
+
+							_if l_sp _isnt _unset _andif l_sp.location _isnt _unset
+							_then
+								_local (latp, longp) << _self.get_latlong(l_sp.location.coord)
+								c_ll << latp + "  " + longp
+								write("    >> Splice coordinates: ", c_ll)
+							_endif
+						_endif
+					_when error
+						# Continue if splice lookup fails
+					_endtry
+				_endif
+			_endif
+		_when error
+			# Continue if micro cell lookup fails
+		_endtry
+
+		# Step 7: Find intersecting boundary for administrative data
+		_local propinsi << _unset
+		_local kabupaten << _unset
+		_local kecamatan << _unset
+		_local desa << _unset
+		_try
+			_local a_point << pseudo_point.new(l_result.location.coord)
+			a_point.world << .database.world
+
+			_local p_predicate << predicate.interacts(:boundary, {a_point})
+			_local s_pol << .pol_col.select(p_predicate)
+
+			_if s_pol.size > 0
+			_then
+				_for r _over s_pol.fast_elements()
+				_loop
+					_if r.type = "Town"
+					_then
+						propinsi << r.provinsi
+						kabupaten << r.kabupaten
+						kecamatan << r.kecamatan
+						desa << r.desa
+						write("    >> Found boundary: ", kecamatan, ", ", desa)
+						_leave
+					_endif
+				_endloop
+			_endif
+		_when error
+			# Continue if boundary lookup fails
+		_endtry
+
+		# Step 8: Convert demand point coordinate to lat/long
+		_local lat << ""
+		_local long << ""
+		_try
+			(lat, long) << _self.get_latlong(l_result.location.coord)
+			write("    >> Coordinates: ", lat, ", ", long)
+		_when error
+			# Continue if coordinate conversion fails
+		_endtry
+
+		# Step 9: Create customer premise
+		_try
+			_local tahun << date_time_now().year.write_string
+
+			_local l_prop_values_cs << property_list.new_with(
+				:identification, pm[:name],
+				:customer_name, pm[:name],
+				:type, "Residential",
+
+				# Administrative fields from boundary
+				:province, propinsi,
+				:branch, kabupaten,
+				:city, kecamatan,
+				:district, desa,
+				:sub_district, "",
+				:postal_code, "",
+
+				# Address fields
+				:area_name, "",
+				:residence_type, "",
+				:residence_name, "",
+				:street_name, "",
+				:unit, "",
+
+				# Network fields
+				:pop_id, .pop_name,
+				:splitter_id, sp_id,
+				:spliter_distribution_coordinate, c_ll,
+
+				# Metadata
+				:remark, "",
+				:remark_2, "",
+				:rfs_year, tahun,
+				:rfs_status, "",
+				:submission_date, "",
+				:last_update, "",
+				:stf_item_code, "",
+
+				# Coordinates
+				:latitude, lat,
+				:longitude, long,
+
+				# Reference to demand point
+				:ftth!demand_point, l_result
+			)
+
+			_local l_rec_trans_cs << record_transaction.new_insert(.cs_col, l_prop_values_cs)
+			_local l_result_cs << l_rec_trans_cs.run()
+
+			.stats[:customer_premises] +<< 1
+			write("    [OK] Customer premise created with full data")
+		_when error
+			write("    WARNING: Error creating customer premise: ", condition.report_contents_string)
+		_endtry
+
+		# Step 10: Create building (optional) if descriptio = "GEDUNG"
+		_try
+			_local descriptio << pm[:descriptio].default("")
+			_if descriptio.lowercase = "gedung"
+			_then
+				_local bb << bounding_box.new_enclosing(l_result.location.bounds, 400)
+
+				_local l_prop_values_bld << property_list.new_with(
+					:type, "Residential",
+					:asset_owner, "Owned",
+					:name, pm[:name],
+					:boundary, bb
+				)
+
+				_local l_rec_trans_bld << record_transaction.new_insert(.bld_col, l_prop_values_bld)
+				_local l_result_bld << l_rec_trans_bld.run()
+
+				.stats[:buildings] +<< 1
+				write("    [OK] Building created (GEDUNG type)")
+			_endif
+		_when error
+			write("    WARNING: Error creating building: ", condition.report_contents_string)
+		_endtry
+
+		>> l_result
+
+	_when error
+		write("  ERROR creating demand point ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_sheath_splice(pm)
+	## Create sheath splice (closure) from point placemark with advanced mode:
+	## - Multi-type detection (Join Closure, FDT, FAT)
+	## - Core count detection with different spec mapping
+	## - Pole association (search or create)
+	## - Optical splitter creation for FDT and FAT
+
+	_try _with errCon
+		# Step 0: Validate sheath splice (already validated by is_splice?())
+		_local folders << pm[:parent].default("")
+		_if _not _self.is_splice?(pm)
+		_then
+			write("  WARNING: Skipping - not a sheath splice: ", folders)
+			_return
+		_endif
+
+		# Step 1: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 2: Determine closure type
+		_local closure_type << _self.match_closure_type(folders)
+		write("  Processing ", closure_type, ": ", pm[:name])
+
+		# Step 2: Detect core count from name (for Join Closure and FDT)
+		_local core_count << _unset
+		_local sp << _unset          # spec_id
+		_local st_cd << _unset        # stf_item_code
+		_local c_spl << 0             # splitter count
+		_local ot << closure_type     # object_type
+
+		_if closure_type = "Join Closure"
+		_then
+			# Join Closure core detection
+			core_count << _self.match_core(pm[:name])
+
+			# Map Join Closure core to spec and STF
+			_if core_count = "24"
+			_then
+				sp << "Join Closure Dome 24 Core"
+				st_cd << "200000180"
+			_elif core_count = "36"
+			_then
+				sp << "Join Closure Dome 36 Core"
+				st_cd << "200001049"
+			_elif core_count = "48"
+			_then
+				sp << "Join Closure Dome 48 Core"
+				st_cd << "200000164"
+			_elif core_count = "72"
+			_then
+				sp << "Join Closure Dome 72 Core"
+				st_cd << "200000159"
+			_elif core_count = "96"
+			_then
+				sp << "Join Closure Dome 96 Core"
+				st_cd << "200000176"
+			_elif core_count = "144"
+			_then
+				sp << "Join Closure Dome 144 Core"
+				st_cd << "200000158"
+			_elif core_count = "288"
+			_then
+				sp << "Join Closure Dome 288 Core"
+				st_cd << "200000156"
+			_else
+				# Default
+				sp << "Join Closure Dome 48 Core"
+				st_cd << "200000164"
+			_endif
+
+			c_spl << 0  # Join Closure does not create splitters
+
+		_elif closure_type = "FDT"
+		_then
+			# FDT core detection
+			core_count << _self.match_core(pm[:name])
+
+			# Map FDT core to spec and STF
+			_if core_count = "48"
+			_then
+				sp << "48 Core pole mounted FDT"
+				st_cd << "200001039"
+				c_spl << 6
+			_elif core_count = "72"
+			_then
+				sp << "72 Core pole mounted FDT"
+				st_cd << "200001040"
+				c_spl << 9
+			_elif core_count = "96"
+			_then
+				sp << "96 Core pole mounted FDT"
+				st_cd << "200001041"
+				c_spl << 12
+			_elif core_count = "144"
+			_then
+				sp << "144 Core Ground mounted FDT"
+				st_cd << "200001042"
+				c_spl << 18
+			_elif core_count = "288"
+			_then
+				sp << "288 Core Ground mounted FDT"
+				st_cd << "200001043"
+				c_spl << 36
+			_elif core_count = "576"
+			_then
+				sp << "576 Core Ground mounted FDT"
+				st_cd << "200001044"
+				c_spl << 72
+			_else
+				# Default
+				sp << "48 Core pole mounted FDT"
+				st_cd << "200001039"
+				c_spl << 6
+			_endif
+
+		_elif closure_type = "FAT"
+		_then
+			# FAT uses fixed spec (no core detection)
+			sp << "Pole mounted outdoor(16 ports)"
+			st_cd << "200001047"
+			c_spl << 2
+
+		_endif
+
+		# Step 3: Parse original location
+		_local original_location << _self.parse_point_geometry(pm[:coord])
+		_local l_location_start << original_location.coord
+
+		# Step 4: Find or create pole within 800m
+		_local pp << pseudo_point.new(l_location_start)
+		pp.world << .database.world
+
+		_local (k1, pt) << _self.scan_pole_st(pp, 800)
+		_local sh_loc << _unset
+		_local l_result_pl << _unset
+
+		_if k1 _is _true
+		_then
+			# Pole found - use its location
+			sh_loc << pt.location.coord
+			l_result_pl << pt
+			write("    >> Found existing pole within 800m")
+		_else
+			# No pole found - create placeholder pole
+			write("    >> Creating placeholder pole")
+
+			# Get line type for pole
+			_local m_line << _self.match_line(folders)
+
+			_local l_prop_values_pl << property_list.new_with(
+				:location, l_location_start,
+				:telco_pole_tag, "Pole" + pm[:name],
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, "T7",
+				:folders, folders,
+				:fttx_network_type, "Cluster",
+				:line_type, m_line,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:segment, segment_id
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+
+			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
+			l_result_pl << l_rec_trans_pl.run()
+
+			sh_loc << l_result_pl.location.coord
+			.stats[:poles] +<< 1
+		_endif
+
+		# Step 5: Get line type for sheath splice
+		_local line_type << _self.match_line(folders)
+
+		# Step 6: Determine construction status based on name pattern
+	_local splice_name_lc << pm[:name].lowercase
+	_local const_status <<
+	_if splice_name_lc.matches?("new*")
+	_then
+		>> "Proposed"
+	_elif splice_name_lc.matches?("ex*")
+	_then
+		>> "In Service"
+	_else
+		>> "Proposed"  # Default to Proposed
+	_endif
+
+	# Step 7: Create sheath splice
+		_local l_prop_values << property_list.new_with(
+			:location, sh_loc,
+			:asset_owner, "Owned",
+			:splice_type, "breaking",
+			:splice_method, "Fusion",
+			:spec_id, sp,
+			:folders, folders,
+			:sheath_splice_object_type, ot,
+			:fttx_network_type, "Cluster",
+			:line_type, line_type,
+			:name, pm[:name],
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:stf_item_code, st_cd,
+			:uuid, .uuid,
+			:construction_status, const_status
+		)
+
+		_local l_rec_trans << record_transaction.new_insert(.sc_col, l_prop_values)
+		_local l_result << l_rec_trans.run()
+
+		.stats[:sheath_splices] +<< 1
+		write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
+
+		# Step 7: Associate to pole structure
+		_try
+			_if l_result_pl _isnt _unset
+			_then
+				_if l_result_pl.external_name = "Pole"
+				_then
+					l_result.associate_to_structure(l_result_pl)
+					write("    >> Associated to pole: ", l_result_pl.telco_pole_tag)
+				_endif
+			_endif
+		_when error
+			# Continue if association fails
+		_endtry
+
+		# Step 8: Create optical splitters (for FDT and FAT only)
+		_if c_spl > 0
+		_then
+			_local splitter_spec << _unset
+
+			_if closure_type = "FDT"
+			_then
+				splitter_spec << "STF Splitter 1:8"
+			_elif closure_type = "FAT"
+			_then
+				splitter_spec << "Splitter 1:8"
+			_endif
+
+			_try
+				_for i _over range(1, c_spl)
+				_loop
+					_local splitter_name << _if closure_type = "FAT"
+					                        _then >> pm[:name] + "-" + i.write_string
+					                        _else >> pm[:name]
+					                        _endif
+
+					_local vals << property_list.new_with(
+						:construction_status, "Proposed",
+						:asset_owner, "Owned",
+						:name, splitter_name,
+						:function, "Splitter",
+						:spec_id, splitter_spec,
+						:stf_splitter_type, closure_type,
+						:stf_item_code, "200001047",
+						:sheath_splice, l_result
+					)
+
+					_local l_rec_trans_s << record_transaction.new_insert(.os_col, vals)
+					_local l_result_s << l_rec_trans_s.run()
+
+					.stats[:optical_splitters] +<< 1
+				_endloop
+
+				write("    [OK] Created ", c_spl, " optical splitters")
+			_when error
+				write("    WARNING: Error creating optical splitters: ", condition.report_contents_string)
+			_endtry
+		_endif
+
+		>> l_result
+
+	_when error
+		write("  ERROR creating sheath splice ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_figure_eight(pm)
+	## Create figure_eight (slack/coil) from point placemark with advanced mode:
+	## - Pole association (search within 700m or create placeholder)
+	## - Aerial route snapping for placeholder poles
+	## - Cable connection if available
+
+	_try _with errCon
+		# Step 0: Validate figure_eight (already validated by is_figure_eight?())
+		_local folders << pm[:parent].default("")
+		_if _not _self.is_figure_eight?(pm)
+		_then
+			write("  WARNING: Skipping - not a figure_eight: ", folders)
+			_return
+		_endif
+
+		write("  Processing figure_eight: ", pm[:name])
+
+		# Step 1: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 2: Parse location
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.coord
+
+		_local pp << pseudo_point.new(coord)
+		pp.world << .database.world
+
+		# Step 3: Find or create pole within 700m
+		_local (h, pl_sl) << _self.scan_pole_st(pp, 700)
+		_local sh_loc << _unset
+
+		_if h _is _true
+		_then
+			# Pole found - use existing pole
+			sh_loc << pl_sl.location.coord
+			write("    >> Found existing pole within 700m: ", pl_sl.telco_pole_tag)
+		_else
+			# No pole found - create placeholder pole
+			write("    >> Creating placeholder pole for slack")
+
+			# Try to snap to aerial route
+			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(pp)
+
+			_if tf _is _true
+			_then
+				sh_loc << snap_loc
+				write("    >> Pole snapped to aerial route")
+			_else
+				sh_loc << coord
+			_endif
+
+			# Get line type for pole
+			_local m_line << _self.match_line(folders.lowercase)
+
+			_local l_prop_values_pl << property_list.new_with(
+				:location, sh_loc,
+				:telco_pole_tag, "Existing Pole Slack",
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, "T7",
+				:folders, folders,
+				:fttx_network_type, "Cluster",
+				:line_type, m_line,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:segment, segment_id
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+
+			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
+			pl_sl << l_rec_trans_pl.run()
+
+			.stats[:poles] +<< 1
+			write("    >> Placeholder pole created")
+		_endif
+
+		# Step 3: Create figure_eight
+		_local l_prop_values << property_list.new_with(
+			:construction_status, "Proposed",
+			:type, "Circle",
+			:length, 20,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name
+			:uuid, .uuid
+		)
+
+		_local l_rec_trans << record_transaction.new_insert(.fe_col, l_prop_values)
+		_local l_result << l_rec_trans.run()
+
+		.stats[:figure_eights] +<< 1
+		write("    [OK] Figure eight created: ", pm[:name], " (Type: Circle, Length: 20)")
+
+		# Step 4: Associate to pole structure
+		_try
+			_if pl_sl _isnt _unset
+			_then
+				l_result.associate_to_structure(pl_sl)
+				write("    >> Associated to pole: ", pl_sl.telco_pole_tag)
+			_endif
+		_when error
+			# Continue if association fails
+		_endtry
+
+		# Step 5: Connect to cable if available
+		_try
+			_local l_cables << pl_sl.cable_records.an_element()
+
+			_if l_cables _isnt _unset
+			_then
+				l_cables.mcn!connect(l_result)
+				write("    >> Connected to cable")
+			_endif
+		_when error
+			# Continue if cable connection fails
+		_endtry
+
+		>> l_result
+
+	_when error
+		write("  ERROR creating figure_eight ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_olt(pm)
+	## Create OLT (Optical Line Terminal) from point placemark
+	## - Point type with name matching "*OLT*"
+	## - Saved to mit_hub collection
+	## - Scans for existing OLT within 500m radius
+	## - If found: skip creation
+	## - If not found: create new OLT
+	##
+	## Parameters:
+	##   pm - placemark property_list with :name, :coord, :parent
+
+	_try _with errCon
+		# Step 0: Validate this is an OLT
+		_if _not _self.is_olt?(pm)
+		_then
+			write("  WARNING: Skipping - not an OLT: ", pm[:name])
+			_return
+		_endif
+
+		write("  Processing OLT: ", pm[:name])
+
+		# Step 1: Get folder information
+		_local folders << pm[:parent].default("")
+		_if folders = "" _orif folders _is _unset
+		_then
+			write("  WARNING: OLT has no folder information")
+		_endif
+
+		# Step 2: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 3: Parse point geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.as_coord()
+
+		# Step 4: Scan for existing OLT within 500m
+		_local pa << pseudo_point.new(coord)
+		pa.world << .database.world
+
+		_local (found?, existing_olt) << _self.scan_olt(pa, 500)
+
+		_if found?
+		_then
+			write("  WARNING: OLT already exists nearby (", existing_olt.name, ") - skipping")
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Step 5: Create new OLT
+		_local prop_values << property_list.new_with(
+			:location, coord,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
 			:pop, .pop_name,
 			:olt, .pop_name,
 			:project, .prj_id,
@@ -523,100 +2478,133 @@ _private _method astri_design_migrator.create_pole(pm)
 			:construction_status, "Proposed"
 		)
 
-		_local rec_trans << record_transaction.new_insert(.pole_col, prop_values)
+		_local rec_trans << record_transaction.new_insert(.olt_col, prop_values)
 		_local result << rec_trans.run()
 
-		.stats[:poles] +<< 1
-		write("  ✓ Pole created: ", pm[:name])
-		>> result
+		.stats[:olts] +<< 1
+		write("  [OK] OLT created: ", pm[:name])
 
 	_when error
-		write("  ERROR creating pole ", pm[:name], ": ", condition.report_contents_string)
+		write("  ERROR creating OLT ", pm[:name], ": ", condition.report_contents_string)
 		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
 	_endtry
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_aerial_route(pm)
-	## Create aerial route (cable) from placemark
+_private _method astri_design_migrator.create_riser(pm)
+	## Create riser cable from point placemark
+	## - Point type with name matching "*riser*" (case-insensitive)
+	## - Saved to sheath_with_loc collection
+	## - Point-based cable (vertical cable connecting to building)
+	##
+	## Parameters:
+	##   pm - placemark property_list with :name, :coord, :parent
 
-	_try
-		# Parse geometry
-		_local route << _self.parse_line_geometry(pm[:coord])
+	_try _with errCon
+		# Step 0: Validate this is a riser
+		_if _not _self.is_riser?(pm)
+		_then
+			write("  WARNING: Skipping - not a riser: ", pm[:name])
+			_return
+		_endif
 
-		# Check minimum length
-		_local length << route.line_length
-		_if length < 0.4 _then _return _endif
+		write("  Processing riser: ", pm[:name])
 
-		# Simplified: assume 24 core cable
-		_local fiber_count << 24
+		# Step 1: Get folder information
+		_local folders << pm[:parent].default("")
 
-		# Create aerial route
-		_local prop_values << property_list.new_with(
-			:construction_status, "Proposed",
-			:name, pm[:name],
-			:asset_ownership, "Owned",
-			:pop, .pop_name,
-			:olt, .pop_name,
-			:fiber_count, fiber_count,
-			:fttx_network_type, "Cluster",
-			:segment, .segment_id,
-			:folders, pm[:parent],
-			:route, route,
-			:uuid, .uuid,
-			:project, .prj_id
-		)
+		# Step 2: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
 
-		_local rec_trans << record_transaction.new_insert(.ar_col, prop_values)
-		_local result << rec_trans.run()
-
-		.stats[:aerial_routes] +<< 1
-		write("  ✓ Aerial route created: ", pm[:name])
-		>> result
-
-	_when error
-		write("  ERROR creating aerial route ", pm[:name], ": ", condition.report_contents_string)
-		.stats[:errors] +<< 1
-	_endtry
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_demand_point(pm)
-	## Create demand point (home pass) from placemark
-
-	_try
-		# Parse geometry
+		# Step 3: Parse point geometry
 		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.as_coord()
 
-		# Create demand point
+		# Step 4: Create riser cable as point-based sheath_with_loc
+		# Using minimal length for point-based representation
 		_local prop_values << property_list.new_with(
-			:identification, pm[:name],
+			:location, coord,
 			:name, pm[:name],
-			:status, "Active",
-			:mdu?, _false,
-			:type, "Type 1",
-			:segment, .segment_id,
+			:folders, folders,
 			:fttx_network_type, "Cluster",
-			:folders, pm[:parent],
+			:segment, segment_id,
 			:pop, .pop_name,
 			:olt, .pop_name,
-			:notes, .prj_id,
-			:location, location,
-			:uuid, .uuid
+			:project, .prj_id,
+			:uuid, .uuid,
+			:construction_status, "Proposed",
+			:cable_type, "Riser"
 		)
 
-		_local rec_trans << record_transaction.new_insert(.dp_col, prop_values)
+		_local rec_trans << record_transaction.new_insert(.sheath_col, prop_values)
 		_local result << rec_trans.run()
 
-		.stats[:demand_points] +<< 1
-		write("  ✓ Demand point created: ", pm[:name])
-		>> result
+		.stats[:risers] +<< 1
+		write("  [OK] Riser created: ", pm[:name], " (Type: Riser)")
 
 	_when error
-		write("  ERROR creating demand point ", pm[:name], ": ", condition.report_contents_string)
+		write("  ERROR creating riser ", pm[:name], ": ", condition.report_contents_string)
 		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_access_point(pm)
+	## Create access_point from point placemark
+	## - Point type (catch-all for points not matching other types)
+	## - Saved to access_point collection
+	##
+	## Parameters:
+	##   pm - placemark property_list with :name, :coord, :parent
+
+	_try _with errCon
+		# Step 0: Validate this is an access point
+		_if _not _self.is_access_point?(pm)
+		_then
+			write("  WARNING: Skipping - not an access_point: ", pm[:name])
+			_return
+		_endif
+
+		write("  Processing access_point: ", pm[:name])
+
+		# Step 1: Get folder information
+		_local folders << pm[:parent].default("")
+
+		# Step 2: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 3: Parse point geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.as_coord()
+
+		# Step 4: Create access_point
+		_local prop_values << property_list.new_with(
+			:location, coord,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:project, .prj_id,
+			:uuid, .uuid,
+			:construction_status, "Proposed"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.ap_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:access_points] +<< 1
+		write("  [OK] Access point created: ", pm[:name])
+
+	_when error
+		write("  ERROR creating access_point ", pm[:name], ": ", condition.report_contents_string)
+		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
 	_endtry
 _endmethod
 $
@@ -625,7 +2613,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.create_sheath(pm)
 	## Create sheath splice from area placemark WITH parent folder
 
-	_try
+	_try _with errCon
 		_local parent << pm[:parent].default("")
 
 		# Only process areas WITH parent folders
@@ -638,55 +2626,168 @@ _private _method astri_design_migrator.create_sheath(pm)
 		_local area << _self.parse_area_geometry(pm[:coord])
 
 		# Create sheath (simplified)
-		write("  → Sheath/splice area: ", pm[:name], " (folder: ", parent, ")")
+		write("  >> Sheath/splice area: ", pm[:name], " (folder: ", parent, ")")
 
 		.stats[:sheaths] +<< 1
 
 	_when error
 		write("  ERROR creating sheath ", pm[:name], ": ", condition.report_contents_string)
 		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
 	_endtry
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.create_micro_cell(pm)
-	## Create micro cell / zone from area placemark WITH parent folder
+	## Create micro cell or macro cell from area placemark
+	## - Areas WITHOUT folders = Macro Cell (boundary areas)
+	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
+	## - Other areas = Skipped
 
-	_try
-		_local parent << pm[:parent].default("")
+	_try _with errCon
+		# Step 0: Parse folder hierarchy
+		_local folders << pm[:parent].default("")
+		_local fol << _unset
+		_local fsize << 0
+		_local fparent << 0
 
-		# Only process areas WITH parent folders
-		_if parent = "" _orif parent _is _unset
+		_if folders _isnt _unset _andif folders <> ""
 		_then
-			_return  # Skip boundary areas
+			fol << folders.split_by("|")
+			fsize << fol.size
+			_if fsize > 1
+			_then
+				fparent << fsize - 1
+			_else
+				fparent << fsize
+			_endif
 		_endif
+
+		# Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 1: Check if this is a MACRO CELL (boundary area without folders)
+		_if folders _is _unset _orif folders = ""
+		_then
+			write("  Processing Macro Cell: ", pm[:name])
+
+			# Parse area geometry
+			_local area << _self.parse_area_geometry(pm[:coord])
+
+			# Create Macro Cell
+			_local prop_values << property_list.new_with(
+				:identification, pm[:name],
+				:name, pm[:name],
+				:type, "Macro Cell",
+				:status, "Active",
+				:location, area,
+				:segment, segment_id,
+				:fttx_network_type, "Cluster",
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:deployment_technology, "System Default",
+				:note, folders,
+				:uuid, .uuid
+				:construction_status, "Proposed"
+			)
+
+			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
+			_local result << rec_trans.run()
+
+			.stats[:micro_cells] +<< 1
+			write("    [OK] Macro cell created: ", pm[:name], " (Type: Macro Cell)")
+			_return result
+		_endif
+
+		# Step 2: Check for LINE pattern (required for Micro Cell)
+		_local has_line << _false
+
+		_if fol[fsize] = "LINE A" _orif fol[fparent] = "LINE A" _orif
+		   fol[fsize] = "LINE B" _orif fol[fparent] = "LINE B" _orif
+		   fol[fsize] = "LINE C" _orif fol[fparent] = "LINE C" _orif
+		   fol[fsize] = "LINE D" _orif fol[fparent] = "LINE D" _orif
+		   fol[fsize] = "LINE E" _orif fol[fparent] = "LINE E"
+		_then
+			has_line << _true
+		_else
+			write("  WARNING: Skipping - no LINE pattern: ", folders)
+			_return
+		_endif
+
+		# Step 3: Check for boundary pattern (required for Micro Cell)
+		_local has_boundary << _false
+
+		_if fol[fsize] = "FAT COVERAGE" _orif fol[fparent] = "FAT COVERAGE" _orif
+		   fol[fsize] = "BOUNDARY" _orif fol[fparent] = "BOUNDARY" _orif
+		   fol[fsize] = "BOUNDARY FAT" _orif fol[fparent] = "BOUNDARY FAT" _orif
+		   fol[fsize] = "SH" _orif fol[fparent] = "SH"
+		_then
+			has_boundary << _true
+		_else
+			write("  WARNING: Skipping - no boundary pattern: ", folders)
+			_return
+		_endif
+
+		# Step 4: Valid Micro Cell - proceed with creation
+		write("  Processing Micro Cell: ", pm[:name])
 
 		# Parse area geometry
 		_local area << _self.parse_area_geometry(pm[:coord])
 
-		# Create micro cell / zone
+		# Step 5: Find splitter inside cell
+		_local s_id << _self.splitter_inside_cell(area)
+		_local nm << _unset
+
+		_if s_id _is _unset
+		_then
+			nm << fol[fsize]  # Use folder name as fallback
+		_else
+			nm << s_id        # Use splitter name
+			write("    >> Found splitter: ", s_id)
+		_endif
+
+		# Step 6: Truncate folders if needed
+		_local ff << _unset
+
+		_if folders.size > 100
+		_then
+			ff << folders.slice(1, 120)  # Truncate to 120 chars
+			write("    >> Folders truncated to 120 chars")
+		_else
+			ff << folders
+		_endif
+
+		# Step 7: Create Micro Cell
 		_local prop_values << property_list.new_with(
-			:name, pm[:name],
-			:area, area,
-			:folders, parent,
+			:identification, pm[:name],
+			:name, nm,
+			:type, "Micro Cell",
+			:status, "Active",
+			:location, area,
+			:folders, ff,
+			:segment, segment_id,
 			:fttx_network_type, "Cluster",
-			:segment, .segment_id,
 			:pop, .pop_name,
 			:olt, .pop_name,
+			:splitter_id, s_id,
+			:deployment_technology, "System Default",
+			:note, folders,
 			:uuid, .uuid
+			:construction_status, "Proposed"
 		)
 
 		_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
 		_local result << rec_trans.run()
 
 		.stats[:micro_cells] +<< 1
-		write("  ✓ Micro cell created: ", pm[:name])
+		write("    [OK] Micro cell created: ", pm[:name], " (Type: Micro Cell, Splitter: ", s_id.default("_unset"), ")")
 		>> result
 
 	_when error
-		write("  ERROR creating micro cell ", pm[:name], ": ", condition.report_contents_string)
+		write("  ERROR creating micro/macro cell ", pm[:name], ": ", condition.report_contents_string)
 		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
 	_endtry
 _endmethod
 $
@@ -696,7 +2797,7 @@ _private _method astri_design_migrator.create_area_based_object(pm)
 	## Create area-based object from placemark WITH parent folder
 	## This is a catchall for other area types
 
-	_try
+	_try _with errCon
 		_local parent << pm[:parent].default("")
 
 		# Safety check: Only process areas WITH parent folders
@@ -708,13 +2809,14 @@ _private _method astri_design_migrator.create_area_based_object(pm)
 		# Parse area geometry
 		_local area << _self.parse_area_geometry(pm[:coord])
 
-		write("  → Other area object: ", pm[:name], " (folder: ", parent, ")")
+		write("  >> Other area object: ", pm[:name], " (folder: ", parent, ")")
 
 		.stats[:areas_created] +<< 1
 
 	_when error
 		write("  ERROR creating area object ", pm[:name], ": ", condition.report_contents_string)
 		.stats[:errors] +<< 1
+		condition.raise(:user_error, :string, errCon)
 	_endtry
 _endmethod
 $
@@ -727,20 +2829,31 @@ _method astri_design_migrator.print_statistics()
 	write("=" * 60)
 	write("Design Migration Statistics")
 	write("=" * 60)
-	write("Aerial Routes:   ", .stats[:aerial_routes])
-	write("Poles:           ", .stats[:poles])
-	write("Sheaths:         ", .stats[:sheaths])
-	write("Sling Wires:     ", .stats[:sling_wires])
-	write("Demand Points:   ", .stats[:demand_points])
-	write("Micro Cells:     ", .stats[:micro_cells])
-	write("Other Areas:     ", .stats[:areas_created])
-	write("Errors:          ", .stats[:errors])
-	write("Skipped:         ", .stats[:skipped])
+	write("Aerial Routes:      ", .stats[:aerial_routes])
+	write("Poles:              ", .stats[:poles])
+	write("Sheaths:            ", .stats[:sheaths])
+	write("Sheath Splices:     ", .stats[:sheath_splices])
+	write("Optical Splitters:  ", .stats[:optical_splitters])
+	write("Figure Eights:      ", .stats[:figure_eights])
+	write("Sling Wires:        ", .stats[:sling_wires])
+	write("Demand Points:      ", .stats[:demand_points])
+	write("Customer Premises:  ", .stats[:customer_premises])
+	write("Buildings:          ", .stats[:buildings])
+	write("Micro Cells:        ", .stats[:micro_cells])
+	write("OLTs:               ", .stats[:olts])
+	write("Risers:             ", .stats[:risers])
+	write("Access Points:      ", .stats[:access_points])
+	write("Other Areas:        ", .stats[:areas_created])
+	write("Errors:             ", .stats[:errors])
+	write("Skipped:            ", .stats[:skipped])
 	write("")
 	_local total_created << .stats[:aerial_routes] + .stats[:poles] + .stats[:sheaths] +
-	                         .stats[:sling_wires] + .stats[:demand_points] +
-	                         .stats[:micro_cells] + .stats[:areas_created]
-	write("Total objects:   ", total_created)
+	                         .stats[:sheath_splices] + .stats[:optical_splitters] +
+	                         .stats[:figure_eights] + .stats[:sling_wires] +
+	                         .stats[:demand_points] + .stats[:customer_premises] +
+	                         .stats[:buildings] + .stats[:micro_cells] + .stats[:olts] +
+	                         .stats[:risers] + .stats[:access_points] + .stats[:areas_created]
+	write("Total objects:      ", total_created)
 	write("=" * 60)
 _endmethod
 $

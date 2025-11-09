@@ -83,12 +83,12 @@ _method rwwi_astri_workorder_engine.get_workorders_from_api(
 
 		# DEMO MODE: Prepend dummy data with KMZ UUID
 		dummy_data << _self.create_dummy_workorder_data()
-		_if dummy_data _isnt _unset
+		_if dummy_data _isnt _unset _andif dummy_data.size > 0
 		_then
-			write("=== DEMO MODE: Adding dummy work order as first record ===")
+			write("=== DEMO MODE: Adding ", dummy_data.size, " dummy work orders as first records ===")
 			# Create new rope with dummy data first, then API results
 			combined_rope << rope.new()
-			combined_rope.add(dummy_data)
+			combined_rope.add_all_last(dummy_data)
 			combined_rope.add_all_last(workorders)
 			workorders << combined_rope
 		_endif
@@ -114,16 +114,91 @@ _private _method rwwi_astri_workorder_engine.create_dummy_workorder_data()
 	## Create dummy work order data for demo/testing purposes
 	##
 	## Returns:
-	##   property_list - Dummy work order with KMZ UUID
+	##   rope of property_lists - Multiple dummy work orders with KMZ UUIDs
 	##
 	## Demo Data Specification:
-	##   - kmz_uuid: 2989eecc-3fd0-402c-bd81-99e02caa7ef5
-	##   - cluster_name: PRE ABD_KEBON PALA RW 09_873 HP
-	##   - cluster_code: JKT00001
-	##   - Other fields: Representative values for testing
+	##   1. Feeder:    WO/PLB/2025/DEMO/10101, PLB10101, ffa84dd4-8128-47dc-aabc-6c7e216c1cd3
+	##   2. Subfeeder: WO/PLB/2025/DEMO/10102, PLB10102, e8932c87-e0f6-42d3-81c2-4a05fbd673af
+	##   3. Cluster:   WO/PLB/2025/DEMO/10103, PLB10103, 4ea5751b-ba8b-4771-86df-1d0225fddc0f
+	##   4. Legacy:    WO/JKT/2025/DEMO/00001, JKT00001, 2989eecc-3fd0-402c-bd81-99e02caa7ef5
 
 	_try
-		_local dummy << property_list.new_with(
+		_local result_rope << rope.new()
+
+		# 1. Feeder work order
+		_local feeder << property_list.new_with(
+			# Primary identifiers
+			:uuid, "demo-wo-10101",
+			:wo_number, "WO/PLB/2025/DEMO/10101",
+
+			# KMZ UUID for download testing
+			:kmz_uuid, "ffa84dd4-8128-47dc-aabc-6c7e216c1cd3",
+
+			# Cluster information
+			:cluster_code, "PLB10101",
+			:cluster_name, "FEEDER PLB10101 - Demo Feeder Network",
+			:topology, "AE",
+
+			# Work order metadata
+			:category, "Feeder BOQ",
+			:status, "in_progress",
+			:vendor, "Demo Cluster Vendor Ltd",
+
+			# Timestamps
+			:created_at, date_time.now().write_string)
+
+		result_rope.add(feeder)
+
+		# 2. Subfeeder work order
+		_local subfeeder << property_list.new_with(
+			# Primary identifiers
+			:uuid, "demo-wo-10102",
+			:wo_number, "WO/PLB/2025/DEMO/10102",
+
+			# KMZ UUID for download testing
+			:kmz_uuid, "e8932c87-e0f6-42d3-81c2-4a05fbd673af",
+
+			# Cluster information
+			:cluster_code, "PLB10102",
+			:cluster_name, "SUBFEEDER PLB10102 - Demo Subfeeder Network",
+			:topology, "AE",
+
+			# Work order metadata
+			:category, "Subfeeder BOQ",
+			:status, "in_progress",
+			:vendor, "Demo Subfeeder Vendor Ltd",
+
+			# Timestamps
+			:created_at, date_time.now().write_string)
+
+		result_rope.add(subfeeder)
+
+		# 3. Cluster work order
+		_local cluster << property_list.new_with(
+			# Primary identifiers
+			:uuid, "demo-wo-10103",
+			:wo_number, "WO/PLB/2025/DEMO/10103",
+
+			# KMZ UUID for download testing
+			:kmz_uuid, "4ea5751b-ba8b-4771-86df-1d0225fddc0f",
+
+			# Cluster information
+			:cluster_code, "PLB10103",
+			:cluster_name, "CLUSTER PLB10103 - Demo Cluster Network",
+			:topology, "AE",
+
+			# Work order metadata
+			:category, "Cluster BOQ",
+			:status, "in_progress",
+			:vendor, "Demo Cluster Vendor Ltd",
+
+			# Timestamps
+			:created_at, date_time.now().write_string)
+
+		result_rope.add(cluster)
+
+		# 4. Legacy work order (for backward compatibility)
+		_local legacy << property_list.new_with(
 			# Primary identifiers
 			:uuid, "demo-wo-00001",
 			:wo_number, "WO/JKT/2025/DEMO/00001",
@@ -139,22 +214,24 @@ _private _method rwwi_astri_workorder_engine.create_dummy_workorder_data()
 			# Work order metadata
 			:category, "Cluster BOQ",
 			:status, "in_progress",
-			:vendor, "Demo Vendor Ltd",
+			:vendor, "Demo Feeder Vendor Ltd",
 
 			# Timestamps
 			:created_at, date_time.now().write_string)
 
-		write("Created dummy work order data:")
-		write("  UUID: ", dummy[:uuid])
-		write("  WO Number: ", dummy[:wo_number])
-		write("  KMZ UUID: ", dummy[:kmz_uuid])
-		write("  Cluster: ", dummy[:cluster_code], " - ", dummy[:cluster_name])
+		result_rope.add(legacy)
 
-		_return dummy
+		write("Created ", result_rope.size, " dummy work orders:")
+		_for wo _over result_rope.fast_elements()
+		_loop
+			write("  ", wo[:wo_number], " (", wo[:cluster_code], ") - KMZ: ", wo[:kmz_uuid])
+		_endloop
+
+		_return result_rope
 
 	_when error
 		write("WARNING: Failed to create dummy work order data:", condition.report_contents_string)
-		_return _unset
+		_return rope.new()
 	_endtry
 _endmethod
 $

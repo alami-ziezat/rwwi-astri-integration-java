@@ -132,7 +132,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 		:model, _self,
 		:display_length, 15,
 		:editable?, _false)
-	.items[:filter_status].text_items << {"All", "draft", "in_progress", "completed", "cancelled"}
+	.items[:filter_status].text_items << {"All", "new", "in_progress", "closed", "cancelled", "successful"}
 	.items[:filter_status].value << "All"
 
 	sw_label_item.new(filter_toolbar, "  Topology:  ")
@@ -581,7 +581,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 	write("Migrating KML to Design objects for UUID:", kmz_uuid)
 
-	_try
+	_try _with errCon
 		# Use Scenario 2: Download files to disk, then read KML file
 		_local output_dir << system.getenv("TEMP").default("C:\temp")
 		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
@@ -619,7 +619,6 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 			# Get project ID and segment ID from work order
 			_local prj_id << wo[:uuid]         # Work order UUID field
-			_local segment_id << wo[:kmz_uuid]  # Work order KMZ UUID field
 
 			# Create design migrator
 			write("Creating design migrator...")
@@ -631,7 +630,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				_return
 			_endif
 
-			_local migrator << astri_design_migrator.new(database, prj_id, segment_id, pop_name)
+			_local migrator << astri_design_migrator.new(database, prj_id, kml_uuid, pop_name)
 
 			# Create project and design
 			write("Initiate: Creating project and design...")
@@ -673,8 +672,6 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				"All objects have been created in the design alternative.", %newline,
 				"Object tagging:", %newline,
 				"  - prj_id:     ", prj_id, %newline,
-				"  - segment_id: ", segment_id, %newline,
-				"  - uuid:       ", segment_id, %newline,
 				"Boundary area (parent=null) was used for project extent only.", %newline,
 				"The design is now active. You can review and modify objects before posting.")
 
@@ -690,7 +687,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 	_when error
 		_self.user_error(write_string("Error migrating to design:", %newline,
-			condition.report_contents_string))
+					      errCon))
 	_endtry
 _endmethod
 $
