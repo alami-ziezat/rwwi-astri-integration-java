@@ -124,7 +124,8 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 	.items[:filter_infrastructure] << sw_text_item.new(filter_toolbar,
 		:model, _self,
 		:display_length, 12,
-		:editable?, _false)
+		:editable?, _false,
+		:change_selector, {:|infrastructure_type_changed()|})
 	.items[:filter_infrastructure].text_items << {"cluster", "subfeeder", "feeder"}
 	.items[:filter_infrastructure].value << "cluster"
 
@@ -144,7 +145,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 	.items[:filter_status].text_items << {"All", "new", "in_progress", "closed", "cancelled", "successful"}
 	.items[:filter_status].value << "All"
 
-	sw_label_item.new(filter_toolbar, "  Topology:  ")
+	.items[:label_topology] << sw_label_item.new(filter_toolbar, "  Topology:  ")
 	.items[:filter_topology] << sw_text_item.new(filter_toolbar,
 		:model, _self,
 		:display_length, 10,
@@ -155,7 +156,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 	# Create third toolbar for cluster filter and pagination
 	pagination_toolbar << toolbar_con.create_toolbar()
 
-	sw_label_item.new(pagination_toolbar, "  Cluster Code:  ")
+	.items[:label_code] << sw_label_item.new(pagination_toolbar, "  Cluster Code:  ")
 	.items[:filter_cluster] << sw_text_item.new(pagination_toolbar,
 		:model, _self,
 		:display_length, 20,
@@ -350,6 +351,46 @@ _method rwwi_astri_workorder_dialog.source_selection()
 
 	write("Source changed to:", .filters[:source])
 	_self.refresh_data()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.infrastructure_type_changed()
+	## Handle infrastructure type selection change
+	## Update UI elements based on selected infrastructure type
+
+	_local infra_type << .items[:filter_infrastructure].value.default("cluster")
+
+	write("Infrastructure type changed to:", infra_type)
+
+	# Update label text and topology visibility based on infrastructure type
+	_if infra_type = "cluster"
+	_then
+		# Cluster: show topology, label = "Cluster Code"
+		.items[:label_code].label_string << "  Cluster Code:  "
+		.items[:label_topology].visible? << _true
+		.items[:filter_topology].visible? << _true
+		.items[:filter_topology].enabled? << _true
+
+	_elif infra_type = "subfeeder"
+	_then
+		# Subfeeder: hide topology, label = "Subfeeder Code"
+		.items[:label_code].label_string << "  Subfeeder Code:  "
+		.items[:label_topology].visible? << _false
+		.items[:filter_topology].visible? << _false
+		.items[:filter_topology].enabled? << _false
+
+	_elif infra_type = "feeder"
+	_then
+		# Feeder: hide topology, label = "Feeder Code"
+		.items[:label_code].label_string << "  Feeder Code:  "
+		.items[:label_topology].visible? << _false
+		.items[:filter_topology].visible? << _false
+		.items[:filter_topology].enabled? << _false
+	_endif
+
+	# Update the stored infrastructure type in filters
+	.filters[:infrastructure_type] << infra_type
 _endmethod
 $
 
