@@ -86,11 +86,11 @@ _method rwwi_astri_workorder_engine.get_workorders_from_api(
 		# Parse XML response using simple_xml
 		workorders << _self.parse_xml_response(xml_result, infrastructure_type)
 
-		# DEMO MODE: Prepend dummy data with KMZ UUID
-		dummy_data << _self.create_dummy_workorder_data()
+		# DEMO MODE: Prepend dummy data with KMZ UUID (filtered by infrastructure type)
+		dummy_data << _self.create_dummy_workorder_data(infrastructure_type)
 		_if dummy_data _isnt _unset _andif dummy_data.size > 0
 		_then
-			write("=== DEMO MODE: Adding ", dummy_data.size, " dummy work orders as first records ===")
+			write("=== DEMO MODE: Adding ", dummy_data.size, " dummy work orders (", infrastructure_type, ") as first records ===")
 			# Create new rope with dummy data first, then API results
 			combined_rope << rope.new()
 			combined_rope.add_all_last(dummy_data)
@@ -115,118 +115,129 @@ _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
-_private _method rwwi_astri_workorder_engine.create_dummy_workorder_data()
+_private _method rwwi_astri_workorder_engine.create_dummy_workorder_data(infrastructure_type)
 	## Create dummy work order data for demo/testing purposes
 	##
+	## Parameters:
+	##   infrastructure_type (string) - Infrastructure type: "cluster", "subfeeder", or "feeder"
+	##
 	## Returns:
-	##   rope of property_lists - Multiple dummy work orders with KMZ UUIDs
+	##   rope of property_lists - Dummy work orders filtered by infrastructure type
 	##
 	## Demo Data Specification:
-	##   1. Feeder:    WO/PLB/2025/DEMO/10101, PLB10101, ffa84dd4-8128-47dc-aabc-6c7e216c1cd3
-	##   2. Subfeeder: WO/PLB/2025/DEMO/10102, PLB10102, e8932c87-e0f6-42d3-81c2-4a05fbd673af
-	##   3. Cluster:   WO/PLB/2025/DEMO/10103, PLB10103, 4ea5751b-ba8b-4771-86df-1d0225fddc0f
-	##   4. Legacy:    WO/JKT/2025/DEMO/00001, JKT00001, 2989eecc-3fd0-402c-bd81-99e02caa7ef5
+	##   Feeder:    WO/PLB/2025/DEMO/10101, PLB10101, ffa84dd4-8128-47dc-aabc-6c7e216c1cd3
+	##   Subfeeder: WO/PLB/2025/DEMO/10102, PLB10102, e8932c87-e0f6-42d3-81c2-4a05fbd673af
+	##   Cluster:   WO/PLB/2025/DEMO/10103, PLB10103, 4ea5751b-ba8b-4771-86df-1d0225fddc0f
+	##              WO/JKT/2025/DEMO/00001, JKT00001, 2989eecc-3fd0-402c-bd81-99e02caa7ef5
 
 	_try
 		_local result_rope << rope.new()
 
-		# 1. Feeder work order
-		_local feeder << property_list.new_with(
-			# Primary identifiers
-			:uuid, "demo-wo-10101",
-			:wo_number, "WO/PLB/2025/DEMO/10101",
+		# Return dummy data based on infrastructure type
+		_if infrastructure_type = "feeder"
+		_then
+			# Feeder work order
+			_local feeder << property_list.new_with(
+				# Primary identifiers
+				:uuid, "demo-wo-10101",
+				:wo_number, "WO/PLB/2025/DEMO/10101",
 
-			# KMZ UUID for download testing
-			:kmz_uuid, "ffa84dd4-8128-47dc-aabc-6c7e216c1cd3",
+				# KMZ UUID for download testing
+				:kmz_uuid, "ffa84dd4-8128-47dc-aabc-6c7e216c1cd3",
 
-			# Cluster information
-			:cluster_code, "PLB10101",
-			:cluster_name, "FEEDER PLB10101 - Demo Feeder Network",
-			:topology, "AE",
+				# Infrastructure information
+				:cluster_code, "PLB10101",
+				:cluster_name, "FEEDER PLB10101 - Demo Feeder Network",
+				:topology, "",  # No topology for feeder
 
-			# Work order metadata
-			:category, "Feeder BOQ",
-			:status, "in_progress",
-			:vendor, "Demo Cluster Vendor Ltd",
+				# Work order metadata
+				:category, "Feeder BOQ",
+				:status, "in_progress",
+				:vendor, "Demo Feeder Vendor Ltd",
 
-			# Timestamps
-			:created_at, date_time.now().write_string)
+				# Timestamps
+				:created_at, date_time.now().write_string)
 
-		result_rope.add(feeder)
+			result_rope.add(feeder)
 
-		# 2. Subfeeder work order
-		_local subfeeder << property_list.new_with(
-			# Primary identifiers
-			:uuid, "demo-wo-10102",
-			:wo_number, "WO/PLB/2025/DEMO/10102",
+		_elif infrastructure_type = "subfeeder"
+		_then
+			# Subfeeder work order
+			_local subfeeder << property_list.new_with(
+				# Primary identifiers
+				:uuid, "demo-wo-10102",
+				:wo_number, "WO/PLB/2025/DEMO/10102",
 
-			# KMZ UUID for download testing
-			:kmz_uuid, "e8932c87-e0f6-42d3-81c2-4a05fbd673af",
+				# KMZ UUID for download testing
+				:kmz_uuid, "e8932c87-e0f6-42d3-81c2-4a05fbd673af",
 
-			# Cluster information
-			:cluster_code, "PLB10102",
-			:cluster_name, "SUBFEEDER PLB10102 - Demo Subfeeder Network",
-			:topology, "AE",
+				# Infrastructure information
+				:cluster_code, "PLB10102",
+				:cluster_name, "SUBFEEDER PLB10102 - Demo Subfeeder Network",
+				:topology, "",  # No topology for subfeeder
 
-			# Work order metadata
-			:category, "Subfeeder BOQ",
-			:status, "in_progress",
-			:vendor, "Demo Subfeeder Vendor Ltd",
+				# Work order metadata
+				:category, "Subfeeder BOQ",
+				:status, "in_progress",
+				:vendor, "Demo Subfeeder Vendor Ltd",
 
-			# Timestamps
-			:created_at, date_time.now().write_string)
+				# Timestamps
+				:created_at, date_time.now().write_string)
 
-		result_rope.add(subfeeder)
+			result_rope.add(subfeeder)
 
-		# 3. Cluster work order
-		_local cluster << property_list.new_with(
-			# Primary identifiers
-			:uuid, "demo-wo-10103",
-			:wo_number, "WO/PLB/2025/DEMO/10103",
+		_elif infrastructure_type = "cluster"
+		_then
+			# Cluster work order
+			_local cluster << property_list.new_with(
+				# Primary identifiers
+				:uuid, "demo-wo-10103",
+				:wo_number, "WO/PLB/2025/DEMO/10103",
 
-			# KMZ UUID for download testing
-			:kmz_uuid, "4ea5751b-ba8b-4771-86df-1d0225fddc0f",
+				# KMZ UUID for download testing
+				:kmz_uuid, "4ea5751b-ba8b-4771-86df-1d0225fddc0f",
 
-			# Cluster information
-			:cluster_code, "PLB10103",
-			:cluster_name, "CLUSTER PLB10103 - Demo Cluster Network",
-			:topology, "AE",
+				# Infrastructure information
+				:cluster_code, "PLB10103",
+				:cluster_name, "CLUSTER PLB10103 - Demo Cluster Network",
+				:topology, "AE",  # Cluster has topology
 
-			# Work order metadata
-			:category, "Cluster BOQ",
-			:status, "in_progress",
-			:vendor, "Demo Cluster Vendor Ltd",
+				# Work order metadata
+				:category, "Cluster BOQ",
+				:status, "in_progress",
+				:vendor, "Demo Cluster Vendor Ltd",
 
-			# Timestamps
-			:created_at, date_time.now().write_string)
+				# Timestamps
+				:created_at, date_time.now().write_string)
 
-		result_rope.add(cluster)
+			result_rope.add(cluster)
 
-		# 4. Legacy work order (for backward compatibility)
-		_local legacy << property_list.new_with(
-			# Primary identifiers
-			:uuid, "demo-wo-00001",
-			:wo_number, "WO/JKT/2025/DEMO/00001",
+			# Legacy cluster work order (for backward compatibility)
+			_local legacy << property_list.new_with(
+				# Primary identifiers
+				:uuid, "demo-wo-00001",
+				:wo_number, "WO/JKT/2025/DEMO/00001",
 
-			# KMZ UUID for download testing
-			:kmz_uuid, "2989eecc-3fd0-402c-bd81-99e02caa7ef5",
+				# KMZ UUID for download testing
+				:kmz_uuid, "2989eecc-3fd0-402c-bd81-99e02caa7ef5",
 
-			# Cluster information
-			:cluster_code, "JKT00001",
-			:cluster_name, "PRE ABD_KEBON PALA RW 09_873 HP",
-			:topology, "AE",
+				# Infrastructure information
+				:cluster_code, "JKT00001",
+				:cluster_name, "PRE ABD_KEBON PALA RW 09_873 HP",
+				:topology, "AE",  # Cluster has topology
 
-			# Work order metadata
-			:category, "Cluster BOQ",
-			:status, "in_progress",
-			:vendor, "Demo Feeder Vendor Ltd",
+				# Work order metadata
+				:category, "Cluster BOQ",
+				:status, "in_progress",
+				:vendor, "Demo Feeder Vendor Ltd",
 
-			# Timestamps
-			:created_at, date_time.now().write_string)
+				# Timestamps
+				:created_at, date_time.now().write_string)
 
-		result_rope.add(legacy)
+			result_rope.add(legacy)
+		_endif
 
-		write("Created ", result_rope.size, " dummy work orders:")
+		write("Created ", result_rope.size, " dummy work orders for infrastructure type: ", infrastructure_type)
 		_for wo _over result_rope.fast_elements()
 		_loop
 			write("  ", wo[:wo_number], " (", wo[:cluster_code], ") - KMZ: ", wo[:kmz_uuid])
