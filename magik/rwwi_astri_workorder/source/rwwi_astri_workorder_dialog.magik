@@ -990,21 +990,17 @@ _private _method rwwi_astri_workorder_dialog.check_project_and_design_exist(wo)
 			_return _false, _false
 		_endif
 
-		# Get design manager
-		_local design_manager << swg_dsn_admin_engine
+		# Get design admin dataset
+		_local design_admin << gis_program_manager.cached_dataset(:design_admin)
+		_if design_admin _is _unset
+		_then
+			write("LOG: ERROR - design_admin dataset not available")
+			_return _false, _false
+		_endif
 
 		# Check if project exists by name (wo_number)
-		_local projects << design_manager.projects
-		_local project << _unset
-
-		_for prj _over projects.fast_elements()
-		_loop
-			_if prj.name = wo_number
-			_then
-				project << prj
-				_leave
-			_endif
-		_endloop
+		_local project_col << design_admin.collections[:swg_dsn_project]
+		_local project << project_col.select(predicate.eq(:name, wo_number)).an_element()
 
 		_if project _is _unset
 		_then
@@ -1046,19 +1042,17 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 			_return _unset
 		_endif
 
-		# Get design manager
-		_local design_manager << swg_dsn_admin_engine
+		# Get design admin dataset
+		_local design_admin << gis_program_manager.cached_dataset(:design_admin)
+		_if design_admin _is _unset
+		_then
+			write("LOG: ERROR - design_admin dataset not available")
+			_return _unset
+		_endif
 
 		# Find project by name (wo_number)
-		_local project << _unset
-		_for prj _over design_manager.projects.fast_elements()
-		_loop
-			_if prj.name = wo_number
-			_then
-				project << prj
-				_leave
-			_endif
-		_endloop
+		_local project_col << design_admin.collections[:swg_dsn_project]
+		_local project << project_col.select(predicate.eq(:name, wo_number)).an_element()
 
 		_if project _is _unset
 		_then
@@ -1074,9 +1068,9 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 			_return _unset
 		_endif
 
-		# Activate the design
+		# Activate the design using swg_dsn_admin_engine
 		write("Activating design:", scheme.name, "(ID:", scheme.id, ")")
-		design_manager.activate_design(scheme)
+		swg_dsn_admin_engine.activate_design(scheme)
 
 		_return scheme
 
