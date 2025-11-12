@@ -329,8 +329,11 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		# Build field names dynamically based on infrastructure type
 		# cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
 		# subfeeder: target_subfeeder_code, target_subfeeder_name (no topology)
-		# feeder:    target_feeder_code, target_feeder_name (no topology)
-		_local code_field << write_string("target_", infrastructure_type, "_code").as_symbol()
+		# feeder:    target_osp_route_area, target_feeder_name (no topology)
+		_local code_field << _if infrastructure_type = "feeder"
+		                     _then >> :target_osp_route_area
+		                     _else >> write_string("target_", infrastructure_type, "_code").as_symbol()
+		                     _endif
 		_local name_field << write_string("target_", infrastructure_type, "_name").as_symbol()
 
 		# Topology field only exists for cluster infrastructure type
