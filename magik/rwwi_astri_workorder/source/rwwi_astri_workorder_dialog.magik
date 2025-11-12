@@ -268,11 +268,17 @@ _private _method rwwi_astri_workorder_dialog.build_detail_panel(parent)
 	#	:selector, :migrate_as_temporary|()|)
 	#.items[:migrate_temp_btn].enabled? << _false
 
-	.items[:construction_btn] << sw_button_item.new(button_con,
-		:label, "Mark Construction",
+	.items[:boq_excel_btn] << sw_button_item.new(button_con,
+		:label, "Generate BoQ as Excel",
 		:model, _self,
-		:selector, :mark_construction|()|)
-	.items[:construction_btn].enabled? << _false
+		:selector, :generate_boq_excel|()|)
+	.items[:boq_excel_btn].enabled? << _false
+
+	.items[:boq_json_btn] << sw_button_item.new(button_con,
+		:label, "Generate BoQ as JSON",
+		:model, _self,
+		:selector, :generate_boq_json|()|)
+	.items[:boq_json_btn].enabled? << _false
 _endmethod
 $
 
@@ -513,7 +519,8 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:kmz_btn].enabled? << _false
 		.items[:migrate_design_btn].enabled? << _false
 		#.items[:migrate_temp_btn].enabled? << _false
-		.items[:construction_btn].enabled? << _false
+		.items[:boq_excel_btn].enabled? << _false
+		.items[:boq_json_btn].enabled? << _false
 	_else
 		.items[:detail_uuid].value << write_string("UUID: ", wo[:uuid].default(""))
 		.items[:detail_cluster].value << write_string("Cluster: ",
@@ -523,9 +530,8 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 			"  |  Category: ", wo[:category].default(""),
 			"  |  Status: ", wo[:status].default(""))
 
-		# Always enable detail and construction buttons
+		# Always enable detail button
 		.items[:detail_btn].enabled? << _true
-		.items[:construction_btn].enabled? << _true
 
 		# Enable KMZ-related buttons only if kmz_uuid is present
 		_local kmz_uuid << wo[:kmz_uuid]
@@ -534,6 +540,11 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:kmz_btn].enabled? << has_kmz
 		.items[:migrate_design_btn].enabled? << has_kmz
 		#.items[:migrate_temp_btn].enabled? << has_kmz
+
+		# Enable BoQ buttons only if project and design exist
+		_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
+		.items[:boq_excel_btn].enabled? << has_project _and has_design
+		.items[:boq_json_btn].enabled? << has_project _and has_design
 	_endif
 _endmethod
 $
@@ -959,6 +970,239 @@ _private _method rwwi_astri_workorder_dialog.format_placemark_display(index, pm)
 	_endif
 
 	>> msg
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.check_project_and_design_exist(wo)
+	## Check if project and design exist in Smallworld for this work order
+	##
+	## Parameters:
+	##   wo (property_list) - Work order data
+	##
+	## Returns:
+	##   (boolean, boolean) - (has_project?, has_design?)
+
+	_try
+		_local wo_number << wo[:wo_number]
+		_if wo_number _is _unset _orif wo_number = ""
+		_then
+			_return _false, _false
+		_endif
+
+		# Get design manager
+		_local design_manager << swg_dsn_admin_engine
+
+		# Check if project exists by name (wo_number)
+		_local projects << design_manager.projects
+		_local project << _unset
+
+		_for prj _over projects.fast_elements()
+		_loop
+			_if prj.name = wo_number
+			_then
+				project << prj
+				_leave
+			_endif
+		_endloop
+
+		_if project _is _unset
+		_then
+			_return _false, _false
+		_endif
+
+		# Check if project has any schemes (designs)
+		_local schemes << project.top_schemes
+		_if schemes _is _unset _orif schemes.empty?
+		_then
+			_return _true, _false
+		_endif
+
+		# Project and design exist
+		_return _true, _true
+
+	_when error
+		write("ERROR checking project/design:", condition.report_contents_string)
+		_return _false, _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
+	## Find and activate the design for the given work order
+	##
+	## Parameters:
+	##   wo (property_list) - Work order data
+	##
+	## Returns:
+	##   scheme - The activated scheme, or _unset if failed
+
+	_try
+		_local wo_number << wo[:wo_number]
+		_if wo_number _is _unset _orif wo_number = ""
+		_then
+			write("ERROR: No work order number")
+			_return _unset
+		_endif
+
+		# Get design manager
+		_local design_manager << swg_dsn_admin_engine
+
+		# Find project by name (wo_number)
+		_local project << _unset
+		_for prj _over design_manager.projects.fast_elements()
+		_loop
+			_if prj.name = wo_number
+			_then
+				project << prj
+				_leave
+			_endif
+		_endloop
+
+		_if project _is _unset
+		_then
+			write("ERROR: Project not found for WO:", wo_number)
+			_return _unset
+		_endif
+
+		# Get first scheme (design) from project
+		_local scheme << project.top_schemes.an_element()
+		_if scheme _is _unset
+		_then
+			write("ERROR: No design found in project:", wo_number)
+			_return _unset
+		_endif
+
+		# Activate the design
+		write("Activating design:", scheme.name, "(ID:", scheme.id, ")")
+		design_manager.activate_design(scheme)
+
+		_return scheme
+
+	_when error
+		write("ERROR activating design:", condition.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.generate_boq_excel()
+	## Generate Bill of Quantities as Excel file
+	## Calls the global create_boq procedure from rwwi_astri_boq.magik
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+
+	# Check if project and design exist
+	_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
+	_if _not (has_project _and has_design)
+	_then
+		_self.user_error("Project and design must exist before generating BoQ")
+		_return
+	_endif
+
+	write("Generating BoQ as Excel for WO:", wo[:wo_number])
+
+	_try
+		# Activate the design first
+		_local scheme << _self.activate_design_for_wo(wo)
+		_if scheme _is _unset
+		_then
+			_self.user_error("Failed to activate design. Cannot generate BoQ.")
+			_return
+		_endif
+
+		# Call the global create_boq procedure
+		write("Calling create_boq procedure...")
+		create_boq()
+
+		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
+			scheme.name))
+
+	_when error
+		_self.user_error(write_string("Error generating BoQ as Excel:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.generate_boq_json()
+	## Generate Bill of Quantities as JSON property list
+	## Calls the global create_pl_boq procedure from rwwi_astri_boq.magik
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+
+	# Check if project and design exist
+	_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
+	_if _not (has_project _and has_design)
+	_then
+		_self.user_error("Project and design must exist before generating BoQ")
+		_return
+	_endif
+
+	write("Generating BoQ as JSON for WO:", wo[:wo_number])
+
+	_try
+		# Activate the design first
+		_local scheme << _self.activate_design_for_wo(wo)
+		_if scheme _is _unset
+		_then
+			_self.user_error("Failed to activate design. Cannot generate BoQ.")
+			_return
+		_endif
+
+		# Call the global create_pl_boq procedure with "json" type
+		write("Calling create_pl_boq procedure...")
+		_local boq_result << create_pl_boq("json")
+
+		# Display result summary
+		_if boq_result _isnt _unset _andif boq_result.size > 0
+		_then
+			_local msg << write_string(
+				"BoQ JSON generation completed successfully", %newline,
+				"Design: ", scheme.name, %newline,
+				"Total items: ", boq_result.size, %newline,
+				%newline,
+				"Sample items:", %newline)
+
+			# Show first 5 items as preview
+			_local count << 0
+			_for item _over boq_result.fast_elements()
+			_loop
+				count +<< 1
+				_if count > 5 _then _leave _endif
+
+				msg << msg + write_string(
+					"  - ", item[:object].default(""), ": ",
+					item[:name].default(""), %newline,
+					"    Code: ", item[:code].default(""),
+					", Material: ", item[:material].default("N/A"),
+					", Service: ", item[:service].default("N/A"), %newline)
+			_endloop
+
+			_self.user_info(msg)
+		_else
+			_self.user_info("BoQ JSON generation completed but no items found")
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error generating BoQ as JSON:", %newline,
+			condition.report_contents_string))
+	_endtry
 _endmethod
 $
 
