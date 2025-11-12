@@ -34,15 +34,20 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 		_local pp << pseudo_point.new(coord)
 		pp.world << .database.world
 
-		# Step 3: Find or create pole within 700m
-		_local (h, pl_sl) << _self.scan_pole_st(pp, 700)
+		# Step 3: Find or create pole within 100m
+		_local (found, n_obj) << _self.scan_olt(pp, 700)
+		_if _not found
+		_then
+			(found, n_obj) << _self.scan_pole_st(pp, 700)			
+		_endif
+
 		_local sh_loc << _unset
 
-		_if h _is _true
+		_if found _is _true
 		_then
 			# Pole found - use existing pole
-			sh_loc << pl_sl.location.coord
-			write("    >> Found existing pole within 700m: ", pl_sl.telco_pole_tag)
+			sh_loc << n_obj.location.coord
+			write("    >> Found existing structure within 100m: ", n_obj)
 		_else
 			# No pole found - create placeholder pole
 			write("    >> Creating placeholder pole for slack")
@@ -83,7 +88,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 			)
 
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
-			pl_sl << l_rec_trans_pl.run()
+			n_obj << l_rec_trans_pl.run()
 
 			.stats[:poles] +<< 1
 			write("    >> Placeholder pole created")
@@ -111,10 +116,10 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 
 		# Step 4: Associate to pole structure
 		_try
-			_if pl_sl _isnt _unset
+			_if n_obj _isnt _unset
 			_then
-				l_result.associate_to_structure(pl_sl)
-				write("    >> Associated to pole: ", pl_sl.telco_pole_tag)
+				l_result.associate_to_structure(n_obj)
+				write("    >> Associated to structure: ",n_obj)
 			_endif
 		_when error
 			# Continue if association fails
@@ -122,7 +127,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 
 		# Step 5: Connect to cable if available
 		_try
-			_local l_cables << pl_sl.cable_records.an_element()
+			_local l_cables << n_obj.cable_records.an_element()
 
 			_if l_cables _isnt _unset
 			_then

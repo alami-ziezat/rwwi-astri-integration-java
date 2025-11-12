@@ -159,24 +159,68 @@ _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.extract_boundary_area(placemarks)
 	## Extract boundary area placemark from placemarks
 	## The boundary area is an area with parent = null or empty
+	## If no boundary area is found, create a convex hull from all placemark points
 	##
 	## Parameters:
 	##   placemarks (rope) - All placemarks
 	##
 	## Returns:
-	##   property_list - Boundary area placemark, or _unset if not found
+	##   property_list - Boundary area placemark (real or synthetic from convex hull)
 
+	_dynamic !print_float_precision! << 16
 	_for pm _over placemarks.fast_elements()
 	_loop
 		_if _self.is_boundary_area?(pm)
 		_then
 			write("  Found boundary area: ", pm[:name])
-			_return pm
+			_return _self.parse_line_geometry(pm[:coord])
 		_endif
 	_endloop
 
 	write("  WARNING: No boundary area found (area with parent=null/empty)")
-	_return _unset
+	write("  Creating convex hull from all placemark points...")
+
+	# Collect all point coordinates from placemarks
+	_local point_rope << rope.new()
+	_for pm _over placemarks.fast_elements()
+	_loop
+		_if pm[:coord] _isnt _unset _andif pm[:coord] <> ""
+		_then
+			_try
+				_local coord_string << pm[:coord]
+				# Parse coordinate string
+				_local coord_parts << coord_string.split_by(",")
+				_if coord_parts.size >= 2
+				_then
+					_local lon << coord_parts[1].as_number()
+					_local lat << coord_parts[2].as_number()
+					_local wgs84_coord << coordinate.new(lon, lat)
+					_local local_coord << .transform.convert(wgs84_coord)
+					point_rope.add_last(local_coord)
+				_endif
+			_when error
+				# Skip invalid coordinates
+				write("  WARNING: Could not parse coordinate for placemark: ", pm[:name].default("(unnamed)"))
+			_endtry
+		_endif
+	_endloop
+
+	_if point_rope.size < 3
+	_then
+		write("  ERROR: Not enough points to create convex hull (need at least 3, found ", point_rope.size, ")")
+		_return _unset
+	_endif
+
+	# Create convex hull from collected points
+	_local convex_hull << sector_rope.new_convex_hull(point_rope)
+	_if convex_hull _is _unset
+	_then
+		write("  ERROR: Failed to create convex hull from placemark points")
+		_return _unset
+	_endif
+
+	write("  Created convex hull boundary from ", point_rope.size, " placemark points")
+	_return convex_hull
 _endmethod
 $
 
@@ -193,7 +237,6 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, c
 	## Returns:
 	##   (project, scheme) - Created project and scheme objects
 
-	!traceback!()
 	write("Creating project and design...")
 	_local sch
 
@@ -201,6 +244,7 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, c
 	_if prj _isnt _unset
 	_then
 		# Check design is exist or not
+		write("Project exist...")
 		sch << prj.top_schemes.an_element()
 	_endif
 
@@ -217,61 +261,42 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, c
 
 	_if prj _is _unset
 	_then
-	# Extract boundary area from placemarks
-	_local boundary_pm << _self.extract_boundary_area(placemarks)
-	_local area_sr << _unset
-	_global wo,dsn,ageo,attr
+		write("Creating project...")
+		# Extract boundary area from placemarks
+		_local area_sr << _self.extract_boundary_area(placemarks)
+		# Ensure it's closed
 
-	_if boundary_pm _isnt _unset
-	_then
-		# Parse boundary area geometry
-		_try
-			area_sr << _self.parse_line_geometry(boundary_pm[:coord])
-			# Ensure it's closed
-			_if area_sr.closed? _is _false
-			_then
-				write("  WARNING: Boundary area not closed, using world bounds")
-				area_sr << _unset
-			_endif
-		_when error
-			write("  ERROR parsing boundary area: ", condition.report_contents_string)
+		_if area_sr.closed? _is _false
+		_then
+			write("  WARNING: Boundary area not closed, using world bounds")
 			area_sr << _unset
-		_endtry
-	_endif
+		_endif
+	
 
-	# Fallback to world bounds if no valid boundary area
-	_if area_sr _is _unset
+		# Create project
+		# project_name = WO number
+		# project_title = cluster code
+		_local prj_attrs << property_list.new_with(
+					    :job_title, cluster_code,
+					    :job_type, "Physical NI Design Job",
+					    :asset_owner, "Owned")
+		prj << .design_manager.create_project(
+			       wo_number,       # Project name from WO number
+			       dsnames,
+			       area_sr,
+			       prj_attrs
+				       )
+		write("  Project created: ", wo_number, " (Title: ", cluster_code, ", ID: ", prj.id, ")")
+		
+	_endif
+	_if sch _isnt unset
 	_then
-		write("  Using database world bounds for project area")
-		_local bounds << .database.world.bounds
-		area_sr << sector_rope.new_with(
-			coordinate.new(bounds.xmin, bounds.ymin),
-			coordinate.new(bounds.xmax, bounds.ymin),
-			coordinate.new(bounds.xmax, bounds.ymax),
-			coordinate.new(bounds.xmin, bounds.ymax),
-			coordinate.new(bounds.xmin, bounds.ymin)
-		)
+		write("Deleting existing scheme..")
+		.design_manager.delete_scheme(sch)
 	_endif
 
-	# Create project
-	# project_name = WO number
-	# project_title = cluster code
-	_local prj_attrs << property_list.new_with(
-		:job_title, cluster_code,
-		:job_type, "Physical NI Design Job",
-		:asset_owner, "Owned")
-	prj << .design_manager.create_project(
-		wo_number,       # Project name from WO number
-		dsnames,
-		area_sr,
-		prj_attrs
-	)
-	write("  Project created: ", wo_number, " (Title: ", cluster_code, ", ID: ", prj.id, ")")
-
-	_endif
-
-	_if sch _is _unset
-	_then
+	#_if sch _is _unset
+	#_then
 	# Create scheme (design)
 	# design_name = cluster name
 	_local area_sch << prj.project_areas.an_element().area
@@ -285,7 +310,7 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, c
 		sch_attrs             # Additional attributes
 	)
 	write("  Design created: ", cluster_name, " (ID: ", sch.id, ")")
-	_endif
+	#_endif
 
 	# Activate the design
 	.design_manager.activate_design(sch)
@@ -321,10 +346,17 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	# All object creation automatically goes into the activated design alternative
 	# No need for database mode switching
 
-	# First pass: Create poles (needed for cable snapping)
-
+	# First pass: Create OLTs (needed for cable snapping)
+	_for pm _over placemarks.fast_elements()
+	_loop
+		# OLT (point-based: name contains "*OLT*")
+		_if _self.is_olt?(pm)
+		_then
+			_self.create_olt(pm)
+		_endif 
+	_endloop
 	# Second pass: Create cables/aerial routes
-	write("  Pass 1: Creating cables and aerial routes...: ",placemarks.size)
+	write("  Pass 2: Creating cables and aerial routes...: ",placemarks.size)
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -340,7 +372,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 
 
-	write("  Pass 2: Creating poles...: ",placemarks.size)
+	write("  Pass 3: Creating poles...: ",placemarks.size)
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -356,7 +388,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 
 	# Third pass: Create other objects (demand points, splices, zones, etc.)
-	write("  Pass 3: Creating demand points, splices, and area-based objects...")
+	write("  Pass 4: Creating demand points, splices, and area-based objects...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area (ONLY areas with parent=null/empty)
@@ -373,12 +405,6 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_elif _self.is_figure_eight?(pm)
 		_then
 			_self.create_figure_eight(pm)
-
-		# OLT (point-based: name contains "*OLT*")
-		_elif _self.is_olt?(pm)
-		_then
-			_self.create_olt(pm)
-
 		# Demand points
 		_elif _self.is_demand_point?(pm[:parent])
 		_then
@@ -398,7 +424,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 
 	# Fifth pass: Create risers (point-based: vertical cables to buildings)
-	write("  Pass 5: Creating risers...")
+	write("  Pass 6: Creating risers...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Riser cables (point-based: name contains "*riser*")
@@ -409,7 +435,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 
 	# Sixth pass: Create access points (catch-all for remaining points)
-	write("  Pass 6: Creating access points...")
+	write("  Pass 7: Creating access points...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Access points (point-based: catch-all for points not matching other types)

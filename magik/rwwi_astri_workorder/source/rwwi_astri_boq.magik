@@ -1,0 +1,1306 @@
+
+_global get_count_closure <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+	
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+	p7 << 0
+	p8 << 0
+	p9 << 0
+	p10 << 0
+	p11 << 0
+	p12 << 0
+	p13 << 0
+
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		
+
+		_if p.spec_id="Join Closure In-line 24 Core" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="Join Closure In-line 36 Core" 
+		_then
+			p2 << p2 + 1
+		_elif p.spec_id="Join Closure In-line 48 Core" 
+		_then
+			p3 << p3 + 1
+		_elif p.spec_id="Join Closure In-line 96 Core" 
+		_then
+			p4 << p4 + 1
+		_elif p.spec_id="Join Closure In-line 144 Core" 
+		_then
+			p5 << p5 + 1
+		_elif p.spec_id="Join Closure In-line 288 Core" 
+		_then
+			p6 << p6 + 1
+		_elif p.spec_id="Join Closure Dome 24 Core" 
+		_then
+			p7 << p7 + 1
+		_elif p.spec_id="Join Closure Dome 36 Core" 
+		_then
+			p8 << p8 + 1
+		_elif p.spec_id="Join Closure Dome 48 Core" 
+		_then
+			p9 << p9 + 1
+		_elif p.spec_id="Join Closure Dome 72 Core" 
+		_then
+			p10 << p10 + 1
+		_elif p.spec_id="Join Closure Dome 96 Core" 
+		_then
+			p11 << p11 + 1
+		_elif p.spec_id="Join Closure Dome 144 Core" 
+		_then
+			p12 << p12 + 1
+		_elif p.spec_id="Join Closure Dome 288 Core" 
+		_then
+			p13 << p13 + 1	
+			
+
+		_endif
+
+	_endloop
+
+	pp_seq_r << rope.new()
+	
+	a_values << property_list.new_with(
+			    :id,"clr1",
+			    :jml,p1)
+	
+	pp_seq_r.add(a_values)
+
+	a_values << property_list.new_with(
+			    :id,"clr2",
+			    :jml,p2)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr3",
+			    :jml,p3)
+	
+	pp_seq_r.add(a_values)
+
+	a_values << property_list.new_with(
+			    :id,"clr4",
+			    :jml,p4)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr5",
+			    :jml,p5)
+	
+	pp_seq_r.add(a_values)
+
+	a_values << property_list.new_with(
+			    :id,"clr6",
+			    :jml,p6)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr7",
+			    :jml,p7)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr8",
+			    :jml,p8)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr9",
+			    :jml,p9)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr10",
+			    :jml,p10)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr11",
+			    :jml,p11)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr12",
+			    :jml,p12)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr13",
+			    :jml,p13)
+	
+	pp_seq_r.add(a_values)
+
+
+
+
+		
+	
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+#>> p1,p2,p3,p4,p5
+>> pp_seq_r		
+_endproc
+$
+
+_global get_count_fdt <<
+_proc()
+
+		table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+
+		_if p.spec_id="48 Core pole mounted FDT" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="72 Core pole mounted FDT" 
+		_then
+			p2 << p2 + 1
+		_elif p.spec_id="96 Core pole mounted FDT" 
+		_then
+			p3 << p3 + 1
+		_elif p.spec_id="144 Core Ground mounted FDT" 
+		_then
+			p4 << p4 + 1
+		_elif p.spec_id="288 Core Ground mounted FDT" 
+		_then
+			p5 << p5 + 1
+		_elif p.spec_id="576 Core Ground mounted FDT" 
+		_then
+			p6 << p6 + 1
+
+		_endif
+
+	_endloop
+
+	
+>> p1,p2,p3,p4,p5,p6
+
+	
+_endproc
+$
+
+_global get_count_fat <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		#write(p.type)
+		_if p.spec_id="Pole mounted outdoor(16 ports)" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="Pole mounted outdoor(16 ports)" 
+		_then
+			p2 << p2 + 1
+		_endif 
+	_endloop
+	
+>> p1,p2
+	
+_endproc
+$
+
+
+
+_global get_count_pole <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :pole _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+	#	write(p.type)
+		_if p.type="Pole 7-3" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.type="Pole 7-4" 
+		_then
+			p2 << p2 + 1
+		_elif p.type="Pole 7-5" 
+		_then
+			p3 << p3 + 1
+		_elif p.type="Pole 9-4" 
+		_then
+			p4 << p4 + 1
+		_elif p.type="Pole 7-5" 
+		_then
+			p5 << p5 + 1
+
+		_endif
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2,p3,p4,p5
+		
+_endproc
+$
+
+_global get_count_sling_wire <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sling_wire _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:sokka_logical]
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop 
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+
+_global get_count_cable <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0.0
+	p2 << 0.0
+	p3 << 0.0
+	p4 << 0.0
+	p5 << 0.0
+	p6 << 0.0
+	p7 << 0.0
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.spec_id="SM G652D-ADSS 24C" 
+		_then
+			p1 << 	p1 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 36C" 
+		_then
+			p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 48C" 
+		_then
+			p3 << 	p3 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 72C" 
+		_then
+			p4 << 	p4 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 96C" 
+		_then
+			p5 << 	p5 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 144C" 
+		_then
+			p6 << 	p6 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 288C" 
+		_then
+			p7 << 	p7 + p.calculated_sheath_length.value_in(:m).as_number()
+
+		_endif
+
+	_endloop
+
+	
+>> p1,p2,p3,p4,p5,p6,p7
+		
+_endproc
+$
+
+
+_global create_boq <<
+_proc()
+
+
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	#		dm << gis_program_manager.databases[:design_admin]
+	#		val << s.inf_project.write_string
+	#		c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	#		cur_rec << c.an_element()
+	#		project_id << cur_rec.id.write_string 
+	#		owner << s.owner.write_string
+			#write(project_id,nama)
+	
+	#ignored except these object
+	object_filtered << rope.new_with(:pole,:figure_eight,:sheath_splice,:sheath_with_loc, :mit_terminal_enclosure, :uub, :optical_splitter )
+	
+	
+	#pake equality ->string sebagai key
+	obj << equality_hash_table.new()
+	
+	start << date_time_now()
+	
+	
+	#a_filename << "c:\template_boq\01.2 BOQ Template to Vendor 2024 Final - Distribute to Vendor v2.xlsx"
+	#a_filename << %TEMPLATE_BOQ%
+	_local a_filename << system.getenv("TEMPLATE_BOQ")
+	Excel_Object << OLE_Client.Create_Object("Excel.Application")
+	Excel_Object.Visible << _True
+	
+	Workbooks << Excel_Object.Workbooks ()
+	WorkBook << Workbooks.add(a_filename) 			
+	Sheet << Excel_Object.Sheets ("BoQ Roll Out ODN")
+	
+	a_ff << float_format.new_with_properties(
+			:float_format,:fixed,
+			:float_decimal_places,3)
+	
+	start << date_time_now()
+	
+
+	pole7m_jml << 0
+	pole9m_jml << 0			
+	
+
+	q1 << get_count_sling_wire()
+	Cell_q1_name << Sheet.Range("D206")
+	Cell_q1_name.value << q1.write_string
+	
+	
+	(j1,j2) << get_count_fat()
+	Cell_j1_name << Sheet.Range("D48")
+	Cell_j1_name.value << j1.write_string
+	Cell_j2_name << Sheet.Range("D50")
+	Cell_j2_name.value << j2.write_string
+	
+	
+	
+	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
+	
+	Cell_f1_name << Sheet.Range("D29")
+	Cell_f1_name.value << f1.write_string
+	Cell_f2_name << Sheet.Range("D31")
+	Cell_f2_name.value << f2.write_string
+	Cell_f3_name << Sheet.Range("D33")
+	Cell_f3_name.value << f3.write_string
+	Cell_f4_name << Sheet.Range("D35")
+	Cell_f4_name.value << f4.write_string
+	Cell_f5_name << Sheet.Range("D37")
+	Cell_f5_name.value << f5.write_string
+	Cell_f6_name << Sheet.Range("D39")
+	Cell_f6_name.value << f6.write_string
+	
+	
+	(p1,p2,p3,p4,p5) << get_count_pole()
+	
+	Cell_p1_name << Sheet.Range("D198")
+	Cell_p1_name.value << p1.write_string
+	Cell_p2_name << Sheet.Range("D194")
+	Cell_p2_name.value << p2.write_string
+	Cell_p3_name << Sheet.Range("D190")
+	Cell_p3_name.value << p3.write_string
+	Cell_p4_name << Sheet.Range("D196")
+	Cell_p4_name.value << p4.write_string
+	Cell_p5_name << Sheet.Range("D192")
+	Cell_p5_name.value << p5.write_string
+	
+	
+	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
+	Cell_c1_name << Sheet.Range("D16")
+	Cell_c1_name.value << c1.write_string
+	Cell_c2_name << Sheet.Range("D18")
+	Cell_c2_name.value << c2.write_string
+	Cell_c3_name << Sheet.Range("D20")
+	Cell_c3_name.value << c3.write_string
+	#Cell_c4_name << Sheet.Range("D196")
+	#Cell_c4_name.value << p4.write_string
+	Cell_c5_name << Sheet.Range("D22")
+	Cell_c5_name.value << c5.write_string
+	Cell_c6_name << Sheet.Range("D24")
+	Cell_c6_name.value << c6.write_string
+	Cell_c7_name << Sheet.Range("D26")
+	Cell_c7_name.value << c7.write_string
+	
+	clr << get_count_closure()
+	
+	_for b _over clr.fast_elements()
+	_loop
+		_if b[:id]="clr1" _then
+			Cell_d55_name << Sheet.Range("D55")
+			Cell_d55_name.value << b[:jml].write_string
+		_elif b[:id]="clr2" 
+		_then
+			Cell_d56_name << Sheet.Range("D56")
+			Cell_d56_name.value << b[:jml].write_string
+		_elif b[:id]="clr3"
+		_then
+			Cell_d57_name << Sheet.Range("D57")
+			Cell_d57_name.value << b[:jml].write_string
+		_elif b[:id]="clr4" 
+		_then
+			Cell_d58_name << Sheet.Range("D58")
+			Cell_d58_name.value << b[:jml].write_string
+		_elif b[:id]="clr5"
+		_then
+			Cell_d59_name << Sheet.Range("D59")
+			Cell_d59_name.value << b[:jml].write_string
+		_elif b[:id]="clr6" 
+		_then
+			Cell_d60_name << Sheet.Range("D60")
+			Cell_d60_name.value << b[:jml].write_string
+		_elif b[:id]="clr7" 
+		_then
+			Cell_d61_name << Sheet.Range("D61")
+			Cell_d61_name.value << b[:jml].write_string
+		_elif b[:id]="clr8" 
+		_then
+			Cell_d62_name << Sheet.Range("D62")
+			Cell_d62_name.value << b[:jml].write_string
+		_elif b[:id]="clr9"
+		_then
+			Cell_d63_name << Sheet.Range("D63")
+			Cell_d63_name.value << b[:jml].write_string
+		_elif b[:id]="clr10" 
+		_then
+			Cell_d64_name << Sheet.Range("D64")
+			Cell_d64_name.value << b[:jml].write_string
+		_elif b[:id]="clr11" 
+		_then
+			Cell_d65_name << Sheet.Range("D65")
+			Cell_d65_name.value << b[:jml].write_string
+		_elif b[:id]="clr12"
+		_then
+			Cell_d66_name << Sheet.Range("D66")
+			Cell_d66_name.value << b[:jml].write_string
+		_elif b[:id]="clr13"
+		_then
+			Cell_d67_name << Sheet.Range("D67")
+			Cell_d67_name.value << b[:jml].write_string	
+		_endif
+	_endloop
+	
+	
+		   _endproc
+
+$
+
+
+_global create_pl_boq <<
+_proc(type)
+
+	_local r_result << rope.new()
+	#_local l_result << property_list.new()
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+		
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	start << date_time_now()
+	
+	a_ff << float_format.new_with_properties(
+			:float_format,:fixed,
+			:float_decimal_places,3)
+	
+	#sling wire
+	q1 << get_count_sling_wire()
+
+#	Cell_q1_name << Sheet.Range("D206")
+#	Cell_q1_name.value << q1.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001033",
+			   :object,"Sling Wire",
+			   :name, "Instalasi strand wire/sling messenger 6 mm",
+			   :material, _unset ,
+			   :service, q1 
+				 )
+
+	r_result.add(results)
+
+	
+	#fat
+	(j1,j2) << get_count_fat()
+#	Cell_j1_name << Sheet.Range("D48")
+#	Cell_j1_name.value << j1.write_string
+#	Cell_j2_name << Sheet.Range("D50")
+#	Cell_j2_name.value << j2.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001047",
+			   :object,"FAT",
+			   :name, "Pole mounted outdoor type (16 ports type)",
+			   :material, j1,
+			   :service, _unset 
+				 )
+	r_result.add(results)
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "100000824",
+			   :object,"FAT",
+			   :name, "Pedestal mounted type (16 ports type)",
+			   :material, j2,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+	#fdt
+	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
+	
+#	Cell_f1_name << Sheet.Range("D29")
+#	Cell_f1_name.value << f1.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001039",
+			   :object,"FDT",
+			   :name, "48 cores capacity pole mounted FDT",
+			   :material, f1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+#	Cell_f2_name << Sheet.Range("D31")
+#	Cell_f2_name.value << f2.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001040",
+			   :object,"FDT",
+			   :name, "72 cores capacity pole mounted FDT",
+			   :material, f1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+#	Cell_f3_name << Sheet.Range("D33")
+#	Cell_f3_name.value << f3.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001041",
+			   :object,"FDT",
+			   :name, "96 cores capacity pole mounted FDT",
+			   :material, f1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+#	Cell_f4_name << Sheet.Range("D35")
+#	Cell_f4_name.value << f4.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001042",
+			   :object,"FDT",
+			   :name, "144 cores capacity ground mounted FDT",
+			   :material, f1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+#	Cell_f5_name << Sheet.Range("D37")
+#	Cell_f5_name.value << f5.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001043",
+			   :object,"FDT",
+			   :name, "288 cores capacity ground mounted FDT",
+			   :material, f1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+#	Cell_f6_name << Sheet.Range("D39")
+#	Cell_f6_name.value << f6.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001044",
+			   :object,"FDT",
+			   :name, "576 cores capacity ground mounted FDT",
+			   :material, f1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+
+
+	#pole
+	(p1,p2,p3,p4,p5) << get_count_pole()
+
+#	Cell_p1_name << Sheet.Range("D198")
+#	Cell_p1_name.value << p1.write_string
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001055",
+			   :object,"Pole",
+			   :name, "Pengadaan Tiang 7 meter 3 inch",
+			   :material, p1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+#	Cell_p2_name << Sheet.Range("D194")
+#	Cell_p2_name.value << p2.write_string
+
+	pl_nm << "Pengadaan Tiang 7 meter 4"+%"+%,+"  STEL L-003 1996"
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001183",
+			   :object,"Pole",
+			   :name, pl_nm,
+			   :material, p2,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+	
+#	Cell_p3_name << Sheet.Range("D190")
+#	Cell_p3_name.value << p3.write_string
+
+	pl_nm << "Pengadaan Tiang 7 meter 5"+%"+%,+"  STEL L-003 1996"
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200000187",
+			   :object,"Pole",
+			   :name, pl_nm,
+			   :material, p3,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+	
+#	Cell_p4_name << Sheet.Range("D196")
+#	Cell_p4_name.value << p4.write_string
+
+
+
+	pl_nm << "Pengadaan  Tiang Tunggal 9 meter 4"+%"+%,+"  STEL L-003 1996"
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001181",
+			   :object,"Pole",
+			   :name, pl_nm,
+			   :material, p4,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+	
+#	Cell_p5_name << Sheet.Range("D192")
+#	Cell_p5_name.value << p5.write_string
+
+
+	pl_nm << "Pengadaan  Tiang Tunggal 9 meter 5"+%"+%,+"  STEL L-003 1996"
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200000169",
+			   :object,"Pole",
+			   :name, pl_nm,
+			   :material, p5,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+	#cable
+	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
+#	Cell_c1_name << Sheet.Range("D16")
+#	Cell_c1_name.value << c1.write_string
+
+	
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200000100",
+			   :object,"Cable",
+			   :name, "FO core type SM G.652.D-ADSS 24 cores",
+			   :material, c1,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+
+	
+	
+#	Cell_c2_name << Sheet.Range("D18")
+#	Cell_c2_name.value << c2.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200000975",
+			   :object,"Cable",
+			   :name, "FO core type SM G.652.D-ADSS 36 cores",
+			   :material, c2,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+#	Cell_c3_name << Sheet.Range("D20")
+#	Cell_c3_name.value << c3.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001038",
+			   :object,"Cable",
+			   :name, "FO core type SM G.652.D-ADSS 48 cores",
+			   :material, c3,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+#	#Cell_c4_name << Sheet.Range("D196")
+#	#Cell_c4_name.value << p4.write_string
+
+#	results << property_list.new_with(
+#			   :type, type,
+#			   :code, "1",
+#			   :object,"Cable",
+#			   :name, "FO core type SM G.652.D-ADSS 72 cores",
+#			   :material, c4,
+#			   :service, _unset 
+#				 )
+#
+#	r_result.add(results)
+	
+#	Cell_c5_name << Sheet.Range("D22")
+#	Cell_c5_name.value << c5.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001630",
+			   :object,"Cable",
+			   :name, "FO core type SM G.652.D-ADSS 96 cores",
+			   :material, c5,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+#	Cell_c6_name << Sheet.Range("D24")
+#	Cell_c6_name.value << c6.write_string
+
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001030",
+			   :object,"Cable",
+			   :name, "FO core  type SM G.652.D-ADSS 144 cores",
+			   :material, c6,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+#	Cell_c7_name << Sheet.Range("D26")
+#	Cell_c7_name.value << c7.write_string
+
+	results << property_list.new_with(
+			   :type, type,
+			   :code, "200001015",
+			   :object,"Cable",
+			   :name, "FO core type SM G.652.D-ADSS 288 cores",
+			   :material, c7,
+			   :service, _unset 
+				 )
+
+	r_result.add(results)
+	
+
+
+
+	#closure
+	clr << get_count_closure()
+#	
+	_for b _over clr.fast_elements()
+	_loop
+		_if b[:id]="clr1" _then
+#			Cell_d55_name << Sheet.Range("D55")
+#			Cell_d55_name.value << b[:jml].write_string
+	
+			results << property_list.new_with(
+					   :type, type,
+					   :code, "200000182",
+					   :object,"Closure",
+					   :name, "Fiber Optic Joint Closure Type In-line 24 Core",
+					   :material, b[:jml].write_string,
+					   :service, _unset 
+						 )
+
+			r_result.add(results)
+	
+
+	
+		_elif b[:id]="clr2" 
+		_then
+#			Cell_d56_name << Sheet.Range("D56")
+#			Cell_d56_name.value << b[:jml].write_string
+
+			results << property_list.new_with(
+					   :type, type,
+					   :code, "200001048",
+					   :object,"Closure",
+					   :name, "Fiber Optic Joint Closure Type In-line 36 Core",
+					   :material, b[:jml].write_string,
+					   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+	
+		_elif b[:id]="clr3"
+		_then
+#			Cell_d57_name << Sheet.Range("D57")
+#			Cell_d57_name.value << b[:jml].write_string
+
+			results << property_list.new_with(
+					   :type, type,
+					   :code, "200000159",
+					   :object,"Closure",
+					   :name, "Fiber Optic Joint Closure Type In-line 48 Core",
+					   :material, b[:jml].write_string,
+					   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+
+
+			
+		_elif b[:id]="clr4" 
+		_then
+#			Cell_d58_name << Sheet.Range("D58")
+#			Cell_d58_name.value << b[:jml].write_string
+
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200000179",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type In-line 96 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+			
+		_elif b[:id]="clr5"
+		_then
+#			Cell_d59_name << Sheet.Range("D59")
+#			Cell_d59_name.value << b[:jml].write_string
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200000186",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type In-line 144 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+
+
+			
+		_elif b[:id]="clr6" 
+		_then
+#			Cell_d60_name << Sheet.Range("D60")
+#			Cell_d60_name.value << b[:jml].write_string
+
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200000155",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type In-line 288 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+
+			
+		_elif b[:id]="clr7" 
+		_then
+#			Cell_d61_name << Sheet.Range("D61")
+#			Cell_d61_name.value << b[:jml].write_string
+
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200000180",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type Dome 24 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+			
+		_elif b[:id]="clr8" 
+		_then
+#			Cell_d62_name << Sheet.Range("D62")
+#			Cell_d62_name.value << b[:jml].write_string
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200001049",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type Dome 36 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+
+			
+		_elif b[:id]="clr9"
+		_then
+#			Cell_d63_name << Sheet.Range("D63")
+#			Cell_d63_name.value << b[:jml].write_string
+
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200000164",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type Dome 48 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+
+
+			
+		_elif b[:id]="clr10" 
+		_then
+#			Cell_d64_name << Sheet.Range("D64")
+#			Cell_d64_name.value << b[:jml].write_string
+#			results << property_list.new_with(
+#						   :type, type,
+#						   :code, "1",
+#						   :object,"Closure",
+#						   :name, "Fiber Optic Joint Closure Type Dome 72 Core",
+#						   :material, b[:jml].write_string,
+#						   :service, _unset 
+#						 )
+#
+#			r_result.add(results)
+
+
+			
+		_elif b[:id]="clr11" 
+		_then
+#			Cell_d65_name << Sheet.Range("D65")
+#			Cell_d65_name.value << b[:jml].write_string
+			results << property_list.new_with(
+						   :type, type,
+						   :code, "200000176",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type Dome 96 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+			r_result.add(results)
+
+			
+		_elif b[:id]="clr12"
+		_then
+#			Cell_d66_name << Sheet.Range("D66")
+#			Cell_d66_name.value << b[:jml].write_string
+
+				results << property_list.new_with(
+						   :type, type,
+						   :code, "200000158",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type Dome 144 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+				r_result.add(results)
+
+
+
+			
+		_elif b[:id]="clr13"
+		_then
+#			Cell_d67_name << Sheet.Range("D67")
+#			Cell_d67_name.value << b[:jml].write_string
+
+				results << property_list.new_with(
+						   :type, type,
+						   :code, "200000156",
+						   :object,"Closure",
+						   :name, "Fiber Optic Joint Closure Type Dome 288 Core",
+						   :material, b[:jml].write_string,
+						   :service, _unset 
+						 )
+
+				r_result.add(results)
+
+
+			
+		_endif
+	_endloop
+	
+	>> r_result
+_endproc
+
+$

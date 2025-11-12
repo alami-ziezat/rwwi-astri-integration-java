@@ -62,9 +62,7 @@ _private _method astri_design_migrator.create_olt(pm)
 			:folders, folders,
 			:fttx_network_type, "Cluster",
 			:segment, segment_id,
-			:pop, .pop_name,
 			:olt, .pop_name,
-			:project, .prj_id,
 			:uuid, .uuid,
 			:construction_status, "Proposed"
 		)

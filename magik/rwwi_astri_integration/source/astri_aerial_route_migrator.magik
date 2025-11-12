@@ -136,9 +136,8 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:segment, segment_id,
 					:fttx_network_type, "Cluster",
 					:line_type, m_line,
-					:route, route,
-					:uuid, .uuid,
-					:construction_status, "Proposed"
+					:route, pc,
+					:uuid, .uuid
 				)
 				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
 				_local result_sw << rec_trans_sw.run()
@@ -184,8 +183,14 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local l_result_pl << _unset
 		_local n_coord << _unset
 		_local fs << _unset
-
-		_local (k1, a_hub) << _self.scan_pole_st(pp, 500)
+		
+		_local (k1, a_hub) << _self.scan_olt(pp, 500)
+		write("OLT found start: ",k1)
+		_if _not k1
+		_then
+			(k1, a_hub) << _self.scan_pole_st(pp, 500)
+			write("POLE found start: ",k1)
+		_endif
 
 		_if k1 _is _true
 		_then
@@ -223,7 +228,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_endif
 
 			l_result_pl << a_hub
-			write("    >> Using existing pole at start: ", a_hub.telco_pole_tag)
+			write("    >> Using existing pole at start: ", a_hub)
 		_else
 			# No pole found - create placeholder
 			fs << route.as_sector_rope()
@@ -265,8 +270,14 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local l_result_pl2 << _unset
 		_local e_coord << _unset
 
-		_local (k2, b_hub) << _self.scan_pole_st(ppr, 500)
-
+		_local (k2, b_hub) << _self.scan_olt(ppr, 500)
+		write("OLT found end: ",k2)
+		_if _not k2
+		_then
+			(k2, b_hub) << _self.scan_pole_st(ppr, 500)
+			write("POLE found end: ",k2)
+		_endif
+		
 		_if k2 _is _true
 		_then
 			# Pole found at end
@@ -309,7 +320,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_endif
 
 			l_result_pl2 << b_hub
-			write("    >> Using existing pole at end: ", b_hub.telco_pole_tag)
+			write("    >> Using existing pole at end: ", b_hub)
 		_else
 			# No pole found - create placeholder
 			e_coord << route.last_coord
@@ -394,10 +405,10 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		write("ERROR in create_aerial_route():", errCon.report_contents_string)
 		write("  Placemark name:", pm[:name].default("(unnamed)"))
 		write("  Folders:", pm[:parent].default("(none)"))
-		write("  Coordinates:", pm[:coord].default("(none)"))
+		#write("  Coordinates:", pm[:coord].default("(none)"))
 		.stats[:errors] +<< 1
 	_endtry
 _endmethod
 $
-
+z
 _pragma(classify_level=basic, topic={astri_integration})

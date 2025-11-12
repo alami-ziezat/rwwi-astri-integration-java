@@ -46,7 +46,6 @@ _private _method astri_design_migrator.create_micro_cell(pm)
 			# Create Macro Cell
 			_local prop_values << property_list.new_with(
 				:identification, pm[:name],
-				:name, pm[:name],
 				:type, "Macro Cell",
 				:status, "Active",
 				:location, area,
@@ -129,7 +128,6 @@ _private _method astri_design_migrator.create_micro_cell(pm)
 		# Step 7: Create Micro Cell
 		_local prop_values << property_list.new_with(
 			:identification, pm[:name],
-			:name, nm,
 			:type, "Micro Cell",
 			:status, "Active",
 			:location, area,
@@ -141,8 +139,7 @@ _private _method astri_design_migrator.create_micro_cell(pm)
 			:splitter_id, s_id,
 			:deployment_technology, "System Default",
 			:note, folders,
-			:uuid, .uuid,
-			:construction_status, "Proposed"
+			:uuid, .uuid
 		)
 
 		_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)

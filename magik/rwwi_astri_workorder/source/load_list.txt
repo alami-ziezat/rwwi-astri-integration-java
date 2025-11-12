@@ -2,3 +2,4 @@ conditions
 rwwi_astri_workorder_engine
 rwwi_astri_workorder_dialog
 rwwi_astri_workorder_plugin
+rwwi_astri_boq

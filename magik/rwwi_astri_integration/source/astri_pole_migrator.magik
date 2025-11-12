@@ -14,19 +14,7 @@ _private _method astri_design_migrator.create_pole(pm)
 	_try _with errCon
 		# Step 0: Validate folder contains "pole" pattern
 		_local folders << pm[:parent].default("")
-		_if folders = "" _orif folders _is _unset
-		_then
-			write("  WARNING: Skipping - no folder information")
-			_return
-		_endif
-
-		# Check if this is a pole (folder must contain "|pole|" case-insensitive)
 		_local folders_lc << folders.lowercase
-		_if _not folders_lc.matches?("*|pole|*")
-		_then
-			write("  WARNING: Skipping - not a pole (folder doesn't contain '|pole|'): ", folders)
-			_return
-		_endif
 
 		# Step 1: Parse folder hierarchy
 		_local fol << folders.split_by("|")
@@ -101,7 +89,6 @@ _private _method astri_design_migrator.create_pole(pm)
 
 		# Step 5: Check for duplicate poles within 200m
 		_local (h, existing_pole) << _self.scan_pole_st(final_location, 200)
-		_global pl_pole
 		_if h _is _true _andif existing_pole _isnt _unset
 		_then
 			write("existing pole...")
@@ -119,7 +106,6 @@ _private _method astri_design_migrator.create_pole(pm)
 				existing_pole.folders << folders
 				existing_pole.fttx_network_type << "Cluster"
 				existing_pole.segment << segment_id
-				existing_pole.project << .prj_id
 
 				_if stf_item_code _isnt _unset
 				_then
@@ -181,7 +167,6 @@ _private _method astri_design_migrator.create_pole(pm)
 				:segment, segment_id,
 				:pop, .pop_name,
 				:olt, .pop_name,
-				:project, .prj_id,
 				:uuid, .uuid,
 				:construction_status, pole_const_status
 			)

@@ -17,12 +17,6 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 	_try _with errCon
 		# Step 0: Validate sheath splice (already validated by is_splice?())
 		_local folders << pm[:parent].default("")
-		_if _not _self.is_splice?(pm)
-		_then
-			write("  WARNING: Skipping - not a sheath splice: ", folders)
-			_return
-		_endif
-
 		# Step 1: Extract segment_id from folders
 		_local segment_id << _self.match_segment(folders)
 
@@ -152,6 +146,14 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_else
 			# No pole found - create placeholder pole
 			write("    >> Creating placeholder pole")
+			# Try to snap to aerial route
+			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(pp)
+
+			_if tf _is _true
+			_then
+				l_location_start << snap_loc
+				write("    >> Pole snapped to aerial route")
+			_endif
 
 			# Get line type for pole
 			_local m_line << _self.match_line(folders)

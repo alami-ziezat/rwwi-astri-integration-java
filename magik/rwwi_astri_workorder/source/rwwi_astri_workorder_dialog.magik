@@ -262,11 +262,11 @@ _private _method rwwi_astri_workorder_dialog.build_detail_panel(parent)
 		:selector, :migrate_to_design|()|)
 	.items[:migrate_design_btn].enabled? << _false
 
-	.items[:migrate_temp_btn] << sw_button_item.new(button_con,
-		:label, "Migrate as Temporary",
-		:model, _self,
-		:selector, :migrate_as_temporary|()|)
-	.items[:migrate_temp_btn].enabled? << _false
+	#.items[:migrate_temp_btn] << sw_button_item.new(button_con,
+	#	:label, "Migrate as Temporary",
+	#	:model, _self,
+	#	:selector, :migrate_as_temporary|()|)
+	#.items[:migrate_temp_btn].enabled? << _false
 
 	.items[:construction_btn] << sw_button_item.new(button_con,
 		:label, "Mark Construction",
@@ -512,7 +512,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:detail_btn].enabled? << _false
 		.items[:kmz_btn].enabled? << _false
 		.items[:migrate_design_btn].enabled? << _false
-		.items[:migrate_temp_btn].enabled? << _false
+		#.items[:migrate_temp_btn].enabled? << _false
 		.items[:construction_btn].enabled? << _false
 	_else
 		.items[:detail_uuid].value << write_string("UUID: ", wo[:uuid].default(""))
@@ -533,7 +533,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 
 		.items[:kmz_btn].enabled? << has_kmz
 		.items[:migrate_design_btn].enabled? << has_kmz
-		.items[:migrate_temp_btn].enabled? << has_kmz
+		#.items[:migrate_temp_btn].enabled? << has_kmz
 	_endif
 _endmethod
 $
@@ -589,10 +589,21 @@ _method rwwi_astri_workorder_dialog.download_kmz()
 	write("Downloading KMZ for UUID:", kmz_uuid)
 
 	_try
-		# Call ASTRI KMZ download API with kmz_uuid
+		# Call ASTRI KMZ download API with kmz_uuid based on infrastructure type
 		# astri_download_cluster_kmz(uuid, outputDir)
+		# astri_download_subfeeder_kmz(uuid, outputDir)
+		# astri_download_feeder_kmz(uuid, outputDir)
 		_local output_dir << system.getenv("TEMP").default("C:\temp")
-		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+		_local infra_type << .filters[:infrastructure_type].default("cluster")
+		write("infra type: ",infra_type)
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "feeder"
+		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _endif
 
 		_if xml_result _is _unset _orif xml_result = ""
 		_then
@@ -653,7 +664,16 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 	_try _with errCon
 		# Use Scenario 2: Download files to disk, then read KML file
 		_local output_dir << system.getenv("TEMP").default("C:\temp")
-		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+		_local infra_type << .filters[:infrastructure_type].default("cluster")
+		write("Infra type: ",infra_type)
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "feeder"
+		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _endif
 
 		_if xml_result _is _unset _orif xml_result = ""
 		_then
@@ -685,6 +705,12 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_local wo_number << wo[:wo_number].default("WO_" + kmz_uuid.subseq(1, 8))
 			_local cluster_code << wo[:cluster_code].default("CLUSTER_" + kmz_uuid.subseq(1, 8))
 			_local cluster_name << wo[:cluster_name].default("Cluster_" + kmz_uuid.subseq(1, 8))
+			_local cluster_name_size << cluster_name.size
+			
+			_if cluster_name_size > 64
+			_then
+				cluster_name << cluster_name.subseq(cluster_name_size-64, 64)
+			_endif
 
 			# Get project ID and segment ID from work order
 			_local prj_id << wo[:uuid]         # Work order UUID field
@@ -699,10 +725,10 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				_return
 			_endif
 
-			_local migrator << astri_design_migrator.new(database, prj_id, kml_uuid, pop_name)
+			_local migrator << astri_design_migrator.new(database, prj_id, kmz_uuid, pop_name)
 
 			# Create project and design
-			write("Initiate: Creating project and design...")
+			write("Initiate: Creating project and design...: ",cluster_code," : ",cluster_name)
 			_local (project, scheme) << migrator.create_project_and_design(
 				placemarks,     # Boundary extracted from placemarks
 				wo_number,      # Project name
@@ -724,24 +750,10 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				"File: ", kml_file_path, %newline,
 				"Project: ", wo_number, " (", cluster_code, ") - ID: ", project.id, %newline,
 				"Design: ", cluster_name, " - ID: ", scheme.id, %newline,
-				"=" * 50, %newline,
-				"Aerial Routes:   ", stats[:aerial_routes], %newline,
-				"Poles:           ", stats[:poles], %newline,
-				"Sheaths:         ", stats[:sheaths], %newline,
-				"Sling Wires:     ", stats[:sling_wires], %newline,
-				"Demand Points:   ", stats[:demand_points], %newline,
-				"Micro Cells:     ", stats[:micro_cells], %newline,
-				"Other Areas:     ", stats[:areas_created], %newline,
-				"Errors:          ", stats[:errors], %newline,
-				"Skipped:         ", stats[:skipped], %newline,
-				"=" * 50, %newline,
-				"Total objects:   ", total_objs, %newline,
-				"=" * 50, %newline,
-				%newline,
+				"=" * 70, %newline,
 				"All objects have been created in the design alternative.", %newline,
 				"Object tagging:", %newline,
 				"  - prj_id:     ", prj_id, %newline,
-				"Boundary area (parent=null) was used for project extent only.", %newline,
 				"The design is now active. You can review and modify objects before posting.")
 
 			_self.user_info(msg)
@@ -787,7 +799,15 @@ _method rwwi_astri_workorder_dialog.migrate_as_temporary()
 	_try
 		# Use Scenario 2: Download files to disk, then read KML file
 		_local output_dir << system.getenv("TEMP").default("C:\temp")
-		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+		_local infra_type << .filters[:infrastructure_type].default("cluster")
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "feeder"
+		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _endif
 
 		_if xml_result _is _unset _orif xml_result = ""
 		_then

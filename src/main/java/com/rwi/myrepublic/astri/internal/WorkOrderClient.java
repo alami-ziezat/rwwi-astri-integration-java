@@ -214,8 +214,13 @@ public class WorkOrderClient {
                     // Extract infrastructure-specific fields based on type
                     // cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
                     // subfeeder: target_subfeeder_code, target_subfeeder_name (no topology)
-                    // feeder:    target_feeder_code, target_feeder_name (no topology)
-                    String targetPrefix = "target_" + infrastructureType;
+                    // feeder:    target_osp_route_code, target_osp_route_name (no topology)
+                    String targetPrefix;
+                    if ("feeder".equals(infrastructureType)) {
+                        targetPrefix = "target_osp_route";
+                    } else {
+                        targetPrefix = "target_" + infrastructureType;
+                    }
                     appendXmlField(xml, woJson, targetPrefix + "_code", 6);
                     appendXmlField(xml, woJson, targetPrefix + "_name", 6);
 

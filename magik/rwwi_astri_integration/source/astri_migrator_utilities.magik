@@ -76,8 +76,7 @@ _private _method astri_design_migrator.is_pole?(pm)
 	## Folder must contain "|pole|" pattern (case-insensitive)
 
 	_local parent << pm[:parent].default("").lowercase
-
-	>> parent.matches?("*|pole|*")
+	>> parent.matches?("*pole*")
 _endmethod
 $
 
@@ -573,37 +572,37 @@ _private _method astri_design_migrator.match_cable_core(cable_name)
 	_local cn << cable_name.lowercase
 
 	_local cable_core <<
-	# Check largest numbers first
-	_if cn.matches?("*fo*576*")
-	_then
-		>> "576"
-	_elif cn.matches?("*fo*288*")
-	_then
-		>> "288"
-	_elif cn.matches?("*fo*144*")
-	_then
-		>> "144"
-	_elif cn.matches?("*fo*96*")
-	_then
-		>> "96"
-	_elif cn.matches?("*fo*72*")
-	_then
-		>> "72"
-	_elif cn.matches?("*fo*48*")
-	_then
-		>> "48"
-	_elif cn.matches?("*fo*36*")
-	_then
-		>> "36"
-	_elif cn.matches?("*fo*24*")
-	_then
-		>> "24"
-	_elif cn.matches?("*fo*12*")
-	_then
-		>> "12"
-	_else
-		>> "24"  # Default to 24 cores
-	_endif
+		# Check largest numbers first
+		_if cn.matches?("*fo*576*")
+		_then
+			>> "576"
+		_elif cn.matches?("*fo*288*")
+		_then
+			>> "288"
+		_elif cn.matches?("*fo*144*")
+		_then
+			>> "144"
+		_elif cn.matches?("*fo*96*")
+		_then
+			>> "96"
+		_elif cn.matches?("*fo*72*")
+		_then
+			>> "72"
+		_elif cn.matches?("*fo*48*")
+		_then
+			>> "48"
+		_elif cn.matches?("*fo*36*")
+		_then
+			>> "36"
+		_elif cn.matches?("*fo*24*")
+		_then
+			>> "24"
+		_elif cn.matches?("*fo*12*")
+		_then
+			>> "12"
+		_else
+			>> "24"  # Default to 24 cores
+		_endif
 	_return cable_core
 _endmethod
 $
@@ -680,24 +679,23 @@ _private _method astri_design_migrator.match_closure_type(folders)
 	_local folders_lc << folders.lowercase
 
 	# STEP 2: Check patterns in order
-	# Priority 1: CLOSURE or JOINT CLOSURE
-	_if folders_lc.matches?("*closure*") _orif folders_lc.matches?("*joint*")
-	_then
-		>> "Join Closure"
-
-	# Priority 2: FAT
-	_elif folders_lc.matches?("*fat*")
-	_then
-		>> "FAT"
-
-	# Priority 3: FDT
-	_elif folders_lc.matches?("*fdt*")
-	_then
-		>> "FDT"
-
-	_else
-		>> "Join Closure"  # Default
-	_endif
+	_local closure_type <<
+		# Priority 1: CLOSURE or JOINT CLOSURE
+		_if folders_lc.matches?("*closure*") _orif folders_lc.matches?("*joint*")
+		_then
+			>> "Join Closure"
+			# Priority 2: FAT
+		_elif folders_lc.matches?("*fat*")
+		_then
+			>> "FAT"
+			# Priority 3: FDT
+		_elif folders_lc.matches?("*fdt*")
+		_then
+			>> "FDT"
+		_else
+			>> "Join Closure"  # Default
+		_endif
+	_return closure_type
 _endmethod
 $
 
@@ -717,32 +715,34 @@ _private _method astri_design_migrator.match_core(name)
 
 	# STEP 2: Check larger numbers FIRST to prevent false matches
 	# (e.g., "*28*" would match 288, "*14*" would match 144)
-	_if name_lc.matches?("*576*")
-	_then
-		>> "576"
-	_elif name_lc.matches?("*288*")
-	_then
-		>> "288"
-	_elif name_lc.matches?("*144*")
-	_then
-		>> "144"
-	_elif name_lc.matches?("*96*")
-	_then
-		>> "96"
-	_elif name_lc.matches?("*72*")
-	_then
-		>> "72"
-	_elif name_lc.matches?("*48*")
-	_then
-		>> "48"
-	_elif name_lc.matches?("*36*")
-	_then
-		>> "36"
-	_elif name_lc.matches?("*24*")
-	_then
-		>> "24"
-	_else
-		>> _unset  # No core count detected
-	_endif
+	_local core << 
+		_if name_lc.matches?("*576*")
+		_then
+			>> "576"
+		_elif name_lc.matches?("*288*")
+		_then
+			>> "288"
+		_elif name_lc.matches?("*144*")
+		_then
+			>> "144"
+		_elif name_lc.matches?("*96*")
+		_then
+			>> "96"
+		_elif name_lc.matches?("*72*")
+		_then
+			>> "72"
+		_elif name_lc.matches?("*48*")
+		_then
+			>> "48"
+		_elif name_lc.matches?("*36*")
+		_then
+			>> "36"
+		_elif name_lc.matches?("*24*")
+		_then
+			>> "24"
+		_else
+			>> _unset  # No core count detected
+		_endif
+	_return core
 _endmethod
 $

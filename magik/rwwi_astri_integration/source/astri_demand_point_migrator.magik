@@ -48,8 +48,7 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			:olt, .pop_name,
 			:notes, .prj_id,
 			:location, location,
-			:uuid, .uuid,
-			:construction_status, "Proposed"
+			:uuid, .uuid
 		)
 
 		_local rec_trans << record_transaction.new_insert(.dp_col, prop_values)
