@@ -983,7 +983,7 @@ _private _method rwwi_astri_workorder_dialog.check_project_and_design_exist(wo)
 	## Returns:
 	##   (boolean, boolean) - (has_project?, has_design?)
 
-	_try
+	_try _with errCond
 		_local wo_number << wo[:wo_number]
 		_if wo_number _is _unset _orif wo_number = ""
 		_then
@@ -1022,7 +1022,7 @@ _private _method rwwi_astri_workorder_dialog.check_project_and_design_exist(wo)
 		_return _true, _true
 
 	_when error
-		write("ERROR checking project/design:", condition.report_contents_string)
+		write("LOG: ERROR checking project/design:", errCond.report_contents_string)
 		_return _false, _false
 	_endtry
 _endmethod
@@ -1038,11 +1038,11 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 	## Returns:
 	##   scheme - The activated scheme, or _unset if failed
 
-	_try
+	_try _with errCond
 		_local wo_number << wo[:wo_number]
 		_if wo_number _is _unset _orif wo_number = ""
 		_then
-			write("ERROR: No work order number")
+			write("LOG: ERROR - No work order number")
 			_return _unset
 		_endif
 
@@ -1062,7 +1062,7 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 
 		_if project _is _unset
 		_then
-			write("ERROR: Project not found for WO:", wo_number)
+			write("LOG: ERROR - Project not found for WO:", wo_number)
 			_return _unset
 		_endif
 
@@ -1070,7 +1070,7 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 		_local scheme << project.top_schemes.an_element()
 		_if scheme _is _unset
 		_then
-			write("ERROR: No design found in project:", wo_number)
+			write("LOG: ERROR - No design found in project:", wo_number)
 			_return _unset
 		_endif
 
@@ -1081,7 +1081,7 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 		_return scheme
 
 	_when error
-		write("ERROR activating design:", condition.report_contents_string)
+		write("LOG: ERROR activating design:", errCond.report_contents_string)
 		_return _unset
 	_endtry
 _endmethod
@@ -1110,7 +1110,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 
 	write("Generating BoQ as Excel for WO:", wo[:wo_number])
 
-	_try
+	_try _with errCond
 		# Activate the design first
 		_local scheme << _self.activate_design_for_wo(wo)
 		_if scheme _is _unset
@@ -1127,8 +1127,9 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 			scheme.name))
 
 	_when error
+		write("LOG: Error generating BoQ as Excel:", errCond.report_contents_string)
 		_self.user_error(write_string("Error generating BoQ as Excel:", %newline,
-			condition.report_contents_string))
+			errCond.report_contents_string))
 	_endtry
 _endmethod
 $
@@ -1156,7 +1157,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 
 	write("Generating BoQ as JSON for WO:", wo[:wo_number])
 
-	_try
+	_try _with errCond
 		# Activate the design first
 		_local scheme << _self.activate_design_for_wo(wo)
 		_if scheme _is _unset
@@ -1200,8 +1201,9 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 		_endif
 
 	_when error
+		write("LOG: Error generating BoQ as JSON:", errCond.report_contents_string)
 		_self.user_error(write_string("Error generating BoQ as JSON:", %newline,
-			condition.report_contents_string))
+			errCond.report_contents_string))
 	_endtry
 _endmethod
 $
