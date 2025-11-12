@@ -550,6 +550,19 @@ _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.refresh_button_states()
+	## Refresh button enable states for currently selected work order
+	## Useful after migration completes to enable BoQ buttons
+
+	_if .selected_wo _isnt _unset
+	_then
+		write("Refreshing button states for WO:", .selected_wo[:wo_number])
+		_self.update_detail_panel(.selected_wo)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.view_details()
 	## View detailed information for selected work order
 
@@ -768,6 +781,10 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				"The design is now active. You can review and modify objects before posting.")
 
 			_self.user_info(msg)
+
+			# Refresh button states to enable BoQ buttons now that design exists
+			write("Migration successful - refreshing button states...")
+			_self.refresh_button_states()
 		_else
 			_local error_elem << xml_doc.element_matching_name(:error)
 			_local error_msg << _if error_elem _isnt _unset
