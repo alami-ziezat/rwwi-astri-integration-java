@@ -676,3 +676,141 @@ _method rwwi_astri_workorder_engine.close_db_connection()
 	_endtry
 _endmethod
 $
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_project_by_name(project_name)
+	## Get project by name from design admin
+	##
+	## Parameters:
+	##   project_name (string) - Project name to search for
+	##
+	## Returns:
+	##   swg_dsn_project - Project record, or _unset if not found
+
+	_try _with errCond
+		_if project_name _is _unset _orif project_name = ""
+		_then
+			_return _unset
+		_endif
+
+		_if .vda _is _unset
+		_then
+			write("LOG: ERROR - design_admin dataset not available")
+			_return _unset
+		_endif
+
+		_local project_col << .vda.collections[:swg_dsn_project]
+		_local project << project_col.select(predicate.eq(:name, project_name)).an_element()
+
+		_return project
+
+	_when error
+		write("LOG: ERROR getting project by name:", errCond.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.check_project_and_design_exist(wo_number)
+	## Check if project and design exist in Smallworld for work order number
+	##
+	## Parameters:
+	##   wo_number (string) - Work order number (project name)
+	##
+	## Returns:
+	##   (boolean, boolean) - (has_project?, has_design?)
+
+	_try _with errCond
+		_if wo_number _is _unset _orif wo_number = ""
+		_then
+			_return _false, _false
+		_endif
+
+		# Get project by name
+		_local project << _self.get_project_by_name(wo_number)
+		_if project _is _unset
+		_then
+			_return _false, _false
+		_endif
+
+		# Check if project has any schemes (designs)
+		_local schemes << project.top_schemes
+		_if schemes _is _unset _orif schemes.empty?
+		_then
+			_return _true, _false
+		_endif
+
+		# Project and design exist
+		_return _true, _true
+
+	_when error
+		write("LOG: ERROR checking project/design:", errCond.report_contents_string)
+		_return _false, _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_design_for_project(project_name)
+	## Get first design (scheme) for project
+	##
+	## Parameters:
+	##   project_name (string) - Project name
+	##
+	## Returns:
+	##   swg_dsn_scheme - Design scheme, or _unset if not found
+
+	_try _with errCond
+		_local project << _self.get_project_by_name(project_name)
+		_if project _is _unset
+		_then
+			write("LOG: ERROR - Project not found:", project_name)
+			_return _unset
+		_endif
+
+		_local scheme << project.top_schemes.an_element()
+		_if scheme _is _unset
+		_then
+			write("LOG: ERROR - No design found in project:", project_name)
+			_return _unset
+		_endif
+
+		_return scheme
+
+	_when error
+		write("LOG: ERROR getting design for project:", errCond.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.activate_design(project_name)
+	## Activate design for given project name
+	##
+	## Parameters:
+	##   project_name (string) - Project name (typically wo_number)
+	##
+	## Returns:
+	##   swg_dsn_scheme - Activated scheme, or _unset if failed
+
+	_try _with errCond
+		_local scheme << _self.get_design_for_project(project_name)
+		_if scheme _is _unset
+		_then
+			_return _unset
+		_endif
+
+		# Activate the design using swg_dsn_admin_engine
+		write("Activating design:", scheme.name, "(ID:", scheme.id, ")")
+		swg_dsn_admin_engine.activate_design(scheme)
+
+		_return scheme
+
+	_when error
+		write("LOG: ERROR activating design:", errCond.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
