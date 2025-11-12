@@ -1,0 +1,146 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Figure Eight Migration
+## Contains methods for creating figure eight (slack/coil) from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_figure_eight(pm)
+	## Create figure_eight (slack/coil) from point placemark with advanced mode:
+	## - Pole association (search within 700m or create placeholder)
+	## - Aerial route snapping for placeholder poles
+	## - Cable connection if available
+
+	_try _with errCon
+		# Step 0: Validate figure_eight (already validated by is_figure_eight?())
+		_local folders << pm[:parent].default("")
+		_if _not _self.is_figure_eight?(pm)
+		_then
+			write("  WARNING: Skipping - not a figure_eight: ", folders)
+			_return
+		_endif
+
+		write("  Processing figure_eight: ", pm[:name])
+
+		# Step 1: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 2: Parse location
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.coord
+
+		_local pp << pseudo_point.new(coord)
+		pp.world << .database.world
+
+		# Step 3: Find or create pole within 700m
+		_local (h, pl_sl) << _self.scan_pole_st(pp, 700)
+		_local sh_loc << _unset
+
+		_if h _is _true
+		_then
+			# Pole found - use existing pole
+			sh_loc << pl_sl.location.coord
+			write("    >> Found existing pole within 700m: ", pl_sl.telco_pole_tag)
+		_else
+			# No pole found - create placeholder pole
+			write("    >> Creating placeholder pole for slack")
+
+			# Try to snap to aerial route
+			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(pp)
+
+			_if tf _is _true
+			_then
+				sh_loc << snap_loc
+				write("    >> Pole snapped to aerial route")
+			_else
+				sh_loc << coord
+			_endif
+
+			# Get line type for pole
+			_local m_line << _self.match_line(folders.lowercase)
+
+			_local l_prop_values_pl << property_list.new_with(
+				:location, sh_loc,
+				:telco_pole_tag, "Existing Pole Slack",
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, "T7",
+				:folders, folders,
+				:fttx_network_type, "Cluster",
+				:line_type, m_line,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:segment, segment_id,
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+
+			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
+			pl_sl << l_rec_trans_pl.run()
+
+			.stats[:poles] +<< 1
+			write("    >> Placeholder pole created")
+		_endif
+
+		# Step 3: Create figure_eight
+		_local l_prop_values << property_list.new_with(
+			:construction_status, "Proposed",
+			:type, "Circle",
+			:length, 20,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:uuid, .uuid
+		)
+
+		_local l_rec_trans << record_transaction.new_insert(.fe_col, l_prop_values)
+		_local l_result << l_rec_trans.run()
+
+		.stats[:figure_eights] +<< 1
+		write("    [OK] Figure eight created: ", pm[:name], " (Type: Circle, Length: 20)")
+
+		# Step 4: Associate to pole structure
+		_try
+			_if pl_sl _isnt _unset
+			_then
+				l_result.associate_to_structure(pl_sl)
+				write("    >> Associated to pole: ", pl_sl.telco_pole_tag)
+			_endif
+		_when error
+			# Continue if association fails
+		_endtry
+
+		# Step 5: Connect to cable if available
+		_try
+			_local l_cables << pl_sl.cable_records.an_element()
+
+			_if l_cables _isnt _unset
+			_then
+				l_cables.mcn!connect(l_result)
+				write("    >> Connected to cable")
+			_endif
+		_when error
+			# Continue if cable connection fails
+		_endtry
+
+		>> l_result
+
+	_when error
+		write("ERROR in create_figure_eight():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

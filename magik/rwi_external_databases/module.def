@@ -1,0 +1,6 @@
+rwi_external_databases	1
+
+description
+	Module to define any configuration for each external databases
+end
+

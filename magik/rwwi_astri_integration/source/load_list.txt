@@ -1,4 +1,22 @@
 astri_kml_parser
 astri_kml_migrator
+
+# ASTRI Design Migrator - Main entry point and orchestration
 astri_design_migrator
+
+# ASTRI Design Migrator - Utility methods (must load after main file)
+astri_migrator_utilities
+
+# ASTRI Design Migrator - Object-specific migrators
+astri_pole_migrator
+astri_aerial_route_migrator
+astri_demand_point_migrator
+astri_splice_migrator
+astri_figure_eight_migrator
+astri_olt_migrator
+astri_riser_migrator
+astri_access_point_migrator
+astri_sheath_migrator
+astri_micro_cell_migrator
+
 test_astri_procs

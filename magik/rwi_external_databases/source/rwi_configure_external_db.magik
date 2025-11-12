@@ -1,0 +1,174 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2013 Realworld Systems Indonesia. All Rights Reserved. 
+# Author: ziezat
+#							       
+# ************************************************************
+
+_package user
+
+_global configure_oracle_objects_ext_db <<
+_proc@configure_oracle_objects_ext_db(db_type,db_name)
+
+	## Add new config of database type here
+	db_source << property_list.new_with(:mysql,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.40.9.74:3306/starclick",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :oracle,
+					  property_list.new_with(:connect_name, "Oracle",
+								 :driver, "oracle.jdbc.driver.OracleDriver",
+								 :data_source, "jdbc:oracle:thin:@10.39.1.4:1521:xe",
+								 :classpath, system.getenv("ORACLE_JDBC_PATH_12G")),
+					  :ora_tenoss,
+					  property_list.new_with(:connect_name, "Oracle",
+								 :driver, "oracle.jdbc.driver.OracleDriver",
+								 :data_source, "jdbc:oracle:thin:@10.0.32.239:1522:odsbd",
+								 :classpath, system.getenv("ORACLE_JDBC_PATH_11G")),
+					  :mysql_wifi,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.40.109.20:3306/map",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :mysql_rest,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.88.10.212:3306/rest",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :mysql_dboard,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.40.109.10:3306/dashboard_sw",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :mysql_abd,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.40.108.153:3306/Dashboard_SWPNI",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :mysql_int2,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.39.1.124:3306/swpni_integration2",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :mysql_wo,
+					  property_list.new_with(:connect_name, "MySQL",
+								 :driver, "com.mysql.jdbc.Driver",
+								 :data_source, "jdbc:mysql://10.39.1.124:3306/swpni_wo",
+								 :classpath, system.getenv("MYSQL_JDBC_PATH")),
+					  :postgresql,
+					  property_list.new_with(:connect_name, "PostgreSQL",#postgresql",
+								 :driver, "org.postgresql.Driver",
+								 :data_source, "jdbc:postgresql://localhost:5432/swpni",
+								 :classpath, system.getenv("POSTGRESQL_JDBC_PATH")),
+					  :postgresql_dev,
+					  property_list.new_with(:connect_name, "PostgreSQL",#postgresql",
+								 :driver, "org.postgresql.Driver",
+								 :data_source, "jdbc:postgresql://10.40.107.51:5432/swpni",
+								 :classpath, system.getenv("POSTGRESQL_JDBC_PATH")),
+					  :postgresql_tenoss,
+					  property_list.new_with(:connect_name, "PostgreSQL",#postgresql",
+								 :driver, "org.postgresql.Driver",
+								 :data_source, "jdbc:postgresql://10.40.107.51:5432/int_tenoss",
+								 :classpath, system.getenv("POSTGRESQL_JDBC_PATH"))
+				   )
+								
+	## Add new database here
+	db_user << property_list.new_with(  :System,
+					    property_list.new_with(:dbusername, "System",
+								   :dbpassword, "telkomakses"),
+					    :swpni,
+					    property_list.new_with(:dbusername, "swpni",
+								   :dbpassword, "pni2013"),
+					    :isc,
+					    property_list.new_with(:dbusername, "isc",
+								   :dbpassword, "isc2014"), 
+					    :swpni_wo,
+					    property_list.new_with(:dbusername, "swpni_wo",
+								   :dbpassword, "swpni_wo"),
+					    :starclick,
+					    property_list.new_with(:databasename, "starclick",
+								   :dbusername, "neuron",
+								   :dbpassword, "bebas"),
+					    :map,
+					    property_list.new_with(:databasename, "map",
+								   :dbusername, "smallworld",
+								   :dbpassword, "smallworld"),
+					    :rest,
+					    property_list.new_with(:databasename, "rest",
+								   :dbusername, "yudo",
+								   :dbpassword, "smallworld",
+								   :mode,:write,
+								   :no_descriptor_validation,_true,
+								   :no_primary_key_validation,_true),
+					    :dboard_sw,
+					    property_list.new_with(:databasename, "dboard_sw",
+								   :dbusername, "dashboard_sw",
+								   :dbpassword, "telkomAkses"),
+					    :dboard_int2,
+					    property_list.new_with(:databasename, "swpni_integration2",
+								   :dbusername, "swpni",
+								   :dbpassword, "swpni@ptta2014"),
+					    :dboard_wo,
+					    property_list.new_with(:databasename, "swpni_wo",
+								   :dbusername, "swpni",
+								   :dbpassword, "swpni@ptta2014"),
+					    :dboard_pni,
+					    property_list.new_with(:dbusername, "swpni",
+								   :dbpassword, "swpni#123"),
+					    :postgresql_pni,
+					    property_list.new_with(:databasename, "swpni",
+								   :dbusername, "ta",
+								   :dbpassword, "tapass"),
+					    :postgresql_dev,
+					    property_list.new_with(:databasename, "swpni",
+								   :dbusername, "postgres",
+								   :dbpassword, "abc#123"),
+					    :postgresql_tenoss,
+					    property_list.new_with(:databasename, "int_tenoss",
+								   :dbusername, "postgres",
+								   :dbpassword, "abc#123"),
+					    :dboard_abd,
+					    property_list.new_with(:dbusername, "amel",
+								   :dbpassword, "telkomakses")
+				   )
+				      
+	extdb_params << property_list.new_with(:dbtype, :jdbc,
+			:server, :jdbc,
+			:connection_class, "com.gesmallworld.extern.jdbc.JdbcConnection"
+#			:options, property_list.new_with(:defaultBatchValue, 100
+#							 :zeroDateTimeBehavior, "convertToNull"
+#						)
+				      )
+
+	_if (l_source << db_source[db_type.as_symbol()]) _is _unset 
+	_then
+		condition.raise( :user_error, :string, "No such "+db_type.write_string+" architecture")	
+	_endif
+	_if (l_user << db_user[db_name.as_symbol()]) _is _unset 
+	_then
+		condition.raise( :user_error, :string, "Database "+db_name.write_string+" is invalid")
+	_endif
+	extdb_params.add_all(l_source)
+	extdb_params.add_all(l_user)
+	_return extdb_params
+_endproc
+$
+
+
+_global get_user_connection <<
+_proc@get_user_connection(db_type,db_name)
+	connect? << _false 
+	_try _with ErrCon
+		c_template << extdb_user.connect_template(_scatter configure_oracle_objects_ext_db(db_type,db_name))
+		c_user << jdbc_user.new(c_template)
+		c_user.connect()
+		connect? << _true 
+	_when error 
+		condition.raise( :user_error, :string, ErrCon)
+		_return connect?, c_user
+	_endtry
+	_return connect?, c_user
+_endproc
+$

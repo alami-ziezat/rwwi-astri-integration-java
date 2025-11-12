@@ -1,6 +1,6 @@
 #% text_encoding = iso8859_1
 
-_package sw
+_package user
 $
 
 ## Test procedures for ASTRI API integration (v2.0)

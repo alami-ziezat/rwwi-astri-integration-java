@@ -1,0 +1,69 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Riser Migration
+## Contains methods for creating riser cables from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_riser(pm)
+	## Create riser cable from point placemark
+	## - Point type with name matching "*riser*" (case-insensitive)
+	## - Saved to riser collection
+	## - Point-based cable (vertical cable connecting to building)
+	##
+	## Parameters:
+	##   pm - placemark property_list with :name, :coord, :parent
+
+	_try _with errCon
+		# Step 0: Validate this is a riser
+		_if _not _self.is_riser?(pm)
+		_then
+			write("  WARNING: Skipping - not a riser: ", pm[:name])
+			_return
+		_endif
+
+		write("  Processing riser: ", pm[:name])
+
+		# Step 1: Get folder information
+		_local folders << pm[:parent].default("")
+
+		# Step 2: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 3: Parse point geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.as_coord()
+
+		# Step 4: Create riser cable as point-based riser object
+		# Using minimal length for point-based representation
+		_local prop_values << property_list.new_with(
+			:location, coord,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:project, .prj_id,
+			:uuid, .uuid,
+			:construction_status, "Proposed",
+			:cable_type, "Riser"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.riser_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:risers] +<< 1
+		write("  [OK] Riser created: ", pm[:name], " (Type: Riser)")
+
+	_when error
+		write("ERROR in create_riser():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

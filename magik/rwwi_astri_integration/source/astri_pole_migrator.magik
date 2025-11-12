@@ -1,0 +1,215 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Pole Migration
+## Contains methods for creating poles from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_pole(pm)
+	## Create pole object from placemark with advanced type detection,
+	## cable snapping, and duplicate detection
+
+	_try _with errCon
+		# Step 0: Validate folder contains "pole" pattern
+		_local folders << pm[:parent].default("")
+		_if folders = "" _orif folders _is _unset
+		_then
+			write("  WARNING: Skipping - no folder information")
+			_return
+		_endif
+
+		# Check if this is a pole (folder must contain "|pole|" case-insensitive)
+		_local folders_lc << folders.lowercase
+		_if _not folders_lc.matches?("*|pole|*")
+		_then
+			write("  WARNING: Skipping - not a pole (folder doesn't contain '|pole|'): ", folders)
+			_return
+		_endif
+
+		# Step 1: Parse folder hierarchy
+		_local fol << folders.split_by("|")
+		_local fsize << fol.size
+
+		_if fsize < 2
+		_then
+			write("  WARNING: Skipping - folder hierarchy too shallow: ", folders)
+			_return
+		_endif
+
+		# Step 2: Parse pole attributes from folder names
+		_local pole_type << _self.match_pole_type(folders_lc)
+		_local pole_emr_status << _self.match_pole_status(folders_lc)
+		_local line_type << _self.match_line(folders_lc)
+		_local segment_id<< _self.match_segment(folders)
+
+		# Map pole type to STF item code
+		_local stf_item_code << _unset
+		_if pole_type = "Pole 7-3"
+		_then
+			stf_item_code << "200001055"
+		_elif pole_type = "Pole 7-4"
+		_then
+			stf_item_code << "200001183"
+		_elif pole_type = "Pole 7-5"
+		_then
+			stf_item_code << "200000187"
+		_elif pole_type = "Pole 9-4"
+		_then
+			stf_item_code << "200001181"
+		_elif pole_type = "Pole 9-5"
+		_then
+			stf_item_code << "200000169"
+		_endif
+
+		write(folders_lc,"--",pole_type,"|",pole_emr_status,"|",line_type,"|",stf_item_code)
+
+		# Step 3: Parse original geometry
+		_local original_location << _self.parse_point_geometry(pm[:coord])
+
+		_local coord << original_location.as_coord()
+
+		# Step 4: Perform cable snapping
+		_local pa << pseudo_point.new(coord)
+		pa.world << .database.world
+
+		_local buff << pa.buffer(500)
+		buff.world << .database.world
+
+		_local pred << predicate.interacts(:route, {buff})
+		_local aerial_routes << .ar_col.select(pred)
+
+		_local final_location << _unset
+		_if aerial_routes.size > 0
+		_then
+			# Aerial route found - snap to nearest point on route
+			_local ar << aerial_routes.an_element()
+			_local q_sec << pseudo_chain.new(ar.route)
+			q_sec.world << .database.world
+			_local cp << q_sec.segpoint_near(pa)
+
+			_local snapped_point << pseudo_point.new(cp)
+			snapped_point.world << .database.world
+			final_location << snapped_point
+
+			write("  >> Pole snapped to aerial route")
+		_else
+			# No aerial route - use original location
+			final_location << original_location
+		_endif
+
+		# Step 5: Check for duplicate poles within 200m
+		_local (h, existing_pole) << _self.scan_pole_st(final_location, 200)
+		_global pl_pole
+		_if h _is _true _andif existing_pole _isnt _unset
+		_then
+			write("existing pole...")
+			# Found existing pole - check if it's a placeholder
+			_if existing_pole.telco_pole_tag = "Existing Pole AR"
+			_then
+				# Update placeholder pole
+				write("  [UPDATE] Updating existing placeholder pole: ", existing_pole.id)
+
+				existing_pole.telco_pole_tag << pm[:name]
+				existing_pole.pop << .pop_name
+				existing_pole.olt << .pop_name
+				existing_pole.type << pole_type
+				existing_pole.pole_emr_status << pole_emr_status
+				existing_pole.folders << folders
+				existing_pole.fttx_network_type << "Cluster"
+				existing_pole.segment << segment_id
+				existing_pole.project << .prj_id
+
+				_if stf_item_code _isnt _unset
+				_then
+					existing_pole.stf_item_code << stf_item_code
+				_endif
+
+				_if line_type _isnt _unset
+				_then
+					existing_pole.line_type << line_type
+				_endif
+
+				# Recreate annotation
+				_try
+					existing_pole.unset_geometry(:annotation_3)
+					_local anno << existing_pole.make_geometry(:annotation_3,
+						final_location.location, existing_pole.telco_pole_tag)
+				_when error
+					# Annotation may not exist or may fail - continue
+				_endtry
+
+				.stats[:poles] +<< 1
+				write("  [OK] Pole updated: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
+				_return existing_pole
+			_else
+				# Existing pole is not a placeholder - skip creation
+				write("  WARNING: Pole already exists nearby (", existing_pole.telco_pole_tag, ") - skipping")
+				.stats[:skipped] +<< 1
+				_return
+			_endif
+		_else
+			# No existing pole - create new one
+
+			# Determine construction status based on pole_emr_status
+			_local pole_const_status <<
+			_if pole_emr_status.matches?("New*")
+			_then
+				>> "Proposed"
+			_elif pole_emr_status.matches?("Existing*")
+			_then
+				>> "In Service"
+			_else
+				>> "Proposed"  # Default to Proposed
+			_endif
+
+			_local prop_values << property_list.new_with(
+				:location, final_location,
+				:telco_pole_tag, pm[:name],
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, pole_type,
+				:pole_emr_status, pole_emr_status,
+				:folders, folders,
+				:fttx_network_type, "Cluster",
+				:segment, segment_id,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:project, .prj_id,
+				:uuid, .uuid,
+				:construction_status, pole_const_status
+			)
+
+			# Add optional fields if available
+			_if stf_item_code _isnt _unset
+			_then
+				prop_values[:stf_item_code] << stf_item_code
+			_endif
+
+			_if line_type _isnt _unset
+			_then
+				prop_values[:line_type] << line_type
+			_endif
+			_local rec_trans << record_transaction.new_insert(.pole_col, prop_values)
+			_local result << rec_trans.run()
+
+			.stats[:poles] +<< 1
+			write("  [OK] Pole created: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
+			_return result
+		_endif
+
+	_when error
+		write("ERROR in create_pole():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

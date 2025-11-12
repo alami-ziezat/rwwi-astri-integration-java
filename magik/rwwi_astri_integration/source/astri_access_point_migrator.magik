@@ -1,0 +1,66 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Access Point Migration
+## Contains methods for creating access points from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_access_point(pm)
+	## Create access_point from point placemark
+	## - Point type (catch-all for points not matching other types)
+	## - Saved to access_point collection
+	##
+	## Parameters:
+	##   pm - placemark property_list with :name, :coord, :parent
+
+	_try _with errCon
+		# Step 0: Validate this is an access point
+		_if _not _self.is_access_point?(pm)
+		_then
+			write("  WARNING: Skipping - not an access_point: ", pm[:name])
+			_return
+		_endif
+
+		write("  Processing access_point: ", pm[:name])
+
+		# Step 1: Get folder information
+		_local folders << pm[:parent].default("")
+
+		# Step 2: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 3: Parse point geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.as_coord()
+
+		# Step 4: Create access_point
+		_local prop_values << property_list.new_with(
+			:location, coord,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:project, .prj_id,
+			:uuid, .uuid,
+			:construction_status, "Proposed"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.ap_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:access_points] +<< 1
+		write("  [OK] Access point created: ", pm[:name])
+
+	_when error
+		write("ERROR in create_access_point():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

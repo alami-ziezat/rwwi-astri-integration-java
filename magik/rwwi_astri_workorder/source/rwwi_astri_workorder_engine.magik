@@ -1,18 +1,35 @@
 #% text_encoding = iso8859_1
 
-_package sw
+_package user
 $
 
 ## ASTRI Work Order Engine
 ## Data access layer for work order retrieval from API and database
+
+remex(:rwwi_astri_workorder_engine)
+$
 
 def_slotted_exemplar(:rwwi_astri_workorder_engine,
 {
 	{:vda,         _unset, :writable},   # View/Design Admin (dataset)
 	{:dialog,      _unset, :writable},   # Parent dialog reference
 	{:current_source, :api, :writable},  # Current data source (:api or :db)
-	{:cache,       _unset, :writable}    # Cached data
+	{:cache,       _unset, :writable},   # Cached data
+	{:db_connection, _unset, :writable}  # PostgreSQL database connection
 }, :engine_model)
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+## SQL queries for retrieving KMZ UUID from PostgreSQL database
+## Uses COALESCE to prioritize abd_kmz_uuid over apd_kmz_uuid
+rwwi_astri_workorder_engine.define_shared_constant(:sql_for_kmz_uuid,
+	property_list.new_with(
+		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
+		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
+		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
+	),
+	_false
+)
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
@@ -48,8 +65,8 @@ _method rwwi_astri_workorder_engine.get_workorders_from_api(
 	##       :assigned_vendor_name - Vendor name filter
 	##     Infrastructure-specific filters:
 	##       For cluster: :target_cluster_topology, :target_cluster_code
-	##       For subfeeder: :target_subfeeder_topology, :target_subfeeder_code
-	##       For feeder: :target_feeder_topology, :target_feeder_code
+	##       For subfeeder: :target_subfeeder_code
+	##       For feeder: :target_osp_route_area
 	##
 	## Returns:
 	##   rope of property_lists with work order data
@@ -105,7 +122,10 @@ _method rwwi_astri_workorder_engine.get_workorders_from_api(
 		_return workorders
 
 	_when error
-		write("ERROR in get_workorders_from_api:", cond.report_contents_string)
+		write("ERROR in get_workorders_from_api():", cond.report_contents_string)
+		write("  Infrastructure type:", infrastructure_type)
+		write("  Limit:", limit, "| Offset:", offset)
+		write("  Filters:", filters)
 		condition.raise(:astri_workorder!api_call_failed,
 			:api_name, "astri_get_work_orders",
 			:error_message, cond.report_contents_string)
@@ -246,7 +266,8 @@ _private _method rwwi_astri_workorder_engine.create_dummy_workorder_data(infrast
 		_return result_rope
 
 	_when error
-		write("WARNING: Failed to create dummy work order data:", condition.report_contents_string)
+		write("ERROR in create_dummy_workorder_data():", condition.report_contents_string)
+		write("  Infrastructure type:", infrastructure_type)
 		_return rope.new()
 	_endtry
 _endmethod
@@ -328,8 +349,12 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:wo_number] << _self.get_xml_element_value(wo_elem, :number)
 
 			# Extract infrastructure-specific fields using dynamic field names
-			pl[:cluster_code] << _self.get_xml_element_value(wo_elem, code_field)
-			pl[:cluster_name] << _self.get_xml_element_value(wo_elem, name_field)
+			# Note: Using :cluster_code as the key for all types for backward compatibility in UI
+			_local infra_code << _self.get_xml_element_value(wo_elem, code_field)
+			_local infra_name << _self.get_xml_element_value(wo_elem, name_field)
+
+			pl[:cluster_code] << infra_code
+			pl[:cluster_name] << infra_name
 
 			# Extract topology only for cluster infrastructure type
 			pl[:topology] << _if topology_field _isnt _unset
@@ -342,8 +367,8 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
 			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
 
-			# KMZ UUID will be retrieved from database, not from API
-			pl[:kmz_uuid] << ""
+			# Retrieve KMZ UUID from PostgreSQL database based on infrastructure type and code
+			pl[:kmz_uuid] << _self.get_kmz_uuid_from_db(infrastructure_type, infra_code)
 
 			result_rope.add(pl)
 		_endloop
@@ -351,9 +376,11 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		_return result_rope
 
 	_when error
-		write("ERROR parsing XML:", cond.report_contents_string)
+		write("ERROR in parse_xml_response():", cond.report_contents_string)
+		write("  Infrastructure type:", infrastructure_type)
 		_local max_len << 100.min(xml_string.size)
 		_local xml_preview << xml_string.subseq(1, max_len)
+		write("  XML preview (first 100 chars):", xml_preview)
 		condition.raise(:astri_workorder!xml_parse_error,
 			:xml_string, xml_preview)
 		_return rope.new()
@@ -454,7 +481,8 @@ _method rwwi_astri_workorder_engine.get_workorders_from_db(_optional filters)
 		>> result_rope
 
 	_when error
-		write("ERROR querying database:", cond.report_contents_string)
+		write("ERROR in get_workorders_from_db():", cond.report_contents_string)
+		write("  Filters:", filters)
 		condition.raise(:astri_workorder!db_query_failed,
 			:query, "work_order collection query",
 			:error_message, cond.report_contents_string)
@@ -500,8 +528,130 @@ _method rwwi_astri_workorder_engine.mark_as_construction(wo_uuid)
 		>> _true
 
 	_when error
-		write("ERROR marking as construction:", cond.report_contents_string)
+		write("ERROR in mark_as_construction():", cond.report_contents_string)
+		write("  Work order UUID:", wo_uuid)
 		>> _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, code)
+	## Retrieve KMZ UUID from PostgreSQL database
+	##
+	## Parameters:
+	##   infrastructure_type (string) - "cluster", "subfeeder", or "feeder"
+	##   code (string) - Infrastructure code to search
+	##
+	## Returns:
+	##   string - KMZ UUID or empty string if not found
+	##
+	## Database Tables:
+	##   cluster:   dim_cluster_master_smallworld.cluster_code
+	##   subfeeder: dim_subfeeder_master_smallworld.subfeeder_code
+	##   feeder:    dim_feeder_master_smallworld.feeder_code
+	##
+	## Priority Logic:
+	##   Returns abd_kmz_uuid if not NULL, otherwise apd_kmz_uuid
+
+	_try _with cond
+		# Validate inputs
+		_if code _is _unset _orif code = ""
+		_then
+			_return ""
+		_endif
+
+		# Establish database connection if not already connected
+		_if .db_connection _is _unset
+		_then
+		_global connect?, db_connection
+
+			_local is_connect?
+			(is_connect?, .db_connection) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			(connect?, db_connection)	<< (is_connect?, .db_connection) 
+			_if _not is_connect?
+			_then
+				write("WARNING: Failed to connect to POSTGRESQL_ASTRI_DB")
+				_return ""
+			_endif
+			write("Connected to POSTGRESQL_ASTRI_DB for KMZ UUID retrieval")
+		_endif
+
+		# Get SQL query for infrastructure type
+		_local sql_query << _self.sql_for_kmz_uuid[infrastructure_type.as_symbol()]
+
+		_if sql_query _is _unset
+		_then
+			write("WARNING: No SQL query defined for infrastructure type:", infrastructure_type)
+			_return ""
+		_endif
+
+		# Execute query (following rwi_pni_to_tenoss pattern)
+		_local recs << .db_connection.sql_select(sql_query, code)
+		_local rec << recs.get()
+
+		_local kmz_uuid << ""
+		_if rec _isnt _unset
+		_then
+			# Extract kmz_uuid field, default to empty string if NULL
+			kmz_uuid << rec.kmz_uuid.default("")
+			write("Retrieved KMZ UUID for ", infrastructure_type, " code ", code, ": ", kmz_uuid)
+		_else
+			write("No KMZ UUID found for ", infrastructure_type, " code ", code)
+		_endif
+
+		recs.close()
+
+		# Commit or rollback to clean transaction state
+		_try
+			.db_connection.commit()
+		_when error
+			.db_connection.rollback()
+		_endtry
+
+		_return kmz_uuid
+
+	_when error
+		write("ERROR in get_kmz_uuid_from_db():", cond.report_contents_string)
+		write("  Infrastructure type:", infrastructure_type)
+		write("  Code:", code)
+
+		# Rollback transaction to clear error state
+		_if .db_connection _isnt _unset
+		_then
+			_try
+				.db_connection.rollback()
+				write("Transaction rolled back due to error")
+			_when error
+				# Ignore rollback errors
+			_endtry
+		_endif
+
+		_return ""
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.close_db_connection()
+	## Close PostgreSQL database connection
+	##
+	## Should be called when:
+	##   - Dialog is closed
+	##   - Session is ending
+	##   - Database connection is no longer needed
+
+	_try
+		_if .db_connection _isnt _unset
+		_then
+			.db_connection.rollback()
+			.db_connection.close()
+			.db_connection << _unset
+			write("Database connection closed")
+		_endif
+	_when error
+		# Ignore cleanup errors
+		write("WARNING: Error closing database connection (ignored):", condition.report_contents_string)
 	_endtry
 _endmethod
 $

@@ -8,6 +8,7 @@ end
 requires
 	base
 	rwwi_astri_integration
+	rwi_external_databases
 end
 
 language en_gb

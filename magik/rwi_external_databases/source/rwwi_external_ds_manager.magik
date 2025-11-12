@@ -1,0 +1,123 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2013 Realworld System Indonesia Company. All Rights Reserved.
+# Author : Ziezat
+# Email  : penztzare@gmail.com or muzizat.rais@realworld-systems.com
+# Date   : 13 April 2015
+#							       
+# ************************************************************
+
+
+_package user
+$
+
+remex(:rwwi_external_ds_manager)
+$
+
+_pragma(classify_level=basic, topic={external_databases})
+##
+##
+def_slotted_exemplar(:rwwi_external_ds_manager,
+	{
+	},
+	{})
+$
+
+
+_pragma(classify_level=basic, topic={external_databases})
+_method rwwi_external_ds_manager.config_file()
+	##
+	##
+	>> smallworld_product.pni_get_resource("rwi_external_databases", "data", "connection_external_ds.cfg")
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={external_databases})
+_method rwwi_external_ds_manager.open_connection_for(a_name)
+	## 
+	##
+	_global gps
+	connect? << _false
+	params << _self.read_connection_for(a_name)
+	_if params.empty?
+	_then
+		condition.raise(:user_error, :string, "No Connection is found")
+	_endif
+	extdb_params << property_list.new_with(:dbtype, :jdbc,
+					       :server, :jdbc,
+					       :connection_class, "com.gesmallworld.extern.jdbc.JdbcConnection")
+
+	_if params[:data_source] _isnt _unset _andif system.getenv(params[:data_source]) _isnt _unset 
+	_then
+		params[:data_source] << system.getenv(params[:data_source])
+	_endif
+	
+	_if params[:classpath] _isnt _unset 
+	_then
+		_if system.getenv(params[:classpath]) _isnt _unset
+		_then
+			params[:classpath] << rope.new_with(system.getenv(params[:classpath]))
+		_else
+			params[:classpath] << rope.new_with(params[:classpath])
+		_endif
+	_endif
+	extdb_params.add_all(params)
+	gps << extdb_params
+	extdb_params.p
+	_try _with ErrCon
+		c_template << extdb_user.connect_template(_scatter extdb_params)
+		c_user << jdbc_user.new(c_template)
+		c_user.connect()
+		connect? << c_user.connected?()
+	_when error
+		condition.raise( :user_error, :string, ErrCon)
+	_endtry
+	_return connect?, c_user
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={external_databases})
+_method rwwi_external_ds_manager.read_connection_for(a_section)
+	##
+	##
+	_try _with cond
+		file_stream << external_text_input_stream.new(_self.config_file())
+		params << hash_table.new()
+		_loop
+			_if (read_line << file_stream.get_line()) _isnt _unset 
+			_then
+				_if read_line = a_section
+				_then
+					_loop
+						read_section << file_stream.get_line()
+						_if read_section = "" _or read_section _is _unset 
+						_then
+							_leave
+						_else
+							a_char << read_section.slice(1,1)
+							_if (a_char ="#") _then
+								# Do nothing when this is comment line	
+							_else
+								a_section << read_section.split_by('=')
+								
+								params[a_section[1].as_symbol()] << a_section[2]
+							_endif
+						_endif
+					_endloop
+					_leave
+				_endif 
+			_else
+				_leave 
+			_endif
+		_endloop
+	_when Error
+		condition.raise(:user_error, :string, cond)
+		file_stream.close()
+	_endtry
+	file_stream.close()
+	_return params 
+_endmethod
+$
+

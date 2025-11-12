@@ -1,0 +1,86 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - OLT Migration
+## Contains methods for creating OLT (Optical Line Terminal) from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_olt(pm)
+	## Create OLT (Optical Line Terminal) from point placemark
+	## - Point type with name matching "*OLT*"
+	## - Saved to mit_hub collection
+	## - Scans for existing OLT within 500m radius
+	## - If found: skip creation
+	## - If not found: create new OLT
+	##
+	## Parameters:
+	##   pm - placemark property_list with :name, :coord, :parent
+
+	_try _with errCon
+		# Step 0: Validate this is an OLT
+		_if _not _self.is_olt?(pm)
+		_then
+			write("  WARNING: Skipping - not an OLT: ", pm[:name])
+			_return
+		_endif
+
+		write("  Processing OLT: ", pm[:name])
+
+		# Step 1: Get folder information
+		_local folders << pm[:parent].default("")
+		_if folders = "" _orif folders _is _unset
+		_then
+			write("  WARNING: OLT has no folder information")
+		_endif
+
+		# Step 2: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 3: Parse point geometry
+		_local location << _self.parse_point_geometry(pm[:coord])
+		_local coord << location.as_coord()
+
+		# Step 4: Scan for existing OLT within 500m
+		_local pa << pseudo_point.new(coord)
+		pa.world << .database.world
+
+		_local (found?, existing_olt) << _self.scan_olt(pa, 500)
+
+		_if found?
+		_then
+			write("  WARNING: OLT already exists nearby (", existing_olt.name, ") - skipping")
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Step 5: Create new OLT
+		_local prop_values << property_list.new_with(
+			:location, coord,
+			:name, pm[:name],
+			:folders, folders,
+			:fttx_network_type, "Cluster",
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:project, .prj_id,
+			:uuid, .uuid,
+			:construction_status, "Proposed"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.olt_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:olts] +<< 1
+		write("  [OK] OLT created: ", pm[:name])
+
+	_when error
+		write("ERROR in create_olt():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

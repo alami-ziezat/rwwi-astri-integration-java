@@ -1,6 +1,6 @@
 #% text_encoding = iso8859_1
 
-_package sw
+_package user
 $
 
 ## ASTRI Work Order Dialog
@@ -205,7 +205,7 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 
 	# Set column labels
 	.items[:table].set_column_labels({
-		"No", "WO Number", "Cluster Code", "Cluster Name",
+		"No", "WO Number", "Code", "Name",
 		"Category", "Status", "Topology", "Vendor", "Created", "KMZ UUID"})
 
 	# Set column resize values (relative widths)
@@ -367,25 +367,25 @@ _method rwwi_astri_workorder_dialog.infrastructure_type_changed()
 	_if infra_type = "cluster"
 	_then
 		# Cluster: show topology, label = "Cluster Code"
-		.items[:label_code].label_string << "  Cluster Code:  "
-		.items[:label_topology].visible? << _true
-		.items[:filter_topology].visible? << _true
+		.items[:label_code].label << "  Cluster Code:  "
+		.items[:label_topology].managed? << _true
+		.items[:filter_topology].managed? << _true
 		.items[:filter_topology].enabled? << _true
 
 	_elif infra_type = "subfeeder"
 	_then
 		# Subfeeder: hide topology, label = "Subfeeder Code"
-		.items[:label_code].label_string << "  Subfeeder Code:  "
-		.items[:label_topology].visible? << _false
-		.items[:filter_topology].visible? << _false
+		.items[:label_code].label << "  Subfeeder Code:  "
+		.items[:label_topology].managed? << _false
+		.items[:filter_topology].managed? << _false
 		.items[:filter_topology].enabled? << _false
 
 	_elif infra_type = "feeder"
 	_then
 		# Feeder: hide topology, label = "Feeder Code"
-		.items[:label_code].label_string << "  Feeder Code:  "
-		.items[:label_topology].visible? << _false
-		.items[:filter_topology].visible? << _false
+		.items[:label_code].label << "  Feeder Code:  "
+		.items[:label_topology].managed? << _false
+		.items[:filter_topology].managed? << _false
 		.items[:filter_topology].enabled? << _false
 	_endif
 
@@ -419,6 +419,9 @@ _private _method rwwi_astri_workorder_dialog.build_filter_params()
 
 	_local filters << property_list.new()
 
+	# Get current infrastructure type
+	_local infra_type << .items[:filter_infrastructure].value.default("cluster")
+
 	# Category filter
 	_local category << .items[:filter_category].value
 	_if category _isnt _unset _and category <> "All"
@@ -443,18 +446,25 @@ _private _method rwwi_astri_workorder_dialog.build_filter_params()
 		filters[:latest_status_name] << status
 	_endif
 
-	# Topology filter
-	_local topology << .items[:filter_topology].value
-	_if topology _isnt _unset _and topology <> "All"
+	# Topology filter (only for cluster infrastructure type)
+	_if infra_type = "cluster"
 	_then
-		filters[:target_cluster_topology] << topology
+		_local topology << .items[:filter_topology].value
+		_if topology _isnt _unset _and topology <> "All"
+		_then
+			# Dynamic field name: target_cluster_topology
+			_local topology_field << write_string("target_", infra_type, "_topology").as_symbol()
+			filters[topology_field] << topology
+		_endif
 	_endif
 
-	# Cluster code filter
-	_local cluster << .items[:filter_cluster].value
-	_if cluster _isnt _unset _and cluster.size > 0
+	# Infrastructure code filter (dynamic based on infrastructure type)
+	_local code_value << .items[:filter_cluster].value
+	_if code_value _isnt _unset _and code_value.size > 0
 	_then
-		filters[:target_cluster_code] << cluster
+		# Dynamic field name: target_cluster_code, target_subfeeder_code, or target_feeder_code
+		_local code_field << write_string("target_", infra_type, "_code").as_symbol()
+		filters[code_field] << code_value
 	_endif
 
 	_return filters

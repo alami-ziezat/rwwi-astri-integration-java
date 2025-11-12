@@ -1,0 +1,194 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Micro Cell Migration
+## Contains methods for creating micro cells and macro cells from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_micro_cell(pm)
+	## Create micro cell or macro cell from area placemark
+	## - Areas WITHOUT folders = Macro Cell (boundary areas)
+	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
+	## - Other areas = Skipped
+
+	_try _with errCon
+		# Step 0: Parse folder hierarchy
+		_local folders << pm[:parent].default("")
+		_local fol << _unset
+		_local fsize << 0
+		_local fparent << 0
+
+		_if folders _isnt _unset _andif folders <> ""
+		_then
+			fol << folders.split_by("|")
+			fsize << fol.size
+			_if fsize > 1
+			_then
+				fparent << fsize - 1
+			_else
+				fparent << fsize
+			_endif
+		_endif
+
+		# Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 1: Check if this is a MACRO CELL (boundary area without folders)
+		_if folders _is _unset _orif folders = ""
+		_then
+			write("  Processing Macro Cell: ", pm[:name])
+
+			# Parse area geometry
+			_local area << _self.parse_area_geometry(pm[:coord])
+
+			# Create Macro Cell
+			_local prop_values << property_list.new_with(
+				:identification, pm[:name],
+				:name, pm[:name],
+				:type, "Macro Cell",
+				:status, "Active",
+				:location, area,
+				:segment, segment_id,
+				:fttx_network_type, "Cluster",
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:deployment_technology, "System Default",
+				:note, folders,
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+
+			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
+			_local result << rec_trans.run()
+
+			.stats[:micro_cells] +<< 1
+			write("    [OK] Macro cell created: ", pm[:name], " (Type: Macro Cell)")
+			_return result
+		_endif
+
+		# Step 2: Check for LINE pattern (required for Micro Cell)
+		_local has_line << _false
+
+		_if fol[fsize] = "LINE A" _orif fol[fparent] = "LINE A" _orif
+		   fol[fsize] = "LINE B" _orif fol[fparent] = "LINE B" _orif
+		   fol[fsize] = "LINE C" _orif fol[fparent] = "LINE C" _orif
+		   fol[fsize] = "LINE D" _orif fol[fparent] = "LINE D" _orif
+		   fol[fsize] = "LINE E" _orif fol[fparent] = "LINE E"
+		_then
+			has_line << _true
+		_else
+			write("  WARNING: Skipping - no LINE pattern: ", folders)
+			_return
+		_endif
+
+		# Step 3: Check for boundary pattern (required for Micro Cell)
+		_local has_boundary << _false
+
+		_if fol[fsize] = "FAT COVERAGE" _orif fol[fparent] = "FAT COVERAGE" _orif
+		   fol[fsize] = "BOUNDARY" _orif fol[fparent] = "BOUNDARY" _orif
+		   fol[fsize] = "BOUNDARY FAT" _orif fol[fparent] = "BOUNDARY FAT" _orif
+		   fol[fsize] = "SH" _orif fol[fparent] = "SH"
+		_then
+			has_boundary << _true
+		_else
+			write("  WARNING: Skipping - no boundary pattern: ", folders)
+			_return
+		_endif
+
+		# Step 4: Valid Micro Cell - proceed with creation
+		write("  Processing Micro Cell: ", pm[:name])
+
+		# Parse area geometry
+		_local area << _self.parse_area_geometry(pm[:coord])
+
+		# Step 5: Find splitter inside cell
+		_local s_id << _self.splitter_inside_cell(area)
+		_local nm << _unset
+
+		_if s_id _is _unset
+		_then
+			nm << fol[fsize]  # Use folder name as fallback
+		_else
+			nm << s_id        # Use splitter name
+			write("    >> Found splitter: ", s_id)
+		_endif
+
+		# Step 6: Truncate folders if needed
+		_local ff << _unset
+
+		_if folders.size > 100
+		_then
+			ff << folders.slice(1, 120)  # Truncate to 120 chars
+			write("    >> Folders truncated to 120 chars")
+		_else
+			ff << folders
+		_endif
+
+		# Step 7: Create Micro Cell
+		_local prop_values << property_list.new_with(
+			:identification, pm[:name],
+			:name, nm,
+			:type, "Micro Cell",
+			:status, "Active",
+			:location, area,
+			:folders, ff,
+			:segment, segment_id,
+			:fttx_network_type, "Cluster",
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:splitter_id, s_id,
+			:deployment_technology, "System Default",
+			:note, folders,
+			:uuid, .uuid,
+			:construction_status, "Proposed"
+		)
+
+		_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
+		_local result << rec_trans.run()
+
+		.stats[:micro_cells] +<< 1
+		write("    [OK] Micro cell created: ", pm[:name], " (Type: Micro Cell, Splitter: ", s_id.default("_unset"), ")")
+		>> result
+
+	_when error
+		write("ERROR in create_micro_cell():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_area_based_object(pm)
+	## Create area-based object from placemark WITH parent folder
+	## This is a catchall for other area types
+
+	_try _with errCon
+		_local parent << pm[:parent].default("")
+
+		# Safety check: Only process areas WITH parent folders
+		_if parent = "" _orif parent _is _unset
+		_then
+			_return  # Skip boundary areas
+		_endif
+
+		# Parse area geometry
+		_local area << _self.parse_area_geometry(pm[:coord])
+
+		write("  >> Other area object: ", pm[:name], " (folder: ", parent, ")")
+
+		.stats[:areas_created] +<< 1
+
+	_when error
+		write("ERROR in create_area_based_object():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

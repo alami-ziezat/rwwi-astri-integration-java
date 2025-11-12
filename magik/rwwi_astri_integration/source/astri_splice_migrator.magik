@@ -1,0 +1,298 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Sheath Splice Migration
+## Contains methods for creating sheath splices (closures) from KMZ placemarks
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_sheath_splice(pm)
+	## Create sheath splice (closure) from point placemark with advanced mode:
+	## - Multi-type detection (Join Closure, FDT, FAT)
+	## - Core count detection with different spec mapping
+	## - Pole association (search or create)
+	## - Optical splitter creation for FDT and FAT
+
+	_try _with errCon
+		# Step 0: Validate sheath splice (already validated by is_splice?())
+		_local folders << pm[:parent].default("")
+		_if _not _self.is_splice?(pm)
+		_then
+			write("  WARNING: Skipping - not a sheath splice: ", folders)
+			_return
+		_endif
+
+		# Step 1: Extract segment_id from folders
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 2: Determine closure type
+		_local closure_type << _self.match_closure_type(folders)
+		write("  Processing ", closure_type, ": ", pm[:name])
+
+		# Step 2: Detect core count from name (for Join Closure and FDT)
+		_local core_count << _unset
+		_local sp << _unset          # spec_id
+		_local st_cd << _unset        # stf_item_code
+		_local c_spl << 0             # splitter count
+		_local ot << closure_type     # object_type
+
+		_if closure_type = "Join Closure"
+		_then
+			# Join Closure core detection
+			core_count << _self.match_core(pm[:name])
+
+			# Map Join Closure core to spec and STF
+			_if core_count = "24"
+			_then
+				sp << "Join Closure Dome 24 Core"
+				st_cd << "200000180"
+			_elif core_count = "36"
+			_then
+				sp << "Join Closure Dome 36 Core"
+				st_cd << "200001049"
+			_elif core_count = "48"
+			_then
+				sp << "Join Closure Dome 48 Core"
+				st_cd << "200000164"
+			_elif core_count = "72"
+			_then
+				sp << "Join Closure Dome 72 Core"
+				st_cd << "200000159"
+			_elif core_count = "96"
+			_then
+				sp << "Join Closure Dome 96 Core"
+				st_cd << "200000176"
+			_elif core_count = "144"
+			_then
+				sp << "Join Closure Dome 144 Core"
+				st_cd << "200000158"
+			_elif core_count = "288"
+			_then
+				sp << "Join Closure Dome 288 Core"
+				st_cd << "200000156"
+			_else
+				# Default
+				sp << "Join Closure Dome 48 Core"
+				st_cd << "200000164"
+			_endif
+
+			c_spl << 0  # Join Closure does not create splitters
+
+		_elif closure_type = "FDT"
+		_then
+			# FDT core detection
+			core_count << _self.match_core(pm[:name])
+
+			# Map FDT core to spec and STF
+			_if core_count = "48"
+			_then
+				sp << "48 Core pole mounted FDT"
+				st_cd << "200001039"
+				c_spl << 6
+			_elif core_count = "72"
+			_then
+				sp << "72 Core pole mounted FDT"
+				st_cd << "200001040"
+				c_spl << 9
+			_elif core_count = "96"
+			_then
+				sp << "96 Core pole mounted FDT"
+				st_cd << "200001041"
+				c_spl << 12
+			_elif core_count = "144"
+			_then
+				sp << "144 Core Ground mounted FDT"
+				st_cd << "200001042"
+				c_spl << 18
+			_elif core_count = "288"
+			_then
+				sp << "288 Core Ground mounted FDT"
+				st_cd << "200001043"
+				c_spl << 36
+			_elif core_count = "576"
+			_then
+				sp << "576 Core Ground mounted FDT"
+				st_cd << "200001044"
+				c_spl << 72
+			_else
+				# Default
+				sp << "48 Core pole mounted FDT"
+				st_cd << "200001039"
+				c_spl << 6
+			_endif
+
+		_elif closure_type = "FAT"
+		_then
+			# FAT uses fixed spec (no core detection)
+			sp << "Pole mounted outdoor(16 ports)"
+			st_cd << "200001047"
+			c_spl << 2
+
+		_endif
+
+		# Step 3: Parse original location
+		_local original_location << _self.parse_point_geometry(pm[:coord])
+		_local l_location_start << original_location.coord
+
+		# Step 4: Find or create pole within 800m
+		_local pp << pseudo_point.new(l_location_start)
+		pp.world << .database.world
+
+		_local (k1, pt) << _self.scan_pole_st(pp, 800)
+		_local sh_loc << _unset
+		_local l_result_pl << _unset
+
+		_if k1 _is _true
+		_then
+			# Pole found - use its location
+			sh_loc << pt.location.coord
+			l_result_pl << pt
+			write("    >> Found existing pole within 800m")
+		_else
+			# No pole found - create placeholder pole
+			write("    >> Creating placeholder pole")
+
+			# Get line type for pole
+			_local m_line << _self.match_line(folders)
+
+			_local l_prop_values_pl << property_list.new_with(
+				:location, l_location_start,
+				:telco_pole_tag, "Pole" + pm[:name],
+				:usage, "Telco",
+				:material_type, "Steel",
+				:extension_arm, _false,
+				:power_riser, _false,
+				:telco_riser, _false,
+				:bond, _false,
+				:ground_status, _false,
+				:type, "T7",
+				:folders, folders,
+				:fttx_network_type, "Cluster",
+				:line_type, m_line,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:segment, segment_id,
+				:uuid, .uuid,
+				:construction_status, "Proposed"
+			)
+
+			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
+			l_result_pl << l_rec_trans_pl.run()
+
+			sh_loc << l_result_pl.location.coord
+			.stats[:poles] +<< 1
+		_endif
+
+		# Step 5: Get line type for sheath splice
+		_local line_type << _self.match_line(folders)
+
+		# Step 6: Determine construction status based on name pattern
+	_local splice_name_lc << pm[:name].lowercase
+	_local const_status <<
+	_if splice_name_lc.matches?("new*")
+	_then
+		>> "Proposed"
+	_elif splice_name_lc.matches?("ex*")
+	_then
+		>> "In Service"
+	_else
+		>> "Proposed"  # Default to Proposed
+	_endif
+
+	# Step 7: Create sheath splice
+		_local l_prop_values << property_list.new_with(
+			:location, sh_loc,
+			:asset_owner, "Owned",
+			:splice_type, "breaking",
+			:splice_method, "Fusion",
+			:spec_id, sp,
+			:folders, folders,
+			:sheath_splice_object_type, ot,
+			:fttx_network_type, "Cluster",
+			:line_type, line_type,
+			:name, pm[:name],
+			:segment, segment_id,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:stf_item_code, st_cd,
+			:uuid, .uuid,
+			:construction_status, const_status
+		)
+
+		_local l_rec_trans << record_transaction.new_insert(.sc_col, l_prop_values)
+		_local l_result << l_rec_trans.run()
+
+		.stats[:sheath_splices] +<< 1
+		write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
+
+		# Step 7: Associate to pole structure
+		_try
+			_if l_result_pl _isnt _unset
+			_then
+				_if l_result_pl.external_name = "Pole"
+				_then
+					l_result.associate_to_structure(l_result_pl)
+					write("    >> Associated to pole: ", l_result_pl.telco_pole_tag)
+				_endif
+			_endif
+		_when error
+			# Continue if association fails
+		_endtry
+
+		# Step 8: Create optical splitters (for FDT and FAT only)
+		_if c_spl > 0
+		_then
+			_local splitter_spec << _unset
+
+			_if closure_type = "FDT"
+			_then
+				splitter_spec << "STF Splitter 1:8"
+			_elif closure_type = "FAT"
+			_then
+				splitter_spec << "Splitter 1:8"
+			_endif
+
+			_try
+				_for i _over range(1, c_spl)
+				_loop
+					_local splitter_name << _if closure_type = "FAT"
+					                        _then >> pm[:name] + "-" + i.write_string
+					                        _else >> pm[:name]
+					                        _endif
+
+					_local vals << property_list.new_with(
+						:construction_status, "Proposed",
+						:asset_owner, "Owned",
+						:name, splitter_name,
+						:function, "Splitter",
+						:spec_id, splitter_spec,
+						:stf_splitter_type, closure_type,
+						:stf_item_code, "200001047",
+						:sheath_splice, l_result
+					)
+
+					_local l_rec_trans_s << record_transaction.new_insert(.os_col, vals)
+					_local l_result_s << l_rec_trans_s.run()
+
+					.stats[:optical_splitters] +<< 1
+				_endloop
+
+				write("    [OK] Created ", c_spl, " optical splitters")
+			_when error
+				write("    WARNING: Error creating optical splitters: ", condition.report_contents_string)
+			_endtry
+		_endif
+
+		>> l_result
+
+	_when error
+		write("ERROR in create_sheath_splice():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		write("  Closure type:", _self.match_closure_type(pm[:parent].default("")).default("(unknown)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

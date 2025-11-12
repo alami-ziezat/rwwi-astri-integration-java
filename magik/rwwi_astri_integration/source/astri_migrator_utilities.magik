@@ -1,0 +1,748 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Utility Methods
+## Contains shared utility methods for geometry parsing, type checking,
+## matching, and scanning operations used by all migrators
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.parse_point_geometry(coord_string)
+	## Convert "lon,lat,elevation" to local coordinate
+
+	_dynamic !print_float_precision! << 16
+
+	_local coord_parts << coord_string.split_by(",")
+	_local lon << coord_parts[1].as_number()
+	_local lat << coord_parts[2].as_number()
+	_local wgs84_coord << coordinate.new(lon, lat)
+	_local local_coord << .transform.convert(wgs84_coord)
+
+	_local point << pseudo_point.new(local_coord)
+	point.world << .database.world
+	_return point
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.parse_line_geometry(coord_string)
+	## Convert "lon1,lat1,0 lon2,lat2,0 ..." to sector_rope
+
+	_dynamic !print_float_precision! << 16
+	_local coord_pairs << coord_string.split_by(",0")
+	_local sect << sector.new()
+
+	_for coord_pair _over coord_pairs.fast_elements()
+	_loop
+		_local parts << coord_pair.split_by(",")
+		_if parts.size >= 2
+		_then
+			_local lon << parts[1].as_number()
+			_local lat << parts[2].as_number()
+
+			_local wgs84_coord << coordinate.new(lon, lat)
+			_local local_coord << .transform.convert(wgs84_coord)
+			sect.add_last(local_coord)
+		_endif
+	_endloop
+
+	_local sector_rope << sect.as_sector_rope()
+	_return sector_rope
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.parse_area_geometry(coord_string)
+	## Convert area coordinates to pseudo_area
+	_dynamic !print_float_precision! << 16
+	_local sector_rope << _self.parse_line_geometry(coord_string)
+
+	_if sector_rope.closed? _is _false
+	_then
+		condition.raise(:area_not_closed)
+	_endif
+
+	_local p_area << pseudo_area.new(sector_rope)
+	p_area.world << .database.world
+
+	>> p_area
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_pole?(pm)
+	## Check if placemark is a pole based on parent folder
+	## Folder must contain "|pole|" pattern (case-insensitive)
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> parent.matches?("*|pole|*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_cable?(pm)
+	## Check if placemark is a cable
+
+	_local parent << pm[:parent].default("").lowercase
+
+	>> parent.matches?("*cable*") _orif
+	   parent.matches?("*kabel*") _orif
+	   parent.matches?("*distribution cable*") _orif
+	   parent.matches?("*sling wire*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_demand_point?(folders)
+	## Check if placemark is a demand point based on multi-level folder patterns
+	## Checks at three levels: fsize (last), fparent, fgp (grandparent)
+	## Uses simplified wildcard patterns: "*homepass*", "*hp*", "*reduce*", "*customer*"
+
+	_if folders _is _unset _orif folders = ""
+	_then
+		_return _false
+	_endif
+
+	# STEP 1: Convert entire folder string to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Parse folder hierarchy
+	_local fol << folders_lc.split_by("|")
+	_local fsize << fol.size
+
+	_if fsize = 0
+	_then
+		_return _false
+	_endif
+
+	# Determine folder levels (fsize = last, fparent = 2nd last, fgp = 3rd last)
+	_local fparent << _if fsize >= 2 _then >> fsize - 1 _else >> fsize _endif
+	_local fgp << _if fsize >= 3 _then >> fparent - 1 _else >> fparent _endif
+
+	# STEP 3: Check simplified patterns at all three levels
+	_for fs _over {fol[fsize], fol[fparent], fol[fgp]}.fast_elements()
+	_loop
+		_if fs.default("").matches?("*homepass*") _orif
+		   fs.default("").matches?("*hp*") _orif
+		   fs.default("").matches?("*reduce*") _orif
+		   fs.default("").matches?("*customer*")
+		_then
+			_return _true
+		_endif
+	_endloop
+
+	_return _false
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_splice?(pm)
+	## Check if placemark is a point-based sheath splice
+	## Checks for: CLOSURE, JOINT CLOSURE, FAT, FDT patterns
+	## IMPORTANT: This is for POINT type (not area)
+
+	_local folders << pm[:parent].default("")
+
+	_if folders = "" _orif folders _is _unset
+	_then
+		_return _false
+	_endif
+
+	# STEP 1: Convert to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Check if it's a POINT type (not area)
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# STEP 3: Check simplified wildcard patterns
+	>> folders_lc.matches?("*closure*") _orif
+	   folders_lc.matches?("*joint*") _orif
+	   folders_lc.matches?("*fdt*") _orif
+	   folders_lc.matches?("*fat*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_figure_eight?(pm)
+	## Check if placemark is a point-based figure_eight (slack, coil)
+	## Checks for: SLACK, SLACK HANGER, COIL patterns
+	## IMPORTANT: This is for POINT type (not area/line)
+
+	_local folders << pm[:parent].default("")
+
+	_if folders = "" _orif folders _is _unset
+	_then
+		_return _false
+	_endif
+
+	# STEP 1: Convert to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Check if it's a POINT type (not area/line)
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# STEP 3: Check simplified wildcard patterns
+	>> folders_lc.matches?("*slack*") _orif
+	   folders_lc.matches?("*slack hanger*") _orif
+	   folders_lc.matches?("*coil*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_micro_cell?(pm)
+	## Check if placemark is a micro cell / zone (area-based)
+	## Accepts ALL area types - validation happens in create_micro_cell()
+	## - Areas WITHOUT folders = Macro Cell (boundary areas)
+	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
+
+	>> pm[:type] = "area"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_olt?(pm)
+	## Check if placemark is an OLT (Optical Line Terminal)
+	## - Point type placemark
+	## - Name contains "*OLT*" (case-sensitive)
+	##
+	## Parameters:
+	##   pm - placemark property_list
+	## Returns:
+	##   _true if OLT, _false otherwise
+
+	# Must be point type
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# Check if name contains "OLT" (case-sensitive)
+	_local name << pm[:name].default("")
+	_if name = "" _orif name _is _unset
+	_then
+		_return _false
+	_endif
+
+	>> name.matches?("*OLT*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_riser?(pm)
+	## Check if placemark is a riser cable
+	## - Point type placemark
+	## - Name contains "*riser*" (case-insensitive - lowercase conversion)
+	##
+	## Parameters:
+	##   pm - placemark property_list
+	## Returns:
+	##   _true if riser, _false otherwise
+
+	# Must be point type
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# Check if name contains "riser" (case-insensitive)
+	_local name << pm[:name].default("")
+	_if name = "" _orif name _is _unset
+	_then
+		_return _false
+	_endif
+
+	_local name_lc << name.lowercase
+	>> name_lc.matches?("*riser*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_access_point?(pm)
+	## Check if placemark is an access point
+	## - Point type placemark
+	## - Catch-all for point placemarks that don't match other specific types
+	##   (pole, splice, figure_eight, OLT, riser, demand_point)
+	##
+	## Parameters:
+	##   pm - placemark property_list
+	## Returns:
+	##   _true if access_point, _false otherwise
+
+	# Must be point type
+	_if pm[:type] <> "point"
+	_then
+		_return _false
+	_endif
+
+	# Check if it matches other specific point types
+	# If it matches any of these, it's NOT an access point
+	_if _self.is_pole?(pm) _orif
+	    _self.is_splice?(pm) _orif
+	    _self.is_figure_eight?(pm) _orif
+	    _self.is_olt?(pm) _orif
+	    _self.is_riser?(pm) _orif
+	    _self.is_demand_point?(pm[:parent])
+	_then
+		_return _false
+	_endif
+
+	# It's a point and doesn't match other types - it's an access point
+	>> _true
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_pole_type(fs)
+	## Extract pole type from folder string using wildcard matching
+	## Returns: "Pole 7-3", "Pole 7-4", "Pole 7-5", "Pole 9-4", "Pole 9-5"
+
+	# Match patterns with wildcards (* = any character)
+	_local pole_type <<
+	_if fs.matches?("*7*3*")
+	_then
+		>> "Pole 7-3"
+	_elif fs.matches?("*7*4*")
+	_then
+		>> "Pole 7-4"
+	_elif fs.matches?("*7*5*")
+	_then
+		>> "Pole 7-5"
+	_elif fs.matches?("*9*4*")
+	_then
+		>> "Pole 9-4"
+	_elif fs.matches?("*9*5*")
+	_then
+		>> "Pole 9-5"
+	_else
+		>> "Pole 7-4"  # Default
+	_endif
+	_return pole_type
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_pole_status(fs)
+	## Determine pole status using nested wildcard matching
+	## Returns: "New", "Existing", "New Partner", "Existing Partner", "New EMR", "Existing EMR"
+
+	# Check for EXISTING variations
+	_local pole_status <<
+	_if fs.matches?("ex*")
+	_then
+		# Check sub-types within EXISTING
+		_if fs.matches?("*partner*")
+		_then
+			>> "Existing Partner"
+		_elif fs.matches?("*emr*")
+		_then
+			>> "Existing EMR"
+		_else
+			>> "Existing"
+		_endif
+
+	# Check for NEW variations
+	_elif fs.matches?("new*")
+	_then
+		# Check sub-types within NEW
+		_if fs.matches?("*partner*")
+		_then
+			>> "New Partner"
+		_elif fs.matches?("*emr*")
+		_then
+			>> "New EMR"
+		_else
+			>> "New"
+		_endif
+
+	_else
+		# Default to New
+		>> "New"
+	_endif
+	_return pole_status
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_line(fs)
+	## Extract line designation from folder string
+	## Returns: "LINE A", "LINE B", etc. or _unset
+
+	# Match line patterns (with space between "line" and letter)
+	fs << fs.lowercase
+	_local line <<
+	_if fs.matches?("*line a*")
+	_then
+		>> "Line A"
+	_elif fs.matches?("*line b*")
+	_then
+		>> "Line B"
+	_elif fs.matches?("*line c*")
+	_then
+		>> "Line C"
+	_elif fs.matches?("*line d*")
+	_then
+		>> "Line D"
+	_elif fs.matches?("*line e*")
+	_then
+		>> "Line E"
+	_elif fs.matches?("*line f*")
+	_then
+		>> "Line F"
+	_else
+		>> _unset
+	_endif
+	_return line
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_segment(fs)
+	## Extract segment designation from folder string
+	## Returns: "SEGMENT 1", "SEGMENT 2", etc. or _unset
+
+	# Match segment patterns
+	_local segment <<
+	_if fs.matches?("*seg*1*") _orif fs.matches?("*segmen*1*")
+	_then
+		>> "SEGMENT 1"
+	_elif fs.matches?("*seg*2*") _orif fs.matches?("*segmen*2*")
+	_then
+		>> "SEGMENT 2"
+	_else
+		>> _unset
+	_endif
+	_return segment
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.scan_pole_st(location, radius)
+	## Search for existing pole within radius
+	## Parameters:
+	##   location - coordinate or pseudo_point
+	##   radius - search radius in meters
+	## Returns:
+	##   (boolean, pole_record) - (_true, pole) if found, (_false, _unset) if not found
+
+	_local coord << _if location.responds_to?(:coord)
+	                _then >> location.coord
+	                _else >> location
+	                _endif
+
+	_local pa << pseudo_point.new(coord)
+	pa.world << .database.world
+
+	_local buff << pa.buffer(radius)
+	buff.world << .database.world
+
+	_local pred << predicate.interacts(:location, {buff})
+	_local poles << .pole_col.select(pred)
+
+	_if poles.size > 0
+	_then
+		# Found existing pole - return nearest one
+		_local nearest_pole << poles.an_element()
+		_return _true, nearest_pole
+	_else
+		# No pole found
+		_return _false, _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.scan_olt(location, radius)
+	## Search for existing OLT (mit_hub) within radius
+	## Parameters:
+	##   location - coordinate or pseudo_point
+	##   radius - search radius in meters
+	## Returns:
+	##   (boolean, olt_record) - (_true, olt) if found, (_false, _unset) if not found
+
+	_local coord << _if location.responds_to?(:coord)
+	                _then >> location.coord
+	                _else >> location
+	                _endif
+
+	_local pa << pseudo_point.new(coord)
+	pa.world << .database.world
+
+	_local buff << pa.buffer(radius)
+	buff.world << .database.world
+
+	_local pred << predicate.interacts(:location, {buff})
+	_local olts << .olt_col.select(pred)
+
+	_if olts.size > 0
+	_then
+		# Found existing OLT - return nearest one
+		_local nearest_olt << olts.an_element()
+		_return _true, nearest_olt
+	_else
+		# No OLT found
+		_return _false, _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.scan_ar_on_design(location)
+	## Search for aerial route near location for snapping
+	## Parameters:
+	##   location - coordinate or pseudo_point
+	## Returns:
+	##   (boolean, aerial_route, snap_location) - (_true, route, location) if found, (_false, _unset, _unset) if not found
+
+	_local coord << _if location.responds_to?(:coord)
+	                _then >> location.coord
+	                _else >> location
+	                _endif
+
+	_local pa << pseudo_point.new(coord)
+	pa.world << .database.world
+
+	_local buff << pa.buffer(500)
+	buff.world << .database.world
+
+	_local pred << predicate.interacts(:route, {buff})
+	_local routes << .ar_col.select(pred)
+
+	_if routes.size > 0
+	_then
+		# Found aerial route - snap to nearest point
+		_local ar << routes.an_element()
+		_local pc << pseudo_chain.new(ar.route)
+		pc.world << .database.world
+		_local snap_loc << pc.segpoint_location_near(pa)
+
+		_return _true, ar, snap_loc
+	_else
+		# No aerial route found
+		_return _false, _unset, _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.splitter_inside_cell(area)
+	## Find optical splitter inside cell area using spatial intersection
+	## Parameters:
+	##   area - pseudo_area geometry
+	## Returns:
+	##   splitter name (string) or _unset if not found
+
+	_try
+		# Create spatial predicate for intersection
+		_local pred << predicate.interacts(:location, {area})
+
+		# Query optical_splitter collection
+		_local splitters << .os_col.select(pred)
+
+		_if splitters.size > 0
+		_then
+			# Return first splitter name found
+			_local sp << splitters.an_element()
+			_return sp.name
+		_else
+			# No splitter found in cell
+			_return _unset
+		_endif
+
+	_when error
+		# Return _unset on error
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_cable_core(cable_name)
+	## Extract fiber count from cable name using wildcard matching
+	## Returns: "12", "24", "36", "48", "72", "96", "144", "288", "576", or "24" (default)
+	## IMPORTANT: Check larger numbers FIRST to avoid false matches
+	## (e.g., check 576 before 57, check 288 before 28, check 144 before 14)
+
+	_local cn << cable_name.lowercase
+
+	_local cable_core <<
+	# Check largest numbers first
+	_if cn.matches?("*fo*576*")
+	_then
+		>> "576"
+	_elif cn.matches?("*fo*288*")
+	_then
+		>> "288"
+	_elif cn.matches?("*fo*144*")
+	_then
+		>> "144"
+	_elif cn.matches?("*fo*96*")
+	_then
+		>> "96"
+	_elif cn.matches?("*fo*72*")
+	_then
+		>> "72"
+	_elif cn.matches?("*fo*48*")
+	_then
+		>> "48"
+	_elif cn.matches?("*fo*36*")
+	_then
+		>> "36"
+	_elif cn.matches?("*fo*24*")
+	_then
+		>> "24"
+	_elif cn.matches?("*fo*12*")
+	_then
+		>> "12"
+	_else
+		>> "24"  # Default to 24 cores
+	_endif
+	_return cable_core
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_sling_wire?(folders)
+	## Check if this is a sling wire based on folder pattern
+	## Returns: boolean
+
+	_local fs << folders.lowercase
+
+	>> fs.matches?("*sling wire*") _orif
+	   fs.matches?("*sling_wire*")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.get_latlong(coord)
+	## Convert local coordinate to WGS84 latitude/longitude strings
+	## Parameters:
+	##   coord - Local coordinate
+	## Returns:
+	##   (latitude_string, longitude_string)
+
+	# Get WGS84 coordinate system
+	_local cs_wgs84 << .ace_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	_local cs_local << .database.world.coordinate_system
+
+	# Create transform from local to WGS84
+	_local transform << transform.new_converting_cs_to_cs(cs_local, cs_wgs84)
+
+	# Convert coordinate
+	_local wgs84_coord << transform.convert(coord)
+
+	# Format as strings with precision
+	_dynamic !print_float_precision! << 12
+	_local lat << wgs84_coord.y.write_string
+	_local long << wgs84_coord.x.write_string
+
+	_return lat, long
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.truncate_folders(folders, max_length)
+	## Truncate folder string to maximum length
+	## Parameters:
+	##   folders - Folder string
+	##   max_length - Maximum length
+	## Returns:
+	##   Truncated folder string
+
+	_if folders _is _unset
+	_then
+		_return ""
+	_endif
+
+	_if folders.size > max_length
+	_then
+		_return folders.slice(1, max_length)
+	_else
+		_return folders
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_closure_type(folders)
+	## Determine closure type from folder string
+	## Order: CLOSURE/JOINT >> FAT >> FDT
+	## Returns: "Join Closure", "FAT", or "FDT"
+
+	# STEP 1: Convert to lowercase FIRST
+	_local folders_lc << folders.lowercase
+
+	# STEP 2: Check patterns in order
+	# Priority 1: CLOSURE or JOINT CLOSURE
+	_if folders_lc.matches?("*closure*") _orif folders_lc.matches?("*joint*")
+	_then
+		>> "Join Closure"
+
+	# Priority 2: FAT
+	_elif folders_lc.matches?("*fat*")
+	_then
+		>> "FAT"
+
+	# Priority 3: FDT
+	_elif folders_lc.matches?("*fdt*")
+	_then
+		>> "FDT"
+
+	_else
+		>> "Join Closure"  # Default
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.match_core(name)
+	## Extract core count from name using wildcard matching
+	## Used for BOTH Join Closure and FDT
+	## Returns: "576", "288", "144", "96", "72", "48", "36", "24", or _unset
+
+	_if name _is _unset _orif name = ""
+	_then
+		_return _unset
+	_endif
+
+	# STEP 1: Convert to lowercase FIRST
+	_local name_lc << name.lowercase
+
+	# STEP 2: Check larger numbers FIRST to prevent false matches
+	# (e.g., "*28*" would match 288, "*14*" would match 144)
+	_if name_lc.matches?("*576*")
+	_then
+		>> "576"
+	_elif name_lc.matches?("*288*")
+	_then
+		>> "288"
+	_elif name_lc.matches?("*144*")
+	_then
+		>> "144"
+	_elif name_lc.matches?("*96*")
+	_then
+		>> "96"
+	_elif name_lc.matches?("*72*")
+	_then
+		>> "72"
+	_elif name_lc.matches?("*48*")
+	_then
+		>> "48"
+	_elif name_lc.matches?("*36*")
+	_then
+		>> "36"
+	_elif name_lc.matches?("*24*")
+	_then
+		>> "24"
+	_else
+		>> _unset  # No core count detected
+	_endif
+_endmethod
+$
