@@ -411,6 +411,7 @@ $
 
 _private _method rwwi_astri_workorder_engine.get_xml_element_value(parent_elem, element_name)
 	## Extract text value from XML element
+	## Unescapes backslash-escaped forward slashes (e.g., \/ becomes /)
 	##
 	## Parameters:
 	##   parent_elem (simple_xml_thing) - Parent XML element
@@ -426,7 +427,16 @@ _private _method rwwi_astri_workorder_engine.get_xml_element_value(parent_elem, 
 			_return ""
 		_endif
 
-		_return elem.xml_result
+		_local value << elem.xml_result
+
+		# Remove backslash escaping from forward slashes
+		# Replace "\/" with "/"
+		_if value _isnt _unset _andif value <> ""
+		_then
+			value << value.substitute_string("\/", "/")
+		_endif
+
+		_return value
 
 	_when error
 		_return ""
