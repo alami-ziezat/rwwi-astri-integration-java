@@ -591,7 +591,7 @@ _private _method rwwi_astri_boq_generator.count_sling_wire_length()
 
 	_try _with errCond
 		write("LOG: Counting sling wire length...")
-		_local table_list << rope.new()
+		_local l_total << 0
 
 		# Collect all sling_wire records
 		_for i _over .change_set.fast_elements()
@@ -599,15 +599,9 @@ _private _method rwwi_astri_boq_generator.count_sling_wire_length()
 			_local name << i.current_record.source_collection.name
 			_if name _is :sling_wire
 			_then
-				table_list.add(i.current_record)
+				rec << i.current_record
+				l_total << l_total + rec.route.line_length
 			_endif
-		_endloop
-
-		# Sum up route lengths (converted to meters by dividing by 100)
-		_local l_total << 0
-		_for s _over table_list.fast_elements()
-		_loop
-			l_total << l_total + s.route.line_length
 		_endloop
 
 		# Convert to meters (line_length is in cm, divide by 100)
@@ -617,7 +611,7 @@ _private _method rwwi_astri_boq_generator.count_sling_wire_length()
 		>> t_pjg
 	_when error
 		write("LOG: ERROR counting sling wire:", errCond.report_contents_string)
-		>> 0.0
+		>> 0
 	_endtry
 _endmethod
 $
@@ -625,28 +619,39 @@ $
 _private _method rwwi_astri_boq_generator.count_fat_types()
 	## Count FAT types from design
 	## Returns: (pole_count, pedestal_count)
+	## Logic matches get_count_fat() in rwwi_astri_boq.magik
 
 	_try _with errCond
-		_local pole_count << 0
-		_local pedestal_count << 0
+		write("LOG: Counting FAT types...")
+		_local table_list << rope.new()
 
-		_for record _over .change_set.fast_elements()
+		# Collect all sheath_splice records (FAT is stored in this collection)
+		_for i _over .change_set.fast_elements()
 		_loop
-			_local col_name << record.current_record.source_collection.name
-			_if col_name _is :fat
+			_local name << i.current_record.source_collection.name
+			_if name _is :sheath_splice
 			_then
-				_local spec << record.current_record.spec_id
-				_if spec.index_of_seq("Pole") _isnt _unset
-				_then
-					pole_count +<< 1
-				_elif spec.index_of_seq("Pedestal") _isnt _unset
-				_then
-					pedestal_count +<< 1
-				_endif
+				table_list.add(i.current_record)
 			_endif
 		_endloop
 
-		>> pole_count, pedestal_count
+		_local p1 << 0
+		_local p2 << 0
+
+		# Count by spec_id
+		_for p _over table_list.fast_elements()
+		_loop
+			_if p.spec_id = "Pole mounted outdoor(16 ports)"
+			_then
+				p1 << p1 + 1
+			_elif p.spec_id = "Pedestal mounted(16 ports)"
+			_then
+				p2 << p2 + 1
+			_endif
+		_endloop
+
+		write("LOG: FAT counts - Pole:", p1, "Pedestal:", p2)
+		>> p1, p2
 	_when error
 		write("LOG: ERROR counting FAT types:", errCond.report_contents_string)
 		>> 0, 0
@@ -657,36 +662,55 @@ $
 _private _method rwwi_astri_boq_generator.count_fdt_types()
 	## Count FDT types by capacity
 	## Returns: (f48, f72, f96, f144, f288, f576)
+	## Logic matches get_count_fdt() in rwwi_astri_boq.magik
 
 	_try _with errCond
-		_local counts << equality_hash_table.new()
-		counts["48"] << 0
-		counts["72"] << 0
-		counts["96"] << 0
-		counts["144"] << 0
-		counts["288"] << 0
-		counts["576"] << 0
+		write("LOG: Counting FDT types...")
+		_local table_list << rope.new()
 
-		_for record _over .change_set.fast_elements()
+		# Collect all sheath_splice records (FDT is stored in this collection)
+		_for i _over .change_set.fast_elements()
 		_loop
-			_local col_name << record.current_record.source_collection.name
-			_if col_name _is :fdt
+			_local name << i.current_record.source_collection.name
+			_if name _is :sheath_splice
 			_then
-				_local spec << record.current_record.spec_id
-				# Parse capacity from spec_id
-				_for capacity _over counts.keys()
-				_loop
-					_if spec.index_of_seq(capacity) _isnt _unset
-					_then
-						counts[capacity] +<< 1
-						_leave
-					_endif
-				_endloop
+				table_list.add(i.current_record)
 			_endif
 		_endloop
 
-		>> counts["48"], counts["72"], counts["96"],
-		   counts["144"], counts["288"], counts["576"]
+		_local p1 << 0
+		_local p2 << 0
+		_local p3 << 0
+		_local p4 << 0
+		_local p5 << 0
+		_local p6 << 0
+
+		# Count by spec_id
+		_for p _over table_list.fast_elements()
+		_loop
+			_if p.spec_id = "48 Core pole mounted FDT"
+			_then
+				p1 << p1 + 1
+			_elif p.spec_id = "72 Core pole mounted FDT"
+			_then
+				p2 << p2 + 1
+			_elif p.spec_id = "96 Core pole mounted FDT"
+			_then
+				p3 << p3 + 1
+			_elif p.spec_id = "144 Core Ground mounted FDT"
+			_then
+				p4 << p4 + 1
+			_elif p.spec_id = "288 Core Ground mounted FDT"
+			_then
+				p5 << p5 + 1
+			_elif p.spec_id = "576 Core Ground mounted FDT"
+			_then
+				p6 << p6 + 1
+			_endif
+		_endloop
+
+		write("LOG: FDT counts - 48:", p1, "72:", p2, "96:", p3, "144:", p4, "288:", p5, "576:", p6)
+		>> p1, p2, p3, p4, p5, p6
 	_when error
 		write("LOG: ERROR counting FDT types:", errCond.report_contents_string)
 		>> 0, 0, 0, 0, 0, 0
@@ -697,40 +721,51 @@ $
 _private _method rwwi_astri_boq_generator.count_pole_types()
 	## Count pole types by height and diameter
 	## Returns: (p7_3, p7_4, p7_5, p9_4, p9_5)
+	## Logic matches get_count_pole() in rwwi_astri_boq.magik
 
 	_try _with errCond
-		_local p7_3 << 0
-		_local p7_4 << 0
-		_local p7_5 << 0
-		_local p9_4 << 0
-		_local p9_5 << 0
+		write("LOG: Counting pole types...")
+		_local table_list << rope.new()
 
-		_for record _over .change_set.fast_elements()
+		# Collect all pole records
+		_for i _over .change_set.fast_elements()
 		_loop
-			_local col_name << record.current_record.source_collection.name
-			_if col_name _is :pole
+			_local name << i.current_record.source_collection.name
+			_if name _is :pole
 			_then
-				_local spec << record.current_record.spec_id
-				_if spec.index_of_seq("Pole 7 meter 3 inch") _isnt _unset
-				_then
-					p7_3 +<< 1
-				_elif spec.index_of_seq("Pole 7 meter 4 inch") _isnt _unset
-				_then
-					p7_4 +<< 1
-				_elif spec.index_of_seq("Pole 7 meter 5 inch") _isnt _unset
-				_then
-					p7_5 +<< 1
-				_elif spec.index_of_seq("Pole 9 meter 4 inch") _isnt _unset
-				_then
-					p9_4 +<< 1
-				_elif spec.index_of_seq("Pole 9 meter 5 inch") _isnt _unset
-				_then
-					p9_5 +<< 1
-				_endif
+				table_list.add(i.current_record)
 			_endif
 		_endloop
 
-		>> p7_3, p7_4, p7_5, p9_4, p9_5
+		_local p1 << 0
+		_local p2 << 0
+		_local p3 << 0
+		_local p4 << 0
+		_local p5 << 0
+
+		# Count by type (not spec_id)
+		_for p _over table_list.fast_elements()
+		_loop
+			_if p.type = "Pole 7-3"
+			_then
+				p1 << p1 + 1
+			_elif p.type = "Pole 7-4"
+			_then
+				p2 << p2 + 1
+			_elif p.type = "Pole 7-5"
+			_then
+				p3 << p3 + 1
+			_elif p.type = "Pole 9-4"
+			_then
+				p4 << p4 + 1
+			_elif p.type = "Pole 9-5"
+			_then
+				p5 << p5 + 1
+			_endif
+		_endloop
+
+		write("LOG: Pole counts - 7-3:", p1, "7-4:", p2, "7-5:", p3, "9-4:", p4, "9-5:", p5)
+		>> p1, p2, p3, p4, p5
 	_when error
 		write("LOG: ERROR counting pole types:", errCond.report_contents_string)
 		>> 0, 0, 0, 0, 0
@@ -741,45 +776,62 @@ $
 _private _method rwwi_astri_boq_generator.count_cable_types()
 	## Count cable types by core count and total length
 	## Returns: (c24, c36, c48, c96, c144, c288)
+	## Logic matches get_count_cable() in rwwi_astri_boq.magik
 
 	_try _with errCond
-		_local lengths << equality_hash_table.new()
-		lengths["24"] << 0.0
-		lengths["36"] << 0.0
-		lengths["48"] << 0.0
-		lengths["96"] << 0.0
-		lengths["144"] << 0.0
-		lengths["288"] << 0.0
+		write("LOG: Counting cable types...")
+		_local table_list << rope.new()
 
-		_for record _over .change_set.fast_elements()
+		# Collect all sheath_with_loc records (cables)
+		_for i _over .change_set.fast_elements()
 		_loop
-			_local col_name << record.current_record.source_collection.name
-			_if col_name _is :fo_cable
+			_local name << i.current_record.source_collection.name
+			_if name _is :sheath_with_loc
 			_then
-				_local spec << record.current_record.spec_id
-				_local geom << record.current_record.geometry
-				_local length << _if geom _isnt _unset
-				                 _then >> geom.length
-				                 _else >> 0.0
-				                 _endif
-
-				# Match core count
-				_for cores _over lengths.keys()
-				_loop
-					_if spec.index_of_seq(cores + " cores") _isnt _unset
-					_then
-						lengths[cores] +<< length
-						_leave
-					_endif
-				_endloop
+				table_list.add(i.current_record)
 			_endif
 		_endloop
 
-		>> lengths["24"], lengths["36"], lengths["48"],
-		   lengths["96"], lengths["144"], lengths["288"]
+		_local p1 << 0
+		_local p2 << 0
+		_local p3 << 0
+		_local p4 << 0
+		_local p5 << 0
+		_local p6 << 0
+		_local p7 << 0
+
+		# Sum up cable lengths by spec_id
+		_for p _over table_list.fast_elements()
+		_loop
+			_if p.spec_id = "SM G652D-ADSS 24C"
+			_then
+				p1 << p1 + p.calculated_sheath_length.value_in(:m).as_number()
+			_elif p.spec_id = "SM G652D-ADSS 36C"
+			_then
+				p2 << p2 + p.calculated_sheath_length.value_in(:m).as_number()
+			_elif p.spec_id = "SM G652D-ADSS 48C"
+			_then
+				p3 << p3 + p.calculated_sheath_length.value_in(:m).as_number()
+			_elif p.spec_id = "SM G652D-ADSS 72C"
+			_then
+				p4 << p4 + p.calculated_sheath_length.value_in(:m).as_number()
+			_elif p.spec_id = "SM G652D-ADSS 96C"
+			_then
+				p5 << p5 + p.calculated_sheath_length.value_in(:m).as_number()
+			_elif p.spec_id = "SM G652D-ADSS 144C"
+			_then
+				p6 << p6 + p.calculated_sheath_length.value_in(:m).as_number()
+			_elif p.spec_id = "SM G652D-ADSS 288C"
+			_then
+				p7 << p7 + p.calculated_sheath_length.value_in(:m).as_number()
+			_endif
+		_endloop
+
+		write("LOG: Cable lengths - 24C:", p1, "36C:", p2, "48C:", p3, "96C:", p5, "144C:", p6, "288C:", p7)
+		>> p1, p2, p3, p5, p6, p7
 	_when error
 		write("LOG: ERROR counting cable types:", errCond.report_contents_string)
-		>> 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+		>> 0, 0, 0, 0, 0, 0
 	_endtry
 _endmethod
 $
