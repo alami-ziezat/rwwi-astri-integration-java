@@ -27,11 +27,10 @@ _pragma(classify_level=basic, topic={boq, generator})
 ##
 def_slotted_exemplar(:rwwi_astri_boq_generator,
 	{
-		{:scheme},           ## Current design scheme (mit_scheme)
-		{:change_set},       ## MIT scheme record change set
-		{:output_type}       ## Output type (json, xml, etc.)
-	},
-	:object)
+		{:scheme, :writable},           ## Current design scheme (mit_scheme)
+		{:change_set, :writable},       ## MIT scheme record change set
+		{:output_type, :writable}       ## Output type (json, xml, etc.)
+	})
 $
 
 _pragma(classify_level=basic, topic={boq})
@@ -275,7 +274,7 @@ $
 # ============================================================================
 # Constructor and Initialization Methods
 # ============================================================================
-_pragma(classify_level=basic, topic={boq})
+
 _method rwwi_astri_boq_generator.new()
 	## Create new BoQ generator instance
 	## Returns: New uninitialized generator
@@ -283,7 +282,6 @@ _method rwwi_astri_boq_generator.new()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.init()
 	## Initialize generator with default values
 	## Returns: _self
@@ -294,7 +292,6 @@ _private _method rwwi_astri_boq_generator.init()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _method rwwi_astri_boq_generator.new_for_current_design(_optional output_type)
 	## Factory method - creates generator for current active design
 	## Parameters:
@@ -328,7 +325,7 @@ $
 # ============================================================================
 # Configuration Methods
 # ============================================================================
-_pragma(classify_level=basic, topic={boq})
+
 _method rwwi_astri_boq_generator.set_scheme(scheme)
 	## Set the design scheme and create change set
 	## Parameters:
@@ -355,7 +352,7 @@ $
 # ============================================================================
 # Main Generation Method
 # ============================================================================
-_pragma(classify_level=basic, topic={boq})
+
 _method rwwi_astri_boq_generator.generate()
 	## Generate complete BoQ for current design
 	## Returns: rope of property_lists with BoQ items
@@ -393,7 +390,7 @@ $
 # ============================================================================
 # Category-Specific Generation Methods
 # ============================================================================
-_pragma(classify_level=basic, topic={boq})
+
 _private _method rwwi_astri_boq_generator.add_sling_wire_items(result)
 	## Add sling wire items to result
 	## Parameters:
@@ -412,7 +409,6 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_items(result)
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.add_fat_items(result)
 	## Add FAT items to result
 
@@ -434,7 +430,6 @@ _private _method rwwi_astri_boq_generator.add_fat_items(result)
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.add_fdt_items(result)
 	## Add FDT items to result
 
@@ -457,7 +452,6 @@ _private _method rwwi_astri_boq_generator.add_fdt_items(result)
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.add_pole_items(result)
 	## Add pole items to result
 
@@ -481,7 +475,6 @@ _private _method rwwi_astri_boq_generator.add_pole_items(result)
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.add_cable_items(result)
 	## Add cable items to result
 
@@ -505,7 +498,6 @@ _private _method rwwi_astri_boq_generator.add_cable_items(result)
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.add_closure_items(result)
 	## Add closure items to result
 
@@ -535,7 +527,7 @@ $
 # ============================================================================
 # Item Creation Helper
 # ============================================================================
-_pragma(classify_level=basic, topic={boq})
+
 _private _method rwwi_astri_boq_generator.create_boq_item(catalog_key, material_qty, service_qty)
 	## Create a BoQ item property_list from catalog
 	## Parameters:
@@ -590,7 +582,7 @@ $
 # ============================================================================
 # Object Counting Methods
 # ============================================================================
-_pragma(classify_level=basic, topic={boq})
+
 _private _method rwwi_astri_boq_generator.count_sling_wire_length()
 	## Count total sling wire length from design
 	## Returns: float - total length
@@ -619,7 +611,6 @@ _private _method rwwi_astri_boq_generator.count_sling_wire_length()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.count_fat_types()
 	## Count FAT types from design
 	## Returns: (pole_count, pedestal_count)
@@ -652,7 +643,6 @@ _private _method rwwi_astri_boq_generator.count_fat_types()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.count_fdt_types()
 	## Count FDT types by capacity
 	## Returns: (f48, f72, f96, f144, f288, f576)
@@ -693,7 +683,6 @@ _private _method rwwi_astri_boq_generator.count_fdt_types()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.count_pole_types()
 	## Count pole types by height and diameter
 	## Returns: (p7_3, p7_4, p7_5, p9_4, p9_5)
@@ -738,7 +727,6 @@ _private _method rwwi_astri_boq_generator.count_pole_types()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.count_cable_types()
 	## Count cable types by core count and total length
 	## Returns: (c24, c36, c48, c96, c144, c288)
@@ -785,7 +773,6 @@ _private _method rwwi_astri_boq_generator.count_cable_types()
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={boq})
 _private _method rwwi_astri_boq_generator.count_closure_types()
 	## Count closure types by spec_id
 	## Returns: equality_hash_table mapping spec_id to count
