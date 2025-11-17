@@ -27,9 +27,9 @@ _pragma(classify_level=basic, topic={boq, generator})
 ##
 def_slotted_exemplar(:rwwi_astri_boq_generator,
 	{
-		{:scheme, :writable},           ## Current design scheme (mit_scheme)
-		{:change_set, :writable},       ## MIT scheme record change set
-		{:output_type, :writable}       ## Output type (json, xml, etc.)
+		{:scheme, _unset, :writable},           ## Current design scheme (mit_scheme)
+		{:change_set, _unset, :writable},       ## MIT scheme record change set
+		{:output_type, _unset, :writable}       ## Output type (json, xml, etc.)
 	})
 $
 
@@ -314,7 +314,7 @@ _method rwwi_astri_boq_generator.new_for_current_design(_optional output_type)
 			generator.output_type << output_type
 		_endif
 
-		>> generator
+		_return generator
 	_when error
 		write("LOG: ERROR creating BoQ generator:", errCond.report_contents_string)
 		_return _unset
@@ -379,7 +379,7 @@ _method rwwi_astri_boq_generator.generate()
 
 		write("LOG: BoQ generation complete. Total items:", result.size)
 
-		>> result
+		_return result
 	_when error
 		write("LOG: ERROR generating BoQ:", errCond.report_contents_string)
 		condition.raise(:user_error, :string, errCond)
@@ -538,6 +538,7 @@ _private _method rwwi_astri_boq_generator.create_boq_item(catalog_key, material_
 	##   property_list with BoQ item data
 
 	_try _with errCond
+		write("Starting BoQ item creation for catalog key:", catalog_key)
 		_local catalog_entry << _self.MATERIAL_CATALOG[catalog_key]
 		_if catalog_entry _is _unset
 		_then
@@ -585,25 +586,35 @@ $
 
 _private _method rwwi_astri_boq_generator.count_sling_wire_length()
 	## Count total sling wire length from design
-	## Returns: float - total length
+	## Returns: float - total length in meters
+	## Logic matches get_count_sling_wire() in rwwi_astri_boq.magik
 
 	_try _with errCond
-		_local total_length << 0.0
+		write("LOG: Counting sling wire length...")
+		_local table_list << rope.new()
 
-		_for record _over .change_set.fast_elements()
+		# Collect all sling_wire records
+		_for i _over .change_set.fast_elements()
 		_loop
-			_local col_name << record.current_record.source_collection.name
-			_if col_name _is :sling_wire
+			_local name << i.current_record.source_collection.name
+			_if name _is :sling_wire
 			_then
-				_local geom << record.current_record.geometry
-				_if geom _isnt _unset
-				_then
-					total_length +<< geom.length
-				_endif
+				table_list.add(i.current_record)
 			_endif
 		_endloop
 
-		>> total_length
+		# Sum up route lengths (converted to meters by dividing by 100)
+		_local l_total << 0
+		_for s _over table_list.fast_elements()
+		_loop
+			l_total << l_total + s.route.line_length
+		_endloop
+
+		# Convert to meters (line_length is in cm, divide by 100)
+		_local t_pjg << l_total / 100
+
+		write("LOG: Sling wire total length:", t_pjg, "m")
+		>> t_pjg
 	_when error
 		write("LOG: ERROR counting sling wire:", errCond.report_contents_string)
 		>> 0.0
