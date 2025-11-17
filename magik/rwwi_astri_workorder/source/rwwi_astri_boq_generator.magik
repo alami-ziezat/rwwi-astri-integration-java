@@ -2,6 +2,9 @@
 _package user
 $
 
+remex(:rwwi_astri_boq_generator)
+$
+
 _pragma(classify_level=basic, topic={boq, generator})
 ##
 ## Class: rwwi_astri_boq_generator
@@ -24,9 +27,9 @@ _pragma(classify_level=basic, topic={boq, generator})
 ##
 def_slotted_exemplar(:rwwi_astri_boq_generator,
 	{
-		{:scheme, _unset},           ## Current design scheme (mit_scheme)
-		{:change_set, _unset},       ## MIT scheme record change set
-		{:output_type, "json"}       ## Output type (json, xml, etc.)
+		{:scheme},           ## Current design scheme (mit_scheme)
+		{:change_set},       ## MIT scheme record change set
+		{:output_type}       ## Output type (json, xml, etc.)
 	},
 	:object)
 $
