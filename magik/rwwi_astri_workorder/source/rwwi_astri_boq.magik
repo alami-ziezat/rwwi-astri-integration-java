@@ -698,6 +698,44 @@ $
 
 _global create_pl_boq <<
 _proc(type)
+	## DEPRECATED: Use rwwi_astri_boq_generator.new_for_current_design() instead
+	## This procedure maintained for backward compatibility
+	##
+	## Wrapper around new class-based BoQ generator
+	## Parameters:
+	##   type - Output type ("json", etc.)
+	## Returns:
+	##   rope of property_lists with BoQ items
+
+	_try _with errCond
+		# Use new class-based implementation
+		_local generator << rwwi_astri_boq_generator.new_for_current_design(type)
+		_if generator _is _unset
+		_then
+			write("No Design Selected")
+			_return rope.new()
+		_endif
+
+		>> generator.generate()
+	_when error
+		write("LOG: ERROR in create_pl_boq:", errCond.report_contents_string)
+		_return rope.new()
+	_endtry
+_endproc
+$
+
+# ============================================================================
+# OLD IMPLEMENTATION - Preserved for reference only
+# ============================================================================
+# The following is the original 608-line procedural implementation.
+# It has been replaced by the rwwi_astri_boq_generator class.
+# Kept here for reference and potential rollback if needed.
+# ============================================================================
+
+_block
+	## Old implementation commented out - using new class instead
+	_local __old_create_pl_boq_implementation <<
+	_proc(type)
 
 	_local r_result << rope.new()
 	#_local l_result << property_list.new()
@@ -706,14 +744,14 @@ _proc(type)
 	_if s _is _unset
 	_then
 		write("No Design Selected")
-		_leave 
+		_leave
 	_endif
-		
-	id << s.id.write_string 
+
+	id << s.id.write_string
 	nama << s.name.write_string
 	owner << s.owner.write_string
 	pj << s.inf_project.write_string
-	st << s.status.write_string	
+	st << s.status.write_string
 	change_set << mit_scheme_record_change_set.new(s)
 	
 	start << date_time_now()
@@ -1299,8 +1337,10 @@ _proc(type)
 			
 		_endif
 	_endloop
-	
-	>> r_result
-_endproc
 
+	>> r_result
+	_endproc ## End of old implementation
+
+	# Block to prevent old implementation from being executed
+_endblock
 $
