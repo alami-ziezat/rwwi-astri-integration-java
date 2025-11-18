@@ -1,0 +1,27 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method ds_record.convert_to_json()
+	## convert_to_json() : json_array
+	##
+	## converts self to a json_array
+	##
+	## have to do it this way to avoid all the crazy method
+	## conflicts. 
+
+	_local jo << json_object.new()
+	_local name
+	
+	_for i_fd _over _self.physical_fields()
+	_loop
+		name << i_fd.name
+		jo[name] << _self.perform(name).convert_to_json()
+	_endloop 
+
+	_return jo
+_endmethod
+$
+
+
+

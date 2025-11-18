@@ -73,9 +73,10 @@ $
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_pole?(pm)
 	## Check if placemark is a pole based on parent folder
-	## Folder must contain "|pole|" pattern (case-insensitive)
+	## Folder must contain "pole" pattern (case-insensitive)
 
 	_local parent << pm[:parent].default("").lowercase
+	write("Checking pole patterns in folders: ", parent)
 	>> parent.matches?("*pole*")
 _endmethod
 $
@@ -158,7 +159,16 @@ _private _method astri_design_migrator.is_splice?(pm)
 		_return _false
 	_endif
 
-	# STEP 3: Check simplified wildcard patterns
+	# Check if it matches other specific point types
+	# STEP 3: If it matches any of these, it's NOT an access point
+	_if _self.is_pole?(pm) _orif
+	    _self.is_figure_eight?(pm)
+	_then
+		_return _false
+	_endif
+
+	write("Checking splice patterns in folders: ", folders_lc)
+	# STEP 4: Check simplified wildcard patterns
 	>> folders_lc.matches?("*closure*") _orif
 	   folders_lc.matches?("*joint*") _orif
 	   folders_lc.matches?("*fdt*") _orif
@@ -181,7 +191,7 @@ _private _method astri_design_migrator.is_figure_eight?(pm)
 
 	# STEP 1: Convert to lowercase FIRST
 	_local folders_lc << folders.lowercase
-
+	write("Checking figure_eight patterns in folders: ", folders_lc)
 	# STEP 2: Check if it's a POINT type (not area/line)
 	_if pm[:type] <> "point"
 	_then

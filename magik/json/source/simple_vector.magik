@@ -1,0 +1,26 @@
+#% text_encoding = cp1252
+# -*- magik-indent-level: 2 -*-
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method simple_vector.write_as_json( out_stream )
+
+	##  simple_vector.write_as_json( output_stream OUT_STREAM )
+	##
+	##  writes self in JSON notation to OUT_STREAM
+
+	#write( "simple_vector.write_as_json( ", out_stream, " )" )
+
+	_local first? << _true
+
+	out_stream.write( "{" )
+	_for i _over 1.upto( _self.size ) _loop
+		_if _not first? _then out_stream.write(",") _else first? << _false _endif
+		#  write the key/value pairs
+		#write( '"',i,'":', _self[i], "; class_name: ", _self[i].class_name )
+		out_stream.write( '"',i,'":' )
+		_self[i].write_as_json( out_stream )
+	_endloop
+	out_stream.write( "}" )
+
+_endmethod   #  simple_vector.write_as_json()

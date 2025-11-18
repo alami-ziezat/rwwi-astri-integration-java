@@ -1,0 +1,38 @@
+#% text_encoding = cp1252
+# -*- magik-indent-level: 2 -*-
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method object.write_as_json( out_stream )
+
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	write( _self.class_name, ".write_as_json( ", out_stream, " )" )
+	write( "_self = ", _self )
+
+	out_stream.write( "{" )
+
+	_local first? << _true
+
+	_for slot_name, slot_value _over _self.fast_keys_and_elements() _loop
+		_if _not first? _then out_stream.write(",") _else first? << _false _endif
+		#  now write the key/value pairs
+		out_stream.write( '"', slot_name, '":' )
+		slot_value.write_as_json( out_stream )
+	_endloop
+
+	#_for i_slot_name _over _self.sys!perform(:slots_to_print).fast_elements()
+	#_loop
+	#	_if _not first? _then out_stream.write(",") _else first? << _false _endif
+
+	#	#  now write the key/value pairs
+	#	out_stream.write( '"',i_slot_name,'":' )
+	#	_self.sys!slot(i_slot_name).write_as_json(out_stream)
+	#_endloop
+
+	out_stream.write( "}" )
+
+_endmethod   #  object.write_as_json()
+$

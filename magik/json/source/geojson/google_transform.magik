@@ -1,0 +1,34 @@
+_global google_crs <<
+_proc @google_crs()
+	transform.ellipsoid_sizes[:wgs84_spherical] << { 6378137, 1000000000000 } 
+	transform.define_datum(:world_longlat_wgs84_degree, transform.new(), :wgs84_spherical )
+	_return coordinate_system.new_proj(:world_longlat_wgs84_degree,
+					   :longlat,
+					   {},
+					   coordinate.new( 0, 0 ),
+					   :degree,
+					   :name ,:world_longlat_wgs84_degree,
+					   :external_cs_name,"Long-Lat WGS84 (degree)",
+					   :in_cs_menus?,_true)
+	
+_endproc
+$
+
+_global google_cs << google_crs()
+$
+
+_global make_google_transform <<
+_proc @google_transform(p_ds)
+	_local ds_cs << p_ds.world.coordinate_system 
+	_return transform.new_converting_cs_to_cs(ds_cs, google_cs)
+_endproc
+$
+
+_global google_transform << make_google_transform(gis_program_manager.cached_dataset(:gis))
+$
+
+_global transform_to_google_cs <<
+_proc @transform_to_google_cs(p_coord)
+	_return p_coord.transformed(google_transform)
+_endproc
+$

@@ -1,0 +1,53 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method char16_string.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	_local parts << _self.split_by(%",_true)
+	
+	out_stream.write('"',write_string_with_separator(parts,'\"'),'"')
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method char16_string.convert_to_json()
+	_return _self 
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method ds_char16_vector.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	_local parts << _self.split_by(%",_true)
+
+	out_stream.write('"',write_string_with_separator(parts,'\"'),'"')
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method ds_char16_vector.convert_to_json()
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method char16_vector.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	_local parts << _self.split_by(%",_true)
+
+	out_stream.write('"',write_string_with_separator(parts,'\"'),'"')
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method char16_vector.convert_to_json()
+	_return _self 
+_endmethod
+$

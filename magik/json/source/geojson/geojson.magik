@@ -1,0 +1,31 @@
+
+#
+# Copyright (c) 2016 acefael
+#
+
+_package sw
+$
+
+def_slotted_exemplar( :geojson , {} , {} )
+$
+
+geojson.define_shared_constant(
+	:number_format ,
+	float_format.new_with_properties(:float_decimal_places,9),
+	_false)
+$
+
+geojson.define_shared_constant(
+	:output_coordinate_system,
+#	coordinate_system.new_proj(:world_longlat_wgs84_degree,
+#					   :longlat,
+#					   {},
+#					   coordinate.new( 0, 0 ),
+#					   :degree,
+#					   :name ,:world_longlat_wgs84_degree,
+#					   :external_cs_name,"Long-Lat WGS84 (degree)",
+#					   :in_cs_menus?,_true),
+	coordinate_system.new_proj_long_lat(:wgs84,:degree),
+	_false)
+$
+	

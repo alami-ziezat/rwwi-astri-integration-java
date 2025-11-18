@@ -1,0 +1,58 @@
+
+#
+# Copyright (c) 2016 acefael
+#
+
+_package sw
+$
+
+_pragma(classify_level=advanced,topic={GEOJSON})
+_method point_geometry_mixin.as_geojson(_optional out_stream)
+
+	_constant COMMA << %,
+	_local out << out_stream.default(!output!)
+	_local astr << _proc(str) >> write_string( %" , str , %" ) _endproc
+	_local wany << _proc(_gather any)
+			       _import out
+			       _for elm _over any.elements()
+			       _loop
+				       out.write(elm)
+			       _endloop
+		       _endproc
+
+	_local nf << _proc@nf(n)
+			     >> geojson.number_format.format(n)
+		     _endproc
+	wany("{")
+	wany(astr("type"),":",astr("Point"))
+	wany(COMMA)
+	wany(astr("coordinates"),":","[",nf(_self.x),COMMA,nf(_self.y),"]")
+	wany("}")
+_endmethod
+$
+
+_pragma(classify_level=advanced,topic={GEOJSON})
+_method point_geometry_mixin.as_google_geojson(_optional out_stream)
+
+	_constant COMMA << %,
+	_local out << out_stream.default(!output!)
+	_local astr << _proc(str) >> write_string( %" , str , %" ) _endproc
+	_local wany << _proc(_gather any)
+			       _import out
+			       _for elm _over any.elements()
+			       _loop
+				       out.write(elm)
+			       _endloop
+		       _endproc
+
+	_local nf << _proc@nf(n)
+			     >> geojson.number_format.format(n)
+		     _endproc
+	wany("{")
+	wany(astr("type"),":",astr("Point"))
+	wany(COMMA)
+	tself << user:transform_to_google_cs(_self)
+	wany(astr("coordinates"),":","[",nf(tself.x),COMMA,nf(tself.y),"]")
+	wany("}")
+_endmethod
+$

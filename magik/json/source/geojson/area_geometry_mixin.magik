@@ -1,0 +1,94 @@
+
+#
+# Copyright (c) 2016 acefael
+#
+
+_package sw
+$
+
+_pragma(classify_level=advanced,topic={GEOJSON})
+_method area_geometry_mixin.as_geojson(_optional out_stream )
+
+	##
+	##
+	##
+
+	_constant COMMA << %,
+	_local out << out_stream.default(!output!)
+	_local astr << _proc(str) >> write_string( %" , str , %" ) _endproc
+	_local wany << _proc(_gather any)
+			       _import out
+			       _for elm _over any.elements()
+			       _loop
+				       out.write(elm)
+			       _endloop
+		       _endproc
+	_local not_first? << _false
+	_local nf << _proc@nf(n)
+			     >> geojson.number_format.format(n)
+		     _endproc
+	wany("{",astr("type"),":",astr("Polygon"),COMMA,astr("coordinates"),":","[")
+	_for boundary _over _self.boundaries()
+	_loop
+		_if not_first? _then wany(COMMA) _else not_first? << _true _endif
+		wany("[")
+		_local nf? << _false
+		_for sec _over boundary.sectors()
+		_loop
+			_for coord _over sec.fast_elements()
+			_loop
+				_if nf? _then wany(COMMA) _endif
+				nf? << _true
+				wany("[",nf(coord.x),COMMA,nf(coord.y),"]")
+			_endloop
+		_endloop
+		wany("]")
+	_endloop
+	wany("]","}")
+
+_endmethod
+$
+
+_pragma(classify_level=advanced,topic={GEOJSON})
+_method area_geometry_mixin.as_google_geojson(_optional out_stream )
+
+	##
+	##
+	##
+
+	_constant COMMA << %,
+	_local out << out_stream.default(!output!)
+	_local astr << _proc(str) >> write_string( %" , str , %" ) _endproc
+	_local wany << _proc(_gather any)
+			       _import out
+			       _for elm _over any.elements()
+			       _loop
+				       out.write(elm)
+			       _endloop
+		       _endproc
+	_local not_first? << _false
+	_local nf << _proc@nf(n)
+			     >> geojson.number_format.format(n)
+		     _endproc
+	wany("{",astr("type"),":",astr("Polygon"),COMMA,astr("coordinates"),":","[")
+	_for boundary _over _self.boundaries()
+	_loop
+		_if not_first? _then wany(COMMA) _else not_first? << _true _endif
+		wany("[")
+		_local nf? << _false
+		_for sec _over boundary.sectors()
+		_loop
+			_for coord _over sec.fast_elements()
+			_loop
+				_if nf? _then wany(COMMA) _endif
+				nf? << _true
+				tcoord << user:transform_to_google_cs(coord)
+				wany("[",nf(tcoord.x),COMMA,nf(tcoord.y),"]")
+			_endloop
+		_endloop
+		wany("]")
+	_endloop
+	wany("]","}")
+
+_endmethod
+$

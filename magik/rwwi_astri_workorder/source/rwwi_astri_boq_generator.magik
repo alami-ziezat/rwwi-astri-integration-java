@@ -834,7 +834,7 @@ _private _method rwwi_astri_boq_generator.count_cable_types()
 			_endif
 		_endloop
 
-		write("LOG: Cable lengths - 24C:", p1, "36C:", p2, "48C:", p3, "96C:", p5, "144C:", p6, "288C:", p7)
+		write("LOG: Cable lengths - 24C:", p1, "| 36C:", p2, "| 48C:", p3, "| 96C:", p5, "| 144C:", p6, "| 288C:", p7)
 		>> p1, p2, p3, p5, p6, p7
 	_when error
 		write("LOG: ERROR counting cable types:", errCond.report_contents_string)

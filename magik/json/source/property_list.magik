@@ -1,0 +1,27 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method property_list.convert_to_json()
+	## convert_to_json() : json_object
+	##
+	## converts self to a json_object
+	##
+	## have to do it this way to avoid all the crazy method
+	## conflicts. 
+
+	_local jo << json_object.new()
+	_local name
+	
+	_for key, value _over _self.fast_keys_and_elements()
+	_loop
+		name << key
+		jo[name] << value.convert_to_json()
+	_endloop 
+
+	_return jo
+_endmethod
+$
+
+
+

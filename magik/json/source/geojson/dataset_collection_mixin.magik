@@ -1,0 +1,43 @@
+
+#
+# Copyright (c) 2016 acefael
+#
+
+_package sw
+$
+
+_pragma(classify_level=advanced,topic={GEOJSON})
+_method dataset_collection_mixin.as_geojson(_optional out_stream)
+
+	_constant COMMA << %,
+	_local out << out_stream.default(!output!)
+	_local astr << _proc(str) >> write_string( %" , str , %" ) _endproc
+	_local wany << _proc(_gather any)
+			       _import out
+			       _for elm _over any.elements()
+			       _loop
+				       out.write(elm)
+			       _endloop
+		       _endproc
+
+	_local first? << _true
+	wany("{")
+	wany(astr("type"),":",astr("FeatureCollection"))
+	wany(COMMA)
+	wany(astr("features"))
+	wany(":")
+	wany("[")
+	_for element _over _self.fast_elements()
+	_loop
+		_if element.responds_to?( :|as_geojson()| )
+		_then
+			_if _not first? _then wany(COMMA) _endif
+			first? << _false
+			element.as_geojson(out)
+		_endif
+	_endloop
+	wany("]")
+	wany("}")
+
+_endmethod
+$
