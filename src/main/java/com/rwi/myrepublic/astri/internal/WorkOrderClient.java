@@ -208,13 +208,20 @@ public class WorkOrderClient {
                     appendXmlField(xml, woJson, "latest_status_name", 6);
                     appendXmlField(xml, woJson, "assigned_vendor_label", 6);
                     appendXmlField(xml, woJson, "assigned_vendor_name", 6);
+                    appendXmlField(xml, woJson, "assigned_subcont_vendor_name", 6);
                     appendXmlField(xml, woJson, "created_at", 6);
                     appendXmlField(xml, woJson, "updated_at", 6);
 
                     // Extract infrastructure-specific fields based on type
-                    // cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
-                    // subfeeder: target_subfeeder_code, target_subfeeder_name (no topology)
-                    // feeder:    target_osp_route_code, target_osp_route_name (no topology)
+                    // cluster:   target_cluster_code, target_cluster_name, target_cluster_topology,
+                    //            target_cluster_area, target_cluster_area_plant_code,
+                    //            target_cluster_olt_name, target_cluster_olt_label
+                    // subfeeder: target_subfeeder_code, target_subfeeder_name (no topology),
+                    //            target_subfeeder_area, target_subfeeder_area_plant_code,
+                    //            target_subfeeder_olt_name, target_subfeeder_olt_label
+                    // feeder:    target_osp_route_code, target_osp_route_name (no topology),
+                    //            target_osp_route_area, target_osp_route_area_plant_code, target_osp_route_asset_number,
+                    //            target_osp_route_olt_name, target_osp_route_olt_label
                     String targetPrefix;
                     if ("feeder".equals(infrastructureType)) {
                         targetPrefix = "target_osp_route";
@@ -227,6 +234,21 @@ public class WorkOrderClient {
                     // Only include topology for cluster infrastructure type
                     if ("cluster".equals(infrastructureType)) {
                         appendXmlField(xml, woJson, targetPrefix + "_topology", 6);
+                        appendXmlField(xml, woJson, "target_cluster_area", 6);
+                        appendXmlField(xml, woJson, "target_cluster_area_plant_code", 6);
+                        appendXmlField(xml, woJson, "target_cluster_olt_name", 6);
+                        appendXmlField(xml, woJson, "target_cluster_olt_label", 6);
+                    } else if ("subfeeder".equals(infrastructureType)) {
+                        appendXmlField(xml, woJson, "target_subfeeder_area", 6);
+                        appendXmlField(xml, woJson, "target_subfeeder_area_plant_code", 6);
+                        appendXmlField(xml, woJson, "target_subfeeder_olt_name", 6);
+                        appendXmlField(xml, woJson, "target_subfeeder_olt_label", 6);
+                    } else if ("feeder".equals(infrastructureType)) {
+                        appendXmlField(xml, woJson, "target_osp_route_area", 6);
+                        appendXmlField(xml, woJson, "target_osp_route_area_plant_code", 6);
+                        appendXmlField(xml, woJson, "target_osp_route_asset_number", 6);
+                        appendXmlField(xml, woJson, "target_osp_route_olt_name", 6);
+                        appendXmlField(xml, woJson, "target_osp_route_olt_label", 6);
                     }
 
                     xml.append("    </workorder>\n");

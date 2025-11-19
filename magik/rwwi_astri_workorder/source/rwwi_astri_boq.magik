@@ -696,7 +696,7 @@ _proc()
 $
 
 
-_global create_pl_boq <<
+_global backup_create_pl_boq <<
 _proc(type)
 	## DEPRECATED: Use rwwi_astri_boq_generator.new_for_current_design() instead
 	## This procedure maintained for backward compatibility
@@ -732,9 +732,9 @@ $
 # Kept here for reference and potential rollback if needed.
 # ============================================================================
 
-_block
+#_block
 	## Old implementation commented out - using new class instead
-	_local __old_create_pl_boq_implementation <<
+	_global create_pl_boq <<
 	_proc(type)
 
 	_local r_result << rope.new()
@@ -1342,5 +1342,5 @@ _block
 	_endproc ## End of old implementation
 
 	# Block to prevent old implementation from being executed
-_endblock
+#_endblock
 $

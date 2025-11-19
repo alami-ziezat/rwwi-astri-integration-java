@@ -1,0 +1,3 @@
+rwi_export_to_kml
+rwi_export_to_kml_dialog
+rwi_export_to_kml_plugin

@@ -20,13 +20,14 @@ def_slotted_exemplar(:rwwi_astri_workorder_engine,
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
-## SQL queries for retrieving KMZ UUID from PostgreSQL database
-## Uses COALESCE to prioritize abd_kmz_uuid over apd_kmz_uuid
+## SQL queries for retrieving KMZ UUID and source from PostgreSQL database
+## Returns both the UUID and the source (ABD or APD)
+## Logic: If abd_kmz_uuid exists, use it and return 'ABD', otherwise use apd_kmz_uuid and return 'APD'
 rwwi_astri_workorder_engine.define_shared_constant(:sql_for_kmz_uuid,
 	property_list.new_with(
-		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
-		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
-		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
+		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
+		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
+		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
 	),
 	_false
 )
@@ -327,9 +328,12 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		_endif
 
 		# Build field names dynamically based on infrastructure type
-		# cluster:   target_cluster_code, target_cluster_name, target_cluster_topology
-		# subfeeder: target_subfeeder_code, target_subfeeder_name (no topology)
-		# feeder:    target_osp_route_area, target_osp_route_name (no topology)
+		# cluster:   target_cluster_code, target_cluster_name, target_cluster_topology,
+		#            target_cluster_area, target_cluster_area_plant_code
+		# subfeeder: target_subfeeder_code, target_subfeeder_name (no topology),
+		#            target_subfeeder_area, target_subfeeder_area_plant_code
+		# feeder:    target_osp_route_code, target_osp_route_name (no topology),
+		#            target_osp_route_area, target_osp_route_area_plant_code, target_osp_route_asset_number
 		_local code_field << _if infrastructure_type = "feeder"
 		                     _then >> :target_osp_route_code
 		                     _else >> write_string("target_", infrastructure_type, "_code").as_symbol()
@@ -344,6 +348,50 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		                         _then >> write_string("target_", infrastructure_type, "_topology").as_symbol()
 		                         _else >> _unset
 		                         _endif
+
+		# Area and area_plant_code fields for all infrastructure types
+		_local area_field << _if infrastructure_type = "cluster"
+		                     _then >> :target_cluster_area
+		                     _elif infrastructure_type = "subfeeder"
+		                     _then >> :target_subfeeder_area
+		                     _elif infrastructure_type = "feeder"
+		                     _then >> :target_osp_route_area
+		                     _else >> _unset
+		                     _endif
+
+		_local area_plant_code_field << _if infrastructure_type = "cluster"
+		                                _then >> :target_cluster_area_plant_code
+		                                _elif infrastructure_type = "subfeeder"
+		                                _then >> :target_subfeeder_area_plant_code
+		                                _elif infrastructure_type = "feeder"
+		                                _then >> :target_osp_route_area_plant_code
+		                                _else >> _unset
+		                                _endif
+
+		# Asset number field only for feeder infrastructure type
+		_local asset_number_field << _if infrastructure_type = "feeder"
+		                             _then >> :target_osp_route_asset_number
+		                             _else >> _unset
+		                             _endif
+
+		# OLT name and label fields for all infrastructure types
+		_local olt_name_field << _if infrastructure_type = "cluster"
+		                         _then >> :target_cluster_olt_name
+		                         _elif infrastructure_type = "subfeeder"
+		                         _then >> :target_subfeeder_olt_name
+		                         _elif infrastructure_type = "feeder"
+		                         _then >> :target_osp_route_olt_name
+		                         _else >> _unset
+		                         _endif
+
+		_local olt_label_field << _if infrastructure_type = "cluster"
+		                          _then >> :target_cluster_olt_label
+		                          _elif infrastructure_type = "subfeeder"
+		                          _then >> :target_subfeeder_olt_label
+		                          _elif infrastructure_type = "feeder"
+		                          _then >> :target_osp_route_olt_label
+		                          _else >> _unset
+		                          _endif
 
 		# Iterate through workorder elements
 		_for wo_elem _over data_elem.elements_matching_name(:workorder)
@@ -371,10 +419,41 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:category] << _self.get_xml_element_value(wo_elem, :category_label)
 			pl[:status] << _self.get_xml_element_value(wo_elem, :latest_status_name)
 			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
+			pl[:subcont_vendor] << _self.get_xml_element_value(wo_elem, :assigned_subcont_vendor_name)
 			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
 
-			# Retrieve KMZ UUID from PostgreSQL database based on infrastructure type and code
-			pl[:kmz_uuid] << _self.get_kmz_uuid_from_db(infrastructure_type, infra_code)
+			# Extract area and area_plant_code fields
+			pl[:area] << _if area_field _isnt _unset
+			             _then >> _self.get_xml_element_value(wo_elem, area_field)
+			             _else >> ""
+			             _endif
+
+			pl[:area_plant_code] << _if area_plant_code_field _isnt _unset
+			                        _then >> _self.get_xml_element_value(wo_elem, area_plant_code_field)
+			                        _else >> ""
+			                        _endif
+
+			# Extract asset_number for feeder infrastructure type only
+			pl[:asset_number] << _if asset_number_field _isnt _unset
+			                     _then >> _self.get_xml_element_value(wo_elem, asset_number_field)
+			                     _else >> ""
+			                     _endif
+
+			# Extract OLT name and label fields
+			pl[:olt_name] << _if olt_name_field _isnt _unset
+			                 _then >> _self.get_xml_element_value(wo_elem, olt_name_field)
+			                 _else >> ""
+			                 _endif
+
+			pl[:olt_label] << _if olt_label_field _isnt _unset
+			                  _then >> _self.get_xml_element_value(wo_elem, olt_label_field)
+			                  _else >> ""
+			                  _endif
+
+			# Retrieve KMZ UUID and source from PostgreSQL database based on infrastructure type and code
+			_local (kmz_uuid, kmz_source) << _self.get_kmz_uuid_from_db(infrastructure_type, infra_code)
+			pl[:kmz_uuid] << kmz_uuid
+			pl[:kmz_source] << kmz_source
 
 			result_rope.add(pl)
 		_endloop
@@ -568,14 +647,15 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, code)
-	## Retrieve KMZ UUID from PostgreSQL database
+	## Retrieve KMZ UUID and source from PostgreSQL database
 	##
 	## Parameters:
 	##   infrastructure_type (string) - "cluster", "subfeeder", or "feeder"
 	##   code (string) - Infrastructure code to search
 	##
 	## Returns:
-	##   string - KMZ UUID or empty string if not found
+	##   (string, string) - (kmz_uuid, kmz_source) or ("", "") if not found
+	##                      kmz_source will be "ABD" or "APD"
 	##
 	## Database Tables:
 	##   cluster:   dim_cluster_master_smallworld.cluster_code
@@ -583,13 +663,14 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 	##   feeder:    dim_feeder_master_smallworld.feeder_code
 	##
 	## Priority Logic:
-	##   Returns abd_kmz_uuid if not NULL, otherwise apd_kmz_uuid
+	##   If abd_kmz_uuid exists, returns (abd_kmz_uuid, "ABD")
+	##   Otherwise returns (apd_kmz_uuid, "APD")
 
 	_try _with cond
 		# Validate inputs
 		_if code _is _unset _orif code = ""
 		_then
-			_return ""
+			_return "", ""
 		_endif
 
 		# Establish database connection if not already connected
@@ -599,11 +680,11 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 
 			_local is_connect?
 			(is_connect?, .db_connection) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
-			(connect?, db_connection)	<< (is_connect?, .db_connection) 
+			(connect?, db_connection)	<< (is_connect?, .db_connection)
 			_if _not is_connect?
 			_then
 				write("WARNING: Failed to connect to POSTGRESQL_ASTRI_DB")
-				_return ""
+				_return "", ""
 			_endif
 			write("Connected to POSTGRESQL_ASTRI_DB for KMZ UUID retrieval")
 		_endif
@@ -614,7 +695,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 		_if sql_query _is _unset
 		_then
 			write("WARNING: No SQL query defined for infrastructure type:", infrastructure_type)
-			_return ""
+			_return "", ""
 		_endif
 
 		# Execute query (following rwi_pni_to_tenoss pattern)
@@ -622,11 +703,13 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 		_local rec << recs.get()
 
 		_local kmz_uuid << ""
+		_local kmz_source << ""
 		_if rec _isnt _unset
 		_then
-			# Extract kmz_uuid field, default to empty string if NULL
+			# Extract kmz_uuid and kmz_source fields, default to empty string if NULL
 			kmz_uuid << rec.kmz_uuid.default("")
-			write("Retrieved KMZ UUID for ", infrastructure_type, " code ", code, ": ", kmz_uuid)
+			kmz_source << rec.kmz_source.default("")
+			write("Retrieved KMZ UUID for ", infrastructure_type, " code ", code, ": ", kmz_uuid, " (Source: ", kmz_source, ")")
 		_else
 			write("No KMZ UUID found for ", infrastructure_type, " code ", code)
 		_endif
@@ -640,7 +723,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 			.db_connection.rollback()
 		_endtry
 
-		_return kmz_uuid
+		_return kmz_uuid, kmz_source
 
 	_when error
 		write("ERROR in get_kmz_uuid_from_db():", cond.report_contents_string)
@@ -658,7 +741,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 			_endtry
 		_endif
 
-		_return ""
+		_return "", ""
 	_endtry
 _endmethod
 $

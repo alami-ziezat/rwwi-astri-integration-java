@@ -34,6 +34,9 @@ _private _method astri_design_migrator.create_demand_point(pm)
 		# Step 3: Parse geometry
 		_local location << _self.parse_point_geometry(pm[:coord])
 
+		# Step 3.5: Extract line_type
+		_local m_line << _self.match_line(folders)
+
 		# Step 4: Create demand point
 		_local prop_values << property_list.new_with(
 			:identification, pm[:name],
@@ -46,6 +49,9 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			:folders, ff,
 			:pop, .pop_name,
 			:olt, .pop_name,
+			:region, .region,
+			:cluster, .cluster,
+			:line_type, m_line,
 			:notes, .prj_id,
 			:location, location,
 			:uuid, .uuid

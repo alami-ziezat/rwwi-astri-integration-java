@@ -53,8 +53,11 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:ap_col,          _unset, :writable},   # access_point
 
 	# Migration context
-	{:pop_name,        _unset, :writable},   # POP name
+	{:pop_name,        _unset, :writable},   # POP name (from OLT label)
 	{:prj_id,          _unset, :writable},   # Project ID (from wo[:uuid])
+	{:region,          _unset, :writable},   # Region (from area field)
+	{:cluster,         _unset, :writable},   # Cluster name (from target_cluster_name)
+	{:infra_type,      _unset, :writable},   # Infrastructure type (cluster/subfeeder/feeder)
 
 	# Statistics
 	{:stats,           _unset, :writable}    # Migration results
@@ -62,28 +65,35 @@ def_slotted_exemplar(:astri_design_migrator,
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name)
+_method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type)
 	## Create new design migrator
 	##
 	## Parameters:
 	##   database - GIS database (e.g., gis_program_manager.databases[:gis])
 	##   prj_id - Project ID from work order uuid field
-	##   pop_name - POP name from work order
+	##   kml_uuid - KMZ UUID for object tagging
+	##   pop_name - POP name from work order OLT label
+	##   region - Region from work order area field
+	##   cluster - Cluster name from work order target_cluster_name (cluster only)
+	##   infra_type - Infrastructure type (cluster/subfeeder/feeder)
 	##
 	## Returns: New astri_design_migrator instance
 
-	>> _clone.init(database, prj_id, kml_uuid, pop_name)
+	>> _clone.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name)
+_private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type)
 	## Initialize migrator
 
 	.database << database
 	.uuid << kml_uuid     # uuid field = wo[:kmz_uuid]
-	.pop_name << pop_name
-	.prj_id << prj_id       # From wo[:uuid]
+	.pop_name << pop_name # From wo[:olt_label]
+	.prj_id << prj_id     # From wo[:uuid]
+	.region << region     # From wo[:area]
+	.cluster << cluster   # From wo[:cluster_name] (cluster infrastructure type only)
+	.infra_type << infra_type  # Infrastructure type
 	.ace_view << gis_program_manager.ace_view
 
 	# Get design manager

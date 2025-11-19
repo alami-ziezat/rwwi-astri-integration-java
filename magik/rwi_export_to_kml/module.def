@@ -1,0 +1,6 @@
+rwi_export_to_kml	1
+
+description
+	User interface to a data export to kml
+end
+

@@ -1,0 +1,125 @@
+_package sw
+$
+
+remex(:rwi_export_to_kml_dialog)
+$
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2013 Realworld Systems Indonesia. All Rights Reserved. 
+#							       
+# ************************************************************
+#_package sw
+#$
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+def_slotted_exemplar(:rwi_export_to_kml_dialog,
+		     {{:file_item,_unset},
+		      {:export_as,_unset},
+		      {:stattext,_unset},
+		      {:exportbtn,_unset},
+		      {:items,_unset},
+		      {:loader,_unset}},
+		        :model)
+$
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.new()
+	_return _clone.init()
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.init()
+	_super.init()
+	_return _self
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.activate_in(f)
+	button_width << 75
+	f.title << _self.message(:title)
+	outer << rowcol.new(f,3,_unset,:pixel,:style,:top_level)
+	inner << rowcol.new(outer,1,_unset ,:pixel,:style,:nested)
+	.export_as << text_choice_item.new(inner,_self.message(:export_for),:min_width,410)
+	.export_as.add_item(_self.message(:design))
+	.export_as.add_item(_self.message(:homepass))
+	inner1 << rowcol.new(outer,1,_unset,:pixel,:style,:nested)
+    .file_item <<
+         text_item.new(inner1,_self.message(:target_dir))
+	button_item.new(inner1,_self.message(:browse),_self,:browse|()|, :min_width, button_width)
+	
+	inner2 << rowcol.new(outer,1,_unset ,:pixel,:style,:button_box, :col_alignment, :right, :row_alignment, :bottom)
+	.exportbtn<<button_item.new_safe(inner2,_self.message(:export),_self,:load|()|, :min_width, button_width)
+	button_item.new(inner2,_self.message(:close),_self,:quit|()|, :min_width, button_width)
+	.stattext << sw_text_window.new( f,
+					 :col_alignment, :fill,
+					 :min_width, 30, :min_height, 70
+				    )
+		#sw_text_window.new( f,30,70 )
+        .stattext.editable? << _false
+        .stattext.resize_x? << _true
+        .stattext.resize_y? << _true
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.get_export_as_value()
+	## 
+	## 
+	_return .export_as.value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.load()
+	filename << .file_item.value
+	.stattext.text << ""
+	#.exportbtn.enabled?<<_false 
+	_self.run(filename)
+	.exportbtn.enabled?<<_true 
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.insert_message(p_string)
+	#_if p_string _isnt _unset 
+	#_then
+	w << .stattext.text
+		.stattext.text << w+p_string+newline_char
+	#	.stattext.text << newline_char
+	#_endif
+	
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.run(filename)
+	.loader<<rwi_export_to_kml.new()
+	.loader.write_as_kml(filename,_self)
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.browse()
+	l_title << _self.message(:sel_dir_title)
+	fd << directory_selection.new(_self,l_title,:ok|()|)
+	_if (.file_item.value <> "")
+	_then
+		fd.directory << .file_item.value.write_string
+	_else
+		fd.directory << "C:\"
+	_endif
+	fd.activate()
+_endmethod
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.quit()
+	## 
+	## 
+	.stattext.contents << ""
+	_super.quit()
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml_dialog})
+_method rwi_export_to_kml_dialog.ok(path)
+	.file_item.value << path
+_endmethod
+
+
+

@@ -1,0 +1,1159 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2013 Realworld Systems Indonesia. All Rights Reserved. 
+#							       
+# ************************************************************ 
+_package sw
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+def_slotted_exemplar(:rwi_export_to_kml,
+	## 
+	## 
+	## 
+	{
+		{:gv,_unset},
+		{:gc,_unset}
+	})
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.new()
+	## 
+	## 
+	_return _clone.init()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.init()
+	## 
+	##
+	.gv << gis_program_manager.databases[:gis]
+	.gc << gis_program_manager.databases[:gis].collections	
+	_return _self 
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={search_object}, usage={internal})
+_method rwi_export_to_kml.cek_duplikat(p_rope,p_object)
+	## 
+	##
+	found? << _false 
+	_for o _over p_rope.fast_elements() 
+	_loop
+		_if(o=p_object)
+		_then
+			found?<<_true
+			_leave 
+		_endif
+	_endloop
+	_return found?
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={search_object}, usage={internal})
+_method rwi_export_to_kml.get_all_object(p_area)
+	## 
+	## Returns (in order):
+	## Building with type = STO,
+	## Terminal Enclosure (ODC) within area
+	## Pole (Tiang) within area
+	## Underground utility box (Manhole,Handhole) within area
+	## All Equipment within area
+	## All sheath with loc within area
+	## Underground Route within area
+	## Design Area
+	c_n << "Planned"
+	c_e << "In Service"
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	gv << gis_program_manager.databases[:gis].collections
+	## - search for building within area with type STO
+	scbuild << .gc[:building].select(predicate.within(:location,p_area) _and predicate.eq(:type,"STO"))
+	## - search for tower within area
+	sctower << .gc[:mit_tower].select(predicate.within(:location,p_area))
+	#write("scbuild:",scbuild.size)
+	## - search for terminal enclosure within area
+	scte << .gc[:mit_terminal_enclosure].select(predicate.within(:location,p_area))
+	#write("scte:",scte.size)
+	## - search for pole within area
+	scpole << .gc[:pole].select(predicate.within(:location,p_area))
+	cpole << {rope.new(),rope.new()}
+	_for o _over scpole.fast_elements() 
+	_loop
+		
+		#_if o.construction_status = c_n
+		#_then
+			cpole[1].add(o)
+		#_elif o.construction_status = c_e
+		#_then
+		#	cpole[2].add(o)
+		#_else
+		#	cpole[2].add(o)
+		#_endif
+	_endloop
+#	#print(scpole)
+#	#write("scpole:",scpole.size)
+#	## - search for equipment within each pole
+	scfat << .gc[:sheath_splice].select(predicate.within(:location,p_area))
+	r_eq << rope.new()
+	_for p _over scfat.fast_elements() 
+	_loop
+		#_for e _over p.get_equipment().fast_elements() 
+		#_loop
+			r_eq.add(p)
+		#_endloop
+	_endloop
+	
+#	## - search for uub within area
+	scuub << .gc[:uub].select(predicate.within(:location,p_area))
+#	## - search for equipment within each uub
+#	_for u _over scuub.fast_elements()
+#	_loop
+#		_for e _over u.get_equipment().fast_elements()
+#		_loop
+#			r_eq.add(e)
+#		_endloop
+#	_endloop
+#	#print(r_eq)
+#	## - search for aerial route within area
+	scar << .gc[:aerial_route].select(predicate.within(:route,p_area))
+#	#write("scar:",scar.size)
+#	## - search for sheath with loc inside aerial route (check for duplicates)
+	r_swl << rope.new()
+#	#write(scar.size)
+	_for s _over scar.fast_elements()
+	_loop
+		write(s)
+		_for c _over s.cables.fast_elements()
+		_loop
+			write(c)
+			_if _not (_self.cek_duplikat(r_swl,c.sheath_with_loc))
+			_then
+				r_swl.add(c.sheath_with_loc)
+			_endif
+		_endloop
+	_endloop
+#	## - search for underground route within area
+	scur << .gc[:underground_route].select(predicate.within(:route,p_area))
+#	#write("scur:",scur.size)
+#	## - search for sheath with loc inside underground route (check for duplicates)
+#	_for s _over scur.fast_elements()
+#	_loop
+#		_for c _over s.cables.fast_elements()
+#		_loop
+#			_if _not (_self.cek_duplikat(r_swl,c.sheath_with_loc))
+#			_then
+#				r_swl.add(c.sheath_with_loc)
+#			_endif
+#		_endloop
+#	_endloop
+#	## group sheath with loc by telkom network type
+	htswl << hash_table.new()
+	htswl[:|Cluster|]<<rope.new()
+	htswl[:|Feeder|]<<rope.new()
+	htswl[:|Sub Feeder|]<<rope.new()
+	htswl[:|Main Feeder|]<<rope.new()
+	_for o _over r_swl.fast_elements() 
+	_loop
+		htswl[o.sheath_network_type.as_symbol()].add(o)
+	_endloop
+#	## group sheath splice by telkom network type
+	htss << hash_table.new()
+	htss[:|Cluster|]<<rope.new()
+	htss[:|Feeder|]<<rope.new()
+	htss[:|Sub Feeder|]<<rope.new()
+	htss[:|Main Feeder|]<<rope.new()
+	_for o _over r_eq.fast_elements() 
+	_loop
+		write(o.fttx_network_type)
+		htss[o.fttx_network_type.as_symbol()].add(o)
+		#htss.add(o)
+	_endloop
+#	## group underground route by designator
+	htur << hash_table.new()
+#	_for o _over scur.fast_elements()
+#	_loop
+#		_if(htur.lookup_key(o.designator.as_symbol()) _is _unset)
+#		_then
+#			htur[o.designator.as_symbol()] << rope.new()
+#		_endif
+#		htur[o.designator.as_symbol()].add(o)
+#	_endloop
+#	## check multiple cable on underground route for additional text
+	httxt << hash_table.new()
+#	_for o _over scur.fast_elements()
+#	_loop
+#		_if o.cables().size > 1
+#		_then
+#			l_key << o.id.write_string.as_symbol()
+#			httxt[l_key]<<rope.new()
+#			#add info coordinate
+#			httxt[l_key].add(o.route.mid_point)
+#			_for c _over o.cables().fast_elements() 
+#			_loop
+#				httxt[l_key].add(c.name+";"+c.spec_id)
+#			_endloop
+#		_endif
+#	_endloop
+#	## check multiple cable on aerial route for additional text
+	htari << hash_table.new()
+#	_for o _over scar.fast_elements()
+#	_loop
+#		_if o.cables().size > 1
+#		_then
+#			l_key << o.id.write_string.as_symbol()
+#			htari[l_key]<<rope.new()
+#			#add info coordinate
+#			htari[l_key].add(o.route.mid_point)
+#			_for c _over o.cables().fast_elements() 
+#			_loop
+#				htari[l_key].add(c.name+";"+c.spec_id)
+#			_endloop
+#		_endif
+#	_endloop
+#	scbuild << empty() #_unset 
+#	scte << empty() #__unset 
+#	#cpole << _unset 
+#	scuub << empty() #__unset 
+#	htss << empty() #__unset 
+#	htswl << empty() #__unset 
+#	htur << empty() #__unset 
+#	httxt << empty() #__unset 
+#	scur << empty() #__unset 
+#	htari << empty() #__unset 
+#	scar  << empty() #__unset 
+#	sctower << empty() #__unset 
+	#print(r_swl)
+	_return scbuild,scte,cpole,scuub,htss,htswl,htur,httxt,scur,htari,scar,sctower
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={search_object}, usage={internal})
+_method rwi_export_to_kml.get_demand_point(p_area)
+	## 
+	## 
+	## populate demand point
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	#gv << gis_program_manager.databases[:gis].collections
+	dp_sc << .gc[:ftth!demand_point].select(predicate.within(:location,p_area))
+	_return dp_sc
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={search_object}, usage={internal})
+_method rwi_export_to_kml.get_unset_loc_size_on_structure(p_uub)
+	## 
+	##
+	l_result << _unset 
+	l_eqs << p_uub.get_equipment()
+	_for e _over l_eqs.fast_elements() 
+	_loop
+		l_upstream<<e.get_upstream_cables()
+		_for c _over l_upstream.fast_elements()
+		_loop
+			_if(c.unset_loc_size() > 0)
+			_then
+				l_result << c.unset_loc_size()
+			_endif
+		_endloop
+	_endloop
+	_return l_result
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.convert_coord(p_coord)
+#	write(p_coord)
+#	cs1 <<.gc[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+#	cs2 <<.gc[:sw_gis!coordinate_system].at(:world_miller_wgs84_cm)
+#	write(p_coord,cs1,"vs",cs2)
+
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	vc << v.collections
+	!current_dsview! << v
+
+	_dynamic !print_float_precision! << 12
+
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	
+	count      << 0
+	dtn        << date_time_now()
+
+
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+
+	t_coord << t.convert(p_coord)
+
+	>> t_coord
+_endmethod 
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.coord_to_string(p_coord)
+
+	l_coord << _self.convert_coord(p_coord)
+
+	_dynamic !print_float_precision!<<16	
+	l_str << l_coord.x.write_string+","+l_coord.y.write_string+",0"
+
+	>> l_str
+_endmethod 
+$
+
+############### KML SECTION ######################
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_as_kml(p_dir,p_dialog)
+	## 
+	##
+	_if p_dialog.get_export_as_value() = p_dialog.message(:design)
+	_then
+		_self.write_for_remote(p_dir,p_dialog)
+	_else
+		_self.write_for_homepass(p_dir,p_dialog)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.strip_filename_restricted_char(p_fname)
+	## 
+	## 
+	#l_restricted_char << {%\,%/,%:,%*,%?,%",%<,%>,%|,%&,%~,%`,%@,%#,%$,%%,%^,%(,%),%+,%{,%},%[,%],%,,%',%;,%=,%.,%!}
+	l_restricted_char << {%\,%/,%:,%*,%?,%",%<,%>,%|}
+	l_fname << p_fname
+	_for a _over l_restricted_char.fast_elements() 
+	_loop
+		p_fname.substitute_character(a,%_)
+	_endloop
+#	_if p_fname.size > 31
+#	_then
+#		p_fname << p_fname.slice(1,31)
+#	_endif
+	_return p_fname
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.replace_special_xml_char(p_str)
+	## 
+	##
+	l_res << {%&,%",%',%<,%>}
+	l_new << {"&amp;","&quot;","&apos;","&lt;","&gt;"}
+	l_count<<0
+	_for a _over l_res.fast_elements() 
+	_loop
+		l_count << l_count + 1
+		p_str<<p_str.substitute_string(a,l_new[l_count])
+	_endloop
+	_return p_str
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.get_project_area(p_design)
+	## 
+	## 
+	l_project << p_design.project
+	_for a _over l_project.project_areas.fast_elements() 
+	_loop
+		_if a.area _isnt _unset 
+		_then
+			_return a.area
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_for_homepass(p_dir,p_dialog)
+	## 
+	##
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	l_area << _unset
+	l_design << _unset	
+	p_design << swg_dsn_admin_engine.get_current_job()	
+	
+	_if(p_design _is _unset)
+	_then
+		p_dialog.show_alert(p_dialog.message(:no_open_design))
+		_leave
+	_endif
+	
+	l_design << p_design.scheme
+	l_area << _self.get_project_area(p_design)
+
+	l_temp_fname << l_design.inf_project.write_string
+	l_temp_fname << _self.strip_filename_restricted_char(l_temp_fname)	
+	l_file_name << l_temp_fname+"_homepass.kml"
+	l_file << p_dir+"\"+l_file_name
+	t_file << smallworld_product.get_data_file("template.kml", :rwi_export_to_kml).write_string
+	p_dialog.insert_message(p_dialog.message(:process_start))
+	p_dialog.insert_message(p_dialog.message(:create_file))
+	_if system.file_creatable?(l_file)
+	_then
+		## write from template to result
+		tstrm << external_text_input_stream.new(t_file)
+		strm << external_text_output_stream.new(l_file)
+		_try _with cond
+			_loop
+				t_line << tstrm.get_line()
+				_if t_line _is _unset 
+				_then
+					tstrm.close()
+					_leave 
+				_endif
+				strm.put_charvec(t_line)
+				strm.newline()
+				strm.flush()
+			_endloop
+			p_dialog.insert_message(p_dialog.message(:populating_object))
+			l_dp << _self.get_demand_point(l_area)
+			strm.flush()
+			p_dialog.insert_message(p_dialog.message(:exporting_object))
+			#demand point object
+			_self.write_demand_point(strm,l_dp,p_dialog)
+			_self.write_open_folder(strm,"Misc")
+			#design area object
+			t_desc << "Jumlah Homepass = "+l_dp.size.write_string
+			l_desc << rope.new()
+			l_desc.add(t_desc)
+			_self.write_design_area(strm,l_design,l_area,l_desc)			
+			_self.write_close_folder(strm)
+			strm.put_charvec("</Document>")
+			strm.newline()
+			strm.put_charvec("</kml>")
+			strm.flush()
+			strm.close()
+			p_dialog.insert_message(p_dialog.message(:finish,_unset,l_file))
+		_when error
+			p_dialog.show_alert(cond)
+			strm.close()
+		_endtry		
+	_else
+		p_dialog.show_alert(p_dialog.message(:write_failed))
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_for_remote(p_dir,p_dialog)
+	## 
+	##
+	
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	l_area << _unset
+	l_design << _unset 
+	p_design << swg_dsn_admin_engine.get_current_job()
+	
+	_if(p_design _is _unset)
+	_then
+		p_dialog.show_alert(p_dialog.message(:no_open_design))
+		_leave
+	_endif
+
+	l_design << p_design.scheme
+	l_area << _self.get_project_area(p_design)
+
+	l_temp_fname << l_design.inf_project.write_string
+	l_temp_fname << _self.strip_filename_restricted_char(l_temp_fname)
+	l_file_name << l_temp_fname+".kml"
+	l_file << p_dir+"\"+l_file_name
+	t_file << smallworld_product.get_data_file("template.kml", :rwi_export_to_kml).write_string
+	#p_dialog.insert_message(p_dialog.message(:process_start))
+	#p_dialog.insert_message(p_dialog.message(:create_file))
+	_if system.file_creatable?(l_file)
+	_then
+		
+		## write from template to result
+		tstrm << external_text_input_stream.new(t_file)
+		strm << external_text_output_stream.new(l_file)
+		_try _with cond
+			_loop
+				t_line << tstrm.get_line()
+				#write(t_line)
+				_if t_line _is _unset 
+				_then
+					tstrm.close()
+					_leave 
+				_endif
+				strm.put_charvec(t_line)
+				strm.newline()
+				strm.flush()
+			_endloop
+			#p_dialog.insert_message(p_dialog.message(:populating_object))
+			(l_sto,l_te,l_pole,l_uub,l_ss,l_swl,l_ur, l_uri, l_urc, l_ari, l_arc,l_tower) << _self.get_all_object(l_area)
+			strm.flush()
+			#p_dialog.insert_message(p_dialog.message(:exporting_object))
+
+			#STO object
+			_self.write_sto(strm,l_sto,p_dialog)
+			#underground route object
+			_self.write_uroute(strm,l_ur,p_dialog)
+			#pole object
+			_self.write_pole(strm,l_pole,p_dialog)
+			#underground utility box object
+			_self.write_uub(strm,l_uub,p_dialog)
+			#sheath splice object
+			_self.write_sheath_splice(strm,l_ss,p_dialog)
+			#terminal enclosure object
+			_self.write_terminal_enclosure(strm,l_te,p_dialog)
+			#tower object
+			_self.write_tower(strm,l_tower,p_dialog)
+			#sheath with loc object
+			_self.write_sheath_loc(strm,l_swl,p_dialog)
+			_self.write_open_folder(strm,"Misc")
+			#design area object
+			_self.write_design_area(strm,l_design,l_area)
+			#multiple cable text info for underground route
+			_self.write_uroute_info(strm,l_urc,l_uri)
+			#multiple cable text info for aerial route
+			_self.write_aroute_info(strm,l_arc,l_ari)			
+			_self.write_close_folder(strm)
+			strm.put_charvec("</Document>")
+			strm.newline()
+			strm.put_charvec("</kml>")
+			strm.flush()
+			strm.close()
+			p_dialog.insert_message(p_dialog.message(:finish,_unset,l_file))
+			p_dialog.show_message("Finish")
+		_when error
+			p_dialog.show_message(cond)
+			strm.close()
+			
+		_endtry		
+	_else
+		p_dialog.show_alert(p_dialog.message(:write_failed))
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_sto(strm,l_sto,p_dialog)
+	## 
+	## 
+	#STO object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"OLT")
+	_for o _over l_sto.fast_elements()
+	_loop
+		p_dialog.insert_message(p_dialog.message(:sto,_unset,o.name))
+		l_desc<<rope.new()
+		l_desc.add("Construction Status: "+o.construction_status.write_string)
+		_self.write_point(strm,o.name.write_string,l_desc,"m_sto",o.location.coord)
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_tower(strm,l_tower,p_dialog)
+	## 
+	## 
+	#Tower object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"Tower")
+	_for o _over l_tower.fast_elements()
+	_loop
+		p_dialog.insert_message(p_dialog.message(:tower,_unset,o.name))
+		l_desc<<rope.new()
+		l_desc.add("Construction Status: "+o.construction_status.write_string)
+		l_desc.add("Specification ID: "+o.spec_id.write_string)
+		_self.write_point(strm,o.name.write_string,l_desc,"m_tower",o.location.coord)
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_uroute(strm,l_ur,p_dialog)
+	## 
+	## 
+	#underground route object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"Underground Route")
+	_for k,v _over l_ur.keys_and_elements() 
+	_loop
+		_self.write_open_folder(strm,k.write_string)
+		_for o _over v.fast_elements()
+		_loop
+			_try _with cond
+				p_dialog.insert_message(p_dialog.message(:ugroute,_unset,o.designator))
+				l_desc<<rope.new()
+				l_desc.add("Designator:"+o.designator.write_string)
+				l_desc.add("Construction Status:"+o.construction_status.write_string)
+				l_desc.add("Type:"+o.underground_route_type.write_string)
+				l_desc.add("Length:"+o.calculated_length.value.rounded.write_string+"mm")
+				_if(o.diameter _isnt _unset)
+				_then 
+					l_desc.add("Diameter:"+o.diameter.value.rounded.write_string+"mm")
+				_endif			
+				_if(o.centre_point_depth _isnt _unset)
+				_then
+					l_desc.add("Center Point Depth:"+o.centre_point_depth.value.rounded.write_string+"mm")
+				_endif
+				_if (o.width _isnt _unset)
+				_then
+					l_desc.add("Width:"+o.width.value.rounded.write_string+"mm")
+				_endif
+				_if (o.upper_material_depth _isnt _unset)
+				_then
+					l_desc.add("Upper Material Depth:"+o.upper_material_depth.value.rounded.write_string+"mm")
+				_endif
+				_if (o.core_material_depth _isnt _unset)
+				_then
+					l_desc.add("Core Material Depth:"+o.core_material_depth.value.rounded.write_string+"mm")
+				_endif
+				_self.write_line(strm,o.designator.write_string,l_desc,"m_urute",o.route.sectors)
+			_when error
+				p_dialog.insert_message(cond)
+			_endtry						
+		_endloop
+		_self.write_close_folder(strm)			
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_aroute(strm,l_ur,p_dialog)
+	## 
+	## 
+	#underground route object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"Aerial Route")
+	_for k,v _over l_ur.keys_and_elements() 
+	_loop
+		_self.write_open_folder(strm,k.write_string)
+		_for o _over v.fast_elements()
+		_loop
+			_try _with cond
+				p_dialog.insert_message(p_dialog.message(:aroute,_unset,o.name))
+				l_desc<<rope.new()
+				l_desc.add("Name:"+o.designator.write_string)
+				l_desc.add("Construction Status:"+o.construction_status.write_string)
+				l_desc.add("Type:"+o.fttx_network_type.write_string)
+				l_desc.add("Length:"+o.calculated_length.value.rounded.write_string+"mm")
+#				_if(o.diameter _isnt _unset)
+#				_then 
+#					l_desc.add("Diameter:"+o.diameter.value.rounded.write_string+"mm")
+#				_endif			
+#				_if(o.centre_point_depth _isnt _unset)
+#				_then
+#					l_desc.add("Center Point Depth:"+o.centre_point_depth.value.rounded.write_string+"mm")
+#				_endif
+#				_if (o.width _isnt _unset)
+#				_then
+#					l_desc.add("Width:"+o.width.value.rounded.write_string+"mm")
+#				_endif
+#				_if (o.upper_material_depth _isnt _unset)
+#				_then
+#					l_desc.add("Upper Material Depth:"+o.upper_material_depth.value.rounded.write_string+"mm")
+#				_endif
+#				_if (o.core_material_depth _isnt _unset)
+#				_then
+#					l_desc.add("Core Material Depth:"+o.core_material_depth.value.rounded.write_string+"mm")
+#				_endif
+				_self.write_line(strm,o.name.write_string,l_desc,"m_urute",o.route.sectors)
+			_when error
+				p_dialog.insert_message(cond)
+			_endtry						
+		_endloop
+		_self.write_close_folder(strm)			
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_pole(strm,l_pole,p_dialog)
+	## 
+	## 
+	#pole object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	l_sv << {"TB","m_tiang","Tiang Baru","TE","m_tiang_e","Tiang Existing"}
+	l_idx << 1
+	_self.write_open_folder(strm,"POLE")
+	_for s _over l_pole.fast_elements()
+	_loop
+		_self.write_open_folder(strm,l_sv[l_idx+2])
+		_for o _over s.fast_elements()
+		_loop
+			p_dialog.insert_message(p_dialog.message(:pole,_unset, o.telco_pole_tag ))
+			l_desc<<rope.new()
+			l_desc.add("Name:"+o.telco_pole_tag.write_string)
+			l_desc.add("Construction Status: "+o.construction_status.write_string)
+			l_desc.add("Material Type:"+o.material_type.write_string)
+			l_desc.add("Usage:"+o.usage.write_string)
+			#_self.write_point(strm,l_sv[l_idx],l_desc,l_sv[l_idx+1],o.location.coord)
+			_self.write_point(strm,o.telco_pole_tag,l_desc,l_sv[l_idx+1],o.location.coord)
+			
+		_endloop
+		_self.write_close_folder(strm)
+		l_idx +<< 3
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_uub(strm,l_uub,p_dialog)
+	## 
+	## 
+	#underground utility box object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"Manhole/Handhole")
+	_for o _over l_uub.fast_elements()
+	_loop
+		p_dialog.insert_message(p_dialog.message(:uub,_unset,o.spec_id))
+		l_desc<<rope.new()
+		l_desc.add("Type: "+o.type.write_string)
+		l_desc.add("Construction Status: "+o.construction_status.write_string)
+		l_cad << _self.get_unset_loc_size_on_structure(o)
+		_if l_cad _isnt _unset 
+		_then
+			l_str << "".concatenation("CAD-",l_cad.write_string,"-CORE")
+			l_desc.add(l_str)
+		_endif
+		l_type << ""
+		_if o.type = "Manhole"
+		_then
+			l_desc.add("Manhole Type:"+o.manhole_type.write_string)
+			l_type << "m_manhole"
+		_else
+			l_type << "m_handhole"
+		_endif
+		l_desc.add("Postition:"+o.position.write_string)
+		_self.write_point(strm,o.spec_id,l_desc,l_type,o.location.coord)
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_sheath_splice(strm,l_ss,p_dialog)
+	## 
+	## 
+	#sheath splice object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	#show(!current_world!)
+	write("SC")
+	_self.write_open_folder(strm,"FAT")
+	_for k,v _over l_ss.keys_and_elements() 
+	_loop
+		_self.write_open_folder(strm,k.write_string)
+		_for o _over v.fast_elements()
+		_loop
+			p_dialog.insert_message(p_dialog.message(:sheath_splice,_unset,o.name))
+			_if o.location _isnt _unset
+			_then
+				str_coord << o.location.coord
+			_else
+				str_coord << o.get_structure().location.coord
+			_endif
+			l_desc<<rope.new()
+			l_desc.add("Network Type:"+o.fttx_network_type.write_string)
+			l_desc.add("Specification ID:"+o.spec_id.write_string)
+			l_desc.add("Type: "+o.sheath_splice_object_type.write_string)
+			l_desc.add("Construction Status:"+o.construction_status.write_string)
+			l_desc.add("Construction Type:"+o.construction_status.write_string)
+			l_desc.add("Splice Type:"+o.sheath_splice_object_type.write_string)
+			l_desc.add("Splice Method:"+o.splice_method.write_string)
+			l_type << ""
+			l_name << o.name.write_string
+			l_type << "FAT"
+			_if k.write_string = "Feeder"
+			_then
+				l_name << o.spec_id
+				_if(o.spec_id.as_sliced_string(8) = "SC-OF-SM")
+				_then
+					l_type << "m_odp_scofsm"
+					#show(l_type)
+				_endif
+			_endif
+			_self.write_point(strm,l_name.write_string,l_desc,l_type,str_coord)
+		_endloop
+		_self.write_close_folder(strm)
+			
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_terminal_enclosure(strm,l_te,p_dialog)
+	## 
+	## 
+	#terminal enclosure object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"FDT")
+	_for o _over l_te.fast_elements()
+	_loop
+		p_dialog.insert_message(p_dialog.message(:terminal_enclosure,_unset,o.name))
+		l_desc<<rope.new()
+		l_desc.add("Specification: "+o.spec_id.write_string)
+		l_desc.add("Construction Status: "+o.construction_status.write_string)
+		_self.write_point(strm,o.name.write_string,l_desc,"m_odc",o.location.coord)
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_sheath_loc(strm,l_swl,p_dialog)
+	## 
+	## 
+	#sheath with loc object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"KABEL")
+	_for k,v _over l_swl.keys_and_elements()
+	_loop
+		_self.write_open_folder(strm,k.write_string)
+		l_style << ""
+		d_num << _unset 
+		_if (k.write_string = "Feeder")
+		_then
+			l_style<<"m_kabel_f"
+		_else
+			l_style<<"m_kabel"
+			d_num << "1"
+		_endif
+		_for o _over v.fast_elements()
+		_loop
+			l_style2 << l_style
+			p_dialog.insert_message(p_dialog.message(:cable,_unset,o.name.write_string))
+			_if o.construction_status = "In Service"
+			_then
+				l_style2 +<< "_e"
+			_endif
+			_if(d_num _isnt _unset)
+			_then
+				l_num << ""
+				_try _with cond
+					l_num << o.name.split_by(%/)[2].split_by(%.)[1].as_number().write_string
+				_when error
+					#p_dialog.insert_message(error)
+					#p_dialog.insert_message(p_dialog.message(:cable_name_error,_unset,o.name))
+				_endtry
+				l_style2 << l_style2+"_"+l_num
+			_endif
+			l_desc<<rope.new()
+			l_desc.add("Network Type: "+o.sheath_network_type.write_string)
+			l_desc.add("Specification: "+o.spec_id.write_string)
+			l_procesed<<""
+			_try _with cond
+				l_processed << "Number of Core"
+				l_desc.add("Number of Core: "+o.spec_id.numbers_and_strings()[2].write_string)
+			_when error
+				write("error while getting ",l_processed)
+			_endtry
+			_try _with cond
+				l_procesed<<"Fiber Length"
+				l_desc.add("Fiber Length: "+o.calculated_fiber_length.value.rounded.write_string+"m")
+			_when error
+				write("error while getting ",l_processed)
+			_endtry
+			_try _with cond
+				l_procesed<<"Construction Status"
+				l_desc.add("Construction Status: "+o.construction_status.write_string)
+			_when error
+				write("error while getting ",l_processed)
+			_endtry
+			l_coord << o.route_sectors()
+			_self.write_line(strm,o.name.write_string,l_desc,l_style2,l_coord)
+		_endloop
+		_self.write_close_folder(strm)			
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_demand_point(strm,l_dp,p_dialog)
+	## 
+	## 
+	#demand point object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_self.write_open_folder(strm,"Homepass")
+	_for o _over l_dp.fast_elements()
+	_loop
+		p_dialog.insert_message(p_dialog.message(:dpoint,_unset,o.name))
+		l_desc<<rope.new()
+		#l_desc.add("Construction Status: "+o.construction_status)
+		_self.write_point(strm,"",l_desc,"m_dpoint",o.location.coord)
+	_endloop
+	_self.write_close_folder(strm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_design_area(strm,l_design,l_area,_optional l_desc)
+	## 
+	## 
+	#design area object
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_if l_desc _is _unset 
+	_then
+		l_desc << rope.new()
+	_endif
+	l_proj_name << l_design.inf_project
+	_self.write_area(strm,l_proj_name.write_string,l_desc,"m_proj_area",l_area)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_uroute_info(strm,l_urc,l_uri)
+	## 
+	## 
+	#multiple cable text info for underground route
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_for o _over l_urc.fast_elements()
+	_loop
+		_if (l_uri.lookup_key(o.id.write_string.as_symbol()) _isnt _unset)
+		_then
+			#insert text
+			l_desc << rope.new()
+			count << 0
+			l_urir << l_uri[o.id.write_string.as_symbol()]
+			l_coord << l_urir.an_element().coord
+			_for d _over l_urir.fast_elements()
+			_loop
+				count +<< 1
+				_if count = 1
+				_then
+					_continue 
+				_endif
+				l_desc.add(d)
+			_endloop
+			_self.write_point(strm,"",l_desc,"m_multi",l_coord)				
+		_endif				
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_aroute_info(strm,l_arc,l_ari)
+	## 
+	## 
+	#multiple cable text info for aerial route
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	_for o _over l_arc.fast_elements()
+	_loop
+		_if (l_ari.lookup_key(o.id.write_string.as_symbol()) _isnt _unset)
+		_then
+			#insert text
+			l_desc << rope.new()
+			count << 0
+			l_arir << l_ari[o.id.write_string.as_symbol()]
+			l_coord << l_arir.an_element().coord
+			_for d _over l_arir.fast_elements()
+			_loop
+				count +<< 1
+				_if count = 1
+				_then
+					_continue 
+				_endif
+				l_desc.add(d)
+			_endloop
+			_self.write_point(strm,"",l_desc,"m_multi",l_coord)				
+		_endif				
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_point(strm,p_name,p_desc,p_style,p_coord)
+	## 
+	##
+	#p_name << "ok"
+	#p_desc << _unset # "asdsdf"
+
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	show(p_name)
+	str_coord << _self.coord_to_string(p_coord)
+	show(p_coord)
+	show(str_coord)
+	strm.put_charvec("<Placemark>")
+	strm.newline()
+	strm.put_charvec("<name>"+p_name.write_string+"</name>")
+	strm.newline()
+	strm.put_charvec("<description>")
+	strm.newline()
+#	_for i _over p_desc.fast_elements() 
+#	_loop
+#		strm.put_charvec(i)
+#		strm.newline()
+#	_endloop
+	strm.put_charvec("</description>")
+	strm.newline()
+	strm.put_charvec("<styleUrl>"+%#+p_style.write_string+"</styleUrl>")
+	strm.newline()
+	strm.put_charvec("<Point>")
+	strm.newline()
+	strm.put_charvec("<coordinates>"+str_coord.write_string+"</coordinates>")
+	strm.newline()
+	strm.put_charvec("</Point>")
+	strm.newline()
+	strm.put_charvec("</Placemark>")
+	strm.newline()
+	strm.flush()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_line(strm,p_name,p_desc,p_style,p_coord)
+	## 
+	##
+
+	#rs_coord << o.route_sectors()
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	s_coord << ""
+	_for i _over p_coord.fast_elements() 
+	_loop
+		_for j _over i.fast_elements() 
+		_loop
+			#l_coord << _self.convert_coord(j)
+			l_coord << _self.coord_to_string(j)
+			s_coord +<< l_coord.write_string
+			s_coord +<< " "					
+		_endloop
+	_endloop
+	strm.put_charvec("<Placemark>")
+	strm.newline()
+	strm.put_charvec("<name>"+p_name.write_string+"</name>")
+	strm.newline()
+	strm.put_charvec("<description>")
+	strm.newline()
+	_for i _over p_desc.fast_elements()
+	_loop
+		strm.put_charvec(i)
+		strm.newline()
+	_endloop
+	strm.put_charvec("</description>")
+	strm.newline()
+	strm.put_charvec("<styleUrl>"+%#+p_style.write_string+"</styleUrl>")
+	strm.newline()
+	strm.put_charvec("<LineString>")
+	strm.newline()
+	strm.put_charvec("<tessellate>1</tessellate>")
+	strm.newline()
+	strm.put_charvec("<coordinates>")
+	strm.put_charvec(s_coord)
+	strm.put_charvec("</coordinates>")
+	strm.newline()
+	strm.put_charvec("</LineString>")
+	strm.newline()
+	strm.put_charvec("</Placemark>")
+	strm.newline()
+	strm.flush()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_open_folder(strm,p_name)
+	## 
+	## 
+	strm.put_charvec("<Folder>")
+	strm.newline()
+	strm.put_charvec("<name>"+p_name.write_string+"</name>")
+	strm.newline()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_close_folder(strm)
+	## 
+	## 
+	strm.put_charvec("</Folder>")
+	strm.newline()
+_endmethod
+$
+
+
+
+_pragma(classify_level=basic, topic={rwi_export_to_kml})
+_method rwi_export_to_kml.write_area(strm,p_name,p_desc,p_style,p_coord)
+	## 
+	##
+
+	#rs_coord << o.route_sectors()
+	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
+	s_coord << ""
+	_for i _over p_coord.sectors.fast_elements() 
+	_loop
+		_for j _over i.fast_elements() 
+		_loop
+			#l_coord << _self.convert_coord(j)
+			l_coord << _self.coord_to_string(j)
+			s_coord +<< l_coord.write_string
+			s_coord +<< " "					
+		_endloop
+	_endloop
+	strm.put_charvec("<Placemark>")
+	strm.newline()
+	strm.put_charvec("<name>"+p_name.write_string+"</name>")
+	strm.newline()
+	strm.put_charvec("<description>")
+	strm.newline()
+	_for i _over p_desc.fast_elements() 
+	_loop
+		strm.put_charvec(i)
+		strm.newline()
+	_endloop
+	strm.put_charvec("</description>")
+	strm.newline()
+	strm.put_charvec("<styleUrl>"+%#+p_style.write_string+"</styleUrl>")
+	strm.newline()
+	strm.put_charvec("<Polygon>")
+	strm.newline()
+	strm.put_charvec("<extrude>1</extrude>")
+	strm.newline()
+	strm.put_charvec("<outerBoundaryIs>")
+	strm.newline()
+	strm.put_charvec("<LinearRing>")
+	strm.newline()
+	strm.put_charvec("<coordinates>")
+	strm.put_charvec(s_coord)
+	strm.put_charvec("</coordinates>")
+	strm.newline()
+	strm.put_charvec("</LinearRing>")
+	strm.newline()
+	strm.put_charvec("</outerBoundaryIs>")
+	strm.newline()
+	strm.put_charvec("</Polygon>")
+	strm.newline()
+	strm.put_charvec("</Placemark>")
+	strm.newline()
+	strm.flush()
+_endmethod
+$

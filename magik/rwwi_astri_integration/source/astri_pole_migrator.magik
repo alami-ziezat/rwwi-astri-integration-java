@@ -106,6 +106,9 @@ _private _method astri_design_migrator.create_pole(pm)
 				existing_pole.folders << folders
 				existing_pole.fttx_network_type << "Cluster"
 				existing_pole.segment << segment_id
+				existing_pole.region << .region
+				existing_pole.cluster << .cluster
+				existing_pole.line_type << m_line
 
 				_if stf_item_code _isnt _unset
 				_then
@@ -167,6 +170,9 @@ _private _method astri_design_migrator.create_pole(pm)
 				:segment, segment_id,
 				:pop, .pop_name,
 				:olt, .pop_name,
+				:region, .region,
+				:cluster, .cluster,
+				:line_type, m_line,
 				:uuid, .uuid,
 				:construction_status, pole_const_status
 			)

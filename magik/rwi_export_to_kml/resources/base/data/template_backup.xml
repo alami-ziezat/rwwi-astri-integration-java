@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<!-- Project Area -->
+	<Style id="s_proj_area">
+		<LineStyle>
+			<color>ff00ff00</color>
+			<width>4</width>
+			<gx:altitudeMode>clampedToGround</gx:altitudeMode>
+		</LineStyle>
+		<PolyStyle>
+			<color>0000ff00</color>
+			<fill>0</fill>
+			<gx:altitudeMode>clampedToGround</gx:altitudeMode>
+		</PolyStyle>
+    </Style>
+	<Style id="h_proj_area">
+		<LineStyle>
+			<color>ff00ff00</color>
+			<width>4</width>
+			<gx:altitudeMode>clampedToGround</gx:altitudeMode>
+		</LineStyle>
+		<PolyStyle>
+			<color>0000ff00</color>
+			<fill>0</fill>
+			<gx:altitudeMode>clampedToGround</gx:altitudeMode>
+		</PolyStyle>
+    </Style>
+	<StyleMap id="m_proj_area">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_proj_area</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_proj_area</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- Tiang Planned -->
+	<Style id="s_tiang">
+		<IconStyle>
+		<color>ff000000</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>
+			</Icon>
+			<hotSpot x="25" y="35" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_tiang">
+		<IconStyle>
+		<color>ff000000</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>
+			</Icon>
+			<hotSpot x="25" y="35" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_tiang">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_tiang</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_tiang</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- Tiang Existing -->
+	<Style id="s_tiang_e">
+		<IconStyle>
+		<color>ff000000</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/donut.png</href>
+			</Icon>
+			<hotSpot x="25" y="35" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_tiang_e">
+		<IconStyle>
+		<color>ff000000</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/donut.png</href>
+			</Icon>
+			<hotSpot x="25" y="35" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_tiang_e">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_tiang_e</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_tiang_e</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- ODP -->
+	<Style id="s_odp">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/paddle/ylw-stars.png</href>
+			</Icon>
+			<hotSpot x="30" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_odp">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/paddle/ylw-stars.png</href>
+			</Icon>
+			<hotSpot x="30" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_odp">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_odp</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_odp</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- ODP SC-OF-SM-->
+	<Style id="s_odp_scofsm">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+			<hotSpot x="30" y="30" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_odp_scofsm">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+			<hotSpot x="30" y="30" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_odp_scofsm">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_odp_scofsm</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_odp_scofsm</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- ODC -->
+	<Style id="s_odc">
+		<IconStyle>
+		<color>ff0000ff</color>
+			<scale>2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="h_odc">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>2.36364</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_odc">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_odc</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_odc</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- Underground Route -->
+	<Style id="s_urute">
+		<LineStyle>
+			<color>ff7800F0</color>
+			<width>10</width>
+		</LineStyle>
+	</Style>
+	<Style id="h_urute">
+		<LineStyle>
+			<color>ff7800F0</color>
+			<width>10</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="m_urute">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_urute</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_urute</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- Kabel -->
+	<Style id="s_kabel">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>6</width>
+		</LineStyle>
+	</Style>
+	<Style id="h_kabel">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>6</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="m_kabel">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_kabel</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_kabel</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- Kabel Existing-->
+	<Style id="s_kabel">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<Style id="h_kabel">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="m_kabel">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_kabel</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_kabel</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<Style id="s_kabel_gr">
+		<LineStyle>
+			<color>ff14F000</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<Style id="h_kabel_gr">
+		<LineStyle>
+			<color>ff14F000</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="m_kabel_2">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_kabel</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_kabel</styleUrl>
+		</Pair>
+	</StyleMap>	
+	<Style id="s_kabel_red">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<Style id="h_kabel_red">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="m_kabel_3">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_kabel_red</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_kabel_red</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<Style id="s_kabel_f">
+		<LineStyle>
+			<color>FFF00014</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<Style id="h_kabel_f">
+		<LineStyle>
+			<color>FFF00014</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="m_kabel_f">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_kabel_f</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_kabel_f</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="s_manhole">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+			<hotSpot x="1" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_manhole">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+			<hotSpot x="1" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_manhole">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_manhole</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_manhole</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="s_handhole">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_square.png</href>
+			</Icon>
+			<hotSpot x="15" y="15" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_handhole">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_square.png</href>
+			</Icon>
+			<hotSpot x="15" y="15" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_handhole">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_handhole</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_handhole</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="s_sto">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png</href>
+			</Icon>
+			<hotSpot x="30" y="40" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_sto">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png</href>
+			</Icon>
+			<hotSpot x="30" y="40" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_sto">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_sto</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_sto</styleUrl>
+		</Pair>
+	</StyleMap>
+	
+	<!-- MULTIPLE CABLE TEXT INFO -->
+	<Style id="s_multi">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/info-i.png</href>
+			</Icon>
+			<hotSpot x="30" y="30" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="h_multi">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/info-i.png</href>
+			</Icon>
+			<hotSpot x="30" y="30" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="m_multi">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_multi</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#h_multi</styleUrl>
+		</Pair>
+	</StyleMap>

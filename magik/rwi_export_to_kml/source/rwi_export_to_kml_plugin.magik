@@ -1,0 +1,54 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2013 Realworld Systems Indonesia. All Rights Reserved. 
+#							       
+# ************************************************************ 
+_package sw
+$
+
+_pragma(classify_level=restricted, topic={rwi_export_to_kml_plugin})
+##
+## This is a simple plugin to activate a dialog box 
+## based on class model.
+##
+# Define the plugin class
+def_slotted_exemplar( :rwi_export_to_kml_plugin, {}, :plugin )
+$
+# Define a property for the user dataset name
+#data_loader_plugin.def_property( :dataset_name,
+#			       :type, :symbol, :default_value, :gis,
+#			       :description, "User dataset name (symbol) for updating" )
+#$
+# Create an action
+_method rwi_export_to_kml_plugin.init_actions()
+	_self.add_action(
+	sw_action.new( :activate_export_to_kml,
+		:engine, _self,
+		:image, {:activate,_self.module_name},
+		:action_message, :activate_export_to_kml|()| ) )
+_endmethod
+$
+# method for a plugin to activate the dialog box
+# a new dialog box is created only if one is not
+# already cached 
+_method rwi_export_to_kml_plugin.activate_export_to_kml()
+	name << :rwi_export_to_kml
+	_if (d << _self.get_dialog( name ) ) _is _unset
+	_then
+	  # Create and cache the dialog
+	  # first, get the database view
+#	  _local a_dsview
+#	  a_dsview << _self.application.database.dataset(_self.dataset_name)
+	  # now get the geographic world for the application, then the dataset world
+	  # will need this to create geometry
+	  # for simplicity - hard-code world id as 0,0
+	  # to be general - get the world of the map from the Map Manager
+	  #a_world << _self.application.get_application_world(0,0).world_for_dataset(a_dsview)
+	   d << rwi_export_to_kml_dialog.new_dialog( _self.top_frame)#, a_dsview, a_world )
+	   _self.cache_dialog( name, d )		
+	_endif
+	d.activate()
+	>> d
+_endmethod
+$
