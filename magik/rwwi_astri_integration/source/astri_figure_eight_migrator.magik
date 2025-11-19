@@ -84,7 +84,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 				:olt, .pop_name,
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, "Proposed"
+				:construction_status, .construction_status
 			)
 
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
@@ -96,7 +96,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 
 		# Step 3: Create figure_eight
 		_local l_prop_values << property_list.new_with(
-			:construction_status, "Proposed",
+			:construction_status, .construction_status,
 			:type, "Circle",
 			:length, 20,
 			:name, pm[:name],

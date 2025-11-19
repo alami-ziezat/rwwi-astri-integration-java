@@ -350,7 +350,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	## Returns:
 	##   property_list - Migration statistics
 
-	write("Starting design migration of ", placemarks.size, " placemarks...")
+	write("Starting design migration of ", placemarks.size, " placemarks...", .construction_status)
 
 	# Only check for activated design if we're creating new objects (Proposed status)
 	# For existing alternative migrations (In Service status), skip this check

@@ -129,7 +129,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_then
 				write("    >> Creating sling wire (", t_len, "m)")
 				_local prop_values_sw << property_list.new_with(
-					:status, "Proposed",
+					:status, .construction_status,
 					:name, pm[:name],
 					:pop, .pop_name,
 					:olt, .pop_name,
@@ -261,7 +261,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:fttx_network_type, "Cluster",
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, "Proposed"
+				:construction_status, .construction_status
 			)
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
 			l_result_pl << l_rec_trans_pl.run()
@@ -307,7 +307,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					# Create additional AR segment from end to pole
 					write("    >> Creating end AR segment (", dist, "m)")
 					_local l_prop_values_ar2 << property_list.new_with(
-						:construction_status, "Proposed",
+						:construction_status, .construction_status,
 						:name, pm[:name],
 						:asset_ownership, "Owned",
 						:fttx_network_type, "Cluster",
@@ -356,7 +356,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:type, "T7",
 				:folders, folders,
 				:uuid, .uuid,
-				:construction_status, "Proposed"
+				:construction_status, .construction_status
 			)
 			_local l_rec_trans_pl2 << record_transaction.new_insert(.pole_col, l_prop_values_pl2)
 			l_result_pl2 << l_rec_trans_pl2.run()
@@ -390,7 +390,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local l_prop_values_swl << property_list.new_with(
 			:name, pm[:name],
 			:spec_id, s_sp,
-			:construction_status, "Proposed",
+			:construction_status, .construction_status,
 			:sheath_network_type, "Cluster",
 			:folders, folders,
 			:pop, .pop_name,

@@ -56,7 +56,7 @@ _private _method astri_design_migrator.create_micro_cell(pm)
 				:deployment_technology, "System Default",
 				:note, folders,
 				:uuid, .uuid,
-				:construction_status, "Proposed"
+				:construction_status, .construction_status
 			)
 
 			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)

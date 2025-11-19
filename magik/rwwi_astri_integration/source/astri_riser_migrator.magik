@@ -48,7 +48,7 @@ _private _method astri_design_migrator.create_riser(pm)
 			:olt, .pop_name,
 			:project, .prj_id,
 			:uuid, .uuid,
-			:construction_status, "Proposed",
+			:construction_status, .construction_status,
 			:cable_type, "Riser"
 		)
 

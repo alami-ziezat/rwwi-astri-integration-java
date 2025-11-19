@@ -178,7 +178,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 				:olt, .pop_name,
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, "Proposed"
+				:construction_status, .construction_status
 			)
 
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
@@ -194,7 +194,10 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		# Step 6: Determine construction status based on name pattern
 	_local splice_name_lc << pm[:name].lowercase
 	_local const_status <<
-	_if splice_name_lc.matches?("new*")
+	_if .construction_status = "In Service"
+	_then
+		>> "In Service"
+	_elif splice_name_lc.matches?("new*")
 	_then
 		>> "Proposed"
 	_elif splice_name_lc.matches?("ex*")
@@ -223,7 +226,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 			:olt, .pop_name,
 			:stf_item_code, st_cd,
 			:uuid, .uuid,
-			:construction_status, const_status
+			:construction_status, .construction_status
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.sc_col, l_prop_values)
@@ -268,7 +271,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 					                        _endif
 
 					_local vals << property_list.new_with(
-						:construction_status, "Proposed",
+						:construction_status, .construction_status,
 						:asset_owner, "Owned",
 						:name, splitter_name,
 						:function, "Splitter",

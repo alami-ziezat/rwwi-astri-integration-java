@@ -46,7 +46,7 @@ _private _method astri_design_migrator.create_access_point(pm)
 			:olt, .pop_name,
 			:project, .prj_id,
 			:uuid, .uuid,
-			:construction_status, "Proposed"
+			:construction_status, .construction_status
 		)
 
 		_local rec_trans << record_transaction.new_insert(.ap_col, prop_values)

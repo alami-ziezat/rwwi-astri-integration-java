@@ -143,7 +143,10 @@ _private _method astri_design_migrator.create_pole(pm)
 
 			# Determine construction status based on pole_emr_status
 			_local pole_const_status <<
-			_if pole_emr_status.matches?("New*")
+			_if .construction_status = "In Service"
+			_then
+				>> "In Service"
+			_elif pole_emr_status.matches?("New*")
 			_then
 				>> "Proposed"
 			_elif pole_emr_status.matches?("Existing*")
