@@ -156,7 +156,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		# Step 6: Create main aerial route
 		write("     [OK] Creating aerial route...")
 		_local l_prop_values << property_list.new_with(
-			:construction_status, "Proposed",
+			:construction_status, .construction_status,
 			:name, pm[:name],
 			:asset_ownership, "Owned",
 			:pop, .pop_name,
@@ -211,7 +211,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				# Create additional AR segment from pole to start
 				write("    >> Creating start AR segment (", dist, "m)")
 				_local l_prop_values_ar << property_list.new_with(
-					:construction_status, "Proposed",
+					:construction_status, .construction_status,
 					:name, pm[:name],
 					:asset_ownership, "Owned",
 					:pop, .pop_name,

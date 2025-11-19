@@ -262,11 +262,11 @@ _private _method rwwi_astri_workorder_dialog.build_detail_panel(parent)
 		:selector, :migrate_to_design|()|)
 	.items[:migrate_design_btn].enabled? << _false
 
-	#.items[:migrate_temp_btn] << sw_button_item.new(button_con,
-	#	:label, "Migrate as Temporary",
-	#	:model, _self,
-	#	:selector, :migrate_as_temporary|()|)
-	#.items[:migrate_temp_btn].enabled? << _false
+	.items[:migrate_existing_btn] << sw_button_item.new(button_con,
+		:label, "Migrate Existing (ABD)",
+		:model, _self,
+		:selector, :migrate_existing|()|)
+	.items[:migrate_existing_btn].enabled? << _false
 
 	.items[:boq_excel_btn] << sw_button_item.new(button_con,
 		:label, "Generate BoQ as Excel",
@@ -521,7 +521,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:detail_btn].enabled? << _false
 		.items[:kmz_btn].enabled? << _false
 		.items[:migrate_design_btn].enabled? << _false
-		#.items[:migrate_temp_btn].enabled? << _false
+		.items[:migrate_existing_btn].enabled? << _false
 		.items[:boq_excel_btn].enabled? << _false
 		.items[:boq_json_btn].enabled? << _false
 	_else
@@ -538,11 +538,15 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 
 		# Enable KMZ-related buttons only if kmz_uuid is present
 		_local kmz_uuid << wo[:kmz_uuid]
+		_local kmz_source << wo[:kmz_source].default("")
 		_local has_kmz << kmz_uuid _isnt _unset _andif kmz_uuid <> ""
+		_local is_abd << kmz_source = "ABD"
 
 		.items[:kmz_btn].enabled? << has_kmz
 		.items[:migrate_design_btn].enabled? << has_kmz
-		#.items[:migrate_temp_btn].enabled? << has_kmz
+
+		# Enable migrate_existing only for ABD KML sources
+		.items[:migrate_existing_btn].enabled? << has_kmz _and is_abd
 
 		# Enable BoQ buttons only if project and design exist
 		_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
@@ -860,8 +864,10 @@ _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
-_method rwwi_astri_workorder_dialog.migrate_as_temporary()
-	## Migrate KML data to temporary Smallworld objects (preview mode)
+_method rwwi_astri_workorder_dialog.migrate_existing()
+	## Migrate ABD KML data to existing |Engineering Design|ABD alternative
+	## This function is ONLY enabled when KML source is ABD
+	## Sets construction_status to "In Service" for all migrated objects
 	##
 	## Uses file download approach (Scenario 2) to avoid large XML string issues
 
@@ -873,6 +879,14 @@ _method rwwi_astri_workorder_dialog.migrate_as_temporary()
 
 	_local wo << .selected_wo
 	_local kmz_uuid << wo[:kmz_uuid]
+	_local kmz_source << wo[:kmz_source]
+
+	# Validate KML source is ABD
+	_if kmz_source <> "ABD"
+	_then
+		_self.user_error("This function is only available for ABD KML sources")
+		_return
+	_endif
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
@@ -880,9 +894,9 @@ _method rwwi_astri_workorder_dialog.migrate_as_temporary()
 		_return
 	_endif
 
-	write("Migrating KML to Temporary objects for UUID:", kmz_uuid)
+	write("Migrating ABD KML to existing alternative for UUID:", kmz_uuid)
 
-	_try
+	_try _with errCon
 		# Use Scenario 2: Download files to disk, then read KML file
 		_local output_dir << system.getenv("TEMP").default("C:\temp")
 		_local infra_type << .filters[:infrastructure_type].default("cluster")
@@ -920,41 +934,78 @@ _method rwwi_astri_workorder_dialog.migrate_as_temporary()
 
 			write("KML parsing complete. Found", placemarks.size, "placemarks")
 
-			# Migrate placemarks to temporary Smallworld objects
-			write("Creating temporary objects...")
+			# Get migration context from work order
+			_local pop_name << wo[:olt_label].default(wo[:olt_name].default("Unknown"))
+			_local region << wo[:area].default("Unknown")
+			_local cluster << wo[:cluster_name].default("Unknown")
+			_local prj_id << wo[:uuid]
+
+			# Navigate to |Engineering Design|ABD alternative
+			write("Navigating to |Engineering Design|ABD alternative...")
 			_local database << gis_program_manager.databases[:gis]
 
 			_if database _is _unset
 			_then
-				_self.user_error("GIS database not available. Cannot create temporary objects.")
+				_self.user_error("GIS database not available")
 				_return
 			_endif
 
-			# Create migrator and run migration
-			_local migrator << astri_kml_migrator.new(database, kmz_uuid)
+			_local gv << gis_program_manager.cached_dataset(:gis)
+			_if gv _is _unset
+			_then
+				_self.user_error("GIS view not available")
+				_return
+			_endif
+
+			# Switch to |Engineering Design|ABD alternative
+			_local alt_name << "|Engineering Design|ABD"
+			_try _with errCon
+				gv.go_to_alternative(alt_name)
+				write("Switched to alternative:", alt_name)
+				
+				write("Switching alternative mode...")
+				gv.switch(:write)
+			_when error
+				_self.user_error(write_string("Failed to switch to alternative ", alt_name, ":", %newline,
+					errCon.report_contents_string))
+				_return
+			_endtry
+			write("Alternative is writable. Proceeding with migration...")
+
+			# Create design migrator with "In Service" construction status
+			write("Creating design migrator...")
+			_local migrator << astri_design_migrator.new(database, prj_id, kmz_uuid, pop_name, region, cluster, infra_type, "In Service")
+
+			# Migrate placemarks without creating project/design
+			write("Migrating placemarks to existing alternative...")
 			_local stats << migrator.migrate_placemarks(placemarks)
 
 			# Display results
-			_local total_created << stats[:points_created] + stats[:lines_created] + stats[:areas_created]
-			_local total_updated << stats[:points_updated] + stats[:lines_updated] + stats[:areas_updated]
-
 			_local msg << write_string(
-				"=== Temporary Migration Complete! ===", %newline,
-				"File: ", kml_file_path, %newline,
-				"=" * 50, %newline,
-				"Points created:  ", stats[:points_created], %newline,
-				"Points updated:  ", stats[:points_updated], %newline,
-				"Lines created:   ", stats[:lines_created], %newline,
-				"Lines updated:   ", stats[:lines_updated], %newline,
-				"Areas created:   ", stats[:areas_created], %newline,
-				"Areas updated:   ", stats[:areas_updated], %newline,
-				"Errors:          ", stats[:errors], %newline,
-				"Skipped:         ", stats[:skipped], %newline,
-				"=" * 50, %newline,
-				"Total created:   ", total_created, %newline,
-				"Total updated:   ", total_updated, %newline,
-				"Total objects:   ", total_created + total_updated, %newline,
-				"=" * 50)
+				"=" * 70, %newline,
+				"ABD MIGRATION TO EXISTING ALTERNATIVE COMPLETE", %newline,
+				"=" * 70, %newline,
+				"Alternative:         ", alt_name, %newline,
+				"Construction Status: In Service", %newline,
+				"KML File:            ", kml_file_path, %newline,
+				"=" * 70, %newline,
+				"Aerial Routes:       ", stats[:aerial_routes], %newline,
+				"Poles:               ", stats[:poles], %newline,
+				"Sheaths:             ", stats[:sheaths], %newline,
+				"Sheath Splices:      ", stats[:sheath_splices], %newline,
+				"Optical Splitters:   ", stats[:optical_splitters], %newline,
+				"Figure Eights:       ", stats[:figure_eights], %newline,
+				"Sling Wires:         ", stats[:sling_wires], %newline,
+				"Demand Points:       ", stats[:demand_points], %newline,
+				"Customer Premises:   ", stats[:customer_premises], %newline,
+				"Buildings:           ", stats[:buildings], %newline,
+				"Micro Cells:         ", stats[:micro_cells], %newline,
+				"OLTs:                ", stats[:olts], %newline,
+				"Risers:              ", stats[:risers], %newline,
+				"Access Points:       ", stats[:access_points], %newline,
+				"Errors:              ", stats[:errors], %newline,
+				"Skipped:             ", stats[:skipped], %newline,
+				"=" * 70)
 
 			_self.user_info(msg)
 		_else
@@ -967,8 +1018,8 @@ _method rwwi_astri_workorder_dialog.migrate_as_temporary()
 		_endif
 
 	_when error
-		_self.user_error(write_string("Error migrating as temporary:", %newline,
-			condition.report_contents_string))
+		_self.user_error(write_string("Error migrating to existing alternative:", %newline,
+			errCon.report_contents_string))
 	_endtry
 _endmethod
 $

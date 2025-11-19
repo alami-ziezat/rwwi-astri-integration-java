@@ -53,11 +53,12 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:ap_col,          _unset, :writable},   # access_point
 
 	# Migration context
-	{:pop_name,        _unset, :writable},   # POP name (from OLT label)
-	{:prj_id,          _unset, :writable},   # Project ID (from wo[:uuid])
-	{:region,          _unset, :writable},   # Region (from area field)
-	{:cluster,         _unset, :writable},   # Cluster name (from target_cluster_name)
-	{:infra_type,      _unset, :writable},   # Infrastructure type (cluster/subfeeder/feeder)
+	{:pop_name,             _unset, :writable},   # POP name (from OLT label)
+	{:prj_id,               _unset, :writable},   # Project ID (from wo[:uuid])
+	{:region,               _unset, :writable},   # Region (from area field)
+	{:cluster,              _unset, :writable},   # Cluster name (from target_cluster_name)
+	{:infra_type,           _unset, :writable},   # Infrastructure type (cluster/subfeeder/feeder)
+	{:construction_status,  _unset, :writable},   # Construction status ("Proposed" or "In Service")
 
 	# Statistics
 	{:stats,           _unset, :writable}    # Migration results
@@ -65,7 +66,7 @@ def_slotted_exemplar(:astri_design_migrator,
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type)
+_method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type, _optional construction_status)
 	## Create new design migrator
 	##
 	## Parameters:
@@ -76,15 +77,16 @@ _method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name, region, 
 	##   region - Region from work order area field
 	##   cluster - Cluster name from work order target_cluster_name (cluster only)
 	##   infra_type - Infrastructure type (cluster/subfeeder/feeder)
+	##   construction_status - Optional construction status ("Proposed" or "In Service", defaults to "Proposed")
 	##
 	## Returns: New astri_design_migrator instance
 
-	>> _clone.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type)
+	>> _clone.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type, construction_status)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type)
+_private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type, _optional construction_status)
 	## Initialize migrator
 
 	.database << database
@@ -94,6 +96,7 @@ _private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name
 	.region << region     # From wo[:area]
 	.cluster << cluster   # From wo[:cluster_name] (cluster infrastructure type only)
 	.infra_type << infra_type  # Infrastructure type
+	.construction_status << _if construction_status _is _unset _then >> "Proposed" _else >> construction_status _endif
 	.ace_view << gis_program_manager.ace_view
 
 	# Get design manager
@@ -337,7 +340,8 @@ $
 _pragma(classify_level=basic, topic={astri_integration})
 _method astri_design_migrator.migrate_placemarks(placemarks)
 	## Migrate placemarks to design objects
-	## NOTE: Design must be activated before calling this method
+	## NOTE: For new projects, design must be activated before calling this method (call create_project_and_design() first)
+	## NOTE: For existing alternatives (construction_status="In Service"), no design activation needed
 	## NOTE: Boundary area (parent=null/empty) is automatically excluded
 	##
 	## Parameters:
@@ -348,12 +352,15 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 	write("Starting design migration of ", placemarks.size, " placemarks...")
 
-	_if .scheme _is _unset
+	# Only check for activated design if we're creating new objects (Proposed status)
+	# For existing alternative migrations (In Service status), skip this check
+	_if .scheme _is _unset _andif .construction_status = "Proposed"
 	_then
 		condition.raise(:error, :string, "Design not activated. Call create_project_and_design() first.")
 	_endif
 
 	# All object creation automatically goes into the activated design alternative
+	# For existing alternatives, objects go into the current alternative
 	# No need for database mode switching
 
 	# First pass: Create OLTs (needed for cable snapping)
