@@ -56,9 +56,15 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:pop_name,             _unset, :writable},   # POP name (from OLT label)
 	{:prj_id,               _unset, :writable},   # Project ID (from wo[:uuid])
 	{:region,               _unset, :writable},   # Region (from area field)
-	{:cluster,              _unset, :writable},   # Cluster name (from target_cluster_name)
+	{:cluster,              _unset, :writable},   # Infrastructure name (from target infra_name)
 	{:infra_type,           _unset, :writable},   # Infrastructure type (cluster/subfeeder/feeder)
 	{:construction_status,  _unset, :writable},   # Construction status ("Proposed" or "In Service")
+
+	# Database infrastructure codes
+	{:cluster_code_db,      _unset, :writable},   # Cluster code from database
+	{:subfeeder_code_db,    _unset, :writable},   # Subfeeder code from database
+	{:feeder_code_db,       _unset, :writable},   # Feeder code from database
+	{:olt_code,             _unset, :writable},   # OLT code from database
 
 	# Statistics
 	{:stats,           _unset, :writable}    # Migration results
@@ -66,36 +72,56 @@ def_slotted_exemplar(:astri_design_migrator,
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_design_migrator.new(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type, _optional construction_status)
+_method astri_design_migrator.new(database, wo_data, _optional construction_status)
 	## Create new design migrator
 	##
 	## Parameters:
 	##   database - GIS database (e.g., gis_program_manager.databases[:gis])
-	##   prj_id - Project ID from work order uuid field
-	##   kml_uuid - KMZ UUID for object tagging
-	##   pop_name - POP name from work order OLT label
-	##   region - Region from work order area field
-	##   cluster - Cluster name from work order target_cluster_name (cluster only)
-	##   infra_type - Infrastructure type (cluster/subfeeder/feeder)
+	##   wo_data - Work order property_list containing:
+	##             :uuid - Project ID from work order
+	##             :kmz_uuid - KMZ UUID for object tagging
+	##             :olt_label - POP name from OLT label
+	##             :area - Region from area field
+	##             :infra_name - Infrastructure name
+	##             :infrastructure_type - Infrastructure type (cluster/subfeeder/feeder)
+	##             :cluster_code_db - Cluster code from database
+	##             :subfeeder_code_db - Subfeeder code from database
+	##             :feeder_code_db - Feeder code from database
+	##             :olt_code - OLT code from database
 	##   construction_status - Optional construction status ("Proposed" or "In Service", defaults to "Proposed")
 	##
 	## Returns: New astri_design_migrator instance
 
-	>> _clone.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type, construction_status)
+	>> _clone.init(database, wo_data, construction_status)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.init(database, prj_id, kml_uuid, pop_name, region, cluster, infra_type, _optional construction_status)
+_private _method astri_design_migrator.init(database, wo_data, _optional construction_status)
 	## Initialize migrator
+	##
+	## Parameters:
+	##   database - GIS database
+	##   wo_data - Work order property_list
+	##   construction_status - Optional construction status
 
 	.database << database
-	.uuid << kml_uuid     # uuid field = wo[:kmz_uuid]
-	.pop_name << pop_name # From wo[:olt_label]
-	.prj_id << prj_id     # From wo[:uuid]
-	.region << region     # From wo[:area]
-	.cluster << cluster   # From wo[:cluster_name] (cluster infrastructure type only)
-	.infra_type << infra_type  # Infrastructure type
+
+	# Extract work order data from property_list
+	.prj_id << wo_data[:uuid].default("")                    # Project ID
+	.uuid << wo_data[:kmz_uuid].default("")                  # KMZ UUID for object tagging
+	.pop_name << wo_data[:olt_label].default("")             # POP name from OLT label
+	.region << wo_data[:area].default("")                    # Region
+	.cluster << wo_data[:infra_name].default("")             # Infrastructure name
+	.infra_type << wo_data[:infrastructure_type].default("cluster")  # Infrastructure type
+
+	# Extract database infrastructure codes
+	.cluster_code_db << wo_data[:cluster_code_db].default("")
+	.subfeeder_code_db << wo_data[:subfeeder_code_db].default("")
+	.feeder_code_db << wo_data[:feeder_code_db].default("")
+	.olt_code << wo_data[:olt_code].default("")
+
+	# Set construction status
 	.construction_status << _if construction_status _is _unset _then >> "Proposed" _else >> construction_status _endif
 	.ace_view << gis_program_manager.ace_view
 
@@ -238,14 +264,14 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_design_migrator.create_project_and_design(placemarks, wo_number, cluster_code, cluster_name)
+_method astri_design_migrator.create_project_and_design(placemarks, wo_number, infra_code, infra_name)
 	## Create new project and design for migration
 	##
 	## Parameters:
 	##   placemarks (rope) - All placemarks (to extract boundary from)
 	##   wo_number (string) - Work order number -> project name
-	##   cluster_code (string) - Cluster code -> project title
-	##   cluster_name (string) - Cluster name -> design name
+	##   infra_code (string) - Infrastructure code (cluster/subfeeder/feeder) -> project title
+	##   infra_name (string) - Infrastructure name -> design name
 	##
 	## Returns:
 	##   (project, scheme) - Created project and scheme objects
@@ -288,18 +314,18 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, c
 
 		# Create project
 		# project_name = WO number
-		# project_title = cluster code
+		# project_title = infra code
 		_local prj_attrs << property_list.new_with(
-					    :job_title, cluster_code,
+					    :job_title, infra_code,
 					    :job_type, "Physical NI Design Job",
 					    :asset_owner, "Owned")
 		prj << .design_manager.create_project(
-			       wo_number,       # Project name from WO number
+			       wo_number,       # Project name from WO number 
 			       dsnames,
 			       area_sr,
 			       prj_attrs
 				       )
-		write("  Project created: ", wo_number, " (Title: ", cluster_code, ", ID: ", prj.id, ")")
+		write("  Project created: ", wo_number, " (Title: ", infra_code, ", ID: ", prj.id, ")")
 		
 	_endif
 	_if sch _isnt unset
@@ -311,18 +337,18 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, c
 	#_if sch _is _unset
 	#_then
 	# Create scheme (design)
-	# design_name = cluster name
+	# design_name = infra name
 	_local area_sch << prj.project_areas.an_element().area
 	_local sch_attrs << property_list.new()
 	sch << .design_manager.create_scheme(
 		prj,                  # Parent project
 		_unset,               # No parent scheme
-		cluster_name,         # Scheme name from cluster name
+		infra_name,           # Scheme name from infra name
 		dsnames,              # Dataset names
 		prj.design_partition, # Design partition
 		sch_attrs             # Additional attributes
 	)
-	write("  Design created: ", cluster_name, " (ID: ", sch.id, ")")
+	write("  Design created: ", infra_name, " (ID: ", sch.id, ")")
 	#_endif
 
 	# Activate the design
@@ -374,6 +400,8 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 	# Second pass: Create cables/aerial routes
 	write("  Pass 2: Creating cables and aerial routes...: ",placemarks.size)
+	write(" >> Initiate dataset_transaction for aerial route creation")
+	_local ds_trans << dataset_transaction.new({})
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -384,10 +412,11 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 		_if _self.is_cable?(pm)
 		_then
-			_self.create_aerial_route(pm)
+			ds_trans.add_record_transaction(_self.create_aerial_route(pm))
 		_endif
 	_endloop
-
+	write(" >> Running dataset_transaction for aerial route creation")
+	ds_trans.run()
 
 	write("  Pass 3: Creating poles...: ",placemarks.size)
 	_for pm _over placemarks.fast_elements()

@@ -64,7 +64,11 @@ _private _method astri_design_migrator.create_olt(pm)
 			:segment, segment_id,
 			:olt, .pop_name,
 			:uuid, .uuid,
-			:construction_status, .construction_status
+			:construction_status, .construction_status,
+			:cluster_code, .cluster_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:feeder_code, .feeder_code_db,
+			:olt_code, .olt_code
 		)
 
 		_local rec_trans << record_transaction.new_insert(.olt_col, prop_values)

@@ -343,18 +343,15 @@ _private _method astri_design_migrator.match_pole_status(fs)
 	## Returns: "New", "Existing", "New Partner", "Existing Partner", "New EMR", "Existing EMR"
 
 	# Check for EXISTING variations
-	_local pole_status <<
-	_if fs.matches?("ex*")
+	#_local pole_status <<
+	_if fs.matches?("*ext*") _orif fs.matches?("*existing*")
 	_then
 		# Check sub-types within EXISTING
 		_if fs.matches?("*partner*")
 		_then
-			>> "Existing Partner"
-		_elif fs.matches?("*emr*")
-		_then
-			>> "Existing EMR"
+			_return "Existing Partner"
 		_else
-			>> "Existing"
+			_return "Existing"
 		_endif
 
 	# Check for NEW variations
@@ -363,19 +360,18 @@ _private _method astri_design_migrator.match_pole_status(fs)
 		# Check sub-types within NEW
 		_if fs.matches?("*partner*")
 		_then
-			>> "New Partner"
-		_elif fs.matches?("*emr*")
-		_then
-			>> "New EMR"
+			_return "New Partner"
 		_else
-			>> "New"
+			_return "New"
 		_endif
 
 	_else
+		write("DEFAULT POLE STATUS TO NEW")
 		# Default to New
-		>> "New"
+		_return "New"
 	_endif
-	_return pole_status
+	#write("POLE STATUS:",pole_status)
+	#_return pole_status
 _endmethod
 $
 

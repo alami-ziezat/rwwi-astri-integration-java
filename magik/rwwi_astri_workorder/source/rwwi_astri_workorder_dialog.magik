@@ -205,7 +205,7 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 
 	# Set column labels
 	.items[:table].set_column_labels({
-		"No", "WO Number", "Code", "Name",
+		"No", "WO Number", "Infra Code", "Name",
 		"Category", "Status", "Topology", "Vendor", "Area", "Area Plant Code", "Created", "KMZ UUID", "KML Source"})
 
 	# Set column resize values (relative widths)
@@ -213,8 +213,8 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 
 	# Enable column filtering
 	.items[:table].enable_column_filter(2, _true)  # WO Number
-	.items[:table].enable_column_filter(3, _true)  # Cluster Code
-	.items[:table].enable_column_filter(4, _true)  # Cluster Name
+	.items[:table].enable_column_filter(3, _true)  # Infra Code
+	.items[:table].enable_column_filter(4, _true)  # Name
 	.items[:table].enable_column_filter(6, _true)  # Status
 
 	# Enable sorting after columns are configured
@@ -311,8 +311,8 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			# Add cells to table
 			.items[:table].add_label(row, 1, row.write_string)
 			.items[:table].add_label(row, 2, wo[:wo_number].default(""))
-			.items[:table].add_label(row, 3, wo[:cluster_code].default(""))
-			.items[:table].add_label(row, 4, wo[:cluster_name].default(""))
+			.items[:table].add_label(row, 3, wo[:infra_code].default(""))
+			.items[:table].add_label(row, 4, wo[:infra_name].default(""))
 			.items[:table].add_label(row, 5, wo[:category].default(""))
 			.items[:table].add_label(row, 6, wo[:status].default(""))
 			.items[:table].add_label(row, 7, wo[:topology].default(""))
@@ -527,7 +527,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 	_else
 		.items[:detail_uuid].value << write_string("UUID: ", wo[:uuid].default(""))
 		.items[:detail_cluster].value << write_string("Cluster: ",
-			wo[:cluster_code].default(""), " - ", wo[:cluster_name].default(""))
+			wo[:infra_code].default(""), " - ", wo[:infra_name].default(""))
 		.items[:detail_vendor].value << write_string("Vendor: ", wo[:vendor].default(""))
 		.items[:detail_info].value << write_string("Topology: ", wo[:topology].default(""),
 			"  |  Category: ", wo[:category].default(""),
@@ -600,8 +600,8 @@ _method rwwi_astri_workorder_dialog.view_details()
 
 		"Infrastructure Information (", infra_type.uppercase, ")", %newline,
 		"-" * 70, %newline,
-		"Code:                ", wo[:cluster_code].default("N/A"), %newline,
-		"Name:                ", wo[:cluster_name].default("N/A"), %newline)
+		"Code:                ", wo[:infra_code].default("N/A"), %newline,
+		"Name:                ", wo[:infra_name].default("N/A"), %newline)
 
 	# Add topology only if available (cluster infrastructure type)
 	_if wo[:topology] _isnt _unset _andif wo[:topology] <> ""
@@ -778,30 +778,27 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 			write("KML parsing complete. Found", placemarks.size, "placemarks")
 
-			# Get migration context from work order
-			_local pop_name << wo[:olt_label].default(wo[:olt_name].default("Unknown"))
-			_local region << wo[:area].default("Unknown")
-			_local cluster << wo[:cluster_name].default("Unknown")
+			# Prepare project and design names
 			_local wo_number << wo[:wo_number].default("WO_" + kmz_uuid.subseq(1, 8))
-			_local cluster_code << wo[:cluster_code].default("CLUSTER_" + kmz_uuid.subseq(1, 8))
-			_local cluster_name << wo[:cluster_name].default("Cluster_" + kmz_uuid.subseq(1, 8))
-			_local cluster_name_size << cluster_name.size
+			_local infra_code << wo[:infra_code].default("INFRA_" + kmz_uuid.subseq(1, 8))
+			_local infra_name << wo[:infra_name].default("Infra_" + kmz_uuid.subseq(1, 8))
+			_local infra_name_size << infra_name.size
 
-			_if cluster_name_size > 64
+			_if infra_name_size > 64
 			_then
-				cluster_name << cluster_name.subseq(cluster_name_size-64, 64)
+				infra_name << infra_name.subseq(infra_name_size-64, 64)
 			_endif
 
-			# Get project ID and infrastructure type from work order
-			_local prj_id << wo[:uuid]         # Work order UUID field
-			_local infra_type << .filters[:infrastructure_type].default("cluster")
+			# Add infrastructure_type to work order property_list
+			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
 
-			# Create design migrator
+			# Create design migrator - pass entire work order property_list
 			write("Creating design migrator...")
-			write("  POP Name (from OLT label): ", pop_name)
-			write("  Region (from area): ", region)
-			write("  Cluster (from cluster_name): ", cluster)
-			write("  Infrastructure Type: ", infra_type)
+			write("  Work Order: ", wo[:wo_number])
+			write("  Infrastructure Type: ", wo[:infrastructure_type])
+			write("  POP Name: ", wo[:olt_label].default(wo[:olt_name].default("Unknown")))
+			write("  Region: ", wo[:area].default("Unknown"))
+			write("  Infrastructure Name: ", wo[:infra_name].default("Unknown"))
 
 			_local database << gis_program_manager.databases[:gis]
 
@@ -811,15 +808,15 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				_return
 			_endif
 
-			_local migrator << astri_design_migrator.new(database, prj_id, kmz_uuid, pop_name, region, cluster, infra_type)
+			_local migrator << astri_design_migrator.new(database, wo)
 
 			# Create project and design
-			write("Initiate: Creating project and design...: ",cluster_code," : ",cluster_name)
+			write("Initiate: Creating project and design...: ",infra_code," : ",infra_name)
 			_local (project, scheme) << migrator.create_project_and_design(
 				placemarks,     # Boundary extracted from placemarks
 				wo_number,      # Project name
-				cluster_code,   # Project title
-				cluster_name    # Design name
+				infra_code,     # Project title
+				infra_name      # Design name
 			)
 
 			# Migrate placemarks to design
@@ -834,8 +831,8 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_local msg << write_string(
 				"=== Design Migration Complete! ===", %newline,
 				"File: ", kml_file_path, %newline,
-				"Project: ", wo_number, " (", cluster_code, ") - ID: ", project.id, %newline,
-				"Design: ", cluster_name, " - ID: ", scheme.id, %newline,
+				"Project: ", wo_number, " (", infra_code, ") - ID: ", project.id, %newline,
+				"Design: ", infra_name, " - ID: ", scheme.id, %newline,
 				"=" * 70, %newline,
 				"All objects have been created in the design alternative.", %newline,
 				"Object tagging:", %newline,
@@ -934,11 +931,8 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 
 			write("KML parsing complete. Found", placemarks.size, "placemarks")
 
-			# Get migration context from work order
-			_local pop_name << wo[:olt_label].default(wo[:olt_name].default("Unknown"))
-			_local region << wo[:area].default("Unknown")
-			_local cluster << wo[:cluster_name].default("Unknown")
-			_local prj_id << wo[:uuid]
+			# Add infrastructure_type to work order property_list
+			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
 
 			# Navigate to |Engineering Design|ABD alternative
 			write("Navigating to |Engineering Design|ABD alternative...")
@@ -962,7 +956,7 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 			_try _with errCon
 				gv.go_to_alternative(alt_name)
 				write("Switched to alternative:", alt_name)
-				
+
 				write("Switching alternative mode...")
 				gv.switch(:write)
 			_when error
@@ -972,9 +966,9 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 			_endtry
 			write("Alternative is writable. Proceeding with migration...")
 
-			# Create design migrator with "In Service" construction status
+			# Create design migrator with "In Service" construction status - pass entire work order
 			write("Creating design migrator...")
-			_local migrator << astri_design_migrator.new(database, prj_id, kmz_uuid, pop_name, region, cluster, infra_type, "In Service")
+			_local migrator << astri_design_migrator.new(database, wo, "In Service")
 
 			# Migrate placemarks without creating project/design
 			write("Migrating placemarks to existing alternative...")

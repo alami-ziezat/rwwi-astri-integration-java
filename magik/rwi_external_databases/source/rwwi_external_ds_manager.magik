@@ -38,7 +38,6 @@ _pragma(classify_level=basic, topic={external_databases})
 _method rwwi_external_ds_manager.open_connection_for(a_name)
 	## 
 	##
-	_global gps
 	connect? << _false
 	params << _self.read_connection_for(a_name)
 	_if params.empty?
@@ -65,7 +64,6 @@ _method rwwi_external_ds_manager.open_connection_for(a_name)
 	_endif
 	extdb_params.add_all(params)
 	gps << extdb_params
-	extdb_params.p
 	_try _with ErrCon
 		c_template << extdb_user.connect_template(_scatter extdb_params)
 		c_user << jdbc_user.new(c_template)

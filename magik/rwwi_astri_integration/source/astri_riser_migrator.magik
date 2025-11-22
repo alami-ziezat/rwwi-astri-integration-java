@@ -49,7 +49,11 @@ _private _method astri_design_migrator.create_riser(pm)
 			:project, .prj_id,
 			:uuid, .uuid,
 			:construction_status, .construction_status,
-			:cable_type, "Riser"
+			:cable_type, "Riser",
+			:cluster_code, .cluster_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:feeder_code, .feeder_code_db,
+			:olt_code, .olt_code
 		)
 
 		_local rec_trans << record_transaction.new_insert(.riser_col, prop_values)

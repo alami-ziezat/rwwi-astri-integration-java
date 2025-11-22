@@ -129,7 +129,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_then
 				write("    >> Creating sling wire (", t_len, "m)")
 				_local prop_values_sw << property_list.new_with(
-					:status, .construction_status,
+					:construction_status, .construction_status,
 					:name, pm[:name],
 					:pop, .pop_name,
 					:olt, .pop_name,
@@ -139,10 +139,12 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:fttx_network_type, "Cluster",
 					:line_type, m_line,
 					:route, pc,
-					:uuid, .uuid
+					:uuid, .uuid,
+					:cluster_code, .cluster_code_db,
+					:subfeeder_code, .subfeeder_code_db,
+					:feeder_code, .feeder_code_db,
+					:olt_code, .olt_code
 				)
-				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
-				_local result_sw << rec_trans_sw.run()
 
 				.stats[:sling_wires] +<< 1
 				write("    [OK] Sling wire created: ", pm[:name])
@@ -169,7 +171,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:line_type, m_line,
 			:folders, folders,
 			:route, route,
-			:uuid, .uuid
+			:uuid, .uuid,
+			:cluster_code, .cluster_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:feeder_code, .feeder_code_db,
+			:olt_code, .olt_code
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.ar_col, l_prop_values)
@@ -224,7 +230,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:line_type, m_line,
 					:folders, folders,
 					:route, bbb,
-					:uuid, .uuid
+					:uuid, .uuid,
+					:cluster_code, .cluster_code_db,
+					:subfeeder_code, .subfeeder_code_db,
+					:feeder_code, .feeder_code_db,
+					:olt_code, .olt_code
 				)
 				_local l_rec_trans_ar << record_transaction.new_insert(.ar_col, l_prop_values_ar)
 				l_result_ar << l_rec_trans_ar.run()
@@ -261,7 +271,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:fttx_network_type, "Cluster",
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, .construction_status
+				:construction_status, .construction_status,
+				:cluster_code, .cluster_code_db,
+				:subfeeder_code, .subfeeder_code_db,
+				:feeder_code, .feeder_code_db,
+				:olt_code, .olt_code
 			)
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
 			l_result_pl << l_rec_trans_pl.run()
@@ -320,7 +334,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 						:fiber_count, fb_c,
 						:folders, folders,
 						:route, ps,
-						:uuid, .uuid
+						:uuid, .uuid,
+						:cluster_code, .cluster_code_db,
+						:subfeeder_code, .subfeeder_code_db,
+						:feeder_code, .feeder_code_db,
+						:olt_code, .olt_code
 					)
 					_local l_rec_trans_ar2 << record_transaction.new_insert(.ar_col, l_prop_values_ar2)
 					l_result_ar2 << l_rec_trans_ar2.run()
@@ -356,7 +374,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:type, "T7",
 				:folders, folders,
 				:uuid, .uuid,
-				:construction_status, .construction_status
+				:construction_status, .construction_status,
+				:cluster_code, .cluster_code_db,
+				:subfeeder_code, .subfeeder_code_db,
+				:feeder_code, .feeder_code_db,
+				:olt_code, .olt_code
 			)
 			_local l_rec_trans_pl2 << record_transaction.new_insert(.pole_col, l_prop_values_pl2)
 			l_result_pl2 << l_rec_trans_pl2.run()
@@ -400,7 +422,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:line_type, m_line,
 			:segment, segment_id,
 			:asset_owner, "Owned",
-			:uuid, .uuid
+			:uuid, .uuid,
+			:cluster_code, .cluster_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:feeder_code, .feeder_code_db,
+			:olt_code, .olt_code
 		)
 
 		_local l_rec_trans_swl << record_transaction.new_insert(.sheath_col, l_prop_values_swl)
@@ -412,7 +438,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		.stats[:sheaths] +<< 1
 		write("    [OK] Sheath created and placed in structures")
 
-		_return  l_result
+		_return l_result
 
 	_when error
 		write("ERROR in create_aerial_route():", errCon.report_contents_string)

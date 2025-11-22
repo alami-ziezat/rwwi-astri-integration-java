@@ -65,7 +65,7 @@ _method rwi_export_to_kml.get_all_object(p_area)
 	## All sheath with loc within area
 	## Underground Route within area
 	## Design Area
-	c_n << "Planned"
+	c_n << "Proposed"
 	c_e << "In Service"
 	_dynamic !current_world! << .gc[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .gc[:sw_gis!world].at(0,0).coordinate_system
@@ -84,15 +84,15 @@ _method rwi_export_to_kml.get_all_object(p_area)
 	_for o _over scpole.fast_elements() 
 	_loop
 		
-		#_if o.construction_status = c_n
-		#_then
+		_if o.construction_status = c_n
+		_then
 			cpole[1].add(o)
-		#_elif o.construction_status = c_e
-		#_then
-		#	cpole[2].add(o)
-		#_else
-		#	cpole[2].add(o)
-		#_endif
+		_elif o.construction_status = c_e
+		_then
+			cpole[2].add(o)
+		_else
+			cpole[2].add(o)
+		_endif
 	_endloop
 #	#print(scpole)
 #	#write("scpole:",scpole.size)
@@ -123,7 +123,7 @@ _method rwi_export_to_kml.get_all_object(p_area)
 #	#write("scar:",scar.size)
 #	## - search for sheath with loc inside aerial route (check for duplicates)
 	r_swl << rope.new()
-#	#write(scar.size)
+	write("Sheath With Loc inside Aerial Route:")
 	_for s _over scar.fast_elements()
 	_loop
 		write(s)
@@ -132,6 +132,7 @@ _method rwi_export_to_kml.get_all_object(p_area)
 			write(c)
 			_if _not (_self.cek_duplikat(r_swl,c.sheath_with_loc))
 			_then
+				write(r_swl)
 				r_swl.add(c.sheath_with_loc)
 			_endif
 		_endloop
@@ -147,7 +148,7 @@ _method rwi_export_to_kml.get_all_object(p_area)
 #			_if _not (_self.cek_duplikat(r_swl,c.sheath_with_loc))
 #			_then
 #				r_swl.add(c.sheath_with_loc)
-#			_endif
+#			_endif b
 #		_endloop
 #	_endloop
 #	## group sheath with loc by telkom network type
@@ -156,8 +157,11 @@ _method rwi_export_to_kml.get_all_object(p_area)
 	htswl[:|Feeder|]<<rope.new()
 	htswl[:|Sub Feeder|]<<rope.new()
 	htswl[:|Main Feeder|]<<rope.new()
+	htswl[:|Hub Feeder|]<<rope.new()
+	write("Sheath With Loc by FTTx Type:")
 	_for o _over r_swl.fast_elements() 
 	_loop
+		write("SWL FTTx Type: ",o.sheath_network_type)
 		htswl[o.sheath_network_type.as_symbol()].add(o)
 	_endloop
 #	## group sheath splice by telkom network type
@@ -166,9 +170,10 @@ _method rwi_export_to_kml.get_all_object(p_area)
 	htss[:|Feeder|]<<rope.new()
 	htss[:|Sub Feeder|]<<rope.new()
 	htss[:|Main Feeder|]<<rope.new()
+	htss[:|Hub Feeder|]<<rope.new()
 	_for o _over r_eq.fast_elements() 
 	_loop
-		write(o.fttx_network_type)
+		write("SS FTTx Type: ",o.fttx_network_type)
 		htss[o.fttx_network_type.as_symbol()].add(o)
 		#htss.add(o)
 	_endloop
@@ -695,9 +700,11 @@ _method rwi_export_to_kml.write_pole(strm,l_pole,p_dialog)
 	_self.write_open_folder(strm,"POLE")
 	_for s _over l_pole.fast_elements()
 	_loop
+		write("S: ",s)
 		_self.write_open_folder(strm,l_sv[l_idx+2])
 		_for o _over s.fast_elements()
 		_loop
+			write("O: ",o)
 			p_dialog.insert_message(p_dialog.message(:pole,_unset, o.telco_pole_tag ))
 			l_desc<<rope.new()
 			l_desc.add("Name:"+o.telco_pole_tag.write_string)
