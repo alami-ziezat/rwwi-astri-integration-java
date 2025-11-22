@@ -400,8 +400,6 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 	# Second pass: Create cables/aerial routes
 	write("  Pass 2: Creating cables and aerial routes...: ",placemarks.size)
-	write(" >> Initiate dataset_transaction for aerial route creation")
-	_local ds_trans << dataset_transaction.new({})
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -412,11 +410,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 		_if _self.is_cable?(pm)
 		_then
-			ds_trans.add_record_transaction(_self.create_aerial_route(pm))
+			_self.create_aerial_route(pm)
 		_endif
 	_endloop
-	write(" >> Running dataset_transaction for aerial route creation")
-	ds_trans.run()
 
 	write("  Pass 3: Creating poles...: ",placemarks.size)
 	_for pm _over placemarks.fast_elements()
