@@ -829,15 +829,13 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			                      stats[:micro_cells] + stats[:areas_created]
 
 			_local msg << write_string(
-				"=== Design Migration Complete! ===", %newline,
+				" >>> Design Migration Complete! <<<", %newline,
 				"File: ", kml_file_path, %newline,
 				"Project: ", wo_number, " (", infra_code, ") - ID: ", project.id, %newline,
 				"Design: ", infra_name, " - ID: ", scheme.id, %newline,
-				"=" * 70, %newline,
 				"All objects have been created in the design alternative.", %newline,
-				"Object tagging:", %newline,
-				"  - prj_id:     ", prj_id, %newline,
-				"The design is now active. You can review and modify objects before posting.")
+				"The design is now active. You can review and modify objects before posting.", %newline,
+				"=" * 100)
 
 			_self.user_info(msg)
 

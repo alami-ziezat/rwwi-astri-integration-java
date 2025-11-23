@@ -43,17 +43,9 @@ _private _method astri_design_migrator.create_riser(pm)
 			:name, pm[:name],
 			:folders, folders,
 			:fttx_network_type, _self.get_fttx_network_type(),
-			:segment, segment_id,
-			:pop, .pop_name,
-			:olt, .pop_name,
-			:project, .prj_id,
-			:uuid, .uuid,
 			:construction_status, .construction_status,
 			:cable_type, "Riser",
-			:cluster_code, .cluster_code_db,
-			:subfeeder_code, .subfeeder_code_db,
-			:feeder_code, .feeder_code_db,
-			:olt_code, .olt_code
+			:stf_item_code, "200001034"
 		)
 
 		_local rec_trans << record_transaction.new_insert(.riser_col, prop_values)

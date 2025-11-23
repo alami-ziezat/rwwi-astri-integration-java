@@ -141,7 +141,8 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:cluster_code, .cluster_code_db,
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
-					:olt_code, .olt_code
+					:olt_code, .olt_code,
+					:stf_item_code, "200001033"
 				)
 				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
 				_local result_sw << rec_trans_sw.run()
@@ -422,6 +423,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:line_type, m_line,
 			:segment, segment_id,
 			:asset_owner, "Owned",
+			:stf_item_code, s_cd,
 			:uuid, .uuid,
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
