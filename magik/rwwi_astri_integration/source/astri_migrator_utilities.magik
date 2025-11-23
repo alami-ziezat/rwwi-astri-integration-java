@@ -76,7 +76,6 @@ _private _method astri_design_migrator.is_pole?(pm)
 	## Folder must contain "pole" pattern (case-insensitive)
 
 	_local parent << pm[:parent].default("").lowercase
-	write("Checking pole patterns in folders: ", parent)
 	>> parent.matches?("*pole*")
 _endmethod
 $
@@ -167,7 +166,6 @@ _private _method astri_design_migrator.is_splice?(pm)
 		_return _false
 	_endif
 
-	write("Checking splice patterns in folders: ", folders_lc)
 	# STEP 4: Check simplified wildcard patterns
 	>> folders_lc.matches?("*closure*") _orif
 	   folders_lc.matches?("*joint*") _orif
@@ -191,7 +189,7 @@ _private _method astri_design_migrator.is_figure_eight?(pm)
 
 	# STEP 1: Convert to lowercase FIRST
 	_local folders_lc << folders.lowercase
-	write("Checking figure_eight patterns in folders: ", folders_lc)
+
 	# STEP 2: Check if it's a POINT type (not area/line)
 	_if pm[:type] <> "point"
 	_then

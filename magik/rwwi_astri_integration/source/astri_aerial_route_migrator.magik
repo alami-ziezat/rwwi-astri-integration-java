@@ -111,8 +111,6 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			fb_c << "24"
 		_endif
 
-		write("    >> Detected fiber count: ", fb_c, " cores")
-
 		# Step 4: Detect line type
 		_local m_line << _self.match_line(folders)
 		_if m_line _is _unset
@@ -121,7 +119,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_endif
 		_local segment_id << _self.match_segment(folders)
 
-		write("    >> Detected line: ", m_line)
+		write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
 		# Step 5: Check for SLING WIRE - special handling
 		_if fol[fsize] = "SLING WIRE"
 		_then
@@ -136,7 +134,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:region, .region,
 					:cluster, .cluster,
 					:segment, segment_id,
-					:fttx_network_type, "Cluster",
+					:fttx_network_type, _self.get_fttx_network_type(),
 					:line_type, m_line,
 					:route, pc,
 					:uuid, .uuid,
@@ -168,7 +166,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:region, .region,
 			:cluster, .cluster,
 			:fiber_count, fb_c,
-			:fttx_network_type, "Cluster",
+			:fttx_network_type, _self.get_fttx_network_type(),
 			:segment, segment_id,
 			:line_type, m_line,
 			:folders, folders,
@@ -227,7 +225,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:region, .region,
 					:cluster, .cluster,
 					:fiber_count, fb_c,
-					:fttx_network_type, "Cluster",
+					:fttx_network_type, _self.get_fttx_network_type(),
 					:segment, segment_id,
 					:line_type, m_line,
 					:folders, folders,
@@ -270,7 +268,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:region, .region,
 				:cluster, .cluster,
 				:line_type, m_line,
-				:fttx_network_type, "Cluster",
+				:fttx_network_type, _self.get_fttx_network_type(),
 				:segment, segment_id,
 				:uuid, .uuid,
 				:construction_status, .construction_status,
@@ -326,7 +324,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 						:construction_status, .construction_status,
 						:name, pm[:name],
 						:asset_ownership, "Owned",
-						:fttx_network_type, "Cluster",
+						:fttx_network_type, _self.get_fttx_network_type(),
 						:segment, segment_id,
 						:pop, .pop_name,
 						:olt, .pop_name,
@@ -361,7 +359,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:telco_pole_tag, "Existing Pole AR",
 				:usage, "Telco",
 				:material_type, "Steel",
-				:fttx_network_type, "Cluster",
+				:fttx_network_type, _self.get_fttx_network_type(),
 				:extension_arm, _false,
 				:power_riser, _false,
 				:telco_riser, _false,
@@ -415,7 +413,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:name, pm[:name],
 			:spec_id, s_sp,
 			:construction_status, .construction_status,
-			:sheath_network_type, "Cluster",
+			:sheath_network_type, _self.get_fttx_network_type(),
 			:folders, folders,
 			:pop, .pop_name,
 			:olt, .pop_name,
@@ -451,5 +449,3 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 	_endtry
 _endmethod
 $
-z
-_pragma(classify_level=basic, topic={astri_integration})

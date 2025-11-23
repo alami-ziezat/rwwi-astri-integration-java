@@ -177,6 +177,37 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_method astri_design_migrator.get_fttx_network_type()
+	## Remap infrastructure type to FTTX network type
+	## Returns display-friendly version of infra_type
+	##
+	## Mapping:
+	##   "cluster" -> "Cluster"
+	##   "subfeeder" -> "Sub Feeder"
+	##   "feeder" -> "Feeder"
+	##
+	## Returns:
+	##   string - Remapped FTTX network type
+
+	_local type << .infra_type.default("cluster").lowercase
+
+	_if type = "cluster"
+	_then
+		_return "Cluster"
+	_elif type = "subfeeder"
+	_then
+		_return "Sub Feeder"
+	_elif type = "feeder"
+	_then
+		_return "Feeder"
+	_else
+		# Default to Cluster if unknown type
+		_return "Cluster"
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_boundary_area?(pm)
 	## Check if placemark is the project boundary area
 	## Boundary area has parent = null or empty AND type = "area"
@@ -220,7 +251,7 @@ _private _method astri_design_migrator.extract_boundary_area(placemarks)
 	write("  Creating convex hull from all placemark points...")
 
 	# Collect all point coordinates from placemarks
-	_local point_rope << rope.new()
+	_local point_rope << sector.new()
 	_for pm _over placemarks.fast_elements()
 	_loop
 		_if pm[:coord] _isnt _unset _andif pm[:coord] <> ""
@@ -254,12 +285,13 @@ _private _method astri_design_migrator.extract_boundary_area(placemarks)
 	_local convex_hull << sector_rope.new_convex_hull(point_rope)
 	_if convex_hull _is _unset
 	_then
-		write("  ERROR: Failed to create convex hull from placemark points")
-		_return _unset
+		write("  WARNING: Convex hull creation failed, suspect line geometry, using buffered points instead")
+		l_new_sectors << point_rope.buffer(200).sectors.an_element()
+		_return sector_rope.new_convex_hull(l_new_sectors)
 	_endif
 
 	write("  Created convex hull boundary from ", point_rope.size, " placemark points")
-	_return convex_hull
+	_return convex_hull.buffer(200).sectors
 _endmethod
 $
 
@@ -390,16 +422,19 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	# No need for database mode switching
 
 	# First pass: Create OLTs (needed for cable snapping)
+	write("  Pass 1: Creating OLTs...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# OLT (point-based: name contains "*OLT*")
-		_if _self.is_olt?(pm)
+		_local is_olt << _self.is_olt?(pm)
+		#write("    Checking: ", pm[:name], " | is_olt?: ", is_olt, " | Folders: ", pm[:parent].default(""))
+		_if is_olt
 		_then
 			_self.create_olt(pm)
-		_endif 
+		_endif
 	_endloop
 	# Second pass: Create cables/aerial routes
-	write("  Pass 2: Creating cables and aerial routes...: ",placemarks.size)
+	write("  Pass 2: Creating cables and aerial routes...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -408,13 +443,15 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_continue
 		_endif
 
-		_if _self.is_cable?(pm)
+		_local is_cable << _self.is_cable?(pm)
+		#write("    Checking: ", pm[:name], " | is_cable?: ", is_cable, " | Folders: ", pm[:parent].default(""))
+		_if is_cable
 		_then
 			_self.create_aerial_route(pm)
 		_endif
 	_endloop
 
-	write("  Pass 3: Creating poles...: ",placemarks.size)
+	write("  Pass 3: Creating poles...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -423,7 +460,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_continue
 		_endif
 
-		_if _self.is_pole?(pm)
+		_local is_pole << _self.is_pole?(pm)
+		#write("    Checking: ", pm[:name], " | is_pole?: ", is_pole, " | Folders: ", pm[:parent].default(""))
+		_if is_pole
 		_then
 			_self.create_pole(pm)
 		_endif
@@ -439,27 +478,35 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_continue
 		_endif
 
-		_if _self.is_splice?(pm)
+		_local is_splice << _self.is_splice?(pm)
+		_local is_fig8 << _self.is_figure_eight?(pm)
+		_local is_dp << _self.is_demand_point?(pm[:parent])
+		#write("    Checking: ", pm[:name], " | is_splice?: ", is_splice, " | is_figure_eight?: ", is_fig8, " | is_demand_point?: ", is_dp, " | Folders: ", pm[:parent].default(""))
+
+		_if is_splice
 		_then
 			_self.create_sheath_splice(pm)
 
 		# Figure eights (point-based: slack, coil)
-		_elif _self.is_figure_eight?(pm)
+		_elif is_fig8
 		_then
 			_self.create_figure_eight(pm)
 		# Demand points
-		_elif _self.is_demand_point?(pm[:parent])
+		_elif is_dp
 		_then
 			_self.create_demand_point(pm)
 		_endif
 	_endloop
 
 	# Fourth: Create macro and micro cell
+	write("  Pass 5: Creating micro/macro cells...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Sheath splices (point-based: Join Closure, FDT, FAT)
 		# Micro cells / zones (area-based with parent folders)
-		_if _self.is_micro_cell?(pm)
+		_local is_cell << _self.is_micro_cell?(pm)
+		#write("    Checking: ", pm[:name], " | is_micro_cell?: ", is_cell, " | Folders: ", pm[:parent].default(""))
+		_if is_cell
 		_then
 			_self.create_micro_cell(pm)
 		_endif
@@ -470,7 +517,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Riser cables (point-based: name contains "*riser*")
-		_if _self.is_riser?(pm)
+		_local is_riser << _self.is_riser?(pm)
+		#write("    Checking: ", pm[:name], " | is_riser?: ", is_riser, " | Folders: ", pm[:parent].default(""))
+		_if is_riser
 		_then
 			_self.create_riser(pm)
 		_endif
@@ -481,7 +530,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Access points (point-based: catch-all for points not matching other types)
-		_if _self.is_access_point?(pm)
+		_local is_ap << _self.is_access_point?(pm)
+		#write("    Checking: ", pm[:name], " | is_access_point?: ", is_ap, " | Folders: ", pm[:parent].default(""))
+		_if is_ap
 		_then
 			_self.create_access_point(pm)
 		_endif

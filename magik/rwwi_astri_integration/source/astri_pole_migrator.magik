@@ -20,14 +20,13 @@ _private _method astri_design_migrator.create_pole(pm)
 		_local fol << folders.split_by("|")
 		_local fsize << fol.size
 
-		_if fsize < 2
+		_if fsize < 2 _andif .infra_type = "Cluster"
 		_then
 			write("  WARNING: Skipping - folder hierarchy too shallow: ", folders)
 			_return
 		_endif
 
 		_local name << pm[:name].default("").lowercase
-		write("POLE NAME:",name)
 		# Step 2: Parse pole attributes from folder names
 		_local pole_type << _self.match_pole_type(folders_lc)
 		_local pole_emr_status << _self.match_pole_status(folders_lc)
@@ -52,8 +51,6 @@ _private _method astri_design_migrator.create_pole(pm)
 		_then
 			stf_item_code << "200000169"
 		_endif
-
-		write(folders_lc,"--",pole_type,"|",pole_emr_status,"|",line_type,"|",stf_item_code)
 
 		# Step 3: Parse original geometry
 		_local original_location << _self.parse_point_geometry(pm[:coord])
@@ -93,7 +90,6 @@ _private _method astri_design_migrator.create_pole(pm)
 		_local (h, existing_pole) << _self.scan_pole_st(final_location, 200)
 		_if h _is _true _andif existing_pole _isnt _unset
 		_then
-			write("existing pole...")
 			# Found existing pole - check if it's a placeholder
 			_if existing_pole.telco_pole_tag = "Existing Pole AR"
 			_then
@@ -175,7 +171,7 @@ _private _method astri_design_migrator.create_pole(pm)
 				:type, pole_type,
 				:pole_emr_status, pole_emr_status,
 				:folders, folders,
-				:fttx_network_type, "Cluster",
+				:fttx_network_type, _self.get_fttx_network_type(),
 				:segment, segment_id,
 				:pop, .pop_name,
 				:olt, .pop_name,

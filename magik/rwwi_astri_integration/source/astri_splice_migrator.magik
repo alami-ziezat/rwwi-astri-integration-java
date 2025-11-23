@@ -170,7 +170,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 				:ground_status, _false,
 				:type, "T7",
 				:folders, folders,
-				:fttx_network_type, "Cluster",
+				:fttx_network_type, _self.get_fttx_network_type(),
 				:line_type, m_line,
 				:region, .region,
 				:cluster, .cluster,
@@ -220,7 +220,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 			:spec_id, sp,
 			:folders, folders,
 			:sheath_splice_object_type, ot,
-			:fttx_network_type, "Cluster",
+			:fttx_network_type, _self.get_fttx_network_type(),
 			:line_type, line_type,
 			:name, pm[:name],
 			:segment, segment_id,
@@ -256,8 +256,20 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_when error
 			# Continue if association fails
 		_endtry
+ 
+		# Step 8: Connect sheath splice to cable if available
+		_try
+			l_swl << l_result_pl.cables().an_element()
+			_if l_swl _isnt _unset
+			_then
+				l_result.add_loop_cable(l_swl)
+				write("    >> Connected to cable: ", l_swl.name)	
+			_endif
+		_when error
+			# Continue if connection fails	
+		_endtry
 
-		# Step 8: Create optical splitters (for FDT and FAT only)
+		# Step 9: Create optical splitters (for FDT and FAT only)
 		_if c_spl > 0
 		_then
 			_local splitter_spec << _unset
@@ -270,7 +282,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 				splitter_spec << "Splitter 1:8"
 			_endif
 
-			_try
+			_try _with errCon
 				_for i _over range(1, c_spl)
 				_loop
 					_local splitter_name << _if closure_type = "FAT"
@@ -286,11 +298,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 						:spec_id, splitter_spec,
 						:stf_splitter_type, closure_type,
 						:stf_item_code, "200001047",
-						:sheath_splice, l_result,
-						:cluster_code, .cluster_code_db,
-						:subfeeder_code, .subfeeder_code_db,
-						:feeder_code, .feeder_code_db,
-						:olt_code, .olt_code
+						:sheath_splice, l_result
 					)
 
 					_local l_rec_trans_s << record_transaction.new_insert(.os_col, vals)
@@ -301,7 +309,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 
 				write("    [OK] Created ", c_spl, " optical splitters")
 			_when error
-				write("    WARNING: Error creating optical splitters: ", condition.report_contents_string)
+				write("    WARNING: Error creating optical splitters: ", errCon.report_contents_string)
 			_endtry
 		_endif
 

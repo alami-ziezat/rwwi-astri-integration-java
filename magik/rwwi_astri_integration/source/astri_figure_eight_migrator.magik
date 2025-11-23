@@ -78,7 +78,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 				:ground_status, _false,
 				:type, "T7",
 				:folders, folders,
-				:fttx_network_type, "Cluster",
+				:fttx_network_type, _self.get_fttx_network_type(),
 				:line_type, m_line,
 				:pop, .pop_name,
 				:olt, .pop_name,
@@ -105,7 +105,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 			:length, 20,
 			:name, pm[:name],
 			:folders, folders,
-			:fttx_network_type, "Cluster",
+			:fttx_network_type, _self.get_fttx_network_type(),
 			:segment, segment_id,
 			:pop, .pop_name,
 			:olt, .pop_name,
@@ -127,7 +127,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 			_if n_obj _isnt _unset
 			_then
 				l_result.associate_to_structure(n_obj)
-				write("    >> Associated to structure: ",n_obj)
+				write("    >> Associated to structure: ",n_obj.telco_pole_tag)
 			_endif
 		_when error
 			# Continue if association fails
@@ -135,11 +135,11 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 
 		# Step 5: Connect to cable if available
 		_try
-			_local l_cables << n_obj.cable_records.an_element()
+			_local l_cable << n_obj.cable_records.an_element()
 
-			_if l_cables _isnt _unset
+			_if l_cable _isnt _unset
 			_then
-				l_cables.mcn!connect(l_result)
+				l_cable.mcn!connect(l_result)
 				write("    >> Connected to cable")
 			_endif
 		_when error
