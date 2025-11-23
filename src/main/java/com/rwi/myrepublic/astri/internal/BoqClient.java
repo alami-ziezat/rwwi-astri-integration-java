@@ -34,12 +34,13 @@ public class BoqClient {
 
     /**
      * Add BOQ DRM Cluster.
+     * Accepts nullable Integer values to support Magik _unset values.
      */
     public String addBoqDrmCluster(String clusterCode, String vendorName, String subcontVendorName,
-                                   String equipmentName, String description, int quantityMaterial,
-                                   int quantityService, String remarks, String phase, String area,
-                                   String areaPlantCode, int overridePriceMaterial,
-                                   int overridePriceService) throws IOException, InterruptedException {
+                                   String equipmentName, String description, Integer quantityMaterial,
+                                   Integer quantityService, String remarks, String phase, String area,
+                                   String areaPlantCode, Integer overridePriceMaterial,
+                                   Integer overridePriceService) throws IOException, InterruptedException {
         String baseUrl = config.getApiBaseUrl();
         String path = "/osp/cluster/boq/add";
         String url = baseUrl + path;
@@ -67,27 +68,55 @@ public class BoqClient {
     }
 
     private String buildJsonBody(String clusterCode, String vendorName, String subcontVendorName,
-                                  String equipmentName, String description, int quantityMaterial,
-                                  int quantityService, String remarks, String phase, String area,
-                                  String areaPlantCode, int overridePriceMaterial,
-                                  int overridePriceService) {
+                                  String equipmentName, String description, Integer quantityMaterial,
+                                  Integer quantityService, String remarks, String phase, String area,
+                                  String areaPlantCode, Integer overridePriceMaterial,
+                                  Integer overridePriceService) {
         StringBuilder json = new StringBuilder();
         json.append("{");
-        json.append("\"cluster_code\":\"").append(escapeJson(clusterCode)).append("\",");
-        json.append("\"vendor_name\":\"").append(escapeJson(vendorName)).append("\",");
-        json.append("\"subcont_vendor_name\":\"").append(escapeJson(subcontVendorName)).append("\",");
-        json.append("\"equipment_name\":\"").append(escapeJson(equipmentName)).append("\",");
-        json.append("\"description\":\"").append(escapeJson(description)).append("\",");
-        json.append("\"quantity_material\":").append(quantityMaterial).append(",");
-        json.append("\"quantity_service\":").append(quantityService).append(",");
-        json.append("\"remarks\":\"").append(escapeJson(remarks)).append("\",");
-        json.append("\"phase\":\"").append(escapeJson(phase)).append("\",");
-        json.append("\"area\":\"").append(escapeJson(area)).append("\",");
-        json.append("\"area_plant_code\":\"").append(escapeJson(areaPlantCode)).append("\",");
-        json.append("\"override_price_material\":").append(overridePriceMaterial).append(",");
-        json.append("\"override_price_service\":").append(overridePriceService);
+        appendJsonField(json, "cluster_code", clusterCode, true);
+        appendJsonField(json, "vendor_name", vendorName, true);
+        appendJsonField(json, "subcont_vendor_name", subcontVendorName, true);
+        appendJsonField(json, "equipment_name", equipmentName, true);
+        appendJsonField(json, "description", description, true);
+        appendJsonField(json, "quantity_material", quantityMaterial, true);
+        appendJsonField(json, "quantity_service", quantityService, true);
+        appendJsonField(json, "remarks", remarks, true);
+        appendJsonField(json, "phase", phase, true);
+        appendJsonField(json, "area", area, true);
+        appendJsonField(json, "area_plant_code", areaPlantCode, true);
+        appendJsonField(json, "override_price_material", overridePriceMaterial, true);
+        appendJsonField(json, "override_price_service", overridePriceService, false);
         json.append("}");
         return json.toString();
+    }
+
+    /**
+     * Append a JSON field to the StringBuilder.
+     * If value is null, appends "null" (without quotes).
+     *
+     * @param json The StringBuilder to append to
+     * @param fieldName The name of the field
+     * @param value The value (String or Integer, can be null)
+     * @param addComma Whether to add a comma after the field
+     */
+    private void appendJsonField(StringBuilder json, String fieldName, Object value, boolean addComma) {
+        json.append("\"").append(fieldName).append("\":");
+
+        if (value == null) {
+            json.append("null");
+        } else if (value instanceof String) {
+            json.append("\"").append(escapeJson((String) value)).append("\"");
+        } else if (value instanceof Integer) {
+            json.append(value);
+        } else {
+            // Fallback for other types
+            json.append("\"").append(escapeJson(value.toString())).append("\"");
+        }
+
+        if (addComma) {
+            json.append(",");
+        }
     }
 
     private String escapeJson(String str) {

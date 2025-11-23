@@ -55,19 +55,20 @@ public class AstriBoqProcs {
 
         BoqClient client = null;
         try {
-            String clusterCodeStr = MagikInteropUtils.fromMagikString(clusterCode);
-            String vendorNameStr = MagikInteropUtils.fromMagikString(vendorName);
-            String subcontVendorNameStr = MagikInteropUtils.fromMagikString(subcontVendorName);
-            String equipmentNameStr = MagikInteropUtils.fromMagikString(equipmentName);
-            String descriptionStr = MagikInteropUtils.fromMagikString(description);
-            int quantityMaterialInt = MagikInteropUtils.fromMagikInteger(quantityMaterial);
-            int quantityServiceInt = MagikInteropUtils.fromMagikInteger(quantityService);
-            String remarksStr = MagikInteropUtils.fromMagikString(remarks);
-            String phaseStr = MagikInteropUtils.fromMagikString(phase);
-            String areaStr = MagikInteropUtils.fromMagikString(area);
-            String areaPlantCodeStr = MagikInteropUtils.fromMagikString(areaPlantCode);
-            int overridePriceMaterialInt = MagikInteropUtils.fromMagikInteger(overridePriceMaterial);
-            int overridePriceServiceInt = MagikInteropUtils.fromMagikInteger(overridePriceService);
+            // Handle _unset (null) values from Magik
+            String clusterCodeStr = (clusterCode == null) ? null : MagikInteropUtils.fromMagikString(clusterCode);
+            String vendorNameStr = (vendorName == null) ? null : MagikInteropUtils.fromMagikString(vendorName);
+            String subcontVendorNameStr = (subcontVendorName == null) ? null : MagikInteropUtils.fromMagikString(subcontVendorName);
+            String equipmentNameStr = (equipmentName == null) ? null : MagikInteropUtils.fromMagikString(equipmentName);
+            String descriptionStr = (description == null) ? null : MagikInteropUtils.fromMagikString(description);
+            Integer quantityMaterialInt = (quantityMaterial == null) ? null : MagikInteropUtils.fromMagikInteger(quantityMaterial);
+            Integer quantityServiceInt = (quantityService == null) ? null : MagikInteropUtils.fromMagikInteger(quantityService);
+            String remarksStr = (remarks == null) ? null : MagikInteropUtils.fromMagikString(remarks);
+            String phaseStr = (phase == null) ? null : MagikInteropUtils.fromMagikString(phase);
+            String areaStr = (area == null) ? null : MagikInteropUtils.fromMagikString(area);
+            String areaPlantCodeStr = (areaPlantCode == null) ? null : MagikInteropUtils.fromMagikString(areaPlantCode);
+            Integer overridePriceMaterialInt = (overridePriceMaterial == null) ? null : MagikInteropUtils.fromMagikInteger(overridePriceMaterial);
+            Integer overridePriceServiceInt = (overridePriceService == null) ? null : MagikInteropUtils.fromMagikInteger(overridePriceService);
 
             System.out.println("Parameters: cluster_code=" + clusterCodeStr +
                              ", vendor=" + vendorNameStr + ", equipment=" + equipmentNameStr);
