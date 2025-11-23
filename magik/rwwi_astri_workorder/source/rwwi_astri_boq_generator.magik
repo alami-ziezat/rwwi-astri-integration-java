@@ -13,13 +13,20 @@ _pragma(classify_level=basic, topic={boq, generator})
 ##          in a structured, data-driven, object-oriented manner.
 ##
 ## Usage:
-##   # For current active design
-##   gen << rwwi_astri_boq_generator.new_for_current_design("json")
-##   boq_items << gen.generate()
-##
-##   # For specific design
-##   gen << rwwi_astri_boq_generator.new()
-##   gen.set_scheme(my_scheme)
+##   # Generate BOQ for current active design
+##   # Note: Use cluster_code, subfeeder_code, or feeder_code based on infra_type
+##   params << property_list.new_with(
+##       :infra_type, "cluster",           # "cluster", "subfeeder", or "feeder"
+##       :cluster_code, "CLU001",          # Use matching field: cluster_code/subfeeder_code/feeder_code
+##       :vendor_name, "Vendor ABC",
+##       :subcont_vendor_name, "Subcon XYZ",
+##       :description, "Project Management",
+##       :remarks, "Service",
+##       :phase, "project_opname",
+##       :area, "Jakarta",
+##       :area_plant_code, "JKT01"
+##   )
+##   gen << rwwi_astri_boq_generator.new(params)
 ##   boq_items << gen.generate()
 ##
 ## Author: Claude Code Assistant
@@ -27,9 +34,11 @@ _pragma(classify_level=basic, topic={boq, generator})
 ##
 def_slotted_exemplar(:rwwi_astri_boq_generator,
 	{
-		{:scheme, _unset, :writable},           ## Current design scheme (mit_scheme)
-		{:change_set, _unset, :writable},       ## MIT scheme record change set
-		{:output_type, _unset, :writable}       ## Output type (json, xml, etc.)
+		{:scheme, _unset, :writable},              ## Current design scheme (mit_scheme)
+		{:change_set, _unset, :writable},          ## MIT scheme record change set
+		{:infra_type, _unset, :writable},          ## Infrastructure type filter (cluster, subfeeder, feeder)
+		{:boq_params, _unset, :writable},          ## BOQ parameters (cluster_code, vendor_name, etc.)
+		{:dataset, _unset, :writable}              ## GIS dataset (cached from gis_program_manager)
 	})
 $
 
@@ -37,10 +46,12 @@ _pragma(classify_level=basic, topic={boq})
 ##
 ## MATERIAL_CATALOG - Central repository for all BoQ material definitions
 ##
-## Structure: equality_hash_table mapping symbol keys to property_lists
+## Structure: equality_hash_table mapping code strings to property_lists
+##
+## Keys: Material/service code strings (e.g., "200001033", "200001055")
 ##
 ## Each entry contains:
-##   :code - Material/service code (e.g., "200001033")
+##   :code - Material/service code (same as the key)
 ##   :object - Category (e.g., "Sling Wire", "FAT", "Pole")
 ##   :name - Full description
 ##   :material_slot - Which slot gets the quantity (:material or :service)
@@ -50,21 +61,29 @@ rwwi_astri_boq_generator.define_shared_constant(
 	:MATERIAL_CATALOG,
 	equality_hash_table.new_with(
 		# Sling Wire
-		:sling_wire, property_list.new_with(
+		"200001033", property_list.new_with(
 			:code, "200001033",
 			:object, "Sling Wire",
 			:name, "Instalasi strand wire/sling messenger 6 mm",
 			:material_slot, :service
 		),
 
+		# Riser
+		"200001034", property_list.new_with(
+			:code, "200001034",
+			:object, "Riser",
+			:name, "Riser Cable Installation",
+			:material_slot, :service
+		),
+
 		# FAT Types
-		:fat_pole_16, property_list.new_with(
+		"200001047", property_list.new_with(
 			:code, "200001047",
 			:object, "FAT",
 			:name, "Pole mounted outdoor type (16 ports type)",
 			:material_slot, :material
 		),
-		:fat_pedestal_16, property_list.new_with(
+		"100000824", property_list.new_with(
 			:code, "100000824",
 			:object, "FAT",
 			:name, "Pedestal mounted type (16 ports type)",
@@ -72,37 +91,37 @@ rwwi_astri_boq_generator.define_shared_constant(
 		),
 
 		# FDT Types
-		:fdt_48, property_list.new_with(
+		"200001039", property_list.new_with(
 			:code, "200001039",
 			:object, "FDT",
 			:name, "48 cores capacity pole mounted FDT",
 			:material_slot, :material
 		),
-		:fdt_72, property_list.new_with(
+		"200001040", property_list.new_with(
 			:code, "200001040",
 			:object, "FDT",
 			:name, "72 cores capacity pole mounted FDT",
 			:material_slot, :material
 		),
-		:fdt_96, property_list.new_with(
+		"200001041", property_list.new_with(
 			:code, "200001041",
 			:object, "FDT",
 			:name, "96 cores capacity pole mounted FDT",
 			:material_slot, :material
 		),
-		:fdt_144, property_list.new_with(
+		"200001042", property_list.new_with(
 			:code, "200001042",
 			:object, "FDT",
 			:name, "144 cores capacity ground mounted FDT",
 			:material_slot, :material
 		),
-		:fdt_288, property_list.new_with(
+		"200001043", property_list.new_with(
 			:code, "200001043",
 			:object, "FDT",
 			:name, "288 cores capacity ground mounted FDT",
 			:material_slot, :material
 		),
-		:fdt_576, property_list.new_with(
+		"200001044", property_list.new_with(
 			:code, "200001044",
 			:object, "FDT",
 			:name, "576 cores capacity ground mounted FDT",
@@ -110,112 +129,118 @@ rwwi_astri_boq_generator.define_shared_constant(
 		),
 
 		# Poles
-		:pole_7m_3inch, property_list.new_with(
+		"200001055", property_list.new_with(
 			:code, "200001055",
 			:object, "Pole",
 			:name, "Pengadaan Tiang 7 meter 3 inch",
 			:material_slot, :material
 		),
-		:pole_7m_4inch, property_list.new_with(
+		"200001183", property_list.new_with(
 			:code, "200001183",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang 7 meter 4", %", %,, " STEL L-003 1996"),
 			:material_slot, :material
 		),
-		:pole_7m_5inch, property_list.new_with(
+		"200000187", property_list.new_with(
 			:code, "200000187",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang 7 meter 5", %", %,, " STEL L-003 1996"),
 			:material_slot, :material
 		),
-		:pole_9m_4inch, property_list.new_with(
+		"200001181", property_list.new_with(
 			:code, "200001181",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang Tunggal 9 meter 4", %", %,, " STEL L-003 1996"),
 			:material_slot, :material
 		),
-		:pole_9m_5inch, property_list.new_with(
+		"200000169", property_list.new_with(
 			:code, "200000169",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang Tunggal 9 meter 5", %", %,, " STEL L-003 1996"),
 			:material_slot, :material
 		),
 
-		# Cables
-		:cable_24, property_list.new_with(
+		# Cables (identified by spec_id, not stf_item_code)
+		"200000100", property_list.new_with(
 			:code, "200000100",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 24 cores",
-			:material_slot, :material
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 24C"
 		),
-		:cable_36, property_list.new_with(
+		"200000975", property_list.new_with(
 			:code, "200000975",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 36 cores",
-			:material_slot, :material
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 36C"
 		),
-		:cable_48, property_list.new_with(
+		"200001038", property_list.new_with(
 			:code, "200001038",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 48 cores",
-			:material_slot, :material
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 48C"
 		),
-		:cable_96, property_list.new_with(
+		"200001630", property_list.new_with(
 			:code, "200001630",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 96 cores",
-			:material_slot, :material
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 96C"
 		),
-		:cable_144, property_list.new_with(
+		"200001030", property_list.new_with(
 			:code, "200001030",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 144 cores",
-			:material_slot, :material
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 144C"
 		),
-		:cable_288, property_list.new_with(
+		"200001015", property_list.new_with(
 			:code, "200001015",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 288 cores",
-			:material_slot, :material
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 288C"
 		),
 
 		# Closures - Inline
-		:closure_inline_24, property_list.new_with(
+		"200000182", property_list.new_with(
 			:code, "200000182",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type In-line 24 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure In-line 24 Core"
 		),
-		:closure_inline_36, property_list.new_with(
+		"200001048", property_list.new_with(
 			:code, "200001048",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type In-line 36 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure In-line 36 Core"
 		),
-		:closure_inline_48, property_list.new_with(
+		"200000159", property_list.new_with(
 			:code, "200000159",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type In-line 48 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure In-line 48 Core"
 		),
-		:closure_inline_96, property_list.new_with(
+		"200000179", property_list.new_with(
 			:code, "200000179",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type In-line 96 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure In-line 96 Core"
 		),
-		:closure_inline_144, property_list.new_with(
+		"200000186", property_list.new_with(
 			:code, "200000186",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type In-line 144 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure In-line 144 Core"
 		),
-		:closure_inline_288, property_list.new_with(
+		"200000155", property_list.new_with(
 			:code, "200000155",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type In-line 288 Core",
@@ -224,42 +249,42 @@ rwwi_astri_boq_generator.define_shared_constant(
 		),
 
 		# Closures - Dome
-		:closure_dome_24, property_list.new_with(
+		"200000180", property_list.new_with(
 			:code, "200000180",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type Dome 24 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure Dome 24 Core"
 		),
-		:closure_dome_36, property_list.new_with(
+		"200001049", property_list.new_with(
 			:code, "200001049",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type Dome 36 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure Dome 36 Core"
 		),
-		:closure_dome_48, property_list.new_with(
+		"200000164", property_list.new_with(
 			:code, "200000164",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type Dome 48 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure Dome 48 Core"
 		),
-		:closure_dome_96, property_list.new_with(
+		"200000176", property_list.new_with(
 			:code, "200000176",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type Dome 96 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure Dome 96 Core"
 		),
-		:closure_dome_144, property_list.new_with(
+		"200000158", property_list.new_with(
 			:code, "200000158",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type Dome 144 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure Dome 144 Core"
 		),
-		:closure_dome_288, property_list.new_with(
+		"200000156", property_list.new_with(
 			:code, "200000156",
 			:object, "Closure",
 			:name, "Fiber Optic Joint Closure Type Dome 288 Core",
@@ -275,29 +300,22 @@ $
 # Constructor and Initialization Methods
 # ============================================================================
 
-_method rwwi_astri_boq_generator.new()
-	## Create new BoQ generator instance
-	## Returns: New uninitialized generator
-	>> _clone.init()
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.init()
-	## Initialize generator with default values
-	## Returns: _self
-	.scheme << _unset
-	.change_set << _unset
-	.output_type << "json"
-	>> _self
-_endmethod
-$
-
-_method rwwi_astri_boq_generator.new_for_current_design(_optional output_type)
-	## Factory method - creates generator for current active design
+_method rwwi_astri_boq_generator.new(params)
+	## Create new BoQ generator for current active design
 	## Parameters:
-	##   output_type (optional) - "json", "xml", etc. Defaults to "json"
-	## Returns:
-	##   New generator instance or _unset if no design active
+	##   params - property_list with BOQ parameters:
+	##            :infra_type - Infrastructure type: "cluster", "subfeeder", or "feeder"
+	##            :cluster_code - Cluster code (optional)
+	##            :vendor_name - Vendor name (optional)
+	##            :subcont_vendor_name - Subcontractor vendor name (optional)
+	##            :description - Description (optional, default: "Project Management")
+	##            :remarks - Remarks (optional, default: "Service")
+	##            :phase - Phase (optional, default: "project_opname")
+	##            :area - Area (optional)
+	##            :area_plant_code - Area plant code (optional)
+	##            :override_price_material - Override price for material (optional)
+	##            :override_price_service - Override price for service (optional)
+	## Returns: New generator instance or _unset if no design active
 
 	_try _with errCond
 		_local scheme << swg_dsn_admin_engine.get_current_job()
@@ -307,14 +325,8 @@ _method rwwi_astri_boq_generator.new_for_current_design(_optional output_type)
 			_return _unset
 		_endif
 
-		_local generator << _self.new()
-		generator.set_scheme(scheme)
-		_if output_type _isnt _unset
-		_then
-			generator.output_type << output_type
-		_endif
+		_return _clone.init(scheme, params)
 
-		_return generator
 	_when error
 		write("LOG: ERROR creating BoQ generator:", errCond.report_contents_string)
 		_return _unset
@@ -322,30 +334,39 @@ _method rwwi_astri_boq_generator.new_for_current_design(_optional output_type)
 _endmethod
 $
 
-# ============================================================================
-# Configuration Methods
-# ============================================================================
-
-_method rwwi_astri_boq_generator.set_scheme(scheme)
-	## Set the design scheme and create change set
+_private _method rwwi_astri_boq_generator.init(scheme, params)
+	## Initialize generator with scheme and BOQ parameters
 	## Parameters:
 	##   scheme - MIT scheme object
+	##   params - property_list with BOQ parameters
+	## Returns: _self
 
-	_try _with errCond
-		_if scheme _is _unset
-		_then
-			write("LOG: ERROR - Cannot set _unset scheme")
-			condition.raise(:user_error, :string, "Scheme cannot be _unset")
-		_endif
+	.scheme << scheme
+	.change_set << mit_scheme_record_change_set.new(scheme)
+	.dataset << gis_program_manager.cached_dataset(:gis)
 
-		.scheme << scheme
-		.change_set << mit_scheme_record_change_set.new(scheme)
+	# Extract infra_type and store all params
+	.infra_type << params[:infra_type].default("cluster").lowercase
+	.boq_params << params
 
-		write("LOG: BoQ generator configured for design:", scheme.name)
-	_when error
-		write("LOG: ERROR setting scheme:", errCond.report_contents_string)
-		condition.raise(:user_error, :string, errCond)
-	_endtry
+	# Set defaults for optional fields if not provided
+	_if .boq_params[:description] _is _unset
+	_then
+		.boq_params[:description] << "Project Management"
+	_endif
+
+	_if .boq_params[:remarks] _is _unset
+	_then
+		.boq_params[:remarks] << "Service"
+	_endif
+
+	_if .boq_params[:phase] _is _unset
+	_then
+		.boq_params[:phase] << "project_opname"
+	_endif
+
+	write("LOG: BoQ generator configured for design:", scheme.name, "| Type:", .infra_type)
+	>> _self
 _endmethod
 $
 
@@ -355,7 +376,7 @@ $
 
 _method rwwi_astri_boq_generator.generate()
 	## Generate complete BoQ for current design
-	## Returns: rope of property_lists with BoQ items
+	## Returns: property_list with code keys mapping to BoQ item property_lists
 
 	_try _with errCond
 		_if .scheme _is _unset _orif .change_set _is _unset
@@ -365,19 +386,74 @@ _method rwwi_astri_boq_generator.generate()
 				"BoQ generator not initialized. Call set_scheme() first.")
 		_endif
 
-		_local result << rope.new()
+		_local result << property_list.new()
 
 		write("LOG: Generating BoQ for design:", .scheme.name)
 
-		# Generate BoQ items by category
-		_self.add_sling_wire_items(result)
-		_self.add_fat_items(result)
-		_self.add_fdt_items(result)
-		_self.add_pole_items(result)
-		_self.add_cable_items(result)
-		_self.add_closure_items(result)
+		# Single-pass iteration through change_set
+		_for record_change _over .change_set.fast_elements()
+		_loop
+			_local rec << record_change.current_record
 
-		write("LOG: BoQ generation complete. Total items:", result.size)
+			# Only process specific collection types
+			_local col_name << rec.source_collection.name
+			write("Processing record in collection:", col_name, "ID:", rec.id)
+			_if col_name _isnt :sheath_splice _andif
+			    col_name _isnt :pole _andif
+			    col_name _isnt :sheath_with_loc _andif
+			    col_name _isnt :sling_wire _andif
+			    col_name _isnt :riser
+			_then
+				_continue
+			_endif
+
+			# Only process Proposed objects
+			_if rec.responds_to?(:construction_status) _andif
+			    rec.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+
+			# Filter by infrastructure type (fttx_network_type)
+			#_if rec.responds_to?(:fttx_network_type)
+			#_then
+			#	_local rec_type << rec.fttx_network_type.default("").lowercase
+			#	_local filter_type << _self.normalize_infra_type(.infra_type)
+
+			#	_if rec_type <> filter_type
+			#	_then
+			#		_continue
+			#	_endif
+			#_endif
+
+			# Get stf_item_code from object
+			_local code << _unset
+			_if rec.responds_to?(:stf_item_code)
+			_then
+				code << rec.stf_item_code
+			_endif
+
+			# Skip if no code or not in catalog
+			_if code _is _unset _orif _self.MATERIAL_CATALOG[code] _is _unset
+			_then
+				_continue
+			_endif
+
+			# Get quantity/length based on object type
+			_local quantity << _self.get_quantity_from_record(rec)
+			_if quantity _is _unset _orif quantity = 0
+			_then
+				_continue
+			_endif
+
+			# Add or accumulate in result
+			_self.add_to_boq_result(result, code, quantity)
+		_endloop
+
+		# Special handling for sling_wire (not in change_set)
+		_self.add_sling_wire_to_result(result)
+
+		write("LOG: BoQ generation complete. Total item types:", result.size)
 
 		_return result
 	_when error
@@ -388,170 +464,93 @@ _endmethod
 $
 
 # ============================================================================
-# Category-Specific Generation Methods
+# Helper Methods for Single-Pass Generation
 # ============================================================================
 
-_private _method rwwi_astri_boq_generator.add_sling_wire_items(result)
-	## Add sling wire items to result
+_private _method rwwi_astri_boq_generator.normalize_infra_type(infra_type)
+	## Normalize infrastructure type to match fttx_network_type field values
 	## Parameters:
-	##   result - rope to add items to
+	##   infra_type - Input type (cluster, subfeeder, feeder)
+	## Returns: Normalized type string
 
-	_try _with errCond
-		_local length << _self.count_sling_wire_length()
-		_if length _isnt _unset _andif length > 0
-		_then
-			_local item << _self.create_boq_item(:sling_wire, _unset, length)
-			result.add(item)
-		_endif
-	_when error
-		write("LOG: ERROR adding sling wire items:", errCond.report_contents_string)
-	_endtry
+	_local type << infra_type.default("cluster").lowercase
+
+	_if type = "cluster"
+	_then
+		_return "Cluster"
+	_elif type = "subfeeder"
+	_then
+		_return "Sub Feeder"
+	_elif type = "feeder"
+	_then
+		_return "Feeder"
+	_else
+		_return "Cluster"
+	_endif
 _endmethod
 $
 
-_private _method rwwi_astri_boq_generator.add_fat_items(result)
-	## Add FAT items to result
-
-	_try _with errCond
-		_local (pole_count, pedestal_count) << _self.count_fat_types()
-
-		_if pole_count _isnt _unset _andif pole_count > 0
-		_then
-			result.add(_self.create_boq_item(:fat_pole_16, pole_count, _unset))
-		_endif
-
-		_if pedestal_count _isnt _unset _andif pedestal_count > 0
-		_then
-			result.add(_self.create_boq_item(:fat_pedestal_16, pedestal_count, _unset))
-		_endif
-	_when error
-		write("LOG: ERROR adding FAT items:", errCond.report_contents_string)
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.add_fdt_items(result)
-	## Add FDT items to result
-
-	_try _with errCond
-		_local (f48, f72, f96, f144, f288, f576) << _self.count_fdt_types()
-
-		_local fdt_types << {:fdt_48, :fdt_72, :fdt_96, :fdt_144, :fdt_288, :fdt_576}
-		_local counts << {f48, f72, f96, f144, f288, f576}
-
-		_for i _over 1.upto(fdt_types.size)
-		_loop
-			_if counts[i] _isnt _unset _andif counts[i] > 0
-			_then
-				result.add(_self.create_boq_item(fdt_types[i], counts[i], _unset))
-			_endif
-		_endloop
-	_when error
-		write("LOG: ERROR adding FDT items:", errCond.report_contents_string)
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.add_pole_items(result)
-	## Add pole items to result
-
-	_try _with errCond
-		_local (p7_3, p7_4, p7_5, p9_4, p9_5) << _self.count_pole_types()
-
-		_local pole_types << {:pole_7m_3inch, :pole_7m_4inch, :pole_7m_5inch,
-		                      :pole_9m_4inch, :pole_9m_5inch}
-		_local counts << {p7_3, p7_4, p7_5, p9_4, p9_5}
-
-		_for i _over 1.upto(pole_types.size)
-		_loop
-			_if counts[i] _isnt _unset _andif counts[i] > 0
-			_then
-				result.add(_self.create_boq_item(pole_types[i], counts[i], _unset))
-			_endif
-		_endloop
-	_when error
-		write("LOG: ERROR adding pole items:", errCond.report_contents_string)
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.add_cable_items(result)
-	## Add cable items to result
-
-	_try _with errCond
-		_local (c24, c36, c48, c96, c144, c288) << _self.count_cable_types()
-
-		_local cable_types << {:cable_24, :cable_36, :cable_48,
-		                       :cable_96, :cable_144, :cable_288}
-		_local lengths << {c24, c36, c48, c96, c144, c288}
-
-		_for i _over 1.upto(cable_types.size)
-		_loop
-			_if lengths[i] _isnt _unset _andif lengths[i] > 0
-			_then
-				result.add(_self.create_boq_item(cable_types[i], lengths[i], _unset))
-			_endif
-		_endloop
-	_when error
-		write("LOG: ERROR adding cable items:", errCond.report_contents_string)
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.add_closure_items(result)
-	## Add closure items to result
-
-	_try _with errCond
-		_local closure_counts << _self.count_closure_types()
-
-		# Check if closure_counts is valid
-		_if closure_counts _is _unset _orif closure_counts.empty?
-		_then
-			write("LOG: No closures found in design")
-			_return
-		_endif
-
-		# Iterate catalog to match spec_ids with counts
-		_for catalog_key, catalog_entry _over _self.MATERIAL_CATALOG.fast_keys_and_elements()
-		_loop
-			_if catalog_entry[:object] = "Closure"
-			_then
-				_local spec_id << catalog_entry[:spec_id]
-				_local count << closure_counts[spec_id]
-
-				_if count _isnt _unset _andif count > 0
-				_then
-					result.add(_self.create_boq_item(catalog_key, count, _unset))
-				_endif
-			_endif
-		_endloop
-	_when error
-		write("LOG: ERROR adding closure items:", errCond.report_contents_string)
-	_endtry
-_endmethod
-$
-
-# ============================================================================
-# Item Creation Helper
-# ============================================================================
-
-_private _method rwwi_astri_boq_generator.create_boq_item(catalog_key, material_qty, service_qty)
-	## Create a BoQ item property_list from catalog
+_private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
+	## Extract quantity or length from a design record
 	## Parameters:
-	##   catalog_key - Symbol key in MATERIAL_CATALOG
+	##   rec - Design record
+	## Returns:
+	##   Numeric quantity/length or _unset
+
+	_local col_name << rec.source_collection.name
+
+	# For cables (sheath_with_loc) - return length in meters
+	_if col_name _is :sheath_with_loc
+	_then
+		write("Getting length for sheath_with_loc ID:", rec.id)
+		_if rec.responds_to?(:calculated_fiber_length)
+		_then
+			_return rec.calculated_fiber_length.value_in(:m).as_number()
+		_endif
+	_endif
+
+	# For all other objects - return count of 1
+	_return 1
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.get_infra_code_field_name()
+	## Returns the field name for infrastructure code based on infra_type
+	## Returns: symbol (:cluster_code, :subfeeder_code, or :feeder_code)
+
+	_if .infra_type = "cluster"
+	_then
+		_return :cluster_code
+	_elif .infra_type = "subfeeder" _orif .infra_type = "sub feeder"
+	_then
+		_return :subfeeder_code
+	_elif .infra_type = "feeder"
+	_then
+		_return :feeder_code
+	_else
+		# Default to cluster_code
+		_return :cluster_code
+	_endif
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, service_qty)
+	## Create a BoQ item property_list from catalog using code
+	## Parameters:
+	##   code - Material code string (stf_item_code, e.g., "200001033")
 	##   material_qty - Quantity for :material slot (or _unset)
 	##   service_qty - Quantity for :service slot (or _unset)
 	## Returns:
-	##   property_list with BoQ item data
+	##   property_list with BoQ item data in ASTRI API format
 
 	_try _with errCond
-		write("Starting BoQ item creation for catalog key:", catalog_key)
-		_local catalog_entry << _self.MATERIAL_CATALOG[catalog_key]
+		write("Starting BoQ item creation for code:", code)
+		_local catalog_entry << _self.MATERIAL_CATALOG[code]
 		_if catalog_entry _is _unset
 		_then
-			write("LOG: ERROR - Unknown catalog key:", catalog_key)
+			write("LOG: ERROR - Unknown material code:", code)
 			condition.raise(:user_error, :string,
-				write_string("Unknown material catalog key: ", catalog_key))
+				write_string("Unknown material code: ", code))
 		_endif
 
 		# Determine which slot gets which quantity
@@ -569,17 +568,29 @@ _private _method rwwi_astri_boq_generator.create_boq_item(catalog_key, material_
 			svc_value << material_qty
 		_endif
 
-		# Create property list
+		# Create property list with ASTRI API format
+		# Get values from boq_params (set during initialization)
+
+		# Get the appropriate infrastructure code field name
+		_local infra_code_field << _self.get_infra_code_field_name()
+
 		_local item << property_list.new_with(
-			:type, .output_type,
-			:code, catalog_entry[:code],
-			:object, catalog_entry[:object],
-			:name, catalog_entry[:name],
-			:material, mat_value,
-			:service, svc_value
+			:cluster_code, .boq_params[infra_code_field],  # Dynamic based on infra_type
+			:vendor_name, .boq_params[:vendor_name],
+			:subcont_vendor_name, .boq_params[:subcont_vendor_name],
+			:equipment_name, code,                    # stf_item_code
+			:description, .boq_params[:description],  # Default: "Project Management"
+			:quantity_material, mat_value,
+			:quantity_service, svc_value,
+			:remarks, .boq_params[:remarks],          # Default: "Service"
+			:phase, .boq_params[:phase],              # Default: "project_opname"
+			:area, .boq_params[:area],
+			:area_plant_code, .boq_params[:area_plant_code],
+			:override_price_material, .boq_params[:override_price_material],
+			:override_price_service, .boq_params[:override_price_service]
 		)
 
-		>> item
+		_return item
 	_when error
 		write("LOG: ERROR creating BoQ item:", errCond.report_contents_string)
 		condition.raise(:user_error, :string, errCond)
@@ -587,289 +598,119 @@ _private _method rwwi_astri_boq_generator.create_boq_item(catalog_key, material_
 _endmethod
 $
 
-# ============================================================================
-# Object Counting Methods
-# ============================================================================
+_private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
+	## Add or accumulate BOQ item in result property_list
+	## Parameters:
+	##   result - property_list to update
+	##   code - material code string
+	##   qty - quantity to add (will be placed in correct slot based on catalog)
 
-_private _method rwwi_astri_boq_generator.count_sling_wire_length()
-	## Count total sling wire length from design
-	## Returns: float - total length in meters
-	## Logic matches get_count_sling_wire() in rwwi_astri_boq.magik
+	_local existing << result[code.as_symbol()]
+	_local catalog_entry << _self.MATERIAL_CATALOG[code]
+	_local slot_type << catalog_entry[:material_slot]
+	# Determine which parameter to pass based on slot type
+	_local mat_val << _unset
+	_local svc_val << _unset
 
-	_try _with errCond
-		write("LOG: Counting sling wire length...")
-		_local l_total << 0
+	_if slot_type = :material
+	_then
+		mat_val << qty
+	_elif slot_type = :service
+	_then
+		svc_val << qty
+	_endif
 
-		# Collect all sling_wire records
-		_for i _over .change_set.fast_elements()
-		_loop
-			_local name << i.current_record.source_collection.name
-			_if name _is :sling_wire
+	_if existing _is _unset
+	_then
+		# Create new BOQ item
+		_local item << _self.create_boq_item(code, mat_val, svc_val)
+		result[code.as_symbol()] << item
+	_else
+		# Accumulate to existing item
+		_if slot_type = :material
+		_then
+			_local current << existing[:quantity_material]
+			write("  >> Current material: ",current)
+			_if current _is _unset
 			_then
-				rec << i.current_record
-				l_total << l_total + rec.route.line_length
+				existing[:quantity_material] << qty
+			_else
+				existing[:quantity_material] << current + qty
 			_endif
-		_endloop
-
-		# Convert to meters (line_length is in cm, divide by 100)
-		_local t_pjg << l_total / 100
-
-		write("LOG: Sling wire total length:", t_pjg, "m")
-		>> t_pjg
-	_when error
-		write("LOG: ERROR counting sling wire:", errCond.report_contents_string)
-		>> 0
-	_endtry
+		_elif slot_type = :service
+		_then
+			_local current << existing[:quantity_service]
+			write("  >> Current service: ",current)
+			_if current _is _unset
+			_then
+				existing[:quantity_service] << qty
+			_else
+				existing[:quantity_service] << current + qty
+			_endif
+		_endif
+	_endif
 _endmethod
 $
 
-_private _method rwwi_astri_boq_generator.count_fat_types()
-	## Count FAT types from design
-	## Returns: (pole_count, pedestal_count)
-	## Logic matches get_count_fat() in rwwi_astri_boq.magik
+_private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
+	## Query sling_wire objects from area/project and add to result
+	## Sling wires are not in change_set, so need special query
 
 	_try _with errCond
-		write("LOG: Counting FAT types...")
-		_local table_list << rope.new()
+		write("LOG: Querying sling_wire objects...")
 
-		# Collect all sheath_splice records (FAT is stored in this collection)
-		_for i _over .change_set.fast_elements()
+		_local total_length << 0
+		_local sling_col << .dataset.collections[:sling_wire]
+
+		_if sling_col _is _unset
+		_then
+			write("LOG: WARNING - sling_wire collection not found")
+			_return
+		_endif
+
+		# Query sling_wire in design area
+		_local area << .scheme.project.project_areas.an_element().area
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area defined for scheme")
+			_return
+		_endif
+
+		_local pred << predicate.interacts(:route, area)
+		_local sling_wires << sling_col.select(pred)
+	
+		_local filter_type << _self.normalize_infra_type(.infra_type)
+
+		_for sw _over sling_wires.fast_elements()
 		_loop
-			_local name << i.current_record.source_collection.name
-			_if name _is :sheath_splice
+			# Only count Proposed sling wires with matching infra type
+			_if sw.responds_to?(:construction_status) _andif
+			    sw.construction_status = "Proposed"
 			_then
-				table_list.add(i.current_record)
+				# Check infrastructure type
+				#_if sw.responds_to?(:fttx_network_type)
+				#_then
+				#	_local sw_type << sw.fttx_network_type.default("").lowercase
+				#	_if sw_type <> filter_type
+				#	_then
+				#		_continue
+				#	_endif
+				#_endif
+
+				_local length << sw.route.line_length / 100  # Convert cm to m
+				total_length +<< length
 			_endif
 		_endloop
 
-		_local p1 << 0
-		_local p2 << 0
+		_if total_length > 0
+		_then
+			# Sling wire code is "200001033", material_slot is :service
+			_self.add_to_boq_result(result, "200001033", total_length)
+			write("LOG: Sling wire total length:", total_length, "m")
+		_endif
 
-		# Count by spec_id
-		_for p _over table_list.fast_elements()
-		_loop
-			_if p.spec_id = "Pole mounted outdoor(16 ports)"
-			_then
-				p1 << p1 + 1
-			_elif p.spec_id = "Pedestal mounted(16 ports)"
-			_then
-				p2 << p2 + 1
-			_endif
-		_endloop
-
-		write("LOG: FAT counts - Pole:", p1, "Pedestal:", p2)
-		>> p1, p2
 	_when error
-		write("LOG: ERROR counting FAT types:", errCond.report_contents_string)
-		>> 0, 0
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.count_fdt_types()
-	## Count FDT types by capacity
-	## Returns: (f48, f72, f96, f144, f288, f576)
-	## Logic matches get_count_fdt() in rwwi_astri_boq.magik
-
-	_try _with errCond
-		write("LOG: Counting FDT types...")
-		_local table_list << rope.new()
-
-		# Collect all sheath_splice records (FDT is stored in this collection)
-		_for i _over .change_set.fast_elements()
-		_loop
-			_local name << i.current_record.source_collection.name
-			_if name _is :sheath_splice
-			_then
-				table_list.add(i.current_record)
-			_endif
-		_endloop
-
-		_local p1 << 0
-		_local p2 << 0
-		_local p3 << 0
-		_local p4 << 0
-		_local p5 << 0
-		_local p6 << 0
-
-		# Count by spec_id
-		_for p _over table_list.fast_elements()
-		_loop
-			_if p.spec_id = "48 Core pole mounted FDT"
-			_then
-				p1 << p1 + 1
-			_elif p.spec_id = "72 Core pole mounted FDT"
-			_then
-				p2 << p2 + 1
-			_elif p.spec_id = "96 Core pole mounted FDT"
-			_then
-				p3 << p3 + 1
-			_elif p.spec_id = "144 Core Ground mounted FDT"
-			_then
-				p4 << p4 + 1
-			_elif p.spec_id = "288 Core Ground mounted FDT"
-			_then
-				p5 << p5 + 1
-			_elif p.spec_id = "576 Core Ground mounted FDT"
-			_then
-				p6 << p6 + 1
-			_endif
-		_endloop
-
-		write("LOG: FDT counts - 48:", p1, "72:", p2, "96:", p3, "144:", p4, "288:", p5, "576:", p6)
-		>> p1, p2, p3, p4, p5, p6
-	_when error
-		write("LOG: ERROR counting FDT types:", errCond.report_contents_string)
-		>> 0, 0, 0, 0, 0, 0
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.count_pole_types()
-	## Count pole types by height and diameter
-	## Returns: (p7_3, p7_4, p7_5, p9_4, p9_5)
-	## Logic matches get_count_pole() in rwwi_astri_boq.magik
-
-	_try _with errCond
-		write("LOG: Counting pole types...")
-		_local table_list << rope.new()
-
-		# Collect all pole records
-		_for i _over .change_set.fast_elements()
-		_loop
-			_local name << i.current_record.source_collection.name
-			_if name _is :pole
-			_then
-				table_list.add(i.current_record)
-			_endif
-		_endloop
-
-		_local p1 << 0
-		_local p2 << 0
-		_local p3 << 0
-		_local p4 << 0
-		_local p5 << 0
-
-		# Count by type (not spec_id)
-		_for p _over table_list.fast_elements()
-		_loop
-			_if p.type = "Pole 7-3"
-			_then
-				p1 << p1 + 1
-			_elif p.type = "Pole 7-4"
-			_then
-				p2 << p2 + 1
-			_elif p.type = "Pole 7-5"
-			_then
-				p3 << p3 + 1
-			_elif p.type = "Pole 9-4"
-			_then
-				p4 << p4 + 1
-			_elif p.type = "Pole 9-5"
-			_then
-				p5 << p5 + 1
-			_endif
-		_endloop
-
-		write("LOG: Pole counts - 7-3:", p1, "7-4:", p2, "7-5:", p3, "9-4:", p4, "9-5:", p5)
-		>> p1, p2, p3, p4, p5
-	_when error
-		write("LOG: ERROR counting pole types:", errCond.report_contents_string)
-		>> 0, 0, 0, 0, 0
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.count_cable_types()
-	## Count cable types by core count and total length
-	## Returns: (c24, c36, c48, c96, c144, c288)
-	## Logic matches get_count_cable() in rwwi_astri_boq.magik
-
-	_try _with errCond
-		write("LOG: Counting cable types...")
-		_local table_list << rope.new()
-
-		# Collect all sheath_with_loc records (cables)
-		_for i _over .change_set.fast_elements()
-		_loop
-			_local name << i.current_record.source_collection.name
-			_if name _is :sheath_with_loc
-			_then
-				table_list.add(i.current_record)
-			_endif
-		_endloop
-
-		_local p1 << 0
-		_local p2 << 0
-		_local p3 << 0
-		_local p4 << 0
-		_local p5 << 0
-		_local p6 << 0
-		_local p7 << 0
-
-		# Sum up cable lengths by spec_id
-		_for p _over table_list.fast_elements()
-		_loop
-			_if p.spec_id = "SM G652D-ADSS 24C"
-			_then
-				p1 << p1 + p.calculated_sheath_length.value_in(:m).as_number()
-			_elif p.spec_id = "SM G652D-ADSS 36C"
-			_then
-				p2 << p2 + p.calculated_sheath_length.value_in(:m).as_number()
-			_elif p.spec_id = "SM G652D-ADSS 48C"
-			_then
-				p3 << p3 + p.calculated_sheath_length.value_in(:m).as_number()
-			_elif p.spec_id = "SM G652D-ADSS 72C"
-			_then
-				p4 << p4 + p.calculated_sheath_length.value_in(:m).as_number()
-			_elif p.spec_id = "SM G652D-ADSS 96C"
-			_then
-				p5 << p5 + p.calculated_sheath_length.value_in(:m).as_number()
-			_elif p.spec_id = "SM G652D-ADSS 144C"
-			_then
-				p6 << p6 + p.calculated_sheath_length.value_in(:m).as_number()
-			_elif p.spec_id = "SM G652D-ADSS 288C"
-			_then
-				p7 << p7 + p.calculated_sheath_length.value_in(:m).as_number()
-			_endif
-		_endloop
-
-		write("LOG: Cable lengths - 24C:", p1, "| 36C:", p2, "| 48C:", p3, "| 96C:", p5, "| 144C:", p6, "| 288C:", p7)
-		_return p1, p2, p3, p5, p6, p7
-	_when error
-		write("LOG: ERROR counting cable types:", errCond.report_contents_string)
-		_return 0, 0, 0, 0, 0, 0
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.count_closure_types()
-	## Count closure types by spec_id
-	## Returns: equality_hash_table mapping spec_id to count
-
-	_try _with errCond
-		_local counts << equality_hash_table.new()
-
-		_for record _over .change_set.fast_elements()
-		_loop
-			_local col_name << record.current_record.source_collection.name
-			_if col_name _is :sheath_splice
-			_then
-				_local spec << record.current_record.spec_id
-				_local current << counts[spec]
-				_if current _is _unset
-				_then
-					counts[spec] << 1
-				_else
-					counts[spec] << current + 1
-				_endif
-			_endif
-		_endloop
-
-		>> counts
-	_when error
-		write("LOG: ERROR counting closure types:", errCond.report_contents_string)
-		>> equality_hash_table.new()
+		write("LOG: ERROR querying sling_wire:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $

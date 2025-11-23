@@ -1136,6 +1136,35 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 _endmethod
 $
 
+_private _method rwwi_astri_workorder_dialog.get_infra_type_from_wo(wo)
+	## Determine infrastructure type from work order category
+	##
+	## Parameters:
+	##   wo (property_list) - Work order data
+	##
+	## Returns:
+	##   string - Infrastructure type: "cluster", "subfeeder", or "feeder"
+
+	_local category << wo[:category].default("").lowercase
+
+	_if category.index_of_seq("cluster") _isnt _unset
+	_then
+		_return "cluster"
+	_elif category.index_of_seq("subfeeder") _isnt _unset _orif
+	      category.index_of_seq("sub feeder") _isnt _unset
+	_then
+		_return "subfeeder"
+	_elif category.index_of_seq("feeder") _isnt _unset
+	_then
+		_return "feeder"
+	_else
+		# Default to cluster if category is unclear
+		write("LOG: WARNING - Unknown category '", category, "', defaulting to 'cluster'")
+		_return "cluster"
+	_endif
+_endmethod
+$
+
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.generate_boq_excel()
 	## Generate Bill of Quantities as Excel file
@@ -1185,8 +1214,8 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.generate_boq_json()
-	## Generate Bill of Quantities as JSON property list
-	## Calls the global create_pl_boq procedure from rwwi_astri_boq.magik
+	## Generate Bill of Quantities as JSON property list using new BOQ generator
+	## Uses rwwi_astri_boq_generator class with work order parameters
 
 	_if .selected_wo _is _unset
 	_then
@@ -1215,43 +1244,91 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			_return
 		_endif
 
-		# Call the global create_pl_boq procedure with "json" type
-		write("Calling create_pl_boq procedure...")
-		_local boq_result << create_pl_boq("json")
+		# Determine infrastructure type from work order category
+		_local infra_type << _self.get_infra_type_from_wo(wo)
+
+		# Get KMZ UUID from work order (from PostgreSQL database)
+		_local kmz_uuid << wo[:kmz_uuid].default("")
+
+		# Get infrastructure code field name based on type
+		_local infra_code_field << _if infra_type = "cluster"
+		                           _then >> :cluster_code
+		                           _elif infra_type = "subfeeder"
+		                           _then >> :subfeeder_code
+		                           _elif infra_type = "feeder"
+		                           _then >> :feeder_code
+		                           _else >> :cluster_code
+		                           _endif
+
+		# Get infrastructure code from database result (already fetched from PostgreSQL)
+		_local infra_code << wo[infra_code_field].default(wo[:infra_code])
+
+		# Build BOQ parameters from work order data
+		_local boq_params << property_list.new_with(
+			:infra_type, infra_type,
+			infra_code_field, infra_code,           # Dynamic: cluster_code/subfeeder_code/feeder_code
+			:vendor_name, wo[:vendor].default(""),
+			:subcont_vendor_name, wo[:subcont_vendor].default(""),
+			:description, "Project Management",     # Default
+			:remarks, "Service",                    # Default
+			:phase, "project_opname",               # Default
+			:area, wo[:area].default(""),
+			:area_plant_code, wo[:area_plant_code].default(""),
+			:override_price_material, _unset,       # Optional
+			:override_price_service, _unset         # Optional
+		)
+
+		write("BOQ Parameters:")
+		write("  Infrastructure Type:", infra_type)
+		write("  Infrastructure Code:", infra_code)
+		write("  Vendor:", wo[:vendor].default(""))
+		write("  Subcont Vendor:", wo[:subcont_vendor].default(""))
+		write("  Area:", wo[:area].default(""))
+		write("  Area Plant Code:", wo[:area_plant_code].default(""))
+		write("  KMZ UUID:", kmz_uuid)
+
+		# Create BOQ generator instance
+		write("Creating BOQ generator...")
+		_local generator << rwwi_astri_boq_generator.new(boq_params)
+
+		# Generate BOQ items
+		write("Generating BOQ items...")
+		_local boq_result << generator.generate()
 
 		# Display result summary
 		_if boq_result _isnt _unset _andif boq_result.size > 0
 		_then
 			_local msg << write_string(
-				"BoQ JSON generation completed successfully", %newline,
+				"BoQ generation completed successfully", %newline,
 				"Design: ", scheme.name, %newline,
+				"Infrastructure: ", infra_type, " - ", infra_code, %newline,
 				"Total items: ", boq_result.size, %newline,
 				%newline,
 				"Sample items:", %newline)
 
 			# Show first 5 items as preview
 			_local count << 0
-			_for item _over boq_result.fast_elements()
+			_for key _over boq_result.keys()
 			_loop
 				count +<< 1
 				_if count > 5 _then _leave _endif
 
+				_local item << boq_result[key]
 				msg << msg + write_string(
-					"  - ", item[:object].default(""), ": ",
-					item[:name].default(""), %newline,
-					"    Code: ", item[:code].default(""),
-					", Material: ", item[:material].default("N/A"),
-					", Service: ", item[:service].default("N/A"), %newline)
+					"  - Equipment: ", item[:equipment_name].default(""), %newline,
+					"    Description: ", item[:description].default(""), %newline,
+					"    Quantity Material: ", item[:quantity_material].default("N/A"),
+					", Quantity Service: ", item[:quantity_service].default("N/A"), %newline)
 			_endloop
 
 			_self.user_info(msg)
 		_else
-			_self.user_info("BoQ JSON generation completed but no items found")
+			_self.user_info("BoQ generation completed but no items found")
 		_endif
 
 	_when error
-		write("LOG: Error generating BoQ as JSON:", errCond.report_contents_string)
-		_self.user_error(write_string("Error generating BoQ as JSON:", %newline,
+		write("LOG: Error generating BoQ:", errCond.report_contents_string)
+		_self.user_error(write_string("Error generating BoQ:", %newline,
 			errCond.report_contents_string))
 	_endtry
 _endmethod
