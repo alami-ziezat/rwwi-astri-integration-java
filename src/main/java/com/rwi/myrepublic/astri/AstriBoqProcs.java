@@ -26,15 +26,15 @@ public class AstriBoqProcs {
      * @param subcontVendorName Subcontractor vendor name (Magik string)
      * @param equipmentName Equipment name (Magik string)
      * @param description Description (Magik string)
-     * @param quantityMaterial Quantity of material (Magik integer)
-     * @param quantityService Quantity of service (Magik integer)
+     * @param quantityMaterial Quantity of material (Magik number - integer or float)
+     * @param quantityService Quantity of service (Magik number - integer or float)
      * @param remarks Remarks (Magik string)
      * @param phase Phase (Magik string)
      * @param area Area (Magik string)
      * @param areaPlantCode Area plant code (Magik string)
-     * @param overridePriceMaterial Override price for material (Magik integer)
-     * @param overridePriceService Override price for service (Magik integer)
-     * @return String - JSON response or empty string on error
+     * @param overridePriceMaterial Override price for material (Magik number - integer or float)
+     * @param overridePriceService Override price for service (Magik number - integer or float)
+     * @return String - JSON response with {"success":true/false, "error":"..."} format
      */
     @MagikProc(@Name("astri_add_boq_drm_cluster"))
     public static Object addBoqDrmCluster(Object proc,
@@ -52,7 +52,21 @@ public class AstriBoqProcs {
                                           Object overridePriceMaterial,
                                           Object overridePriceService) {
         System.out.println("=== DEBUG: astri_add_boq_drm_cluster called ===");
-
+        /*System.out.println("Parameters received: "+
+              "clusterCode="+ clusterCode +
+              ", vendorName="+ vendorName +
+              ", subcontVendorName="+ subcontVendorName +
+              ", equipmentName="+ equipmentName +
+              ", description="+ description +
+              ", quantityMaterial="+ quantityMaterial +
+              ", quantityService="+ quantityService +
+              ", remarks="+ remarks +
+              ", phase="+ phase +
+              ", area="+ area +
+              ", areaPlantCode="+ areaPlantCode +
+              ", overridePriceMaterial="+ overridePriceMaterial +
+              ", overridePriceService="+ overridePriceService);
+        */
         BoqClient client = null;
         try {
             // Handle _unset (null) values from Magik
@@ -61,23 +75,28 @@ public class AstriBoqProcs {
             String subcontVendorNameStr = (subcontVendorName == null) ? null : MagikInteropUtils.fromMagikString(subcontVendorName);
             String equipmentNameStr = (equipmentName == null) ? null : MagikInteropUtils.fromMagikString(equipmentName);
             String descriptionStr = (description == null) ? null : MagikInteropUtils.fromMagikString(description);
-            Integer quantityMaterialInt = (quantityMaterial == null) ? null : MagikInteropUtils.fromMagikInteger(quantityMaterial);
-            Integer quantityServiceInt = (quantityService == null) ? null : MagikInteropUtils.fromMagikInteger(quantityService);
+
+            // Convert numeric values - handle both integer and float/double from Magik
+            // Round to 2 decimal places and convert to Double
+            Double quantityMaterialDbl = convertMagikNumberToDouble(quantityMaterial);
+            Double quantityServiceDbl = convertMagikNumberToDouble(quantityService);
+            Double overridePriceMaterialDbl = convertMagikNumberToDouble(overridePriceMaterial);
+            Double overridePriceServiceDbl = convertMagikNumberToDouble(overridePriceService);
+
             String remarksStr = (remarks == null) ? null : MagikInteropUtils.fromMagikString(remarks);
             String phaseStr = (phase == null) ? null : MagikInteropUtils.fromMagikString(phase);
             String areaStr = (area == null) ? null : MagikInteropUtils.fromMagikString(area);
             String areaPlantCodeStr = (areaPlantCode == null) ? null : MagikInteropUtils.fromMagikString(areaPlantCode);
-            Integer overridePriceMaterialInt = (overridePriceMaterial == null) ? null : MagikInteropUtils.fromMagikInteger(overridePriceMaterial);
-            Integer overridePriceServiceInt = (overridePriceService == null) ? null : MagikInteropUtils.fromMagikInteger(overridePriceService);
 
             System.out.println("Parameters: cluster_code=" + clusterCodeStr +
                              ", vendor=" + vendorNameStr + ", equipment=" + equipmentNameStr);
+            System.out.println("Quantities: material=" + quantityMaterialDbl + ", service=" + quantityServiceDbl);
 
             client = new BoqClient();
             String jsonResponse = client.addBoqDrmCluster(
                 clusterCodeStr, vendorNameStr, subcontVendorNameStr, equipmentNameStr,
-                descriptionStr, quantityMaterialInt, quantityServiceInt, remarksStr,
-                phaseStr, areaStr, areaPlantCodeStr, overridePriceMaterialInt, overridePriceServiceInt
+                descriptionStr, quantityMaterialDbl, quantityServiceDbl, remarksStr,
+                phaseStr, areaStr, areaPlantCodeStr, overridePriceMaterialDbl, overridePriceServiceDbl
             );
 
             System.out.println("=== DEBUG: BOQ DRM Cluster added successfully ===");
@@ -90,7 +109,10 @@ public class AstriBoqProcs {
             System.err.println("=== DEBUG: ERROR in addBoqDrmCluster ===");
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
-            return "";
+
+            // Return error as JSON string with proper format
+            String errorJson = "{\"success\":false,\"error\":\"" + escapeJson(e.getMessage()) + "\"}";
+            return MagikInteropUtils.toMagikString(errorJson);
         } finally {
             if (client != null) {
                 try {
@@ -101,5 +123,50 @@ public class AstriBoqProcs {
             }
             System.out.println("=== DEBUG: astri_add_boq_drm_cluster completed ===");
         }
+    }
+
+    /**
+     * Convert Magik number (integer or float) to Double rounded to 2 decimal places.
+     *
+     * @param magikNumber Magik number object (can be integer or float/double)
+     * @return Double rounded to 2 decimal places, or null if input is null
+     */
+    private static Double convertMagikNumberToDouble(Object magikNumber) {
+        if (magikNumber == null) {
+            return null;
+        }
+
+        try {
+            // Try to get as float first (works for both integer and float from Magik)
+            Float floatValue = MagikInteropUtils.fromMagikFloat(magikNumber);
+            Double value = floatValue.doubleValue();
+
+            // Round to 2 decimal places
+            return Math.round(value * 100.0) / 100.0;
+        } catch (Exception e) {
+            // If fromMagikFloat fails, try as integer
+            try {
+                Integer intValue = MagikInteropUtils.fromMagikInteger(magikNumber);
+                return intValue.doubleValue();
+            } catch (Exception e2) {
+                System.err.println("Warning: Could not convert Magik number to Double: " + e2.getMessage());
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Escape special characters in JSON strings.
+     *
+     * @param str String to escape
+     * @return Escaped string safe for JSON
+     */
+    private static String escapeJson(String str) {
+        if (str == null) return "";
+        return str.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r")
+                  .replace("\t", "\\t");
     }
 }

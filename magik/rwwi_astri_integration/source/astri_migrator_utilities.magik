@@ -313,7 +313,10 @@ _private _method astri_design_migrator.match_pole_type(fs)
 
 	# Match patterns with wildcards (* = any character)
 	_local pole_type <<
-	_if fs.matches?("*7*3*")
+	_if fs.matches?("*7*2.5*")
+	_then
+		>> "Pole 7-2.5"
+	_elif fs.matches?("*7*3*")
 	_then
 		>> "Pole 7-3"
 	_elif fs.matches?("*7*4*")

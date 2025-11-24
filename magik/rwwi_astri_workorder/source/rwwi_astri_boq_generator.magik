@@ -129,6 +129,12 @@ rwwi_astri_boq_generator.define_shared_constant(
 		),
 
 		# Poles
+		"200002675", property_list.new_with(
+			:code, "200002675",
+			:object, "Pole",
+			:name, write_string("Pengadaan Tiang 7 meter 2.5", %", %,, " STEL L-003 1996"),
+			:material_slot, :material
+		),
 		"200001055", property_list.new_with(
 			:code, "200001055",
 			:object, "Pole",
@@ -397,7 +403,6 @@ _method rwwi_astri_boq_generator.generate()
 
 			# Only process specific collection types
 			_local col_name << rec.source_collection.name
-			write("Processing record in collection:", col_name, "ID:", rec.id)
 			_if col_name _isnt :sheath_splice _andif
 			    col_name _isnt :pole _andif
 			    col_name _isnt :sheath_with_loc _andif
@@ -554,8 +559,8 @@ _private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, se
 		_endif
 
 		# Determine which slot gets which quantity
-		_local mat_value << _unset
-		_local svc_value << _unset
+		_local mat_value << 0
+		_local svc_value << 0
 
 		_local slot_type << catalog_entry[:material_slot]
 		_if slot_type = :material
@@ -623,14 +628,13 @@ _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 	_if existing _is _unset
 	_then
 		# Create new BOQ item
-		_local item << _self.create_boq_item(code, mat_val, svc_val)
+		_local item << _self.create_boq_item(code.write_string, mat_val, svc_val)
 		result[code.as_symbol()] << item
 	_else
 		# Accumulate to existing item
 		_if slot_type = :material
 		_then
 			_local current << existing[:quantity_material]
-			write("  >> Current material: ",current)
 			_if current _is _unset
 			_then
 				existing[:quantity_material] << qty
@@ -640,7 +644,6 @@ _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 		_elif slot_type = :service
 		_then
 			_local current << existing[:quantity_service]
-			write("  >> Current service: ",current)
 			_if current _is _unset
 			_then
 				existing[:quantity_service] << qty

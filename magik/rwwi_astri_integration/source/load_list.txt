@@ -1,5 +1,5 @@
 astri_kml_parser
-astri_kml_migrator
+# astri_kml_migrator -- not used anymore
 
 # ASTRI Design Migrator - Main entry point and orchestration
 astri_design_migrator
@@ -16,7 +16,5 @@ astri_figure_eight_migrator
 astri_olt_migrator
 astri_riser_migrator
 astri_access_point_migrator
-astri_sheath_migrator
 astri_micro_cell_migrator
 
-test_astri_procs

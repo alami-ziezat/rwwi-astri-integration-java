@@ -35,7 +35,10 @@ _private _method astri_design_migrator.create_pole(pm)
 
 		# Map pole type to STF item code
 		_local stf_item_code << _unset
-		_if pole_type = "Pole 7-3"
+		_if pole_type = "Pole 7-2.5"
+		_then
+			stf_item_code << "200002675"
+		_elif pole_type = "Pole 7-3"
 		_then
 			stf_item_code << "200001055"
 		_elif pole_type = "Pole 7-4"

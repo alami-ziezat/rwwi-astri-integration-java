@@ -9,7 +9,6 @@ requires
 	base
 	rwwi_astri_integration
 	rwi_external_databases
-	#json	4000
 end
 
 language en_gb

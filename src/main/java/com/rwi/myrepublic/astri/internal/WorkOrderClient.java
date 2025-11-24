@@ -272,13 +272,25 @@ public class WorkOrderClient {
 
     /**
      * Extract a JSON field value.
+     * Handles both quoted strings (can contain commas) and unquoted values (numbers, booleans, null).
      */
     private String extractJsonValue(String json, String fieldName) {
-        Pattern pattern = Pattern.compile("\"" + fieldName + "\"\\s*:\\s*\"?([^,}\"\\n]+)\"?");
-        Matcher matcher = pattern.matcher(json);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
+        // First try to match quoted string values (can contain commas, spaces, etc.)
+        // Pattern: "fieldName": "value with, commas and spaces"
+        Pattern quotedPattern = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"");
+        Matcher quotedMatcher = quotedPattern.matcher(json);
+        if (quotedMatcher.find()) {
+            return quotedMatcher.group(1).trim();
         }
+
+        // If not quoted, try to match unquoted values (numbers, booleans, null)
+        // Pattern: "fieldName": value (stops at comma or closing brace)
+        Pattern unquotedPattern = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*([^,}\\s]+)");
+        Matcher unquotedMatcher = unquotedPattern.matcher(json);
+        if (unquotedMatcher.find()) {
+            return unquotedMatcher.group(1).trim();
+        }
+
         return null;
     }
 

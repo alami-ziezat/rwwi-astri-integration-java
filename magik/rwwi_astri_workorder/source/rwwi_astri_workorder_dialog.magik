@@ -307,7 +307,6 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		_for wo _over workorders.fast_elements()
 		_loop
 			row +<< 1
-
 			# Add cells to table
 			.items[:table].add_label(row, 1, row.write_string)
 			.items[:table].add_label(row, 2, wo[:wo_number].default(""))
@@ -1217,6 +1216,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 	## Generate Bill of Quantities as JSON property list using new BOQ generator
 	## Uses rwwi_astri_boq_generator class with work order parameters
 
+	_dynamic !print_float_precision! << 16
+
 	_if .selected_wo _is _unset
 	_then
 		_self.user_info("Please select a work order first")
@@ -1262,26 +1263,27 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 
 		# Get infrastructure code from database result (already fetched from PostgreSQL)
 		_local infra_code << wo[infra_code_field].default(wo[:infra_code])
-
+		#infra_code << "PLB006435 " #temp hardcode for testing BOQ
 		# Build BOQ parameters from work order data
+
 		_local boq_params << property_list.new_with(
 			:infra_type, infra_type,
 			infra_code_field, infra_code,           # Dynamic: cluster_code/subfeeder_code/feeder_code
-			:vendor_name, wo[:vendor].default(""),
-			:subcont_vendor_name, wo[:subcont_vendor].default(""),
+			:vendor_name, wo[:vendor_name].default(_unset),
+			:subcont_vendor_name, wo[:subcont_vendor].default(_unset),
 			:description, "Project Management",     # Default
 			:remarks, "Service",                    # Default
 			:phase, "project_opname",               # Default
-			:area, wo[:area].default(""),
-			:area_plant_code, wo[:area_plant_code].default(""),
+			:area, wo[:area].default(_unset),
+			:area_plant_code, wo[:area_plant_code].default(_unset),
 			:override_price_material, _unset,       # Optional
 			:override_price_service, _unset         # Optional
 		)
-
+		
 		write("BOQ Parameters:")
 		write("  Infrastructure Type:", infra_type)
 		write("  Infrastructure Code:", infra_code)
-		write("  Vendor:", wo[:vendor].default(""))
+		write("  Vendor:", wo[:vendor_name].default(""))
 		write("  Subcont Vendor:", wo[:subcont_vendor].default(""))
 		write("  Area:", wo[:area].default(""))
 		write("  Area Plant Code:", wo[:area_plant_code].default(""))
@@ -1295,6 +1297,89 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 		write("Generating BOQ items...")
 		_local boq_result << generator.generate()
 
+		# Send BOQ data to ASTRI API (only for cluster infrastructure type)
+		_local api_success_count << 0
+		_local api_error_count << 0
+		_local api_skipped_count << 0
+
+		_if infra_type = "cluster" _andif boq_result _isnt _unset _andif boq_result.size > 0
+		_then
+			write("Sending BOQ items to ASTRI API...")
+
+			_for key _over boq_result.keys()
+			_loop
+				_local item << boq_result[key]
+
+				_try _with apiErrCond
+					# Call astri_add_boq_drm_cluster Java procedure
+					write("Sending BOQ item:", item[:equipment_name].default(""))
+
+					_local json_response << astri_add_boq_drm_cluster(
+						infra_code,                                    # cluster_code
+						item[:vendor_name].default(""),                # vendor_name
+						item[:subcont_vendor_name].default(""),        # subcont_vendor_name
+						item[:equipment_name].default(""),             # equipment_name
+						item[:description].default(""),                # description
+						item[:quantity_material],                      # quantity_material (can be _unset)
+						item[:quantity_service],                       # quantity_service (can be _unset)
+						item[:remarks].default(""),                    # remarks
+						item[:phase].default(""),                      # phase
+						item[:area].default(""),                       # area
+						item[:area_plant_code].default(""),            # area_plant_code
+						item[:override_price_material],                # override_price_material (can be _unset)
+						item[:override_price_service]                  # override_price_service (can be _unset)
+					)
+
+					# Parse JSON response to check for success/error
+					_if json_response _isnt _unset _andif json_response <> ""
+					_then
+						_try _with parseErr
+							# Parse JSON response using json_parser
+							_local json_obj << json_parser.parse(json_response)
+
+							# Check for success field
+							_local success << json_obj[:success]
+
+							_if success _is _true
+							_then
+								write("  SUCCESS: BOQ item sent to ASTRI API")
+								api_success_count +<< 1
+							_else
+								# Error response from API
+								_local error_msg << json_obj[:error].default("Unknown error")
+								write("  ERROR: API returned error:")
+								print(error_msg)
+								api_error_count +<< 1
+							_endif
+
+						_when error
+							# If JSON parsing fails, treat as error
+							write("  ERROR: Failed to parse API response:", parseErr.report_contents_string)
+							write("  Response:", json_response)
+							api_error_count +<< 1
+						_endtry
+					_else
+						write("  ERROR: Empty response from ASTRI API")
+						api_error_count +<< 1
+					_endif
+
+				_when error
+					write("  ERROR sending BOQ item:", apiErrCond.report_contents_string)
+					api_error_count +<< 1
+				_endtry
+			_endloop
+
+			write("API Send Summary:")
+			write("  Success:", api_success_count)
+			write("  Errors:", api_error_count)
+		_else
+			_if infra_type <> "cluster"
+			_then
+				write("Skipping API send - infrastructure type is:", infra_type, "(only 'cluster' supported)")
+				api_skipped_count << boq_result.size
+			_endif
+		_endif
+
 		# Display result summary
 		_if boq_result _isnt _unset _andif boq_result.size > 0
 		_then
@@ -1303,16 +1388,27 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				"Design: ", scheme.name, %newline,
 				"Infrastructure: ", infra_type, " - ", infra_code, %newline,
 				"Total items: ", boq_result.size, %newline,
-				%newline,
-				"Sample items:", %newline)
+				%newline)
+
+			# Add API send summary if cluster type
+			_if infra_type = "cluster"
+			_then
+				msg << msg + write_string(
+					"API Send Summary:", %newline,
+					"  Successful: ", api_success_count, %newline,
+					"  Errors: ", api_error_count, %newline,
+					%newline)
+			_else
+				msg << msg + write_string(
+					"API Send: Skipped (only cluster infrastructure supported)", %newline,
+					%newline)
+			_endif
+
+			msg << msg + write_string("BoQ Report Summary:", %newline)
 
 			# Show first 5 items as preview
-			_local count << 0
 			_for key _over boq_result.keys()
 			_loop
-				count +<< 1
-				_if count > 5 _then _leave _endif
-
 				_local item << boq_result[key]
 				msg << msg + write_string(
 					"  - Equipment: ", item[:equipment_name].default(""), %newline,
@@ -1320,6 +1416,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 					"    Quantity Material: ", item[:quantity_material].default("N/A"),
 					", Quantity Service: ", item[:quantity_service].default("N/A"), %newline)
 			_endloop
+			msg << msg + write_string(
+				"="*100)
 
 			_self.user_info(msg)
 		_else

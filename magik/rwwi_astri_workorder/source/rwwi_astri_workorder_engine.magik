@@ -397,7 +397,6 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		_for wo_elem _over data_elem.elements_matching_name(:workorder)
 		_loop
 			_local pl << property_list.new()
-
 			# Extract all work order fields
 			pl[:uuid] << _self.get_xml_element_value(wo_elem, :uuid)
 			pl[:wo_number] << _self.get_xml_element_value(wo_elem, :number)
@@ -419,6 +418,7 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:category] << _self.get_xml_element_value(wo_elem, :category_label)
 			pl[:status] << _self.get_xml_element_value(wo_elem, :latest_status_name)
 			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
+			pl[:vendor_name] << _self.get_xml_element_value(wo_elem, :assigned_vendor_name)
 			pl[:subcont_vendor] << _self.get_xml_element_value(wo_elem, :assigned_subcont_vendor_name)
 			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
 
@@ -461,7 +461,7 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:subfeeder_code_db] << db_result[:subfeeder_code].default("")
 			pl[:feeder_code_db] << db_result[:feeder_code].default("")
 			pl[:olt_code] << db_result[:olt_code].default("")
-
+						  
 			result_rope.add(pl)
 		_endloop
 
@@ -514,12 +514,17 @@ _private _method rwwi_astri_workorder_engine.get_xml_element_value(parent_elem, 
 		_endif
 
 		_local value << elem.xml_result
-
+		
 		# Remove backslash escaping from forward slashes
 		# Replace "\/" with "/"
 		_if value _isnt _unset _andif value <> ""
 		_then
 			value << value.substitute_string("\/", "/")
+		_endif
+
+		_if value = "null"
+		_then
+			value << _unset 
 		_endif
 
 		_return value

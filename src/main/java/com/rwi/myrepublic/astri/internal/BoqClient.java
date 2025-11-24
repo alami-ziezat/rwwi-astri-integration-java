@@ -34,13 +34,13 @@ public class BoqClient {
 
     /**
      * Add BOQ DRM Cluster.
-     * Accepts nullable Integer values to support Magik _unset values.
+     * Accepts nullable Double values to support Magik _unset values and decimal quantities.
      */
     public String addBoqDrmCluster(String clusterCode, String vendorName, String subcontVendorName,
-                                   String equipmentName, String description, Integer quantityMaterial,
-                                   Integer quantityService, String remarks, String phase, String area,
-                                   String areaPlantCode, Integer overridePriceMaterial,
-                                   Integer overridePriceService) throws IOException, InterruptedException {
+                                   String equipmentName, String description, Double quantityMaterial,
+                                   Double quantityService, String remarks, String phase, String area,
+                                   String areaPlantCode, Double overridePriceMaterial,
+                                   Double overridePriceService) throws IOException, InterruptedException {
         String baseUrl = config.getApiBaseUrl();
         String path = "/osp/cluster/boq/add";
         String url = baseUrl + path;
@@ -68,10 +68,10 @@ public class BoqClient {
     }
 
     private String buildJsonBody(String clusterCode, String vendorName, String subcontVendorName,
-                                  String equipmentName, String description, Integer quantityMaterial,
-                                  Integer quantityService, String remarks, String phase, String area,
-                                  String areaPlantCode, Integer overridePriceMaterial,
-                                  Integer overridePriceService) {
+                                  String equipmentName, String description, Double quantityMaterial,
+                                  Double quantityService, String remarks, String phase, String area,
+                                  String areaPlantCode, Double overridePriceMaterial,
+                                  Double overridePriceService) {
         StringBuilder json = new StringBuilder();
         json.append("{");
         appendJsonField(json, "cluster_code", clusterCode, true);
@@ -97,7 +97,7 @@ public class BoqClient {
      *
      * @param json The StringBuilder to append to
      * @param fieldName The name of the field
-     * @param value The value (String or Integer, can be null)
+     * @param value The value (String, Integer, or Double, can be null)
      * @param addComma Whether to add a comma after the field
      */
     private void appendJsonField(StringBuilder json, String fieldName, Object value, boolean addComma) {
@@ -109,6 +109,9 @@ public class BoqClient {
             json.append("\"").append(escapeJson((String) value)).append("\"");
         } else if (value instanceof Integer) {
             json.append(value);
+        } else if (value instanceof Double) {
+            // Format Double with 2 decimal places
+            json.append(String.format("%.2f", (Double) value));
         } else {
             // Fallback for other types
             json.append("\"").append(escapeJson(value.toString())).append("\"");
