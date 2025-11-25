@@ -26,7 +26,7 @@ _pragma(classify_level=debug, topic={astri_integration})
 rwwi_astri_workorder_engine.define_shared_constant(:sql_for_kmz_uuid,
 	property_list.new_with(
 		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, cluster_code, subfeeder_code, feeder_code, olt_code FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
-		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, subfeeder_code FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
+		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, subfeeder_code, feeder_code, olt_code FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
 		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, feeder_code, olt_code FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
 	),
 	_false
@@ -452,7 +452,6 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 
 			# Retrieve KMZ UUID, source, and infrastructure codes from PostgreSQL database
 			_local db_result << _self.get_kmz_uuid_from_db(infrastructure_type, infra_code)
-			write("DB result for infra_code ", infra_code, ":", db_result)
 
 			# Add all database fields to property list (all fields always present with defaults)
 			pl[:kmz_uuid] << db_result[:kmz_uuid].default("")
@@ -669,7 +668,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 	##   property_list with keys:
 	##     :kmz_uuid, :kmz_source (always returned)
 	##     For cluster: :cluster_code, :subfeeder_code, :feeder_code, :olt_code
-	##     For subfeeder: :subfeeder_code
+	##     For subfeeder: :subfeeder_code, :feeder_code, :olt_code
 	##     For feeder: :feeder_code, :olt_code
 	##   Returns property_list with empty values if not found
 	##
@@ -761,13 +760,13 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 			_elif infrastructure_type = "subfeeder"
 			_then
 				result[:subfeeder_code] << rec.subfeeder_code.default("")
+				result[:feeder_code] << rec.feeder_code.default("")
+				result[:olt_code] << rec.olt_code.default("")
 			_elif infrastructure_type = "feeder"
 			_then
 				result[:feeder_code] << rec.feeder_code.default("")
 				result[:olt_code] << rec.olt_code.default("")
 			_endif
-			write("Retrieved KMZ UUID for ", infrastructure_type, " code ", code, ": ",
-			      result[:kmz_uuid], " (Source: ", result[:kmz_source], ")")
 		_else
 			# No record found - all fields already initialized to empty strings
 			write("No KMZ UUID found for ", infrastructure_type, " code ", code)
