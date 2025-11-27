@@ -48,6 +48,20 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 			# Pole found - use existing pole
 			sh_loc << n_obj.location.coord
 			write("    >> Found existing structure within 100m: ", n_obj)
+
+			# Check if structure already has a figure_eight
+			_local existing_fe << _unset
+			_try
+				existing_fe << n_obj.figure_eight_records.an_element()
+			_when error
+				# No figure_eight method or error accessing
+			_endtry
+
+			_if existing_fe _isnt _unset
+			_then
+				write("    >> Structure already has figure_eight, skipping creation: ", existing_fe.name)
+				_return
+			_endif
 		_else
 			# No pole found - create placeholder pole
 			write("    >> Creating placeholder pole for slack")

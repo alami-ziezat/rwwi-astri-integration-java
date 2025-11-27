@@ -313,6 +313,65 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 			_endtry
 		_endif
 
+		# Step 10: Create figure_eight for FAT closures
+		_if closure_type = "FAT"
+		_then
+			_try _with errCon
+				write("    >> Creating figure_eight for FAT")
+
+				# Create figure_eight (slack/coil)
+				_local l_prop_values_fe << property_list.new_with(
+					:construction_status, .construction_status,
+					:type, "Circle",
+					:length, 20,
+					:name, pm[:name] + " Slack",
+					:folders, folders,
+					:fttx_network_type, _self.get_fttx_network_type(),
+					:segment, segment_id,
+					:pop, .pop_name,
+					:olt, .pop_name,
+					:uuid, .uuid,
+					:cluster_code, .cluster_code_db,
+					:subfeeder_code, .subfeeder_code_db,
+					:feeder_code, .feeder_code_db,
+					:olt_code, .olt_code
+				)
+
+				_local l_rec_trans_fe << record_transaction.new_insert(.fe_col, l_prop_values_fe)
+				_local l_result_fe << l_rec_trans_fe.run()
+
+				.stats[:figure_eights] +<< 1
+				write("    [OK] Figure eight created for FAT: ", pm[:name] + " Slack")
+
+				# Associate figure_eight to pole structure
+				_try
+					_if l_result_pl _isnt _unset
+					_then
+						l_result_fe.associate_to_structure(l_result_pl)
+						write("    >> Figure eight associated to structure")
+					_endif
+				_when error
+					# Continue if association fails
+				_endtry
+
+				# Connect figure_eight to cable if available
+				_try
+					_local l_swl_fe << l_result_pl.cable_records.an_element()
+
+					_if l_swl_fe _isnt _unset
+					_then
+						l_swl_fe.mcn!connect(l_result_fe)
+						write("    >> Figure eight connected to cable: ", l_swl_fe.name)
+					_endif
+				_when error
+					# Continue if cable connection fails
+				_endtry
+
+			_when error
+				write("    WARNING: Error creating figure_eight for FAT: ", errCon.report_contents_string)
+			_endtry
+		_endif
+
 		>> l_result
 
 	_when error
