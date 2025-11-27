@@ -64,7 +64,9 @@ public class BoqClient {
             .build();
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        return response.body();
+        var jsonResponse = response.body();
+        System.out.println("Response body: " + jsonResponse);
+        return jsonResponse;
     }
 
     private String buildJsonBody(String clusterCode, String vendorName, String subcontVendorName,

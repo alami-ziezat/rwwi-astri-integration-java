@@ -1,0 +1,1017 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Folder>
+	<name>Format KMZ Design (rev28102025)</name>
+	<visibility>0</visibility>
+	<open>1</open>
+	<Folder>
+		<name>FORMAT KMZ AERIAL</name>
+		<visibility>0</visibility>
+		<Folder>
+			<name>FEEDER CODE.KMZ</name>
+			<visibility>0</visibility>
+			<Folder>
+				<name>OLT</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>CABLE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-3</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-4</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 9-5</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 9-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE PARTNER 7-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE PARTNER 9-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 7-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 7-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 9-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 9-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>JOINT CLOSURE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>SLACK HANGER</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>HANDHOLE 80X80X130</name>
+				<visibility>0</visibility>
+			</Folder>
+		</Folder>
+		<Folder>
+			<name>SUBFEEDER CODE.KMZ</name>
+			<visibility>0</visibility>
+			<Folder>
+				<name>JOINT CLOSURE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-2.5</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-3</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 7-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 9-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE EMR 9-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE PARTNER 7-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING POLE PARTNER 9-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 7-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 9-5</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 7-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW POLE 9-4</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>CABLE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>SLACK HANGER</name>
+				<visibility>0</visibility>
+			</Folder>
+		</Folder>
+		<Folder>
+			<name>CLUSTER CODE.KMZ</name>
+			<visibility>0</visibility>
+			<Folder>
+				<name>BOUNDARY CLUSTER</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>FDT</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>LINE A</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>A01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-2.5</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-2.5</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+			<Folder>
+				<name>LINE B</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>B01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-2.5</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-2.5</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+			<Folder>
+				<name>LINE C</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>C01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-2.5</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-2.5</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+			<Folder>
+				<name>LINE D</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>D01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-2.5</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE EMR 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING POLE PARTNER 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-2.5</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-3</name>
+					<visibility>0</visibility>
+					<open>1</open>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 7-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW POLE 9-4</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+		</Folder>
+	</Folder>
+	<Folder>
+		<name>FORMAT KMZ UNDERGROUND</name>
+		<visibility>0</visibility>
+		<Folder>
+			<name>FEEDER CODE.KMZ</name>
+			<visibility>0</visibility>
+			<Folder>
+				<name>OLT</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>CABLE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>JOINT CLOSURE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING HH 80X80X130</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW HH 80X80X130</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>SUBDUCT 40/34</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>SUBDUCT 32/28</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>SLACK HANGER</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>SEWER</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>OPEN TRENCHING</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>BORING MANUAL</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>BORING MACHINE</name>
+				<visibility>0</visibility>
+			</Folder>
+		</Folder>
+		<Folder>
+			<name>SUBFEEDER CODE.KMZ</name>
+			<visibility>0</visibility>
+			<Folder>
+				<name>OPEN TRENCHING</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>BORING MACHINE</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>BORING MANUAL</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>SEWER</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>JOINT CLOSURE</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>CABLE</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>EXISTING HH 80X80X130</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>EXISTING HH 40X40X60</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW HH 80X80X130</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>NEW HH 40X40X60</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>SUBDUCT 40/34</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>SUBDUCT 32/28</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>SLACK HANGER</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+		</Folder>
+		<Folder>
+			<name>CLUSTER CODE.KMZ</name>
+			<visibility>0</visibility>
+			<Folder>
+				<name>BOUNDARY CLUSTER</name>
+				<visibility>0</visibility>
+				<open>1</open>
+			</Folder>
+			<Folder>
+				<name>FDT</name>
+				<visibility>0</visibility>
+			</Folder>
+			<Folder>
+				<name>LINE A</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>A01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>A05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>OPEN TRENCHING</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SEWER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MANUAL</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MACHINE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+			<Folder>
+				<name>LINE B</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>B01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>B05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>OPEN TRENCHING</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SEWER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MANUAL</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MACHINE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+			<Folder>
+				<name>LINE C</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>C01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>C05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>OPEN TRENCHING</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SEWER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MANUAL</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MACHINE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+			<Folder>
+				<name>LINE D</name>
+				<visibility>0</visibility>
+				<Folder>
+					<name>BOUNDARY FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>FAT</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>HP COVER</name>
+					<visibility>0</visibility>
+					<Folder>
+						<name>D01</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D02</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D03</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D04</name>
+						<visibility>0</visibility>
+					</Folder>
+					<Folder>
+						<name>D05</name>
+						<visibility>0</visibility>
+					</Folder>
+				</Folder>
+				<Folder>
+					<name>HP UNCOVER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>EXISTING HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 40X40X60</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>NEW HH 20X20X20</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>DISTRIBUTION CABLE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLACK HANGER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SLING WIRE</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>OPEN TRENCHING</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>SEWER</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MANUAL</name>
+					<visibility>0</visibility>
+				</Folder>
+				<Folder>
+					<name>BORING MACHINE</name>
+					<visibility>0</visibility>
+				</Folder>
+			</Folder>
+		</Folder>
+	</Folder>
+	<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10441"></atom:link>
+</Folder>
+</kml>

@@ -314,7 +314,6 @@ _method rwwi_astri_boq_generator.new(params)
 	##            :cluster_code - Cluster code (optional)
 	##            :vendor_name - Vendor name (optional)
 	##            :subcont_vendor_name - Subcontractor vendor name (optional)
-	##            :description - Description (optional, default: "Project Management")
 	##            :remarks - Remarks (optional, default: "Service")
 	##            :phase - Phase (optional, default: "project_opname")
 	##            :area - Area (optional)
@@ -356,11 +355,6 @@ _private _method rwwi_astri_boq_generator.init(scheme, params)
 	.boq_params << params
 
 	# Set defaults for optional fields if not provided
-	_if .boq_params[:description] _is _unset
-	_then
-		.boq_params[:description] << "Project Management"
-	_endif
-
 	_if .boq_params[:remarks] _is _unset
 	_then
 		.boq_params[:remarks] << "Service"
@@ -584,7 +578,7 @@ _private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, se
 			:vendor_name, .boq_params[:vendor_name],
 			:subcont_vendor_name, .boq_params[:subcont_vendor_name],
 			:equipment_name, code,                    # stf_item_code
-			:description, .boq_params[:description],  # Default: "Project Management"
+			:description, catalog_entry[:name],  # Default: "Project Management"
 			:quantity_material, mat_value,
 			:quantity_service, svc_value,
 			:remarks, .boq_params[:remarks],          # Default: "Service"

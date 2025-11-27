@@ -367,7 +367,6 @@ _private _method astri_design_migrator.match_pole_status(fs)
 		_endif
 
 	_else
-		write("DEFAULT POLE STATUS TO NEW")
 		# Default to New
 		_return "New"
 	_endif
