@@ -52,9 +52,20 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 			# Check if structure already has a figure_eight
 			_local existing_fe << _unset
 			_try
-				existing_fe << n_obj.figure_eight_records.an_element()
+				_local equipment_set << n_obj.get_equipment()
+				_if equipment_set _isnt _unset
+				_then
+					_for eq _over equipment_set.fast_elements()
+					_loop
+						_if eq.source_collection.name _is :figure_eight
+						_then
+							existing_fe << eq
+							_leave
+						_endif
+					_endloop
+				_endif
 			_when error
-				# No figure_eight method or error accessing
+				# Error accessing equipment
 			_endtry
 
 			_if existing_fe _isnt _unset
