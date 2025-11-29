@@ -1,3 +1,9 @@
 rwi_export_to_kml
 rwi_export_to_kml_dialog
 rwi_export_to_kml_plugin
+# New aerial KMZ export classes
+rwi_aerial_kmz_style_manager
+rwi_aerial_kmz_folder_builder
+rwi_aerial_kmz_line_assigner
+rwi_aerial_kmz_object_writer
+rwi_export_to_aerial_kmz

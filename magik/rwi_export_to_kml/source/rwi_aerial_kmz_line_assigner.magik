@@ -1,0 +1,169 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ LINE ASSIGNER
+## Assigns objects to LINE A/B/C/D based on line_type or comments field
+
+remex(:rwi_aerial_kmz_line_assigner)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+def_slotted_exemplar(:rwi_aerial_kmz_line_assigner,
+{
+}, :object)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_line_assigner.new()
+	## Create new LINE assigner
+	>> _clone
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_line_assigner.assign_line_to_object(p_object)
+	## Assigns object to LINE A/B/C/D based on line_type field or comments
+	##
+	## For most objects: Uses line_type attribute
+	## For ftth!zone and ftth!demand_point: Parses comments field
+	##
+	## Parameters:
+	##   p_object - Smallworld object
+	##
+	## Returns:
+	##   String - "A", "B", "C", or "D"
+
+	# Special handling for zone and demand_point objects (use comments field)
+	_if p_object.class_name _is :ftth!zone _orif
+	    p_object.class_name _is :ftth!demand_point
+	_then
+		_return _self.extract_line_from_comments(p_object)
+	_endif
+
+	# Standard objects: use line_type field
+	# Includes: cables, poles, FAT, HP points, mit_sling_wire, mit_figure_eight
+	line_type << p_object.perform_safely(:line_type)
+
+	_if line_type _isnt _unset _and
+	    {"A", "B", "C", "D"}.includes?(line_type.uppercase)
+	_then
+		_return line_type.uppercase
+	_endif
+
+	# Fallback: Default to LINE A
+	write("WARNING: Object ", p_object.class_name, " ID ", p_object.id,
+	      " has no valid line_type, defaulting to LINE A")
+	_return "A"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_line_assigner.extract_line_from_comments(p_object)
+	## Extracts LINE (A/B/C/D) from comments field
+	## Handles patterns: "Line A", "LINE B", "line C", etc.
+	##
+	## Parameters:
+	##   p_object - Smallworld object with comments field
+	##
+	## Returns:
+	##   String - "A", "B", "C", or "D"
+
+	comments << p_object.perform_safely(:comments).default("")
+
+	# Parse comments for "Line A", "LINE B", "line C", etc. (case-insensitive)
+	_for line_letter _over {"A", "B", "C", "D"}.fast_elements()
+	_loop
+		# Match patterns: "Line A", "LINE A", "line A", "line_A", etc.
+		pattern << write_string("(?i)line[\\s_]+(", line_letter, ")")
+
+		_if comments.index_of_regex(pattern) _isnt _unset
+		_then
+			_return line_letter
+		_endif
+	_endloop
+
+	# Fallback: Default to LINE A if no match found
+	write("WARNING: Object ", p_object.class_name, " ID ", p_object.id,
+	      " has no LINE in comments, defaulting to LINE A")
+	_return "A"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_line_assigner.assign_fdt_to_cluster_object(p_object, p_fdts)
+	## Assigns cluster object to nearest FDT using ring_name or proximity
+	##
+	## Parameters:
+	##   p_object - Smallworld object
+	##   p_fdts - Rope of FDT objects
+	##
+	## Returns:
+	##   FDT object
+
+	_if p_fdts.size = 0
+	_then
+		_return _unset
+	_endif
+
+	_if p_fdts.size = 1
+	_then
+		_return p_fdts.an_element()
+	_endif
+
+	# Try ring_name matching first (Priority 1)
+	obj_ring_name << p_object.perform_safely(:ring_name)
+
+	_if obj_ring_name _isnt _unset _and obj_ring_name <> ""
+	_then
+		_for fdt _over p_fdts.fast_elements()
+		_loop
+			fdt_name << fdt.perform_safely(:name).default("")
+
+			# Case-insensitive matching
+			_if obj_ring_name.lowercase.index_of_seq(fdt_name.lowercase) _isnt _unset
+			_then
+				_return fdt
+			_endif
+		_endloop
+	_endif
+
+	# Fallback to proximity (Priority 2)
+	obj_loc << p_object.perform_safely(:location)
+	_if obj_loc _is _unset
+	_then
+		# Default: assign to first FDT
+		_return p_fdts.an_element()
+	_endif
+
+	obj_coord << obj_loc.coord
+	nearest_fdt << _unset
+	min_distance << _unset
+
+	_for fdt _over p_fdts.fast_elements()
+	_loop
+		fdt_loc << fdt.perform_safely(:location)
+		_if fdt_loc _is _unset
+		_then
+			_continue
+		_endif
+
+		fdt_coord << fdt_loc.coord
+		distance << obj_coord.distance_to(fdt_coord)
+
+		_if min_distance _is _unset _orif distance < min_distance
+		_then
+			min_distance << distance
+			nearest_fdt << fdt
+		_endif
+	_endloop
+
+	# Default: return first FDT if proximity calculation failed
+	_if nearest_fdt _is _unset
+	_then
+		nearest_fdt << p_fdts.an_element()
+	_endif
+
+	>> nearest_fdt
+_endmethod
+$

@@ -971,3 +971,33 @@ _method rwwi_astri_workorder_engine.activate_design(project_name)
 	_endtry
 _endmethod
 $
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_design_boundary(design)
+	## Extract boundary polygon from design
+	##
+	## Parameters:
+	##   design - Smallworld design object
+	##
+	## Returns:
+	##   pseudo_polygon - Design boundary area for spatial filtering
+
+	_try _with errCond
+		# Get from project boundary
+		l_project << design.project
+		_for a _over l_project.project_areas.fast_elements() 
+		_loop
+			_if a.area _isnt _unset 
+			_then
+				_return a.area
+			_endif
+		_endloop
+
+		write("WARNING: No boundary found for design:", design.name)
+		_return _unset
+
+	_when error
+		write("Error getting design boundary:", errCond.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$

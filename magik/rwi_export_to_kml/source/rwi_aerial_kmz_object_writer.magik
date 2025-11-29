@@ -1,0 +1,67 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ OBJECT WRITER
+## Writes individual objects as KML placemarks
+
+remex(:rwi_aerial_kmz_object_writer)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+def_slotted_exemplar(:rwi_aerial_kmz_object_writer,
+{
+}, :object)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.new()
+	## Create new object writer
+	>> _clone
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
+	## Write pole placemark
+	## TODO: Implement in Phase 3
+
+	# Placeholder
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_stream, p_indent)
+	## Write cable placemark
+	## TODO: Implement in Phase 3
+
+	# Placeholder
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_equipment(p_equipment, p_stream, p_indent)
+	## Write equipment placemark (FAT/FDT/closure)
+	## TODO: Implement in Phase 3
+
+	# Placeholder
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_hp_point(p_hp, p_stream, p_indent)
+	## Write homepass point placemark
+	## TODO: Implement in Phase 3
+
+	# Placeholder
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_boundary(p_boundary, p_stream, p_indent)
+	## Write polygon boundary placemark
+	## TODO: Implement in Phase 3
+
+	# Placeholder
+_endmethod
+$

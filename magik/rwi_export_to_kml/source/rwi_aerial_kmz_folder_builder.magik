@@ -1,0 +1,295 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ FOLDER BUILDER
+## Builds hierarchical folder structure for FORMAT KMZ AERIAL
+
+remex(:rwi_aerial_kmz_folder_builder)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+def_slotted_exemplar(:rwi_aerial_kmz_folder_builder,
+{
+}, :object)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.new()
+	## Create new folder builder
+	>> _clone
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_feeder_folders()
+	## Build FEEDER CODE folder structure (15 folders)
+	##
+	## Returns:
+	##   rope of property_lists - Folder definitions
+
+	folder_defs << rope.new()
+
+	# 1. OLT
+	folder_defs.add(property_list.new_with(
+		:name, "OLT",
+		:visibility, _false))
+
+	# 2-9. EXISTING POLE variations (TELKOM, EMR, PARTNER) x (9-5, 9-4)
+	_for owner _over {"TELKOM", "EMR", "PARTNER"}.fast_elements()
+	_loop
+		_for pole_spec _over {"9-5", "9-4"}.fast_elements()
+		_loop
+			folder_defs.add(property_list.new_with(
+				:name, write_string("EXISTING POLE ", owner, " ", pole_spec),
+				:visibility, _false))
+		_endloop
+	_endloop
+
+	# 10-11. NEW POLE (9-5, 9-4)
+	_for pole_spec _over {"9-5", "9-4"}.fast_elements()
+	_loop
+		folder_defs.add(property_list.new_with(
+			:name, write_string("NEW POLE ", pole_spec),
+			:visibility, _false))
+	_endloop
+
+	# 12. JOINT CLOSURE
+	folder_defs.add(property_list.new_with(
+		:name, "JOINT CLOSURE",
+		:visibility, _false))
+
+	# 13. SLACK HANGER
+	folder_defs.add(property_list.new_with(
+		:name, "SLACK HANGER",
+		:visibility, _false))
+
+	# 14. HANDHOLE 80X80X130
+	folder_defs.add(property_list.new_with(
+		:name, "HANDHOLE 80X80X130",
+		:visibility, _false))
+
+	# 15. CABLE
+	folder_defs.add(property_list.new_with(
+		:name, "CABLE",
+		:visibility, _false))
+
+	>> folder_defs
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_subfeeder_folders()
+	## Build SUBFEEDER CODE folder structure (14 folders)
+	##
+	## Returns:
+	##   rope of property_lists - Folder definitions
+
+	folder_defs << rope.new()
+
+	# 1. JOINT CLOSURE (at top for subfeeder)
+	folder_defs.add(property_list.new_with(
+		:name, "JOINT CLOSURE",
+		:visibility, _false))
+
+	# 2-9. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-4)
+	_for owner _over {"EMR", "PARTNER"}.fast_elements()
+	_loop
+		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-4"}.fast_elements()
+		_loop
+			folder_defs.add(property_list.new_with(
+				:name, write_string("EXISTING POLE ", owner, " ", pole_spec),
+				:visibility, _false))
+		_endloop
+	_endloop
+
+	# 10-13. NEW POLE (7-2.5, 7-3, 7-4, 9-4)
+	_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-4"}.fast_elements()
+	_loop
+		folder_defs.add(property_list.new_with(
+			:name, write_string("NEW POLE ", pole_spec),
+			:visibility, _false))
+	_endloop
+
+	# 14. CABLE
+	folder_defs.add(property_list.new_with(
+		:name, "CABLE",
+		:visibility, _false))
+
+	# 15. SLACK HANGER
+	folder_defs.add(property_list.new_with(
+		:name, "SLACK HANGER",
+		:visibility, _false))
+
+	>> folder_defs
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
+	## Build CLUSTER CODE folder structure (dynamic based on FDT count)
+	##
+	## Parameters:
+	##   p_fdts - Rope of FDT objects
+	##
+	## Returns:
+	##   rope of property_lists - Folder definitions
+
+	folder_defs << rope.new()
+
+	# 1. BOUNDARY CLUSTER (always present)
+	folder_defs.add(property_list.new_with(
+		:name, "BOUNDARY CLUSTER",
+		:visibility, _false))
+
+	# Determine structure based on FDT count
+	fdt_count << p_fdts.size
+
+	_if fdt_count = 0
+	_then
+		# No FDTs - create minimal structure (rare case)
+		write("WARNING: No FDTs detected in cluster export area")
+		>> folder_defs
+
+	_elif fdt_count = 1
+	_then
+		# Single FDT - simplified structure (FDT at top level with LINEs inside)
+		fdt << p_fdts.an_element()
+		fdt_folder << property_list.new_with(
+			:name, "FDT",
+			:visibility, _false,
+			:fdt_object, fdt,
+			:subfolders, rope.new())
+
+		# Add 4 LINEs inside FDT folder
+		_for line_id _over {"A", "B", "C", "D"}.fast_elements()
+		_loop
+			line_folder << _self.build_line_folders(line_id, fdt)
+			fdt_folder[:subfolders].add(line_folder)
+		_endloop
+
+		folder_defs.add(fdt_folder)
+
+	_else
+		# Multiple FDTs - create separate FDT_[NAME] folder for each
+		_for fdt _over p_fdts.fast_elements()
+		_loop
+			fdt_name << fdt.perform_safely(:name).default("FDT_" + fdt.id.write_string)
+
+			# Create FDT_[FDT_NAME] folder (NO "CLUSTER" prefix)
+			cluster_folder << property_list.new_with(
+				:name, write_string("FDT_", fdt_name),
+				:visibility, _false,
+				:fdt_object, fdt,
+				:subfolders, rope.new())
+
+			# Add FDT folder inside
+			cluster_folder[:subfolders].add(property_list.new_with(
+				:name, "FDT",
+				:visibility, _false,
+				:fdt_object, fdt))
+
+			# Add 4 LINEs inside this FDT folder
+			_for line_id _over {"A", "B", "C", "D"}.fast_elements()
+			_loop
+				line_folder << _self.build_line_folders(line_id, fdt)
+				cluster_folder[:subfolders].add(line_folder)
+			_endloop
+
+			folder_defs.add(cluster_folder)
+		_endloop
+	_endif
+
+	>> folder_defs
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_line_folders(p_line_id, p_fdt)
+	## Build LINE folder structure (14 subfolders for A/B/C/D)
+	##
+	## Parameters:
+	##   p_line_id - "A", "B", "C", or "D"
+	##   p_fdt - Parent FDT object (for context)
+	##
+	## Returns:
+	##   property_list - LINE folder definition with subfolders
+
+	line_def << property_list.new_with(
+		:name, write_string("LINE ", p_line_id),
+		:visibility, _false,
+		:line_id, p_line_id,
+		:fdt_object, p_fdt,
+		:subfolders, rope.new())
+
+	subfolders << line_def[:subfolders]
+
+	# 1. BOUNDARY FAT
+	subfolders.add(property_list.new_with(
+		:name, "BOUNDARY FAT",
+		:visibility, _false))
+
+	# 2. FAT
+	subfolders.add(property_list.new_with(
+		:name, "FAT",
+		:visibility, _false))
+
+	# 3. HP COVER with 5 zones ([LINE]01 through [LINE]05)
+	hp_cover_folder << property_list.new_with(
+		:name, "HP COVER",
+		:visibility, _false,
+		:subfolders, rope.new())
+
+	_for zone_num _over 1.upto(5)
+	_loop
+		# Format zone number as 01, 02, 03, 04, 05
+		zone_name << write_string(p_line_id, %0, zone_num)
+		hp_cover_folder[:subfolders].add(property_list.new_with(
+			:name, zone_name,
+			:visibility, _false))
+	_endloop
+
+	subfolders.add(hp_cover_folder)
+
+	# 4. HP UNCOVER
+	subfolders.add(property_list.new_with(
+		:name, "HP UNCOVER",
+		:visibility, _false))
+
+	# 5-12. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-4)
+	_for owner _over {"EMR", "PARTNER"}.fast_elements()
+	_loop
+		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-4"}.fast_elements()
+		_loop
+			subfolders.add(property_list.new_with(
+				:name, write_string("EXISTING POLE ", owner, " ", pole_spec),
+				:visibility, _false))
+		_endloop
+	_endloop
+
+	# 13-16. NEW POLE (7-4, 9-4) - only 2 variations for cluster
+	_for pole_spec _over {"7-4", "9-4"}.fast_elements()
+	_loop
+		subfolders.add(property_list.new_with(
+			:name, write_string("NEW POLE ", pole_spec),
+			:visibility, _false))
+	_endloop
+
+	# 17. DISTRIBUTION CABLE
+	subfolders.add(property_list.new_with(
+		:name, "DISTRIBUTION CABLE",
+		:visibility, _false))
+
+	# 18. SLACK HANGER
+	subfolders.add(property_list.new_with(
+		:name, "SLACK HANGER",
+		:visibility, _false))
+
+	# 19. SLING WIRE
+	subfolders.add(property_list.new_with(
+		:name, "SLING WIRE",
+		:visibility, _false))
+
+	>> line_def
+_endmethod
+$

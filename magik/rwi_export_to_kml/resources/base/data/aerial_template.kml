@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>PROJECT_NAME_PLACEHOLDER</name>
+	<open>1</open>
+
+	<!-- Pole Styles -->
+	<Style id="pole_emr">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.8</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="pole_emr_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>1.0</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="pole_emr_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_emr</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_emr_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="pole_partner">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.8</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="pole_partner_highlight">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>1.0</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="pole_partner_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_partner</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_partner_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- Cable Styles by Distribution -->
+	<Style id="cable_dist_1">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_dist_1_highlight">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_dist_1_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_dist_1</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_dist_1_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="cable_dist_2">
+		<LineStyle>
+			<color>ff00ff00</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_dist_2_highlight">
+		<LineStyle>
+			<color>ff00ff00</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_dist_2_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_dist_2</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_dist_2_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="cable_dist_3">
+		<LineStyle>
+			<color>ffffff00</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_dist_3_highlight">
+		<LineStyle>
+			<color>ffffff00</color>
+			<width>5</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_dist_3_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_dist_3</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_dist_3_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="cable_feeder">
+		<LineStyle>
+			<color>ffff00ff</color>
+			<width>4</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_feeder_highlight">
+		<LineStyle>
+			<color>ffff00ff</color>
+			<width>6</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_feeder_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_feeder</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_feeder_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- Equipment Styles -->
+	<Style id="olt">
+		<IconStyle>
+			<color>ff0000aa</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>https://maps.google.com/mapfiles/kml/shapes/ranger_station.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.9</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="olt_highlight">
+		<IconStyle>
+			<color>ff0000aa</color>
+			<scale>1.4</scale>
+			<Icon>
+				<href>https://maps.google.com/mapfiles/kml/shapes/ranger_station.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>1.1</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="olt_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#olt</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#olt_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="fdt">
+		<IconStyle>
+			<color>ff0000aa</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.8</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="fdt_highlight">
+		<IconStyle>
+			<color>ff0000aa</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>1.0</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="fdt_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="fat">
+		<IconStyle>
+			<color>ffaa0000</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/paddle/C.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.8</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="fat_highlight">
+		<IconStyle>
+			<color>ffaa0000</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/paddle/C.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>1.0</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="fat_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<Style id="joint_closure">
+		<IconStyle>
+			<color>ff7f0000</color>
+			<scale>0.8</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.7</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="joint_closure_highlight">
+		<IconStyle>
+			<color>ff7f0000</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.9</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="joint_closure_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#joint_closure</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#joint_closure_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- Homepass Styles -->
+	<Style id="hp_point">
+		<IconStyle>
+			<color>ffffffff</color>
+			<scale>0.7</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.6</scale>
+		</LabelStyle>
+	</Style>
+	<Style id="hp_point_highlight">
+		<IconStyle>
+			<color>ffffffff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<scale>0.8</scale>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="hp_point_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#hp_point</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#hp_point_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- Boundary Styles -->
+	<Style id="boundary">
+		<LineStyle>
+			<color>7f00ffff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>3f00ffff</color>
+			<fill>1</fill>
+			<outline>1</outline>
+		</PolyStyle>
+	</Style>
+	<Style id="boundary_highlight">
+		<LineStyle>
+			<color>7f00ffff</color>
+			<width>3</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>3f00ffff</color>
+			<fill>1</fill>
+			<outline>1</outline>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="boundary_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#boundary</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#boundary_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- Sling Wire / Slack Hanger Styles -->
+	<Style id="sling_wire">
+		<LineStyle>
+			<color>ff808080</color>
+			<width>1</width>
+		</LineStyle>
+	</Style>
+	<Style id="sling_wire_highlight">
+		<LineStyle>
+			<color>ff808080</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="sling_wire_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sling_wire</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sling_wire_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CONTENT_PLACEHOLDER -->
+
+</Document>
+</kml>

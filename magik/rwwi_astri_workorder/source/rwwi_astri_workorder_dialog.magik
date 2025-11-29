@@ -289,6 +289,13 @@ _private _method rwwi_astri_workorder_dialog.build_detail_panel(parent)
 		:model, _self,
 		:selector, :generate_boq_json|()|)
 	.items[:boq_json_btn].enabled? << _false
+
+	# NEW: Export KML button
+	.items[:export_kml_btn] << sw_button_item.new(button_con,
+		:label, "Export Smallworld KML",
+		:model, _self,
+		:selector, :export_smallworld_kml|()|)
+	.items[:export_kml_btn].enabled? << _false
 _endmethod
 $
 
@@ -603,6 +610,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:migrate_existing_btn].enabled? << _false
 		.items[:boq_excel_btn].enabled? << _false
 		.items[:boq_json_btn].enabled? << _false
+		.items[:export_kml_btn].enabled? << _false
 	_else
 		# Display comprehensive work order details in text window WITHOUT clearing previous logs
 		# This preserves process execution results while showing current selection
@@ -709,10 +717,11 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		# Enable migrate_existing only for ABD KML sources
 		.items[:migrate_existing_btn].enabled? << has_kmz _and is_abd
 
-		# Enable BoQ buttons only if project and design exist
+		# Enable BoQ and KML export buttons only if project and design exist
 		_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
 		.items[:boq_excel_btn].enabled? << has_project _and has_design
 		.items[:boq_json_btn].enabled? << has_project _and has_design
+		.items[:export_kml_btn].enabled? << has_project _and has_design
 	_endif
 _endmethod
 $
@@ -1901,5 +1910,94 @@ _method rwwi_astri_workorder_dialog.user_error(message)
 	## Display error message to user
 
 	write("ERROR:", message)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.export_smallworld_kml()
+	## Export Smallworld objects to KML based on selected work order
+	## Exports design area with infrastructure type filtering
+
+	_if .selected_wo _is _unset
+	_then
+		_self.show_alert("No Work Order Selected",
+			"Please select a work order to export")
+		_return
+	_endif
+
+	# Get work order details
+	wo_number << .selected_wo[:wo_number]
+	infra_type << .selected_wo[:infrastructure_type].default("cluster")
+
+	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type)
+	_self.log_info(write_string("Exporting KML for WO: ", wo_number, newline_char))
+
+	# Get project and design
+	_try _with errCond
+		design << .engine.get_design_for_project(wo_number)
+		_if design _is _unset
+		_then
+			_self.show_alert("Design Not Found",
+				write_string("No design found for project '", wo_number, "'"))
+			_return
+		_endif
+
+		# Activate the design before export
+		_self.log_info(write_string("Activating design for project: ", wo_number, newline_char))
+		.engine.activate_design(wo_number)
+
+		# Get design boundary
+		design_area << .engine.get_design_boundary(design)
+		_if design_area _is _unset
+		_then
+			_self.show_alert("Design Area Not Found",
+				"Design has no boundary area defined")
+			_return
+		_endif
+
+		# Show file chooser dialog
+		# Sanitize WO number for filename (replace / with _)
+		safe_filename << wo_number.substitute_string("/", "_") + ".kmz"
+		output_file << _self.get_output_file_from_user(safe_filename)
+		_if output_file _is _unset
+		_then
+			_return  # User cancelled
+		_endif
+
+		# Create exporter
+		exporter << rwi_export_to_aerial_kmz.new()
+		exporter.gc << gis_program_manager.cached_dataset(:gis).collections
+		exporter.project_name << wo_number
+		exporter.project_area << design_area
+		exporter.infrastructure_type << infra_type.as_symbol()
+
+		# Show progress
+		_self.log_info(write_string("Starting export...", newline_char))
+
+		# Export with dynamic network detection
+		output_path << exporter.export_mixed_network(design_area, output_file)
+
+		# Success message
+		_self.show_message("Export Complete",
+			write_string("Created: ", output_path))
+		_self.log_info(write_string("Export completed: ", output_path, newline_char))
+
+	_when error
+		_self.show_alert("Export Failed", errCond.report_contents_string)
+		_self.log_info(write_string("Export failed: ", errCond.report_contents_string, newline_char))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.get_output_file_from_user(default_filename)
+	## Shows file chooser dialog for KMZ output
+
+	output_dir << system.temp_directory_name
+
+	# Simple file path construction (file chooser not available in SW)
+	output_file << system.pathname_from_components(output_dir, default_filename)
+
+	>> output_file
 _endmethod
 $

@@ -1,0 +1,48 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ STYLE MANAGER
+## Manages KML style definitions for objects
+
+remex(:rwi_aerial_kmz_style_manager)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+def_slotted_exemplar(:rwi_aerial_kmz_style_manager,
+{
+}, :object)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_style_manager.new()
+	## Create new style manager
+	>> _clone
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_style_manager.write_style_definitions(p_stream)
+	## Write KML style definitions
+	## TODO: Load from template file in Phase 1 Day 3
+
+	# For now, write minimal styles
+	p_stream.write("  <!-- Styles will be added in Phase 1 Day 3 -->", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_style_manager.get_style_for_object(p_object_type, p_attributes)
+	## Get style ID for an object
+	##
+	## Parameters:
+	##   p_object_type - Symbol (:pole, :cable, :fat, etc.)
+	##   p_attributes - property_list of object attributes
+	##
+	## Returns:
+	##   String - Style ID
+
+	# TODO: Implement full style mapping in Phase 1 Day 3
+	>> "default_style"
+_endmethod
+$

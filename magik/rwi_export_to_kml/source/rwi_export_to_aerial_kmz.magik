@@ -1,0 +1,440 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ EXPORTER
+## Main class for exporting Smallworld network to FORMAT KMZ AERIAL hierarchy
+## Integrates with ASTRI Work Order Dialog
+
+remex(:rwi_export_to_aerial_kmz)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+def_slotted_exemplar(:rwi_export_to_aerial_kmz,
+{
+	{:gc, _unset, :writable},                    # GIS case
+	{:project_name, _unset, :writable},          # Project name (from WO number)
+	{:project_area, _unset, :writable},          # Design boundary area
+	{:output_directory, _unset, :writable},      # Output directory
+	{:infrastructure_type, _unset, :writable},   # Infrastructure type filter (cluster/feeder/subfeeder)
+	{:style_manager, _unset, :writable},         # Style manager instance
+	{:folder_builder, _unset, :writable},        # Folder builder instance
+	{:object_writer, _unset, :writable},         # Object writer instance
+	{:line_assigner, _unset, :writable}          # LINE assigner instance
+}, :object)
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_export_to_aerial_kmz.new()
+	## Create new exporter instance
+	>> _clone.init()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.init()
+	## Initialize exporter with helper instances
+
+	# Create helper instances
+	.style_manager << rwi_aerial_kmz_style_manager.new()
+	.folder_builder << rwi_aerial_kmz_folder_builder.new()
+	.object_writer << rwi_aerial_kmz_object_writer.new()
+	.line_assigner << rwi_aerial_kmz_line_assigner.new()
+
+	>> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
+	## Main export method - exports with automatic network level detection
+	## and infrastructure type filtering
+	##
+	## Parameters:
+	##   p_area - Design boundary area (pseudo_polygon)
+	##   p_output_file - Output file path (e.g., "WO_12345.kmz")
+	##
+	## Returns:
+	##   String - Path to created KMZ file
+
+	write("Starting aerial KMZ export...")
+	write("  Project:", .project_name)
+	write("  Infrastructure Type:", .infrastructure_type)
+
+	# Detect network levels in area
+	levels << _self.detect_network_levels_in_area(p_area)
+
+	# Filter based on infrastructure type
+	_if .infrastructure_type _isnt _unset _and
+	    .infrastructure_type <> :all
+	_then
+		write("  Filtering to infrastructure type:", .infrastructure_type)
+
+		_if .infrastructure_type _is :cluster
+		_then
+			levels[:feeder] << _false
+			levels[:subfeeder] << _false
+		_elif .infrastructure_type _is :feeder
+		_then
+			levels[:subfeeder] << _false
+			levels[:cluster] << _false
+		_elif .infrastructure_type _is :subfeeder
+		_then
+			levels[:feeder] << _false
+			levels[:cluster] << _false
+		_endif
+	_endif
+
+	write("  Network levels to export:")
+	write("    FEEDER:", levels[:feeder])
+	write("    SUBFEEDER:", levels[:subfeeder])
+	write("    CLUSTER:", levels[:cluster])
+
+	# Create KML file
+	kml_file << _self.create_kml_file(p_output_file, p_area, levels)
+
+	# Create KMZ (zip the KML) - COMMENTED OUT FOR NOW
+	# kmz_file << _self.create_kmz_from_kml(kml_file)
+
+	write("Export complete:", kml_file)
+	>> kml_file
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
+	## Detect which network levels are present in the export area
+	## Logic:
+	##   1. FEEDER: Find if mit_hub is inside project area
+	##   2. SUBFEEDER: Find poles in area, check if poles have sheath_splice with type Joint Closure/Closure AND FDT
+	##   3. CLUSTER: Find poles in area, check if poles have sheath_splice with type FDT AND FAT
+	##
+	## Returns:
+	##   property_list - {:feeder, boolean, :subfeeder, boolean, :cluster, boolean, :fdts, rope}
+
+	levels << property_list.new_with(
+		:feeder, _false,
+		:subfeeder, _false,
+		:cluster, _false,
+		:fdts, rope.new())
+
+	# 1. FEEDER: Check for mit_hub in area
+	olts << .gc[:mit_hub].select(
+		predicate.within(:location, p_area))
+
+	_if olts.size > 0
+	_then
+		levels[:feeder] << _true
+		write("  Detected FEEDER network (", olts.size, " OLTs/hubs)")
+	_endif
+
+	# Get all poles in area first
+	all_poles << .gc[:pole].select(
+		predicate.within(:location, p_area))
+
+	write("  Found ", all_poles.size, " poles in area")
+
+	# Now check equipment on these poles
+	has_joint_closure << _false
+	has_fdt << _false
+	has_fat << _false
+	all_fdts << rope.new()
+
+	_for pole _over all_poles.fast_elements()
+	_loop
+		# Get all equipment on this pole
+		pole_equipment << pole.get_equipment()
+		_if pole_equipment _is _unset _then _continue _endif
+
+		# Get sheath_splice from equipment
+		pole_splices << pole_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :sheath_splice)))
+
+		# Check if sheath_splice exists on this pole
+		_if _not pole_splices.empty?
+		_then
+			# Check each sheath_splice
+			_for splice _over pole_splices.fast_elements()
+			_loop
+				splice_type << splice.sheath_splice_object_type
+				_if splice_type _is _unset _then _continue _endif
+
+				# Check for Joint Closure (SUBFEEDER indicator)
+				_if splice_type.lowercase = "joint closure" _or
+				    splice_type.lowercase = "closure"
+				_then
+					has_joint_closure << _true
+				_endif
+
+				# Check for FDT (SUBFEEDER and CLUSTER indicator)
+				_if splice_type.uppercase = "FDT"
+				_then
+					has_fdt << _true
+					all_fdts.add_last(splice)
+				_endif
+
+				# Check for FAT (CLUSTER indicator)
+				_if splice_type.uppercase = "FAT"
+				_then
+					has_fat << _true
+				_endif
+			_endloop
+		_endif
+	_endloop
+
+	# Check for mit_terminal_enclosure directly in area (world geometry)
+	terminal_enclosures << .gc[:mit_terminal_enclosure].select(
+		predicate.within(:location, p_area))
+
+	_if terminal_enclosures.size > 0
+	_then
+		has_fdt << _true
+		_for terminal _over terminal_enclosures.fast_elements()
+		_loop
+			all_fdts.add_last(terminal)
+		_endloop
+		write("  Found ", terminal_enclosures.size, " mit_terminal_enclosures (FDTs) in area")
+	_endif
+
+	# Store all FDTs found
+	levels[:fdts] << all_fdts
+
+	# 2. SUBFEEDER: Poles have Joint Closure AND FDT
+	_if has_joint_closure _and has_fdt
+	_then
+		levels[:subfeeder] << _true
+		write("  Detected SUBFEEDER network (has Joint Closures and FDTs on poles)")
+	_endif
+
+	# 3. CLUSTER: Poles have FDT AND FAT
+	_if has_fdt _and has_fat
+	_then
+		levels[:cluster] << _true
+		write("  Detected CLUSTER network (", all_fdts.size, " FDTs and FATs on poles)")
+	_endif
+
+	>> levels
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area, p_levels)
+	## Create KML file with dynamic folder structure using template
+
+	# Replace .kmz with .kml for temp file
+	kml_file << p_output_file.substitute_string(".kmz", ".kml")
+
+	# Load template file
+	template_file << smallworld_product.get_data_file("aerial_template.kml", :rwi_export_to_kml)
+	_if template_file _is _unset
+	_then
+		condition.raise(:error, :string, "Template file aerial_template.kml not found")
+	_endif
+
+	# Read template content
+	template_stream << external_text_input_stream.new(template_file.write_string)
+	template_content << rope.new()
+	_loop
+		line << template_stream.get_line()
+		_if line _is _unset _then _leave _endif
+		template_content.add_last(line)
+	_endloop
+	template_stream.close()
+
+	# Create output stream
+	kml_stream << external_text_output_stream.new(kml_file)
+
+	# Write template header and styles (up to CONTENT_PLACEHOLDER)
+	_for line _over template_content.fast_elements()
+	_loop
+		_if line.index_of_seq("CONTENT_PLACEHOLDER") _isnt _unset
+		_then
+			_leave  # Stop before placeholder
+		_endif
+
+		# Replace project name placeholder
+		_local output_line << line
+		_if line.index_of_seq("PROJECT_NAME_PLACEHOLDER") _isnt _unset
+		_then
+			output_line << line.substitute_string("PROJECT_NAME_PLACEHOLDER", .project_name.default("AERIAL_EXPORT"))
+		_endif
+
+		kml_stream.write(output_line, newline_char)
+	_endloop
+
+	# Write network level folders
+	_if p_levels[:feeder]
+	_then
+		write("Exporting FEEDER network...")
+		_self.write_feeder_section(kml_stream, p_area)
+	_endif
+
+	_if p_levels[:subfeeder]
+	_then
+		write("Exporting SUBFEEDER network...")
+		_self.write_subfeeder_section(kml_stream, p_area)
+	_endif
+
+	_if p_levels[:cluster]
+	_then
+		write("Exporting CLUSTER network...")
+		_self.write_cluster_section(kml_stream, p_area, p_levels[:fdts])
+	_endif
+
+	# Write KML footer
+	_self.write_kml_footer(kml_stream)
+
+	kml_stream.close()
+
+	>> kml_file
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_kml_footer(p_stream)
+	## Write KML document footer
+
+	p_stream.write("</Document>", newline_char)
+	p_stream.write("</kml>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_feeder_section(p_stream, p_area)
+	## Write FEEDER CODE section with 15 folders
+
+	p_stream.write("  <Folder>", newline_char)
+	p_stream.write("    <name>FEEDER CODE</name>", newline_char)
+
+	# Get folder definitions from builder
+	folder_defs << .folder_builder.build_feeder_folders()
+
+	# Write each folder
+	_for folder_def _over folder_defs.fast_elements()
+	_loop
+		_self.write_folder(p_stream, folder_def, p_area, 4)
+	_endloop
+
+	p_stream.write("  </Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_subfeeder_section(p_stream, p_area)
+	## Write SUBFEEDER CODE section with 14 folders
+
+	p_stream.write("  <Folder>", newline_char)
+	p_stream.write("    <name>SUBFEEDER CODE</name>", newline_char)
+
+	# Get folder definitions from builder
+	folder_defs << .folder_builder.build_subfeeder_folders()
+
+	# Write each folder
+	_for folder_def _over folder_defs.fast_elements()
+	_loop
+		_self.write_folder(p_stream, folder_def, p_area, 4)
+	_endloop
+
+	p_stream.write("  </Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area, p_fdts)
+	## Write CLUSTER CODE section with dynamic FDT structure
+
+	p_stream.write("  <Folder>", newline_char)
+	p_stream.write("    <name>CLUSTER CODE</name>", newline_char)
+
+	# Get folder definitions from builder (dynamic based on FDT count)
+	folder_defs << .folder_builder.build_cluster_folders(p_fdts)
+
+	# Write each folder
+	_for folder_def _over folder_defs.fast_elements()
+	_loop
+		_self.write_folder(p_stream, folder_def, p_area, 4)
+	_endloop
+
+	p_stream.write("  </Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_folder(p_stream, p_folder_def, p_area, p_indent)
+	## Write a folder and its contents recursively
+
+	indent << "".fill_up_with(% , p_indent)
+
+	p_stream.write(indent, "<Folder>", newline_char)
+	p_stream.write(indent, "  <name>", p_folder_def[:name], "</name>", newline_char)
+
+	# Write visibility if specified
+	_if p_folder_def[:visibility] _isnt _unset
+	_then
+		vis_str << _if p_folder_def[:visibility] _then "1" _else "0" _endif
+		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
+	_endif
+
+	# Write subfolders if present
+	_if p_folder_def[:subfolders] _isnt _unset
+	_then
+		_for subfolder _over p_folder_def[:subfolders].fast_elements()
+		_loop
+			_self.write_folder(p_stream, subfolder, p_area, p_indent + 2)
+		_endloop
+	_endif
+
+	# TODO: Write placemarks for this folder
+	# This will be implemented in Phase 3
+
+	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.create_kmz_from_kml(p_kml_file)
+	## Create KMZ file (zipped KML)
+
+	kmz_file << p_kml_file.substitute_string(".kml", ".kmz")
+
+	# Use system zip command (Windows compatible)
+	_if system.getenv("OS").default("").matches?("Windows")
+	_then
+		# Windows: use PowerShell Compress-Archive
+		# PowerShell handles paths with spaces correctly
+		zip_cmd << write_string("powershell -Command ",
+			%", "Compress-Archive -Force -Path '", p_kml_file, "' -DestinationPath '", kmz_file, "'", %")
+
+		system.do_command(zip_cmd)
+	_else
+		# Unix/Linux: use zip command
+		# Get directory and basename for zip command
+		last_slash << p_kml_file.rindex_of(%\)
+		_if last_slash _is _unset
+		_then
+			last_slash << p_kml_file.rindex_of(%/)
+		_endif
+
+		_if last_slash _isnt _unset
+		_then
+			kml_dir << p_kml_file.slice(1, last_slash - 1)
+			kml_basename << p_kml_file.slice_to_end(last_slash + 1)
+		_else
+			kml_dir << "."
+			kml_basename << p_kml_file
+		_endif
+
+		kmz_basename << kml_basename.substitute_string(".kml", ".kmz")
+
+		zip_cmd << write_string("cd ", %", kml_dir, %", " && zip -q ", %", kmz_basename, %", " ", %", kml_basename, %")
+		system.do_command(zip_cmd)
+	_endif
+
+	# Delete temporary KML file
+	system.unlink(p_kml_file)
+
+	>> kmz_file
+_endmethod
+$
