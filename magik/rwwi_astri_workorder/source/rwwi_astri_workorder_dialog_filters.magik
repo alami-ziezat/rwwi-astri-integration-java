@@ -154,4 +154,3 @@ _private _method rwwi_astri_workorder_dialog.build_filter_params()
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={astri_integration})

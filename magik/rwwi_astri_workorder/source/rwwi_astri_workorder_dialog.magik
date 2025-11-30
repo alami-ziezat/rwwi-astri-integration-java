@@ -754,5 +754,3 @@ _method rwwi_astri_workorder_dialog.user_error(message)
 	write("ERROR:", message)
 _endmethod
 $
-
-_pragma(classify_level=debug, topic={astri_integration})

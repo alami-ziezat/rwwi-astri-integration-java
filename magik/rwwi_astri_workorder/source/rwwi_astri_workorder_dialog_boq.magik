@@ -448,5 +448,3 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 	_endtry
 _endmethod
 $
-
-_pragma(classify_level=debug, topic={astri_integration})
