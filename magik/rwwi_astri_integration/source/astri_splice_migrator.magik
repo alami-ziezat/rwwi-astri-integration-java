@@ -195,6 +195,9 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		# Step 5: Get line type for sheath splice
 		_local line_type << _self.match_line(folders)
 
+		# Step 5.5: Extract ring_name from folders
+		_local ring_name << _self.extract_ring_name_from_folders(folders)
+
 		# Step 6: Determine construction status based on name pattern
 	_local splice_name_lc << pm[:name].lowercase
 	_local const_status <<
@@ -222,6 +225,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 			:sheath_splice_object_type, ot,
 			:fttx_network_type, _self.get_fttx_network_type(),
 			:line_type, line_type,
+			:ring_name, ring_name,
 			:name, pm[:name],
 			:segment, segment_id,
 			:region, .region,

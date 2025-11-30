@@ -33,6 +33,9 @@ _private _method astri_design_migrator.create_pole(pm)
 		_local line_type << _self.match_line(folders_lc)
 		_local segment_id<< _self.match_segment(folders)
 
+		# Step 2.5: Extract ring_name from folders
+		_local ring_name << _self.extract_ring_name_from_folders(folders)
+
 		# Map pole type to STF item code
 		_local stf_item_code << _unset
 		_if pole_type = "Pole 7-2.5"
@@ -110,6 +113,7 @@ _private _method astri_design_migrator.create_pole(pm)
 				existing_pole.region << .region
 				existing_pole.cluster << .cluster
 				existing_pole.line_type << m_line
+				existing_pole.ring_name << ring_name
 				existing_pole.cluster_code << .cluster_code_db
 				existing_pole.subfeeder_code << .subfeeder_code_db
 				existing_pole.feeder_code << .feeder_code_db
@@ -176,6 +180,7 @@ _private _method astri_design_migrator.create_pole(pm)
 				:folders, folders,
 				:fttx_network_type, _self.get_fttx_network_type(),
 				:segment, segment_id,
+				:ring_name, ring_name,
 				:pop, .pop_name,
 				:olt, .pop_name,
 				:region, .region,

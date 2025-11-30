@@ -36,6 +36,9 @@ _private _method astri_design_migrator.create_riser(pm)
 		_local location << _self.parse_point_geometry(pm[:coord])
 		_local coord << location.as_coord()
 
+		# Step 3.5: Extract ring_name from folders (FDT/Closure name)
+		_local ring_name << _self.extract_ring_name_from_folders(folders)
+
 		# Step 4: Create riser cable as point-based riser object
 		# Using minimal length for point-based representation
 		_local prop_values << property_list.new_with(
@@ -43,6 +46,7 @@ _private _method astri_design_migrator.create_riser(pm)
 			:name, pm[:name],
 			:folders, folders,
 			:fttx_network_type, _self.get_fttx_network_type(),
+			:ring_name, ring_name,
 			:construction_status, .construction_status,
 			:cable_type, "Riser",
 			:stf_item_code, "200001034"

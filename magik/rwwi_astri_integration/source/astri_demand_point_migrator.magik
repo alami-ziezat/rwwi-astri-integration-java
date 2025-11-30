@@ -37,6 +37,9 @@ _private _method astri_design_migrator.create_demand_point(pm)
 		# Step 3.5: Extract line_type
 		_local m_line << _self.match_line(folders)
 
+		# Step 3.6: Extract ring_name from folders (FDT/Closure name)
+		_local ring_name << _self.extract_ring_name_from_folders(folders)
+
 		# Step 4: Create demand point
 		_local prop_values << property_list.new_with(
 			:identification, pm[:name],
@@ -50,7 +53,8 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			:pop, .pop_name,
 			:olt, .pop_name,
 			:line_type, m_line,
-			:notes, .prj_id,
+			:ring_name, ring_name,
+			:notes, ring_name+" | "+.cluster_code_db,
 			:location, location,
 			:uuid, .uuid
 		)

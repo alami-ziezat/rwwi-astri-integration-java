@@ -13,7 +13,11 @@ $
 
 def_slotted_exemplar(:astri_kml_parser,
 	{
-		{:kml_content, _unset}
+		{:kml_content, _unset},
+		{:splice_names, _unset},
+		{:splice_name_mapping, _unset},
+		{:splice_index_mapping, _unset},
+		{:current_splice_folder_name, _unset}
 	})
 $
 
@@ -64,6 +68,14 @@ _method astri_kml_parser.parse()
 	_then
 		condition.raise(:error, :string, "No KML file path set. Use kml_file_path<< first.")
 	_endif
+	# Create hash tables to track splice names for uniqueness
+	.splice_names << equality_set.new()
+	# Create hash table to map original placemark names to unique splice names
+	# Key: original placemark name, Value: unique splice name (e.g., "FDT -- ABC")
+	.splice_name_mapping << equality_hash_table.new()
+	# Create hash table to map "FDT 1", "FDT 2", "Closure 1" to actual splice names
+	# Key: "FDT 1", Value: "FDT -- IDL3.018-1"
+	.splice_index_mapping << equality_hash_table.new()
 
 	>> _self.extract_placemarks_from_file(.kml_content)
 _endmethod
@@ -91,7 +103,7 @@ _private _method astri_kml_parser.extract_placemarks_from_file(kml_file_path)
 	##   kml_file_path: Path to KML file
 	##
 	## Returns: rope of property_lists
-
+	write("Parsing KML file: ", kml_file_path)
 	_constant C_DOCUMENT << "Document"
 	_constant C_FOLDER << "Folder"
 	_constant C_PLACEMARK << "Placemark"
@@ -99,7 +111,7 @@ _private _method astri_kml_parser.extract_placemarks_from_file(kml_file_path)
 	result_rope << rope.new()
 	sxml << simple_xml.new()
 
-	_try
+	_try _with errCon	
 		# Parse KML content from file (like rwi_kml_data_loader)
 		# IMPORTANT: read_elements_from() returns all top-level elements including
 		# Document AND its children. We must ONLY process Document to avoid duplicates.
@@ -127,7 +139,7 @@ _private _method astri_kml_parser.extract_placemarks_from_file(kml_file_path)
 
 	_when error
 		condition.raise(:error, :string,
-			"Failed to parse KML file: " + condition.report_contents_string)
+			"Failed to parse KML file: " + errCon.report_contents_string)
 	_endtry
 
 	>> result_rope
@@ -135,13 +147,14 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_kml_parser.process_element(element, parent_path, result_rope)
+_private _method astri_kml_parser.process_element(element, parent_path, result_rope, _optional ring_name)
 	## Recursively process KML element (Document, Folder, or Placemark)
 	##
 	## Parameters:
 	##   element      - simple_xml element to process
 	##   parent_path  - Current folder path (e.g. "Folder1|Folder2")
 	##   result_rope  - rope to accumulate placemark property_lists
+	##   ring_name    - Ring name (FDT/Closure splice name) to assign to placemarks
 
 	_constant C_DOCUMENT << "Document"
 	_constant C_FOLDER << "Folder"
@@ -153,11 +166,15 @@ _private _method astri_kml_parser.process_element(element, parent_path, result_r
 	# Handle Document - process children with same parent path
 	_if elem_type.matches?(C_DOCUMENT)
 	_then
+		# First pass: look for FDT/Closure folders at this level
+		_local sibling_ring_name << _self.find_sibling_fdt_context(element)
+
+		# Second pass: process all children with ring_name
 		_for child _over element.xml_elements.fast_elements()
 		_loop
 			_if child _isnt _unset
 			_then
-				_self.process_element(child, parent_path, result_rope)
+				_self.process_element(child, parent_path, result_rope, sibling_ring_name)
 			_endif
 		_endloop
 
@@ -193,19 +210,53 @@ _private _method astri_kml_parser.process_element(element, parent_path, result_r
 			_endif
 		_endif
 
-		# Process all children with new parent path
+		# Determine ring_name for children
+		_local child_ring_name << ring_name  # Default: inherit from parent
+
+		# Check if this is an FDT or Closure folder (for building mappings)
+		# Returns: single splice name, :multiple, or _false
+		_local splice_result << _self.check_and_build_splice_mappings(element, folder_name)
+
+		_if splice_result.is_kind_of?(char16_vector)
+		_then
+			# VARIANT 3: Single FDT/Closure folder - children inherit this ring_name
+			child_ring_name << splice_result
+
+		_elif splice_result _is :multiple
+		_then
+			# Multiple FDT placemarks - children must specify which one via folder name pattern
+			# Don't set ring_name yet - let folder pattern matching handle it below
+
+		_elif splice_result _is _false
+		_then
+			# Not an FDT/Closure folder
+			# Check if this folder references a specific FDT (e.g., "LINE A - FDT 1")
+			_local matched_ring_name << _self.find_matching_subfolder_splice(element, folder_name)
+
+			_if matched_ring_name _isnt _unset
+			_then
+				# VARIANT 2: Folder explicitly references an FDT
+				child_ring_name << matched_ring_name
+			_elif ring_name _is _unset
+			_then
+				# No ring_name yet - look for FDT folders among children (VARIANT 1 & 2)
+				child_ring_name << _self.find_sibling_fdt_context(element)
+			_endif
+		_endif
+
+		# Process all children with updated path and ring_name
 		_for child _over element.xml_elements.fast_elements()
 		_loop
 			_if child _isnt _unset
 			_then
-				_self.process_element(child, new_parent_path, result_rope)
+				_self.process_element(child, new_parent_path, result_rope, child_ring_name)
 			_endif
 		_endloop
 
 	# Handle Placemark - parse and add to result
 	_elif elem_type.matches?(C_PLACEMARK)
 	_then
-		placemark_pl << _self.parse_placemark(element, parent_path)
+		placemark_pl << _self.parse_placemark(element, parent_path, ring_name)
 		_if placemark_pl _isnt _unset
 		_then
 			result_rope.add_last(placemark_pl)
@@ -215,12 +266,13 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_kml_parser.parse_placemark(placemark_element, parent_path)
+_private _method astri_kml_parser.parse_placemark(placemark_element, parent_path, _optional ring_name)
 	## Parse a single Placemark element into property_list
 	##
 	## Parameters:
 	##   placemark_element: simple_xml element for Placemark
 	##   parent_path: Parent folder path (e.g. "Folder1|Folder2")
+	##   ring_name: Ring name (FDT/Closure splice name) for this placemark
 	##
 	## Returns: property_list with placemark data
 
@@ -245,6 +297,7 @@ _private _method astri_kml_parser.parse_placemark(placemark_element, parent_path
 		:type, "unknown",
 		:id, _unset,
 		:parent, parent_path,
+		:ring_name, ring_name,
 		:extended, property_list.new())
 
 	# Extract id attribute if present
@@ -512,5 +565,288 @@ _private _method astri_kml_parser.extract_extended_data(extdata_elem, pl)
 			_endif
 		_endif
 	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.check_and_build_splice_mappings(folder_element, folder_name)
+	## Check if this folder contains FDT/Closure placemarks and build mappings
+	## This supports VARIANT 2 where multiple FDT placemarks exist in one FDT folder
+	## Each placemark gets its own unique mapping
+	##
+	## Parameters:
+	##   folder_element - simple_xml folder element to search
+	##   folder_name - name of the folder (to check if folder itself is FDT/Closure)
+	##
+	## Returns: splice_name if single FDT/Closure found, :multiple if multiple found, _false otherwise
+
+	_constant C_PLACEMARK << "Placemark"
+	_constant C_NAME << "name"
+	_local folder_name_lc << folder_name.lowercase.default("")
+
+	# STEP 1: Check if the folder name is exactly "fdt", "closure", or "joint closure"
+	_if folder_name_lc <> "fdt" _andif
+	    folder_name_lc <> "closure" _andif
+	    folder_name_lc <> "joint closure" _andif
+	    folder_name_lc <> "join closure"
+	_then
+		_return _false
+	_endif
+
+	# STEP 2: This is an FDT/Closure folder - find ALL placemarks and build mappings
+	_local splice_counter << 0
+	_local first_splice_name << _unset
+
+	# Determine splice type based on folder name
+	_local splice_type << _if folder_name_lc.matches?("*closure*")
+	                      _then >> "CLOSURE"
+	                      _else >> "FDT"
+	                      _endif
+
+	_for child _over folder_element.xml_elements.fast_elements()
+	_loop
+		_if child _is _unset
+		_then
+			_continue
+		_endif
+
+		elem_type << child.type.write_string
+		write("  Checking element type: ", elem_type)
+
+		# Check if this is a Placemark
+		_if elem_type.matches?(C_PLACEMARK)
+		_then
+			# Extract placemark name
+			write("	Found Placemark element")
+			_local pm_name << _unset
+			_for pm_child _over child.xml_elements.fast_elements()
+			_loop
+				write("	  Checking placemark child type: ", pm_child.type.write_string)
+				_if pm_child _isnt _unset _andif
+				    pm_child.type.write_string.matches?(C_NAME)
+				_then
+					name_elem << pm_child.xml_elements.an_element()
+					_if name_elem _isnt _unset
+					_then
+						pm_name << name_elem.write_string
+					_endif
+					_leave
+				_endif
+			_endloop
+
+			# Build mapping for this placemark
+			_if pm_name _isnt _unset
+			_then
+				write("	  Placemark name: ", pm_name)
+				splice_counter +<< 1
+
+				# Use the original placemark name as the splice name (no modification)
+				_local sheath_splice_name << pm_name.trim_spaces()
+
+				write("Splice mapping created: ", pm_name, " -> ", sheath_splice_name)
+
+				# Store mapping (original placemark name → splice name)
+				.splice_name_mapping[pm_name] << sheath_splice_name
+
+				# Store index mapping ("FDT 1", "FDT 2", "Closure 1", etc. → splice name)
+				_local index_key << splice_type + " " + splice_counter.write_string
+				.splice_index_mapping[index_key] << sheath_splice_name
+				write("Index mapping created: ", index_key, " -> ", sheath_splice_name)
+
+				# Remember first splice name
+				_if first_splice_name _is _unset
+				_then
+					first_splice_name << sheath_splice_name
+				_endif
+			_endif
+		_endif
+	_endloop
+
+	# Return result based on how many FDT/Closure placemarks found
+	_if splice_counter = 0
+	_then
+		_return _false
+	_elif splice_counter = 1
+	_then
+		# Single FDT - return its splice name for child folders to inherit
+		write("  Single ", splice_type, " found - children will inherit: ", first_splice_name)
+		_return first_splice_name
+	_else
+		# Multiple FDTs - return :multiple symbol
+		write("  Multiple ", splice_type, " found (", splice_counter, ") - children must specify which one")
+		_return :multiple
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.find_sibling_fdt_context(parent_element)
+	## Look for FDT/Closure folders among children of parent_element
+	## This supports VARIANT 1 & 2 where FDT and LINE folders are siblings
+	##
+	## Parameters:
+	##   parent_element - parent element whose children to search
+	##
+	## Returns: single splice name, :multiple, or _unset
+
+	_constant C_FOLDER << "Folder"
+	_constant C_NAME << "name"
+
+	# Search for FDT/Closure folders among children
+	_for child _over parent_element.xml_elements.fast_elements()
+	_loop
+		_if child _is _unset
+		_then
+			_continue
+		_endif
+
+		_if child.type.write_string.matches?(C_FOLDER)
+		_then
+			# Extract folder name
+			_local child_folder_name << ""
+			_for name_child _over child.xml_elements.fast_elements()
+			_loop
+				_if name_child _isnt _unset _andif
+				    name_child.type.write_string.matches?(C_NAME)
+				_then
+					name_elem << name_child.xml_elements.an_element()
+					_if name_elem _isnt _unset
+					_then
+						child_folder_name << name_elem.write_string
+					_endif
+					_leave
+				_endif
+			_endloop
+
+			# Check if this child folder is an FDT/Closure folder
+			_local child_folder_lc << child_folder_name.lowercase.default("")
+			_if child_folder_lc = "fdt" _orif
+			    child_folder_lc = "closure" _orif
+			    child_folder_lc = "joint closure" _orif
+			    child_folder_lc = "join closure"
+			_then
+				# Found FDT/Closure folder - check what's inside
+				_local fdt_result << _self.check_and_build_splice_mappings(child, child_folder_name)
+				_return fdt_result
+			_endif
+		_endif
+	_endloop
+
+	# No FDT/Closure folder found among siblings
+	_return _unset
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.make_unique_splice_name(base_name)
+	## Make splice name unique by adding increment if duplicate exists
+	## Increments until finding a unique name not in splice_names set
+	##
+	## Parameters:
+	##   base_name - original splice name
+	##
+	## Returns: string - unique name
+
+	_local trimmed_name << base_name.trim_spaces()
+	_local candidate_name << trimmed_name
+	_local counter << 1
+
+	# Check if name already exists in splice_names
+	_if .splice_names.includes?(candidate_name)
+	_then
+		# Duplicate detected - increment until we find a unique one
+		write("  Duplicate splice name detected: ", candidate_name)
+
+		_loop
+			counter +<< 1
+			candidate_name << trimmed_name + " (" + counter.write_string + ")"
+
+			# Check if this incremented name is unique
+			_if _not .splice_names.includes?(candidate_name)
+			_then
+				# Found unique name
+				_leave
+			_endif
+		_endloop
+
+		write("  Generated unique name: ", candidate_name)
+	_endif
+
+	# Add the unique name to splice_names set
+	.splice_names.add(candidate_name)
+
+	# Return the unique name as string
+	_return candidate_name.write_string
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.find_matching_subfolder_splice(folder_element, folder_name)
+	## For VARIANT 2: Check if folder name contains FDT/Closure reference
+	## Example: Folder "Line A - FDT 1" should match placemark "FDT 1"
+	##          Folder "Feeder B - Closure 2" should match placemark "Closure 2"
+	##
+	## Parameters:
+	##   folder_element - simple_xml folder element to search
+	##   folder_name - name of the current folder (e.g., "Line A - FDT 1")
+	##
+	## Returns: splice name string (e.g., "FDT -- FDT 1") or _unset
+
+	_if folder_name _is _unset _orif folder_name = ""
+	_then
+		_return _unset
+	_endif
+
+	_local folder_name_lc << folder_name.lowercase
+
+	# Check if folder name contains " - FDT" or " - Closure" pattern
+	_local splice_reference << _unset
+
+	# Pattern: "Line A - FDT 1" or "Line A - Closure 2"
+	_if folder_name_lc.index_of_seq(" - fdt") _isnt _unset
+	_then
+		# Extract everything after " - " to get "FDT 1", "FDT 2", etc.
+		_local dash_index << folder_name.index_of_seq(" - ")
+		_if dash_index _isnt _unset
+		_then
+			splice_reference << folder_name.slice(dash_index + 3, folder_name.size).trim_spaces()
+		_endif
+
+	_elif folder_name_lc.index_of_seq(" - closure") _isnt _unset _orif
+	      folder_name_lc.index_of_seq(" - joint closure") _isnt _unset _orif
+	      folder_name_lc.index_of_seq(" - join closure") _isnt _unset
+	_then
+		# Extract everything after " - " to get "Closure 1", "Joint Closure 2", etc.
+		_local dash_index << folder_name.index_of_seq(" - ")
+		_if dash_index _isnt _unset
+		_then
+			splice_reference << folder_name.slice(dash_index + 3, folder_name.size).trim_spaces()
+		_endif
+	_endif
+
+	# Look up the splice reference in the index mapping
+	_if splice_reference _isnt _unset
+	_then
+		# First try direct lookup in splice_name_mapping (for exact placemark name matches)
+		_local mapped_splice_name << .splice_name_mapping[splice_reference]
+
+		# If not found, try index mapping (for "FDT 1", "FDT 2" patterns)
+		_if mapped_splice_name _is _unset
+		_then
+			mapped_splice_name << .splice_index_mapping[splice_reference]
+		_endif
+
+		_if mapped_splice_name _isnt _unset
+		_then
+			write("  Matched folder '", folder_name, "' (extracted: '", splice_reference, "') to splice: ", mapped_splice_name)
+			_return mapped_splice_name
+		_else
+			write("  WARNING: Folder '", folder_name, "' references '", splice_reference, "' but no mapping found")
+			write("    Available index mappings: ", .splice_index_mapping.keys)
+		_endif
+	_endif
+
+	# No matching splice reference found
+	_return _unset
 _endmethod
 $

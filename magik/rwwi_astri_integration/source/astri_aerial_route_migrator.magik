@@ -119,6 +119,9 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_endif
 		_local segment_id << _self.match_segment(folders)
 
+		# Step 4.5: Extract ring_name from folders
+		_local ring_name << _self.extract_ring_name_from_folders(folders)
+
 		write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
 		# Step 5: Check for SLING WIRE - special handling
 		_if fol[fsize] = "SLING WIRE"
@@ -134,6 +137,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:region, .region,
 					:cluster, .cluster,
 					:segment, segment_id,
+					:ring_name, ring_name,
 					:fttx_network_type, _self.get_fttx_network_type(),
 					:line_type, m_line,
 					:route, pc,
@@ -169,6 +173,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:fiber_count, fb_c,
 			:fttx_network_type, _self.get_fttx_network_type(),
 			:segment, segment_id,
+			:ring_name, ring_name,
 			:line_type, m_line,
 			:folders, folders,
 			:route, route,
