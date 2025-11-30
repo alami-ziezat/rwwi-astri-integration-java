@@ -386,10 +386,43 @@ _private _method rwi_export_to_aerial_kmz.write_folder(p_stream, p_folder_def, p
 		_endloop
 	_endif
 
-	# TODO: Write placemarks for this folder
-	# This will be implemented in Phase 3
+	# Write placemarks for this folder based on folder type
+	_self.write_folder_contents(p_stream, p_folder_def, p_area, indent + "  ")
 
 	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_folder_def, p_area, p_indent)
+	## Write placemarks (poles, cables, equipment) for this folder
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	folder_name << p_folder_def[:name]
+
+	# Check if this is a pole folder (EXISTING POLE or NEW POLE)
+	_if folder_name.index_of_seq("POLE") _isnt _unset
+	_then
+		# Query poles in area
+		all_poles << .gc[:pole].select(
+			predicate.within(:location, p_area))
+
+		# Filter poles based on folder name
+		_for pole _over all_poles.fast_elements()
+		_loop
+			# For now, write all poles (filtering logic can be added later)
+			.object_writer.write_pole(pole, p_stream, p_indent)
+		_endloop
+
+		write("  Wrote ", all_poles.size, " poles to folder: ", folder_name)
+	_endif
+
+	# TODO: Add logic for other folder types (CABLE, FDT, FAT, etc.)
 _endmethod
 $
 

@@ -754,3 +754,77 @@ _method rwwi_astri_workorder_dialog.user_error(message)
 	write("ERROR:", message)
 _endmethod
 $
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.check_project_and_design_exist(wo)
+	## Check if project and design exist in Smallworld for this work order
+	## Delegates to engine for data access
+	##
+	## Parameters:
+	##   wo (property_list) - Work order data
+	##
+	## Returns:
+	##   (boolean, boolean) - (has_project?, has_design?)
+
+	_local wo_number << wo[:wo_number]
+	_if wo_number _is _unset _orif wo_number = ""
+	_then
+		_return _false, _false
+	_endif
+
+	# Delegate to engine
+	>> .engine.check_project_and_design_exist(wo_number)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
+	## Find and activate the design for the given work order
+	## Delegates to engine for data access and activation
+	##
+	## Parameters:
+	##   wo (property_list) - Work order data
+	##
+	## Returns:
+	##   scheme - The activated scheme, or _unset if failed
+
+	_local wo_number << wo[:wo_number]
+	_if wo_number _is _unset _orif wo_number = ""
+	_then
+		write("LOG: ERROR - No work order number")
+		_return _unset
+	_endif
+
+	# Delegate to engine
+	>> .engine.activate_design(wo_number)
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.get_infra_type_from_wo(wo)
+	## Determine infrastructure type from work order category
+	##
+	## Parameters:
+	##   wo (property_list) - Work order data
+	##
+	## Returns:
+	##   string - Infrastructure type: "cluster", "subfeeder", or "feeder"
+
+	_local category << wo[:category].default("").lowercase
+
+	_if category.index_of_seq("cluster") _isnt _unset
+	_then
+		_return "cluster"
+	_elif category.index_of_seq("subfeeder") _isnt _unset _orif
+	      category.index_of_seq("sub feeder") _isnt _unset
+	_then
+		_return "subfeeder"
+	_elif category.index_of_seq("feeder") _isnt _unset
+	_then
+		_return "feeder"
+	_else
+		# Default to cluster if category is unclear
+		write("LOG: WARNING - Unknown category '", category, "', defaulting to 'cluster'")
+		_return "cluster"
+	_endif
+_endmethod
+$

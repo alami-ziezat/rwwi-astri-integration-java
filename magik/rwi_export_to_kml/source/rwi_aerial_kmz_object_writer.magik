@@ -22,11 +22,111 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
-	## Write pole placemark
-	## TODO: Implement in Phase 3
+_method rwi_aerial_kmz_object_writer.convert_coord_to_wgs84_string(p_coord)
+	## Convert coordinate from current coordinate system to WGS84 and format as string
+	## Returns: String in format "lon,lat,0" for KML
 
-	# Placeholder
+	# Get database and view
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+
+	# Set up dynamics for coordinate system
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	# Get current coordinate system and WGS84 coordinate system
+	cs1 << v.world.coordinate_system
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+
+	# Create transform
+	t << transform.new_converting_cs_to_cs(cs1, cs2)
+
+	# Convert coordinate
+	t_coord << t.convert(p_coord)
+
+	# Format as string with precision
+	_dynamic !print_float_precision! << 16
+	l_str << write_string(t_coord.x, ",", t_coord.y, ",0")
+
+	>> l_str
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
+	## Write pole placemark with coordinates and styling
+	##
+	## Parameters:
+	##   p_pole - Pole object
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	# Get pole geometry (location point)
+	pole_geom << p_pole.location
+	_if pole_geom _is _unset _then _return _endif
+
+	# Get coordinate
+	coord << pole_geom.coord
+	_if coord _is _unset _then _return _endif
+
+	# Convert coordinate to WGS84 (Google Earth coordinate system)
+	coord_string << _self.convert_coord_to_wgs84_string(coord)
+
+	# Get pole attributes
+	pole_id << p_pole.perform_safely(:id).default("Unknown")
+	pole_owner << p_pole.perform_safely(:owner).default("PARTNER")
+	pole_height << p_pole.perform_safely(:height).default("")
+	pole_class << p_pole.perform_safely(:class_value).default("")
+
+	# Determine style based on owner
+	_if pole_owner.uppercase.index_of_seq("EMR") _isnt _unset
+	_then
+		style_url << "#pole_emr_map"
+	_else
+		# Default to PARTNER
+		style_url << "#pole_partner_map"
+	_endif
+
+	# Build pole name/label
+	pole_name << write_string("Pole ", pole_id)
+	_if pole_height _isnt ""
+	_then
+		pole_name << write_string(pole_name, " (", pole_height, ")")
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", pole_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+
+	# Write ExtendedData with pole attributes
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'>", newline_char)
+	p_stream.write(p_indent, "      <value>", pole_id, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Owner'>", newline_char)
+	p_stream.write(p_indent, "      <value>", pole_owner, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	_if pole_height _isnt ""
+	_then
+		p_stream.write(p_indent, "    <Data name='Height'>", newline_char)
+		p_stream.write(p_indent, "      <value>", pole_height, "</value>", newline_char)
+		p_stream.write(p_indent, "    </Data>", newline_char)
+	_endif
+	_if pole_class _isnt ""
+	_then
+		p_stream.write(p_indent, "    <Data name='Class'>", newline_char)
+		p_stream.write(p_indent, "      <value>", pole_class, "</value>", newline_char)
+		p_stream.write(p_indent, "    </Data>", newline_char)
+	_endif
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write Point geometry
+	p_stream.write(p_indent, "  <Point>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </Point>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
 _endmethod
 $
 
