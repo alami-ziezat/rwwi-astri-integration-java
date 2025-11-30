@@ -120,7 +120,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local segment_id << _self.match_segment(folders)
 
 		# Step 4.5: Extract ring_name from folders
-		_local ring_name << _self.extract_ring_name_from_folders(folders)
+		_local ring_name << pm[:ring_name]
 
 		write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
 		# Step 5: Check for SLING WIRE - special handling

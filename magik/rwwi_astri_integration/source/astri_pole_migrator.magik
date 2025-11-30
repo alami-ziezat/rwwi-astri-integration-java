@@ -33,8 +33,8 @@ _private _method astri_design_migrator.create_pole(pm)
 		_local line_type << _self.match_line(folders_lc)
 		_local segment_id<< _self.match_segment(folders)
 
-		# Step 2.5: Extract ring_name from folders
-		_local ring_name << _self.extract_ring_name_from_folders(folders)
+		# Step 2.5: Get ring_name from placemark (assigned by KML parser)
+		_local ring_name << pm[:ring_name]
 
 		# Map pole type to STF item code
 		_local stf_item_code << _unset

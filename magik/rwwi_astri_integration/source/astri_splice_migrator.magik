@@ -196,7 +196,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_local line_type << _self.match_line(folders)
 
 		# Step 5.5: Extract ring_name from folders
-		_local ring_name << _self.extract_ring_name_from_folders(folders)
+		_local ring_name << pm[:ring_name]
 
 		# Step 6: Determine construction status based on name pattern
 	_local splice_name_lc << pm[:name].lowercase

@@ -681,8 +681,9 @@ $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_kml_parser.find_sibling_fdt_context(parent_element)
-	## Look for FDT/Closure folders among children of parent_element
+	## Look for OLT/FDT/Closure folders among children of parent_element
 	## This supports VARIANT 1 & 2 where FDT and LINE folders are siblings
+	## Priority: OLT (feeder) > CLOSURE (subfeeder) > FDT (cluster)
 	##
 	## Parameters:
 	##   parent_element - parent element whose children to search
@@ -692,7 +693,12 @@ _private _method astri_kml_parser.find_sibling_fdt_context(parent_element)
 	_constant C_FOLDER << "Folder"
 	_constant C_NAME << "name"
 
-	# Search for FDT/Closure folders among children
+	_local olt_result << _unset
+	_local closure_result << _unset
+	_local fdt_result << _unset
+
+	# Search for OLT/FDT/Closure folders among children
+	# First pass: look for OLT, CLOSURE, and FDT
 	_for child _over parent_element.xml_elements.fast_elements()
 	_loop
 		_if child _is _unset
@@ -718,21 +724,51 @@ _private _method astri_kml_parser.find_sibling_fdt_context(parent_element)
 				_endif
 			_endloop
 
-			# Check if this child folder is an FDT/Closure folder
+			# Check if this child folder is an OLT, Closure, or FDT folder
 			_local child_folder_lc << child_folder_name.lowercase.default("")
-			_if child_folder_lc = "fdt" _orif
-			    child_folder_lc = "closure" _orif
-			    child_folder_lc = "joint closure" _orif
-			    child_folder_lc = "join closure"
+
+			_if child_folder_lc = "olt"
 			_then
-				# Found FDT/Closure folder - check what's inside
-				_local fdt_result << _self.check_and_build_splice_mappings(child, child_folder_name)
-				_return fdt_result
+				# Found OLT folder - check what's inside
+				olt_result << _self.check_and_build_splice_mappings(child, child_folder_name)
+				# If no placemarks found in OLT folder, use "OLT" as default
+				_if olt_result _is _false
+				_then
+					olt_result << "OLT"
+					write("  Found OLT folder (no placemarks) - using default 'OLT'")
+				_endif
+
+			_elif child_folder_lc = "closure" _orif
+			      child_folder_lc = "joint closure" _orif
+			      child_folder_lc = "join closure"
+			_then
+				# Found CLOSURE folder - check what's inside
+				closure_result << _self.check_and_build_splice_mappings(child, child_folder_name)
+
+			_elif child_folder_lc = "fdt"
+			_then
+				# Found FDT folder - check what's inside
+				fdt_result << _self.check_and_build_splice_mappings(child, child_folder_name)
 			_endif
 		_endif
 	_endloop
 
-	# No FDT/Closure folder found among siblings
+	# Priority: OLT > CLOSURE > FDT
+	_if olt_result _isnt _unset
+	_then
+		write("  Found OLT folder - using OLT name (feeder infrastructure)")
+		_return olt_result
+	_elif closure_result _isnt _unset
+	_then
+		write("  Found CLOSURE folder - using CLOSURE name (subfeeder infrastructure)")
+		_return closure_result
+	_elif fdt_result _isnt _unset
+	_then
+		write("  Found FDT folder - using FDT name (cluster infrastructure)")
+		_return fdt_result
+	_endif
+
+	# No OLT/FDT/Closure folder found among siblings
 	_return _unset
 _endmethod
 $

@@ -37,7 +37,7 @@ _private _method astri_design_migrator.create_riser(pm)
 		_local coord << location.as_coord()
 
 		# Step 3.5: Extract ring_name from folders (FDT/Closure name)
-		_local ring_name << _self.extract_ring_name_from_folders(folders)
+		_local ring_name << pm[:ring_name]
 
 		# Step 4: Create riser cable as point-based riser object
 		# Using minimal length for point-based representation

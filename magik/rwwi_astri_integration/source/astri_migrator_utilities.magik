@@ -754,64 +754,66 @@ _private _method astri_design_migrator.match_core(name)
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.extract_ring_name_from_folders(folders)
-	## Extract ring_name from folder path based on infrastructure type
-	## Looks for "FDT -- <name>" or "CLOSURE -- <name>" in folder path
-	##
-	## Logic:
-	##   - cluster infrastructure: Extract name after "FDT -- "
-	##   - subfeeder infrastructure: Extract name after "CLOSURE -- "
-	##   - feeder infrastructure: Return _unset
-	##
-	## Parameters:
-	##   folders - folder path string (e.g., "A|B|FDT -- MyFDT|C")
-	##
-	## Returns:
-	##   string - ring_name or _unset
-
-	# Feeder infrastructure: no ring_name
-	_if .infra_type = "feeder"
-	_then
-		_return _unset
-	_endif
-
-	_if folders _is _unset _orif folders = ""
-	_then
-		_return _unset
-	_endif
-
-	# Split folders by pipe
-	_local folder_parts << folders.split_by("|")
-
-	# Search for FDT or CLOSURE marker
-	_for part _over folder_parts.fast_elements()
-	_loop
-		_local part_trimmed << part.trim_spaces()
-
-		# For cluster infrastructure, look for FDT
-		_if .infra_type = "cluster"
-		_then
-			_if part_trimmed.matches?("FDT -- *")
-			_then
-				# Extract name after "FDT -- "
-				_local splice_name << part_trimmed.slice(7, part_trimmed.size)
-				_return splice_name.trim_spaces()
-			_endif
-
-		# For subfeeder infrastructure, look for CLOSURE
-		_elif .infra_type = "subfeeder"
-		_then
-			_if part_trimmed.matches?("CLOSURE -- *")
-			_then
-				# Extract name after "CLOSURE -- "
-				_local splice_name << part_trimmed.slice(12, part_trimmed.size)
-				_return splice_name.trim_spaces()
-			_endif
-		_endif
-	_endloop
-
-	# No matching splice found in folders
-	_return _unset
-_endmethod
-$
+## DEPRECATED: This method is no longer used - ring_name is now assigned directly by KML parser
+## Left here for reference in case old approach is needed
+#_pragma(classify_level=basic, topic={astri_integration})
+#_private _method astri_design_migrator.extract_ring_name_from_folders(folders)
+#	## Extract ring_name from folder path based on infrastructure type
+#	## Looks for "FDT -- <name>" or "CLOSURE -- <name>" in folder path
+#	##
+#	## Logic:
+#	##   - cluster infrastructure: Extract name after "FDT -- "
+#	##   - subfeeder infrastructure: Extract name after "CLOSURE -- "
+#	##   - feeder infrastructure: Return _unset
+#	##
+#	## Parameters:
+#	##   folders - folder path string (e.g., "A|B|FDT -- MyFDT|C")
+#	##
+#	## Returns:
+#	##   string - ring_name or _unset
+#
+#	# Feeder infrastructure: no ring_name
+#	_if .infra_type = "feeder"
+#	_then
+#		_return _unset
+#	_endif
+#
+#	_if folders _is _unset _orif folders = ""
+#	_then
+#		_return _unset
+#	_endif
+#
+#	# Split folders by pipe
+#	_local folder_parts << folders.split_by("|")
+#
+#	# Search for FDT or CLOSURE marker
+#	_for part _over folder_parts.fast_elements()
+#	_loop
+#		_local part_trimmed << part.trim_spaces()
+#
+#		# For cluster infrastructure, look for FDT
+#		_if .infra_type = "cluster"
+#		_then
+#			_if part_trimmed.matches?("FDT -- *")
+#			_then
+#				# Extract name after "FDT -- "
+#				_local splice_name << part_trimmed.slice(7, part_trimmed.size)
+#				_return splice_name.trim_spaces()
+#			_endif
+#
+#		# For subfeeder infrastructure, look for CLOSURE
+#		_elif .infra_type = "subfeeder"
+#		_then
+#			_if part_trimmed.matches?("CLOSURE -- *")
+#			_then
+#				# Extract name after "CLOSURE -- "
+#				_local splice_name << part_trimmed.slice(12, part_trimmed.size)
+#				_return splice_name.trim_spaces()
+#			_endif
+#		_endif
+#	_endloop
+#
+#	# No matching splice found in folders
+#	_return _unset
+#_endmethod
+#$

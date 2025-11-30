@@ -902,11 +902,12 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_local infra_name << wo[:infra_name].default("Infra_" + kmz_uuid.subseq(1, 8))
 			_local infra_name_size << infra_name.size
 
-			_for pmark _over placemarks.fast_elements()
-			_loop
-				write("Placemark:", pmark[:name].default("Unnamed")," <<==>> ", pmark[:type].default("Unknown")," <<==>> ", pmark[:ring_name].default("None")," <<==>> ", pmark[:parent].default("None"))
-			_endloop
-			_return 	
+			# DEBUG: Uncomment to print all placemarks with ring_name
+			#_for pmark _over placemarks.fast_elements()
+			#_loop
+			#	write("Placemark:", pmark[:name].default("Unnamed")," <<==>> ", pmark[:type].default("Unknown")," <<==>> ", pmark[:ring_name].default("None")," <<==>> ", pmark[:parent].default("None"))
+			#_endloop
+			#_return 	
 			_if infra_name_size > 64
 			_then
 				infra_name << infra_name.subseq(infra_name_size-64, 64)
