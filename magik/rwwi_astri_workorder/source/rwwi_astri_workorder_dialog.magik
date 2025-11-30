@@ -1755,8 +1755,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 						              _endif
 
 						success_msg << success_msg + write_string(
-							"  Equipment Code   : ", item[:equipment_code], %newline,
-							"  Equipment Name   : ", item[:equipment_name], %newline,
+							"  Equipment Code   : ", item[:equipment_name], %newline,
+							"  Description      : ", item[:description], %newline,
 							"  Material Qty     : ", mat_qty, %newline,
 							"  Service Qty      : ", svc_qty, %newline,
 							"  Status           : SUCCESS", %newline,
@@ -1784,8 +1784,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 						              _endif
 
 						failed_msg << failed_msg + write_string(
-							"  Equipment Code   : ", item[:equipment_code], %newline,
-							"  Equipment Name   : ", item[:equipment_name], %newline,
+							"  Equipment Code   : ", item[:equipment_name], %newline,
+							"  Description      : ", item[:description], %newline,
 							"  Material Qty     : ", mat_qty, %newline,
 							"  Service Qty      : ", svc_qty, %newline,
 							"  Error            : ", item[:error], %newline,

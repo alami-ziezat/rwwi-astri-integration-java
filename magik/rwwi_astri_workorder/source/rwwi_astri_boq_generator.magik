@@ -577,9 +577,8 @@ _private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, se
 			:cluster_code, .boq_params[infra_code_field],  # Dynamic based on infra_type
 			:vendor_name, .boq_params[:vendor_name],
 			:subcont_vendor_name, .boq_params[:subcont_vendor_name],
-			:equipment_code, code,                    # stf_item_code
-			:equipment_name, catalog_entry[:name],    # Description from catalog
-			:description, catalog_entry[:name],       # Default: "Project Management"
+			:equipment_name, code,                    # stf_item_code
+			:description, catalog_entry[:name],  # Default: "Project Management"
 			:quantity_material, mat_value,
 			:quantity_service, svc_value,
 			:remarks, .boq_params[:remarks],          # Default: "Service"
