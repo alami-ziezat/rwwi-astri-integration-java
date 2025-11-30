@@ -429,6 +429,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:segment, segment_id,
 			:asset_owner, "Owned",
 			:stf_item_code, s_cd,
+			:ring_name, ring_name,
 			:uuid, .uuid,
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,

@@ -526,7 +526,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endloop
 
 	# Sixth pass: Create access points (catch-all for remaining points)
-	write("  Pass 7: Creating access points...")
+	# write("  Pass 7: Creating access points...")
 	# COMMENTED OUT: Access point migration disabled for now - may be useful later
 	#_for pm _over placemarks.fast_elements()
 	#_loop

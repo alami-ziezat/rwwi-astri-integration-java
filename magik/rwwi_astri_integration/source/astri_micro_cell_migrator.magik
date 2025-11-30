@@ -140,7 +140,6 @@ _private _method astri_design_migrator.create_micro_cell(pm)
 			:pop, .pop_name,
 			:olt, .pop_name,
 			:splitter_id, s_id,
-			:ring_name, ring_name,
 			:deployment_technology, "System Default",
 			:note, ring_name.default("") + "|" + folders,
 			:uuid, .uuid
