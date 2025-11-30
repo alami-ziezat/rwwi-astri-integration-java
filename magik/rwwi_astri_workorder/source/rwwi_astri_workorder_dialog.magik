@@ -1645,6 +1645,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 								# Track successful item with quantities
 								success_items.add(property_list.new_with(
 									:equipment_name, equipment_name,
+									:description, item[:description],
 									:qty_material, qty_material,
 									:qty_service, qty_service))
 							_else
@@ -1661,6 +1662,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 								# Track failed item with error
 								failed_items.add(property_list.new_with(
 									:equipment_name, equipment_name,
+									:description, item[:description],
 									:qty_material, qty_material,
 									:qty_service, qty_service,
 									:error, error_msg))
@@ -1673,6 +1675,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 							api_error_count +<< 1
 							failed_items.add(property_list.new_with(
 								:equipment_name, equipment_name,
+								:description, item[:description],
 								:qty_material, qty_material,
 								:qty_service, qty_service,
 								:error, "JSON parse error: " + parseErr.report_contents_string))
@@ -1682,6 +1685,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 						api_error_count +<< 1
 						failed_items.add(property_list.new_with(
 							:equipment_name, equipment_name,
+							:description, item[:description],
 							:qty_material, qty_material,
 							:qty_service, qty_service,
 							:error, "Empty API response"))
@@ -1692,6 +1696,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 					api_error_count +<< 1
 					failed_items.add(property_list.new_with(
 						:equipment_name, equipment_name,
+						:description, item[:description],
 						:qty_material, qty_material,
 						:qty_service, qty_service,
 						:error, apiErrCond.report_contents_string))
