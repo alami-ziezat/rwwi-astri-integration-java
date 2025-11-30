@@ -1,0 +1,46 @@
+#% text_encoding = iso8859_1
+
+_package user
+
+## ASTRI Work Order Dialog - Construction Marking Methods
+## Handles marking objects as constructed
+
+_method rwwi_astri_workorder_dialog.mark_construction()
+	## Mark selected work order as under construction
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local uuid << wo[:uuid]
+
+	_if uuid _is _unset _orif uuid = ""
+	_then
+		_self.user_error("No UUID available for this work order")
+		_return
+	_endif
+
+	write("Marking work order as construction:", uuid)
+
+	_try
+		_local success << .engine.mark_as_construction(uuid)
+
+		_if success
+		_then
+			_self.user_info("Work order marked as under construction successfully")
+			_self.refresh_data()
+		_else
+			_self.user_error("Failed to mark work order as under construction")
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error marking work order:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})

@@ -1,0 +1,511 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Work Order Dialog - Migration Methods
+## Handles KML to Smallworld design migration operations
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.migrate_to_design()
+	## Migrate KML data to real Smallworld design objects
+	##
+	## Uses file download approach (Scenario 2) to avoid large XML string issues
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local kmz_uuid << wo[:kmz_uuid]
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		_self.user_info("No KMZ UUID available for this work order")
+		_return
+	_endif
+
+	_self.clear_log()
+	_self.log_separator()
+	_self.log_info("STARTING DESIGN MIGRATION")
+	_self.log_separator()
+	_self.log_info("Work Order:      " + wo[:wo_number].default("N/A"))
+	_self.log_info("Infrastructure:  " + wo[:infra_code].default("N/A"))
+	_self.log_info("KMZ UUID:        " + kmz_uuid)
+	_self.log_info("")
+
+	write("Migrating KML to Design objects for UUID:", kmz_uuid)
+
+	_try _with errCon
+		# Use Scenario 2: Download files to disk, then read KML file
+		_local output_dir << system.getenv("TEMP").default("C:\temp")
+		_local infra_type << .filters[:infrastructure_type].default("cluster")
+		_self.log_info("Step 1: Downloading KMZ file...")
+		_self.log_info("  Output directory: " + output_dir)
+		_self.log_info("  Infrastructure type: " + infra_type)
+		write("Infra type: ",infra_type)
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "feeder"
+		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _endif
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.log_error("Failed to download KML file")
+			_self.user_error("Failed to download KML file")
+			_return
+		_endif
+
+		_self.log_success("KMZ file downloaded successfully")
+		_self.log_info("")
+		_self.log_info("Step 2: Parsing download response...")
+
+		# Parse XML response to get file path
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local kml_file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if success_elem _isnt _unset _andif
+		    success_elem.xml_result = "true" _andif
+		    kml_file_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_file_path_elem.xml_result
+			_self.log_success("KML file path extracted")
+			_self.log_info("  File: " + kml_file_path)
+			_self.log_info("")
+			write("KML file downloaded to:", kml_file_path)
+
+			# Parse KML file using astri_kml_parser
+			_self.log_info("Step 3: Parsing KML file...")
+			write("Parsing KML file...")
+			_local parser << astri_kml_parser.new(kml_file_path)
+			_local placemarks << parser.parse()
+
+			_self.log_success("KML parsing complete")
+			_self.log_info("  Found " + placemarks.size.write_string + " placemarks")
+			_self.log_info("")
+			write("KML parsing complete. Found", placemarks.size, "placemarks")
+
+			# Prepare project and design names
+			_local wo_number << wo[:wo_number].default("WO_" + kmz_uuid.subseq(1, 8))
+			_local infra_code << wo[:infra_code].default("INFRA_" + kmz_uuid.subseq(1, 8))
+			_local infra_name << wo[:infra_name].default("Infra_" + kmz_uuid.subseq(1, 8))
+			_local infra_name_size << infra_name.size
+
+			# DEBUG: Uncomment to print all placemarks with ring_name
+			#_for pmark _over placemarks.fast_elements()
+			#_loop
+			#	write("Placemark:", pmark[:name].default("Unnamed")," <<==>> ", pmark[:type].default("Unknown")," <<==>> ", pmark[:ring_name].default("None")," <<==>> ", pmark[:parent].default("None"))
+			#_endloop
+			#_return
+			_if infra_name_size > 64
+			_then
+				infra_name << infra_name.subseq(infra_name_size-64, 64)
+			_endif
+
+			# Add infrastructure_type to work order property_list
+			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
+
+			_self.log_info("Step 4: Initializing design migrator...")
+			_self.log_info("  Project name:   " + wo_number)
+			_self.log_info("  Project title:  " + infra_code)
+			_self.log_info("  Design name:    " + infra_name)
+			_self.log_info("  Infra type:     " + wo[:infrastructure_type].default("cluster"))
+			_self.log_info("  POP name:       " + wo[:olt_label].default(wo[:olt_name].default("Unknown")))
+			_self.log_info("  Region:         " + wo[:area].default("Unknown"))
+			_self.log_info("")
+
+			# Create design migrator - pass entire work order property_list
+			write("Creating design migrator...")
+			write("  Work Order: ", wo[:wo_number])
+			write("  Infrastructure Type: ", wo[:infrastructure_type])
+			write("  POP Name: ", wo[:olt_label].default(wo[:olt_name].default("Unknown")))
+			write("  Region: ", wo[:area].default("Unknown"))
+			write("  Infrastructure Name: ", wo[:infra_name].default("Unknown"))
+
+			_local database << gis_program_manager.databases[:gis]
+
+			_if database _is _unset
+			_then
+				_self.log_error("GIS database not available")
+				_self.user_error("GIS database not available")
+				_return
+			_endif
+
+			_local migrator << astri_design_migrator.new(database, wo)
+			_self.log_success("Design migrator initialized")
+			_self.log_info("")
+
+			# Create project and design
+			_self.log_info("Step 5: Creating Design Manager project and design...")
+			write("Initiate: Creating project and design...: ",infra_code," : ",infra_name)
+			_local (project, scheme) << migrator.create_project_and_design(
+				placemarks,     # Boundary extracted from placemarks
+				wo_number,      # Project name
+				infra_code,     # Project title
+				infra_name      # Design name
+			)
+			_self.log_success("Project and design created")
+			_self.log_info("")
+
+			# Migrate placemarks to design
+			_self.log_info("Step 6: Migrating placemarks to design objects...")
+			write("Migrating objects to design...")
+			_local stats << migrator.migrate_placemarks(placemarks)
+			_self.log_success("Migration complete!")
+			_self.log_info("")
+
+			# Display results
+			_local total_objs << stats[:aerial_routes] + stats[:poles] + stats[:sheaths] +
+			                      stats[:sling_wires] + stats[:demand_points] +
+			                      stats[:micro_cells] + stats[:areas_created]
+
+			_self.log_separator()
+			_self.log_success("DESIGN MIGRATION COMPLETE!")
+			_self.log_separator()
+			_self.log_info("Project:         " + wo_number + " (" + infra_code + ") - ID: " + project.id.write_string)
+			_self.log_info("Design:          " + infra_name + " - ID: " + scheme.id.write_string)
+			_self.log_info("")
+			_self.log_info("MIGRATION STATISTICS:")
+			_self.log_info("  Aerial Routes:      " + stats[:aerial_routes].write_string)
+			_self.log_info("  Poles:              " + stats[:poles].write_string)
+			_self.log_info("  Sheaths:            " + stats[:sheaths].write_string)
+			_self.log_info("  Sheath Splices:     " + stats[:sheath_splices].write_string)
+			_self.log_info("  Optical Splitters:  " + stats[:optical_splitters].write_string)
+			_self.log_info("  Figure Eights:      " + stats[:figure_eights].write_string)
+			_self.log_info("  Sling Wires:        " + stats[:sling_wires].write_string)
+			_self.log_info("  Demand Points:      " + stats[:demand_points].write_string)
+			_self.log_info("  Customer Premises:  " + stats[:customer_premises].write_string)
+			_self.log_info("  Buildings:          " + stats[:buildings].write_string)
+			_self.log_info("  Micro Cells:        " + stats[:micro_cells].write_string)
+			_self.log_info("  OLTs:               " + stats[:olts].write_string)
+			_self.log_info("  Risers:             " + stats[:risers].write_string)
+			_self.log_info("  Access Points:      " + stats[:access_points].write_string)
+			_self.log_info("  Errors:             " + stats[:errors].write_string)
+			_self.log_info("  Skipped:            " + stats[:skipped].write_string)
+			_self.log_info("")
+			_self.log_info("Total objects:      " + total_objs.write_string)
+			_self.log_separator()
+
+			_local msg << write_string(
+				" >>> Design Migration Complete! <<<", %newline,
+				"File: ", kml_file_path, %newline,
+				"Project: ", wo_number, " (", infra_code, ") - ID: ", project.id, %newline,
+				"Design: ", infra_name, " - ID: ", scheme.id, %newline,
+				"All objects have been created in the design alternative.", %newline,
+				"The design is now active. You can review and modify objects before posting.", %newline,
+				"=" * 100)
+
+			_self.user_info(msg)
+
+			# Refresh button states to enable BoQ buttons now that design exists
+			write("Migration successful - refreshing button states...")
+			_self.refresh_button_states()
+		_else
+			_local error_elem << xml_doc.element_matching_name(:error)
+			_local error_msg << _if error_elem _isnt _unset
+					    _then >> error_elem.xml_result
+					    _else >> "Unknown error"
+					    _endif
+			_self.log_separator()
+			_self.log_error("MIGRATION FAILED")
+			_self.log_separator()
+			_self.log_error("Failed to download KML file")
+			_self.log_error("Error: " + error_msg)
+			_self.log_separator()
+			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
+		_endif
+
+	_when error
+		_self.log_separator()
+		_self.log_error("MIGRATION FAILED")
+		_self.log_separator()
+		_self.log_error("Error during migration:")
+		_self.log_error(errCon.report_contents_string)
+		_self.log_separator()
+		_self.user_error(write_string("Error migrating to design:", %newline,
+					      errCon))
+	_endtry
+_endmethod
+$
+_method rwwi_astri_workorder_dialog.migrate_existing()
+	## Migrate ABD KML data to existing |Engineering Design|ABD alternative
+	## This function is ONLY enabled when KML source is ABD
+	## Sets construction_status to "In Service" for all migrated objects
+	##
+	## Uses file download approach (Scenario 2) to avoid large XML string issues
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local kmz_uuid << wo[:kmz_uuid]
+	_local kmz_source << wo[:kmz_source]
+
+	# Validate KML source is ABD
+	_if kmz_source <> "ABD"
+	_then
+		_self.user_error("This function is only available for ABD KML sources")
+		_return
+	_endif
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		_self.user_info("No KMZ UUID available for this work order")
+		_return
+	_endif
+
+	_self.clear_log()
+	_self.log_separator()
+	_self.log_info("STARTING ABD MIGRATION TO EXISTING ALTERNATIVE")
+	_self.log_separator()
+	_self.log_info("Work Order:      " + wo[:wo_number].default("N/A"))
+	_self.log_info("Infrastructure:  " + wo[:infra_code].default("N/A"))
+	_self.log_info("KMZ UUID:        " + kmz_uuid)
+	_self.log_info("KMZ Source:      " + kmz_source)
+	_self.log_info("Target Alt:      |Engineering Design|ABD")
+	_self.log_info("")
+
+	write("Migrating ABD KML to existing alternative for UUID:", kmz_uuid)
+
+	_try _with errCon
+		# Use Scenario 2: Download files to disk, then read KML file
+		_local output_dir << system.getenv("TEMP").default("C:\temp")
+		_local infra_type << .filters[:infrastructure_type].default("cluster")
+		_self.log_info("Step 1: Downloading KMZ file...")
+		_self.log_info("  Output directory: " + output_dir)
+		_self.log_info("  Infrastructure type: " + infra_type)
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "feeder"
+		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _endif
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.log_error("Failed to download KML file")
+			_self.user_error("Failed to download KML file")
+			_return
+		_endif
+
+		_self.log_success("KMZ file downloaded successfully")
+		_self.log_info("")
+		_self.log_info("Step 2: Parsing download response...")
+
+		# Parse XML response to get file path
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local kml_file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if success_elem _isnt _unset _andif
+		    success_elem.xml_result = "true" _andif
+		    kml_file_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_file_path_elem.xml_result
+			_self.log_success("KML file path extracted")
+			_self.log_info("  File: " + kml_file_path)
+			_self.log_info("")
+			write("KML file downloaded to:", kml_file_path)
+
+			# Parse KML file using astri_kml_parser
+			_self.log_info("Step 3: Parsing KML file...")
+			write("Parsing KML file...")
+			_local parser << astri_kml_parser.new(kml_file_path)
+			_local placemarks << parser.parse()
+
+			_self.log_success("KML parsing complete")
+			_self.log_info("  Found " + placemarks.size.write_string + " placemarks")
+			_self.log_info("")
+			write("KML parsing complete. Found", placemarks.size, "placemarks")
+
+			# Add infrastructure_type to work order property_list
+			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
+
+			# Navigate to |Engineering Design|ABD alternative
+			_self.log_info("Step 4: Navigating to existing alternative...")
+			write("Navigating to |Engineering Design|ABD alternative...")
+			_local database << gis_program_manager.databases[:gis]
+
+			_if database _is _unset
+			_then
+				_self.log_error("GIS database not available")
+				_self.user_error("GIS database not available")
+				_return
+			_endif
+
+			_local gv << gis_program_manager.cached_dataset(:gis)
+			_if gv _is _unset
+			_then
+				_self.log_error("GIS view not available")
+				_self.user_error("GIS view not available")
+				_return
+			_endif
+
+			# Switch to |Engineering Design|ABD alternative
+			_local alt_name << "|Engineering Design|ABD"
+			_try _with errCon
+				gv.go_to_alternative(alt_name)
+				_self.log_success("Switched to alternative: " + alt_name)
+				write("Switched to alternative:", alt_name)
+
+				_self.log_info("  Switching to write mode...")
+				write("Switching alternative mode...")
+				gv.switch(:write)
+				_self.log_success("Alternative is now writable")
+			_when error
+				_self.log_error("Failed to switch to alternative: " + alt_name)
+				_self.log_error(errCon.report_contents_string)
+				_self.user_error(write_string("Failed to switch to alternative ", alt_name, ":", %newline,
+					errCon.report_contents_string))
+				_return
+			_endtry
+			_self.log_info("")
+			write("Alternative is writable. Proceeding with migration...")
+
+			# Create design migrator with "In Service" construction status - pass entire work order
+			_self.log_info("Step 5: Creating design migrator...")
+			_self.log_info("  Construction status: In Service")
+			write("Creating design migrator...")
+			_local migrator << astri_design_migrator.new(database, wo, "In Service")
+			_self.log_success("Design migrator initialized")
+			_self.log_info("")
+
+			# Migrate placemarks without creating project/design
+			_self.log_info("Step 6: Migrating placemarks to existing alternative...")
+			write("Migrating placemarks to existing alternative...")
+			_local stats << migrator.migrate_placemarks(placemarks)
+			_self.log_success("Migration complete!")
+			_self.log_info("")
+
+			# Display results
+			_self.log_separator()
+			_self.log_success("ABD MIGRATION TO EXISTING ALTERNATIVE COMPLETE!")
+			_self.log_separator()
+			_self.log_info("Alternative:         " + alt_name)
+			_self.log_info("Construction Status: In Service")
+			_self.log_info("KML File:            " + kml_file_path)
+			_self.log_info("")
+			_self.log_info("MIGRATION STATISTICS:")
+			_self.log_info("  Aerial Routes:      " + stats[:aerial_routes].write_string)
+			_self.log_info("  Poles:              " + stats[:poles].write_string)
+			_self.log_info("  Sheaths:            " + stats[:sheaths].write_string)
+			_self.log_info("  Sheath Splices:     " + stats[:sheath_splices].write_string)
+			_self.log_info("  Optical Splitters:  " + stats[:optical_splitters].write_string)
+			_self.log_info("  Figure Eights:      " + stats[:figure_eights].write_string)
+			_self.log_info("  Sling Wires:        " + stats[:sling_wires].write_string)
+			_self.log_info("  Demand Points:      " + stats[:demand_points].write_string)
+			_self.log_info("  Customer Premises:  " + stats[:customer_premises].write_string)
+			_self.log_info("  Buildings:          " + stats[:buildings].write_string)
+			_self.log_info("  Micro Cells:        " + stats[:micro_cells].write_string)
+			_self.log_info("  OLTs:               " + stats[:olts].write_string)
+			_self.log_info("  Risers:             " + stats[:risers].write_string)
+			_self.log_info("  Access Points:      " + stats[:access_points].write_string)
+			_self.log_info("  Errors:             " + stats[:errors].write_string)
+			_self.log_info("  Skipped:            " + stats[:skipped].write_string)
+			_self.log_separator()
+
+			_local msg << write_string(
+				"=" * 70, %newline,
+				"ABD MIGRATION TO EXISTING ALTERNATIVE COMPLETE", %newline,
+				"=" * 70, %newline,
+				"Alternative:         ", alt_name, %newline,
+				"Construction Status: In Service", %newline,
+				"KML File:            ", kml_file_path, %newline,
+				"=" * 70, %newline,
+				"Aerial Routes:       ", stats[:aerial_routes], %newline,
+				"Poles:               ", stats[:poles], %newline,
+				"Sheaths:             ", stats[:sheaths], %newline,
+				"Sheath Splices:      ", stats[:sheath_splices], %newline,
+				"Optical Splitters:   ", stats[:optical_splitters], %newline,
+				"Figure Eights:       ", stats[:figure_eights], %newline,
+				"Sling Wires:         ", stats[:sling_wires], %newline,
+				"Demand Points:       ", stats[:demand_points], %newline,
+				"Customer Premises:   ", stats[:customer_premises], %newline,
+				"Buildings:           ", stats[:buildings], %newline,
+				"Micro Cells:         ", stats[:micro_cells], %newline,
+				"OLTs:                ", stats[:olts], %newline,
+				"Risers:              ", stats[:risers], %newline,
+				"Access Points:       ", stats[:access_points], %newline,
+				"Errors:              ", stats[:errors], %newline,
+				"Skipped:             ", stats[:skipped], %newline,
+				"=" * 70)
+
+			_self.user_info(msg)
+		_else
+			_local error_elem << xml_doc.element_matching_name(:error)
+			_local error_msg << _if error_elem _isnt _unset
+					    _then >> error_elem.xml_result
+					    _else >> "Unknown error"
+					    _endif
+			_self.log_separator()
+			_self.log_error("MIGRATION FAILED")
+			_self.log_separator()
+			_self.log_error("Failed to download KML file")
+			_self.log_error("Error: " + error_msg)
+			_self.log_separator()
+			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
+		_endif
+
+	_when error
+		_self.log_separator()
+		_self.log_error("MIGRATION FAILED")
+		_self.log_separator()
+		_self.log_error("Error migrating to existing alternative:")
+		_self.log_error(errCon.report_contents_string)
+		_self.log_separator()
+		_self.user_error(write_string("Error migrating to existing alternative:", %newline,
+			errCon.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.read_kml_file(file_path)
+	## Read KML file content from disk
+	##
+	## Parameters:
+	##   file_path (string) - Full path to KML file
+	##
+	## Returns:
+	##   string - KML file content, or _unset if failed
+
+	_try
+		_local input_stream << external_text_input_stream.new(file_path)
+		_local kml_content << ""
+
+		_protect
+			_loop
+				_local line << input_stream.get_line()
+				_if line _is _unset
+				_then
+					_leave
+				_endif
+				kml_content << kml_content + line + %newline
+			_endloop
+		_protection
+			input_stream.close()
+		_endprotect
+
+		write("Successfully read KML file:", file_path)
+		write("Content size:", kml_content.size, "characters")
+
+		_return kml_content
+
+	_when error
+		write("ERROR reading KML file:", condition.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$

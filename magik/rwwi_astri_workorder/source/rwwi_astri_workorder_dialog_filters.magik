@@ -1,0 +1,157 @@
+#% text_encoding = iso8859_1
+
+_package user
+
+## ASTRI Work Order Dialog - Filter and Refresh Methods
+## Handles data filtering and refreshing operations
+
+_method rwwi_astri_workorder_dialog.refresh_data()
+	## Refresh table data from current source
+
+	write("Refreshing work order data...")
+	_self.changed(:workorder_list, :renew)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.source_selection()
+	## Handle source dropdown change
+
+	_local source_text << .items[:source].value
+
+	.filters[:source] << _if source_text = "ASTRI API"
+	_then
+		>> :api
+	_else
+		>> :db
+	_endif
+
+	write("Source changed to:", .filters[:source])
+	_self.refresh_data()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.infrastructure_type_changed()
+	## Handle infrastructure type selection change
+	## Update UI elements based on selected infrastructure type
+
+	_local infra_type << .items[:filter_infrastructure].value.default("cluster")
+
+	write("Infrastructure type changed to:", infra_type)
+
+	# Update label text and topology visibility based on infrastructure type
+	_if infra_type = "cluster"
+	_then
+		# Cluster: show topology, label = "Cluster Code"
+		.items[:label_code].label << "  Cluster Code:  "
+		.items[:label_topology].managed? << _true
+		.items[:filter_topology].managed? << _true
+		.items[:filter_topology].enabled? << _true
+
+	_elif infra_type = "subfeeder"
+	_then
+		# Subfeeder: hide topology, label = "Subfeeder Code"
+		.items[:label_code].label << "  Subfeeder Code:  "
+		.items[:label_topology].managed? << _false
+		.items[:filter_topology].managed? << _false
+		.items[:filter_topology].enabled? << _false
+
+	_elif infra_type = "feeder"
+	_then
+		# Feeder: hide topology, label = "OSP Route Area"
+		.items[:label_code].label << "  OSP Route Area:  "
+		.items[:label_topology].managed? << _false
+		.items[:filter_topology].managed? << _false
+		.items[:filter_topology].enabled? << _false
+	_endif
+
+	# Update the stored infrastructure type in filters
+	.filters[:infrastructure_type] << infra_type
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.apply_filters()
+	## Apply current filter selections
+
+	write("Applying filters...")
+
+	# Update filters from UI
+	.filters[:infrastructure_type] << .items[:filter_infrastructure].value.default("cluster")
+
+	_local limit_str << .items[:filter_limit].value
+	.filters[:limit] << limit_str.as_number().default(10)
+
+	_local offset_str << .items[:filter_offset].value
+	.filters[:offset] << offset_str.as_number().default(0)
+
+	# Refresh data with new filters
+	_self.refresh_data()
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_filter_params()
+	## Build filter property list from UI controls
+
+	_local filters << property_list.new()
+
+	# Get current infrastructure type
+	_local infra_type << .items[:filter_infrastructure].value.default("cluster")
+
+	# Category filter
+	_local category << .items[:filter_category].value
+	_if category _isnt _unset _and category <> "All"
+	_then
+		# Map display label to API field name
+		_local category_map << equality_hash_table.new_with(
+			"Cluster BOQ", "cluster_boq",
+			"Installation", "installation",
+			"Maintenance", "maintenance")
+
+		_local category_name << category_map[category]
+		_if category_name _isnt _unset
+		_then
+			filters[:category_name] << category_name
+		_endif
+	_endif
+
+	# Status filter
+	_local status << .items[:filter_status].value
+	_if status _isnt _unset _and status <> "All"
+	_then
+		filters[:latest_status_name] << status
+	_endif
+
+	# Topology filter (only for cluster infrastructure type)
+	_if infra_type = "cluster"
+	_then
+		_local topology << .items[:filter_topology].value
+		_if topology _isnt _unset _and topology <> "All"
+		_then
+			# Dynamic field name: target_cluster_topology
+			_local topology_field << write_string("target_", infra_type, "_topology").as_symbol()
+			filters[topology_field] << topology
+		_endif
+	_endif
+
+	# Infrastructure code filter (dynamic based on infrastructure type)
+	_local code_value << .items[:filter_cluster].value
+	_if code_value _isnt _unset _and code_value.size > 0
+	_then
+		# Dynamic field name based on infrastructure type:
+		# - cluster:   target_cluster_code
+		# - subfeeder: target_subfeeder_code
+		# - feeder:    target_osp_route_area (NOT target_feeder_code)
+		_local code_field << _if infra_type = "feeder"
+		                     _then >> :target_osp_route_area
+		                     _else >> write_string("target_", infra_type, "_code").as_symbol()
+		                     _endif
+		filters[code_field] << code_value
+	_endif
+
+	_return filters
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})

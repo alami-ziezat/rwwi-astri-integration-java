@@ -1,0 +1,165 @@
+#% text_encoding = iso8859_1
+
+_package user
+
+## ASTRI Work Order Dialog - Export Methods
+## Handles KML/KMZ download and export operations
+
+_method rwwi_astri_workorder_dialog.download_kmz()
+	## Download KMZ file for selected work order using kmz_uuid
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local kmz_uuid << wo[:kmz_uuid]
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		_self.user_info("No KMZ UUID available for this work order")
+		_return
+	_endif
+
+	write("Downloading KMZ for UUID:", kmz_uuid)
+
+	_try
+		# Call ASTRI KMZ download API with kmz_uuid based on infrastructure type
+		# astri_download_cluster_kmz(uuid, outputDir)
+		# astri_download_subfeeder_kmz(uuid, outputDir)
+		# astri_download_feeder_kmz(uuid, outputDir)
+		_local output_dir << system.getenv("TEMP").default("C:\temp")
+		_local infra_type << .filters[:infrastructure_type].default("cluster")
+		write("infra type: ",infra_type)
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "feeder"
+		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _endif
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.user_error("Failed to download KMZ file")
+			_return
+		_endif
+
+		# Parse XML response to get file path
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if success_elem _isnt _unset _andif
+		    success_elem.xml_result = "true" _andif
+		    file_path_elem _isnt _unset
+		_then
+			_local file_path << file_path_elem.xml_result
+			_self.user_info(write_string("KMZ downloaded successfully:", %newline, file_path))
+		_else
+			_local error_elem << xml_doc.element_matching_name(:error)
+			_local error_msg << _if error_elem _isnt _unset
+					    _then >> error_elem.xml_result
+					    _else >> "Unknown error"
+					    _endif
+			_self.user_error(write_string("Failed to download KMZ:", %newline, error_msg))
+		_endif
+
+	_when error
+		_self.user_error(write_string("Error downloading KMZ:", %newline,
+			condition.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.export_smallworld_kml()
+	## Export Smallworld objects to KML based on selected work order
+	## Exports design area with infrastructure type filtering
+
+	_if .selected_wo _is _unset
+	_then
+		_self.show_alert("No Work Order Selected",
+			"Please select a work order to export")
+		_return
+	_endif
+
+	# Get work order details
+	wo_number << .selected_wo[:wo_number]
+	infra_type << .selected_wo[:infrastructure_type].default("cluster")
+
+	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type)
+	_self.log_info(write_string("Exporting KML for WO: ", wo_number, newline_char))
+
+	# Get project and design
+	_try _with errCond
+		design << .engine.get_design_for_project(wo_number)
+		_if design _is _unset
+		_then
+			_self.show_alert("Design Not Found",
+				write_string("No design found for project '", wo_number, "'"))
+			_return
+		_endif
+
+		# Activate the design before export
+		_self.log_info(write_string("Activating design for project: ", wo_number, newline_char))
+		.engine.activate_design(wo_number)
+
+		# Get design boundary
+		design_area << .engine.get_design_boundary(design)
+		_if design_area _is _unset
+		_then
+			_self.show_alert("Design Area Not Found",
+				"Design has no boundary area defined")
+			_return
+		_endif
+
+		# Show file chooser dialog
+		# Sanitize WO number for filename (replace / with _)
+		safe_filename << wo_number.substitute_string("/", "_") + ".kmz"
+		output_file << _self.get_output_file_from_user(safe_filename)
+		_if output_file _is _unset
+		_then
+			_return  # User cancelled
+		_endif
+
+		# Create exporter
+		exporter << rwi_export_to_aerial_kmz.new()
+		exporter.gc << gis_program_manager.cached_dataset(:gis).collections
+		exporter.project_name << wo_number
+		exporter.project_area << design_area
+		exporter.infrastructure_type << infra_type.as_symbol()
+
+		# Show progress
+		_self.log_info(write_string("Starting export...", newline_char))
+
+		# Export with dynamic network detection
+		output_path << exporter.export_mixed_network(design_area, output_file)
+
+		# Success message
+		_self.show_message("Export Complete",
+			write_string("Created: ", output_path))
+		_self.log_info(write_string("Export completed: ", output_path, newline_char))
+
+	_when error
+		_self.show_alert("Export Failed", errCond.report_contents_string)
+		_self.log_info(write_string("Export failed: ", errCond.report_contents_string, newline_char))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.get_output_file_from_user(default_filename)
+	## Shows file chooser dialog for KMZ output
+
+	output_dir << system.temp_directory_name
+
+	# Simple file path construction (file chooser not available in SW)
+	output_file << system.pathname_from_components(default_filename, output_dir)
+
+	>> output_file
+_endmethod
+$

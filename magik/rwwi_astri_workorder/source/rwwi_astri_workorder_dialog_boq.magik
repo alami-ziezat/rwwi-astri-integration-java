@@ -1,0 +1,452 @@
+#% text_encoding = iso8859_1
+
+_package user
+
+## ASTRI Work Order Dialog - BOQ Generation Methods
+## Handles Bill of Quantities generation in Excel and JSON formats
+
+_method rwwi_astri_workorder_dialog.generate_boq_excel()
+	## Generate Bill of Quantities as Excel file
+	## Calls the global create_boq procedure from rwwi_astri_boq.magik
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+
+	# Check if project and design exist
+	_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
+	_if _not (has_project _and has_design)
+	_then
+		_self.user_error("Project and design must exist before generating BoQ")
+		_return
+	_endif
+
+	write("Generating BoQ as Excel for WO:", wo[:wo_number])
+
+	_try _with errCond
+		# Activate the design first
+		_local scheme << _self.activate_design_for_wo(wo)
+		_if scheme _is _unset
+		_then
+			_self.user_error("Failed to activate design. Cannot generate BoQ.")
+			_return
+		_endif
+
+		# Call the global create_boq procedure
+		write("Calling create_boq procedure...")
+		create_boq()
+
+		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
+			scheme.name))
+
+	_when error
+		write("LOG: Error generating BoQ as Excel:", errCond.report_contents_string)
+		_self.user_error(write_string("Error generating BoQ as Excel:", %newline,
+			errCond.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.generate_boq_json()
+	## Generate Bill of Quantities as JSON property list using new BOQ generator
+	## Uses rwwi_astri_boq_generator class with work order parameters
+
+	_dynamic !print_float_precision! << 6
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_info("Please select a work order first")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+
+	# Check if project and design exist
+	_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
+	_if _not (has_project _and has_design)
+	_then
+		_self.user_error("Project and design must exist before generating BoQ")
+		_return
+	_endif
+
+	_self.clear_log()
+	_self.log_separator()
+	_self.log_info("STARTING BOQ GENERATION")
+	_self.log_separator()
+	_self.log_info("Work Order:      " + wo[:wo_number].default("N/A"))
+	_self.log_info("Infrastructure:  " + wo[:infra_code].default("N/A"))
+	_self.log_info("")
+
+	write("Generating BoQ as JSON for WO:", wo[:wo_number])
+
+	_try _with errCond
+		# Activate the design first
+		_self.log_info("Step 1: Activating design...")
+		_local scheme << _self.activate_design_for_wo(wo)
+		_if scheme _is _unset
+		_then
+			_self.log_error("Failed to activate design")
+			_self.user_error("Failed to activate design. Cannot generate BoQ.")
+			_return
+		_endif
+		_self.log_success("Design activated: " + scheme.name.default("(unnamed)"))
+		_self.log_info("")
+
+		# Determine infrastructure type from work order category
+		_local infra_type << _self.get_infra_type_from_wo(wo)
+
+		# Get KMZ UUID from work order (from PostgreSQL database)
+		_local kmz_uuid << wo[:kmz_uuid].default("")
+
+		# Get infrastructure code field name based on type
+		_local infra_code_field << _if infra_type = "cluster"
+		                           _then >> :cluster_code
+		                           _elif infra_type = "subfeeder"
+		                           _then >> :subfeeder_code
+		                           _elif infra_type = "feeder"
+		                           _then >> :feeder_code
+		                           _else >> :cluster_code
+		                           _endif
+
+		# Get infrastructure code from database result (already fetched from PostgreSQL)
+		_local infra_code << wo[infra_code_field].default(wo[:infra_code])
+		infra_code << "PLB006435 " #temp hardcode for testing BOQ
+		# Build BOQ parameters from work order data
+
+		_local boq_params << property_list.new_with(
+			:infra_type, infra_type,
+			infra_code_field, infra_code,           # Dynamic: cluster_code/subfeeder_code/feeder_code
+			:vendor_name, wo[:vendor_name].default(_unset),
+			:subcont_vendor_name, wo[:subcont_vendor].default(_unset),
+			:remarks, "Service",                    # Default
+			:phase, "project_opname",               # Default
+			:area, wo[:area].default(_unset),
+			:area_plant_code, wo[:area_plant_code].default(_unset),
+			:override_price_material, _unset,       # Optional
+			:override_price_service, _unset         # Optional
+		)
+
+		_self.log_info("Step 2: Preparing BOQ parameters...")
+		_self.log_info("  Infrastructure Type: " + infra_type)
+		_self.log_info("  Infrastructure Code: " + infra_code)
+		_self.log_info("  Vendor:              " + wo[:vendor_name].default("(none)"))
+		_self.log_info("  Subcont Vendor:      " + wo[:subcont_vendor].default("(none)"))
+		_self.log_info("  Area:                " + wo[:area].default("(none)"))
+		_self.log_info("  Area Plant Code:     " + wo[:area_plant_code].default("(none)"))
+		_self.log_info("")
+
+		write("BOQ Parameters:")
+		write("  Infrastructure Type:", infra_type)
+		write("  Infrastructure Code:", infra_code)
+		write("  Vendor:", wo[:vendor_name].default(""))
+		write("  Subcont Vendor:", wo[:subcont_vendor].default(""))
+		write("  Area:", wo[:area].default(""))
+		write("  Area Plant Code:", wo[:area_plant_code].default(""))
+		write("  KMZ UUID:", kmz_uuid)
+
+		# Create BOQ generator instance
+		_self.log_info("Step 3: Creating BOQ generator...")
+		write("Creating BOQ generator...")
+		_local generator << rwwi_astri_boq_generator.new(boq_params)
+		_self.log_success("BOQ generator created")
+		_self.log_info("")
+
+		# Generate BOQ items
+		_self.log_info("Step 4: Generating BOQ items from design...")
+		write("Generating BOQ items...")
+		_local boq_result << generator.generate()
+		_self.log_success("BOQ generation complete")
+		_self.log_info("  Total BOQ items: " + boq_result.size.write_string)
+		_self.log_info("")
+
+		# Send BOQ data to ASTRI API (only for cluster infrastructure type)
+		_local api_success_count << 0
+		_local api_error_count << 0
+		_local api_skipped_count << 0
+		_local success_items << rope.new()  # Track successful items
+		_local failed_items << rope.new()   # Track failed items with error details
+
+		_if infra_type = "cluster" _andif boq_result _isnt _unset _andif boq_result.size > 0
+		_then
+			_self.log_info("Step 5: Sending BOQ items to ASTRI API...")
+			_self.log_info("  Infrastructure type is 'cluster' - API submission enabled")
+			_self.log_info("  Processing " + boq_result.size.write_string + " BOQ items...")
+			_self.log_info("")
+			write("Sending BOQ items to ASTRI API...")
+
+			_for key _over boq_result.keys()
+			_loop
+				_local item << boq_result[key]
+				_local equipment_name << item[:equipment_name].default("")
+				_local qty_material << item[:quantity_material]
+				_local qty_service << item[:quantity_service]
+
+				_try _with apiErrCond
+					# Call astri_add_boq_drm_cluster Java procedure
+					write("Sending BOQ item:", equipment_name)
+
+					_local json_response << astri_add_boq_drm_cluster(
+						infra_code,                                    # cluster_code
+						item[:vendor_name].default(""),                # vendor_name
+						item[:subcont_vendor_name].default(""),        # subcont_vendor_name
+						equipment_name,                                # equipment_name
+						item[:description].default(""),                # description
+						qty_material,                                  # quantity_material (can be _unset)
+						qty_service,                                   # quantity_service (can be _unset)
+						item[:remarks].default(""),                    # remarks
+						item[:phase].default(""),                      # phase
+						item[:area].default(""),                       # area
+						item[:area_plant_code].default(""),            # area_plant_code
+						item[:override_price_material],                # override_price_material (can be _unset)
+						item[:override_price_service]                  # override_price_service (can be _unset)
+					)
+
+					# Parse JSON response to check for success/error
+					_if json_response _isnt _unset _andif json_response <> ""
+					_then
+						_try _with parseErr
+							# Parse JSON response using json_parser
+							_local json_obj << json_parser.parse(json_response)
+
+							# Check for success field
+							_local success << json_obj[:success]
+
+							_if success _is _true
+							_then
+								write("  SUCCESS: BOQ item sent to ASTRI API")
+								api_success_count +<< 1
+								# Track successful item with quantities
+								success_items.add(property_list.new_with(
+									:equipment_name, equipment_name,
+									:description, item[:description],
+									:qty_material, qty_material,
+									:qty_service, qty_service))
+							_else
+								# Error response from API
+								_local error_msg << json_obj[:error].default("Unknown error")
+								write("  ERROR: API returned error:")
+								print(error_msg)
+								api_error_count +<< 1
+								_if error_msg.size > 1
+								_then
+									error_msg << write_string(error_msg[1], " <==> ", error_msg[2])
+								_endif
+
+								# Track failed item with error
+								failed_items.add(property_list.new_with(
+									:equipment_name, equipment_name,
+									:description, item[:description],
+									:qty_material, qty_material,
+									:qty_service, qty_service,
+									:error, error_msg))
+							_endif
+
+						_when error
+							# If JSON parsing fails, treat as error
+							write("  ERROR: Failed to parse API response:", parseErr.report_contents_string)
+							write("  Response:", json_response)
+							api_error_count +<< 1
+							failed_items.add(property_list.new_with(
+								:equipment_name, equipment_name,
+								:description, item[:description],
+								:qty_material, qty_material,
+								:qty_service, qty_service,
+								:error, "JSON parse error: " + parseErr.report_contents_string))
+						_endtry
+					_else
+						write("  ERROR: Empty response from ASTRI API")
+						api_error_count +<< 1
+						failed_items.add(property_list.new_with(
+							:equipment_name, equipment_name,
+							:description, item[:description],
+							:qty_material, qty_material,
+							:qty_service, qty_service,
+							:error, "Empty API response"))
+					_endif
+
+				_when error
+					write("  ERROR sending BOQ item:", apiErrCond.report_contents_string)
+					api_error_count +<< 1
+					failed_items.add(property_list.new_with(
+						:equipment_name, equipment_name,
+						:description, item[:description],
+						:qty_material, qty_material,
+						:qty_service, qty_service,
+						:error, apiErrCond.report_contents_string))
+				_endtry
+			_endloop
+
+			_self.log_info("")
+			_self.log_success("API submission complete")
+			_self.log_info("  Successfully sent: " + api_success_count.write_string)
+			_self.log_info("  Errors:            " + api_error_count.write_string)
+			write("API Send Summary:")
+			write("  Success:", api_success_count)
+			write("  Errors:", api_error_count)
+		_else
+			_if infra_type <> "cluster"
+			_then
+				_self.log_info("Step 5: Skipping API submission...")
+				_self.log_warning("Infrastructure type '" + infra_type + "' does not support API submission")
+				_self.log_info("  API submission is only available for 'cluster' infrastructure type")
+				write("Skipping API send - infrastructure type is:", infra_type, "(only 'cluster' supported)")
+				api_skipped_count << boq_result.size
+			_endif
+		_endif
+		_self.log_info("")
+
+		# Display result summary
+		_if boq_result _isnt _unset _andif boq_result.size > 0
+		_then
+			_self.log_separator()
+			_self.log_success("BOQ GENERATION COMPLETE!")
+			_self.log_separator()
+			_self.log_info("Design:          " + scheme.name.default("(unnamed)"))
+			_self.log_info("Infrastructure:  " + infra_type + " - " + infra_code)
+			_self.log_info("Total BOQ Items: " + boq_result.size.write_string)
+			_self.log_info("")
+
+			# Add API send summary if cluster type
+			_if infra_type = "cluster"
+			_then
+				_self.log_info("API SUBMISSION SUMMARY:")
+				_self.log_info("  Successfully sent: " + api_success_count.write_string)
+				_self.log_info("  Errors:            " + api_error_count.write_string)
+				_self.log_info("")
+
+				# Display detailed successful items
+				_if success_items.size > 0
+				_then
+					_local success_msg << write_string(
+						"SUCCESSFUL ITEMS (", success_items.size, "):", %newline,
+						"-" * 80, %newline)
+
+					_for item _over success_items.fast_elements()
+					_loop
+						_local mat_qty << _if item[:qty_material] _is _unset
+						              _then >> "N/A"
+						              _else >> write_string(item[:qty_material])
+						              _endif
+						_local svc_qty << _if item[:qty_service] _is _unset
+						              _then >> "N/A"
+						              _else >> write_string(item[:qty_service])
+						              _endif
+
+						success_msg << success_msg + write_string(
+							"  Equipment Code   : ", item[:equipment_name], %newline,
+							"  Description      : ", item[:description], %newline,
+							"  Material Qty     : ", mat_qty, %newline,
+							"  Service Qty      : ", svc_qty, %newline,
+							"  Status           : SUCCESS", %newline,
+							%newline)
+					_endloop
+					_self.log_info(success_msg)
+				_endif
+
+				# Display detailed failed items
+				_if failed_items.size > 0
+				_then
+					_local failed_msg << write_string(
+						"FAILED ITEMS (", failed_items.size, "):", %newline,
+						"-" * 80, %newline)
+
+					_for item _over failed_items.fast_elements()
+					_loop
+						_local mat_qty << _if item[:qty_material] _is _unset
+						              _then >> "N/A"
+						              _else >> write_string(item[:qty_material])
+						              _endif
+						_local svc_qty << _if item[:qty_service] _is _unset
+						              _then >> "N/A"
+						              _else >> write_string(item[:qty_service])
+						              _endif
+
+						failed_msg << failed_msg + write_string(
+							"  Equipment Code   : ", item[:equipment_name], %newline,
+							"  Description      : ", item[:description], %newline,
+							"  Material Qty     : ", mat_qty, %newline,
+							"  Service Qty      : ", svc_qty, %newline,
+							"  Error            : ", item[:error], %newline,
+							%newline)
+					_endloop
+					_self.log_warning(failed_msg)
+				_endif
+
+				_if api_error_count > 0
+				_then
+					_self.log_warning("  Some BOQ items failed to send to ASTRI API")
+				_endif
+			_else
+				_self.log_info("API SUBMISSION: Skipped (only cluster infrastructure supported)")
+			_endif
+			_self.log_separator()
+
+			_local msg << write_string(
+				"BoQ generation completed successfully", %newline,
+				"Design: ", scheme.name, %newline,
+				"Infrastructure: ", infra_type, " - ", infra_code, %newline,
+				"Total items: ", boq_result.size, %newline,
+				%newline)
+
+			# Add API send summary if cluster type
+			_if infra_type = "cluster"
+			_then
+				msg << msg + write_string(
+					"API Send Summary:", %newline,
+					"  Successful: ", api_success_count, %newline,
+					"  Errors: ", api_error_count, %newline,
+					%newline)
+			_else
+				msg << msg + write_string(
+					"API Send: Skipped (only cluster infrastructure supported)", %newline,
+					%newline)
+			_endif
+
+			msg << msg + write_string("BoQ Report Summary:", %newline)
+
+			# Show first 5 items as preview
+			_for key _over boq_result.keys()
+			_loop
+				_local item << boq_result[key]
+				msg << msg + write_string(
+					"  - Equipment: ", item[:equipment_name].default(""), %newline,
+					"    Description: ", item[:description].default(""), %newline,
+					"    Quantity Material: ", item[:quantity_material].default("N/A"),
+					", Quantity Service: ", item[:quantity_service].default("N/A"), %newline)
+			_endloop
+			msg << msg + write_string(
+				"="*100)
+
+			_self.user_info(msg)
+		_else
+			_self.log_separator()
+			_self.log_warning("BOQ GENERATION COMPLETE - NO ITEMS FOUND")
+			_self.log_separator()
+			_self.log_warning("No BOQ items were generated from the design")
+			_self.log_info("This may indicate:")
+			_self.log_info("  - Design has no objects")
+			_self.log_info("  - Objects have no STF item codes assigned")
+			_self.log_separator()
+			_self.user_info("BoQ generation completed but no items found")
+		_endif
+
+	_when error
+		_self.log_separator()
+		_self.log_error("BOQ GENERATION FAILED")
+		_self.log_separator()
+		_self.log_error("Error generating BoQ:")
+		_self.log_error(errCond.report_contents_string)
+		_self.log_separator()
+		write("LOG: Error generating BoQ:", errCond.report_contents_string)
+		_self.user_error(write_string("Error generating BoQ:", %newline,
+			errCond.report_contents_string))
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
