@@ -40,9 +40,16 @@ _private _method astri_design_migrator.create_demand_point(pm)
 		# Step 3.6: Extract ring_name from folders (FDT/Closure name)
 		_local ring_name << pm[:ring_name]
 
+		# Step 3.7: Truncate identification to fit field length (max 32 chars)
+		_local identification << pm[:name].default("")
+		_if identification.size > 32
+		_then
+			identification << identification.slice(1, 32)
+		_endif
+
 		# Step 4: Create demand point
 		_local prop_values << property_list.new_with(
-			:identification, pm[:name],
+			:identification, identification,
 			:name, pm[:name],
 			:status, "Active",
 			:mdu?, _false,
@@ -53,7 +60,6 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			:pop, .pop_name,
 			:olt, .pop_name,
 			:line_type, m_line,
-			:ring_name, ring_name,
 			:notes, ring_name.default("") + "|" + .cluster_code_db,
 			:location, location,
 			:uuid, .uuid
@@ -168,7 +174,7 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			_local tahun << date_time_now().year.write_string
 
 			_local l_prop_values_cs << property_list.new_with(
-				:identification, pm[:name],
+				:identification, identification,
 				:customer_name, pm[:name],
 				:type, "Residential",
 
