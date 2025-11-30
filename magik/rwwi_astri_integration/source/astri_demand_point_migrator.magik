@@ -54,7 +54,7 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			:olt, .pop_name,
 			:line_type, m_line,
 			:ring_name, ring_name,
-			:notes, ring_name+" | "+.cluster_code_db,
+			:notes, ring_name.default("") + "|" + .cluster_code_db,
 			:location, location,
 			:uuid, .uuid
 		)

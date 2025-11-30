@@ -527,16 +527,17 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 	# Sixth pass: Create access points (catch-all for remaining points)
 	write("  Pass 7: Creating access points...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Access points (point-based: catch-all for points not matching other types)
-		_local is_ap << _self.is_access_point?(pm)
-		#write("    Checking: ", pm[:name], " | is_access_point?: ", is_ap, " | Folders: ", pm[:parent].default(""))
-		_if is_ap
-		_then
-			_self.create_access_point(pm)
-		_endif
-	_endloop
+	# COMMENTED OUT: Access point migration disabled for now - may be useful later
+	#_for pm _over placemarks.fast_elements()
+	#_loop
+	#	# Access points (point-based: catch-all for points not matching other types)
+	#	_local is_ap << _self.is_access_point?(pm)
+	#	#write("    Checking: ", pm[:name], " | is_access_point?: ", is_ap, " | Folders: ", pm[:parent].default(""))
+	#	_if is_ap
+	#	_then
+	#		_self.create_access_point(pm)
+	#	_endif
+	#_endloop
 
 	_self.print_statistics()
 	>> .stats
