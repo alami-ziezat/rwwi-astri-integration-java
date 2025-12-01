@@ -428,6 +428,10 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			_endif
 		_endloop
 
+		# DEBUG: Print folder criteria
+		write("  Processing folder: ", folder_name)
+		write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
+
 		# Filter and write poles based on folder criteria
 		pole_count << 0
 		_for pole _over all_poles.fast_elements()
@@ -436,6 +440,12 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			asset_owner << pole.perform(:asset_owner).default("")
 			pole_status << pole.perform(:construction_status).default("")
 			pole_type << pole.perform(:type).default("")  # e.g., "Pole 7-2.5"
+
+			# DEBUG: Print first 3 poles
+			_if pole_count < 3
+			_then
+				write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner)
+			_endif
 
 			# Check if pole matches folder criteria
 			matches? << _true
