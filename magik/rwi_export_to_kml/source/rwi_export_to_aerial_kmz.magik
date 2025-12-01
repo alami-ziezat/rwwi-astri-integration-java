@@ -21,7 +21,8 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:style_manager, _unset, :writable},         # Style manager instance
 	{:folder_builder, _unset, :writable},        # Folder builder instance
 	{:object_writer, _unset, :writable},         # Object writer instance
-	{:line_assigner, _unset, :writable}          # LINE assigner instance
+	{:line_assigner, _unset, :writable},         # LINE assigner instance
+	{:total_pole_count, _unset, :writable}       # Total poles exported
 }, :object)
 $
 
@@ -223,6 +224,9 @@ _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area, p_levels)
 	## Create KML file with dynamic folder structure using template
 
+	# Initialize pole counter
+	.total_pole_count << 0
+
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
 
@@ -288,6 +292,11 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 
 	kml_stream.close()
 
+	# Display total pole count for validation
+	write("==========================================================")
+	write("TOTAL POLES EXPORTED: ", .total_pole_count)
+	write("==========================================================")
+
 	>> kml_file
 _endmethod
 $
@@ -348,7 +357,7 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 
 	# Use infrastructure code if available, otherwise default to "CLUSTER CODE"
 	folder_name << _if .infrastructure_code _isnt _unset
-	               _then >> .infrastructure_code + "_code"
+	               _then >> .infrastructure_code
 	               _else >> "CLUSTER CODE"
 	               _endif
 
@@ -369,8 +378,11 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_folder(p_stream, p_folder_def, p_area, p_indent)
+_private _method rwi_export_to_aerial_kmz.write_folder(p_stream, p_folder_def, p_area, p_indent, _optional p_parent_line_id)
 	## Write a folder and its contents recursively
+	##
+	## Parameters:
+	##   p_parent_line_id - LINE ID from parent folder (propagated to children)
 
 	indent << "".fill_up_with(% , p_indent)
 
@@ -384,24 +396,30 @@ _private _method rwi_export_to_aerial_kmz.write_folder(p_stream, p_folder_def, p
 		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
 	_endif
 
+	# Determine LINE ID for this folder level
+	# If this folder defines a line_id, use it; otherwise inherit from parent
+	current_line_id << p_folder_def[:line_id].default(p_parent_line_id)
+
 	# Write subfolders if present
 	_if p_folder_def[:subfolders] _isnt _unset
 	_then
 		_for subfolder _over p_folder_def[:subfolders].fast_elements()
 		_loop
-			_self.write_folder(p_stream, subfolder, p_area, p_indent + 2)
+			# Pass current_line_id down to children
+			_self.write_folder(p_stream, subfolder, p_area, p_indent + 2, current_line_id)
 		_endloop
 	_endif
 
 	# Write placemarks for this folder based on folder type
-	_self.write_folder_contents(p_stream, p_folder_def, p_area, indent + "  ")
+	# Pass current_line_id so pole folders know which LINE they belong to
+	_self.write_folder_contents(p_stream, p_folder_def, p_area, indent + "  ", current_line_id)
 
 	p_stream.write(indent, "</Folder>", newline_char)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_folder_def, p_area, p_indent)
+_private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_folder_def, p_area, p_indent, _optional p_parent_line_id)
 	## Write placemarks (poles, cables, equipment) for this folder
 	##
 	## Parameters:
@@ -409,9 +427,11 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	##   p_folder_def - Folder definition property_list
 	##   p_area - Design boundary area
 	##   p_indent - Indentation string
+	##   p_parent_line_id - LINE ID inherited from parent folder
 
 	folder_name << p_folder_def[:name]
-	line_id << p_folder_def[:line_id]  # "A", "B", "C", or "D" if this is inside a LINE folder
+	# Use line_id from folder definition if present, otherwise use parent's line_id
+	line_id << p_folder_def[:line_id].default(p_parent_line_id)
 
 	# Check if this is a pole folder (EXISTING POLE or NEW POLE)
 	_if folder_name.index_of_seq("POLE") _isnt _unset
@@ -437,8 +457,8 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		_endloop
 
 		# DEBUG: Print folder criteria
-		#write("  Processing folder: ", folder_name)
-		#write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
+		write("  Processing folder: ", folder_name, " (LINE: ", line_id, ")")
+		write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
 
 		# Filter and write poles based on folder criteria
 		pole_count << 0
@@ -451,10 +471,10 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			pole_line_type << pole.perform(:line_type).default("")  # e.g., "A", "B", "C", "D"
 
 			# DEBUG: Print first 3 poles
-			#_if pole_count < 3
-			#_then
-			#	write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner, " Line:", pole_line_type)
-			#_endif
+			_if pole_count < 3
+			_then
+				write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner, " Line:", pole_line_type)
+			_endif
 
 			# Check if pole matches folder criteria
 			matches? << _true
@@ -465,6 +485,11 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 				_if pole_line_type.uppercase <> line_id.uppercase
 				_then
 					matches? << _false
+					# DEBUG: Show why pole was rejected
+					_if pole_count < 3
+					_then
+						write("      REJECTED: pole line_type '", pole_line_type, "' does not match folder LINE '", line_id, "'")
+					_endif
 				_endif
 			_endif
 
@@ -516,10 +541,11 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			_then
 				.object_writer.write_pole(pole, p_stream, p_indent)
 				pole_count +<< 1
+				.total_pole_count +<< 1  # Increment total counter
 			_endif
 		_endloop
 
-		write("  Wrote ", pole_count, " poles to folder: ", folder_name)
+		write("  Wrote ", pole_count, " poles to folder: ", folder_name, " (Total so far: ", .total_pole_count, ")")
 	_endif
 
 	# TODO: Add logic for other folder types (CABLE, FDT, FAT, etc.)
