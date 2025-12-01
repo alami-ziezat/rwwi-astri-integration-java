@@ -335,6 +335,87 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_sling_wire(p_sling_wire, p_route_geom, p_stream, p_indent)
+	## Write sling_wire chain as LineString with coordinates and styling
+	##
+	## Parameters:
+	##   p_sling_wire - Sling wire object
+	##   p_route_geom - Route geometry (chain)
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	_if p_route_geom _is _unset _then _return _endif
+
+	# Get database and view for coordinate conversion
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+
+	# Set up dynamics for coordinate system
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	# Get current coordinate system and WGS84 coordinate system
+	cs1 << v.world.coordinate_system
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+
+	# Create transform
+	t << transform.new_converting_cs_to_cs(cs1, cs2)
+
+	# Convert route sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	# Get route sectors and convert each coordinate
+	route_sectors << p_route_geom.sectors
+	_for sector _over route_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			# Convert coordinate to WGS84
+			t_coord << t.convert(coord)
+			# Format as "lon,lat,0 "
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Get sling_wire attributes
+	sling_id << p_sling_wire.perform(:id).default("Unknown")
+	sling_name << p_sling_wire.perform(:name).default("")
+
+	# Build chain name
+	_if sling_name <> ""
+	_then
+		chain_name << sling_name
+	_else
+		chain_name << write_string("SLING WIRE ", sling_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#sling_wire_map</styleUrl>", newline_char)
+
+	# Write ExtendedData with sling_wire attributes
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'>", newline_char)
+	p_stream.write(p_indent, "      <value>", sling_id, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'>", newline_char)
+	p_stream.write(p_indent, "      <value>SLING WIRE</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write LineString geometry
+	p_stream.write(p_indent, "  <LineString>", newline_char)
+	p_stream.write(p_indent, "    <tessellate>1</tessellate>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </LineString>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_object_writer.write_hp_point(p_hp, p_stream, p_indent)
 	## Write homepass point placemark
 	## TODO: Implement in Phase 3

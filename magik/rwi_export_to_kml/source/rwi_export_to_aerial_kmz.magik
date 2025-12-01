@@ -27,7 +27,8 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:total_fat_count, _unset, :writable},       # Total FATs exported
 	{:total_fdt_count, _unset, :writable},       # Total FDTs exported
 	{:total_closure_count, _unset, :writable},   # Total CLOSUREs exported
-	{:total_slack_hanger_count, _unset, :writable}  # Total SLACK HANGERs exported
+	{:total_slack_hanger_count, _unset, :writable},  # Total SLACK HANGERs exported
+	{:total_sling_wire_count, _unset, :writable}     # Total SLING WIREs exported
 }, :object)
 $
 
@@ -114,6 +115,7 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 		:total_fdts, .total_fdt_count,
 		:total_closures, .total_closure_count,
 		:total_slack_hangers, .total_slack_hanger_count,
+		:total_sling_wires, .total_sling_wire_count,
 		:project_name, .project_name,
 		:infrastructure_type, .infrastructure_type)
 _endmethod
@@ -247,6 +249,7 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	.total_fdt_count << 0
 	.total_closure_count << 0
 	.total_slack_hanger_count << 0
+	.total_sling_wire_count << 0
 
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
@@ -672,6 +675,12 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_then
 		_self.write_figure_eight_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
 	_endif
+
+	# Handle SLING WIRE folders - export sling_wire chains
+	_if folder_name.index_of_seq("SLING WIRE") _isnt _unset
+	_then
+		_self.write_sling_wire_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
+	_endif
 _endmethod
 $
 
@@ -1009,6 +1018,76 @@ _private _method rwi_export_to_aerial_kmz.write_figure_eight_for_folder(p_stream
 	_if equipment_count > 0
 	_then
 		write("  Wrote ", equipment_count, " SLACK HANGER equipment")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_sling_wire_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write sling_wire chains to folder
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_line_id - LINE ID (A/B/C/D) for filtering, _unset if not in LINE folder (first optional)
+	##   p_fdt_folder - FDT folder name (e.g., "FDT_FDT001") for filtering (second optional)
+
+	# Query sling_wire chains in area
+	all_sling_wires << .gc[:sling_wire].select(
+		predicate.interacts(:route, p_area))
+
+	chain_count << 0
+
+	# Iterate through sling_wire chains
+	_for sling_wire _over all_sling_wires.fast_elements()
+	_loop
+		# Get sling_wire route geometry
+		route_geom << sling_wire.route
+		_if route_geom _is _unset _then _continue _endif
+
+		# Filter by LINE if we're in a LINE folder
+		_if p_line_id _isnt _unset
+		_then
+			# Convert p_line_id to line_type format (e.g., "A" -> "LINE A")
+			expected_line_type << "LINE " + p_line_id
+			sling_line_type << sling_wire.perform(:line_type).default("")
+
+			_if sling_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue  # Skip sling_wire if it doesn't match LINE
+			_endif
+		_endif
+
+		# Filter by FDT folder if we're inside an FDT folder (cluster structure)
+		_if p_fdt_folder _isnt _unset
+		_then
+			# Get sling_wire ring_name
+			sling_ring_name << sling_wire.perform(:ring_name).default("")
+
+			# FDT folder format is "FDT_<name>", extract the name part
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then
+				# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
+				fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+
+				# Check if ring_name matches FDT name
+				_if sling_ring_name.uppercase <> fdt_name.uppercase
+				_then
+					_continue  # Skip sling_wire if it doesn't belong to this FDT
+				_endif
+			_endif
+		_endif
+
+		# Write the sling_wire using its route geometry
+		.object_writer.write_sling_wire(sling_wire, route_geom, p_stream, p_indent)
+		chain_count +<< 1
+		.total_sling_wire_count +<< 1
+	_endloop
+
+	_if chain_count > 0
+	_then
+		write("  Wrote ", chain_count, " SLING WIRE chains")
 	_endif
 _endmethod
 $
