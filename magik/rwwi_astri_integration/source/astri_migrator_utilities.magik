@@ -30,9 +30,8 @@ _private _method astri_design_migrator.parse_line_geometry(coord_string)
 	## Convert "lon1,lat1,0 lon2,lat2,0 ..." to sector_rope
 
 	_dynamic !print_float_precision! << 16
-	_local coord_pairs << coord_string.split_by(",0")
+	_local coord_pairs << coord_string.split_by(",0 ")
 	_local sect << sector.new()
-
 	_for coord_pair _over coord_pairs.fast_elements()
 	_loop
 		_local parts << coord_pair.split_by(",")

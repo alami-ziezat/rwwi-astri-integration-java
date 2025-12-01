@@ -432,13 +432,14 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	folder_name << p_folder_def[:name]
 	# Use line_id from folder definition if present, otherwise use parent's line_id
 	line_id << p_folder_def[:line_id].default(p_parent_line_id)
+	line_type << "LINE " + line_id.default("A")
 
 	# Check if this is a pole folder (EXISTING POLE or NEW POLE)
 	_if folder_name.index_of_seq("POLE") _isnt _unset
 	_then
 		# Query poles in area
 		all_poles << .gc[:pole].select(
-			predicate.within(:location, p_area))
+			predicate.interacts(:location, p_area))
 
 		# Determine filtering criteria from folder name
 		is_new_pole? << folder_name.index_of_seq("NEW POLE") _isnt _unset
@@ -457,7 +458,7 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		_endloop
 
 		# DEBUG: Print folder criteria
-		write("  Processing folder: ", folder_name, " (LINE: ", line_id, ")")
+		write("  Processing folder: ", folder_name, " (LINE: ", line_type, ")")
 		write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
 
 		# Filter and write poles based on folder criteria
@@ -473,22 +474,23 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			# DEBUG: Print first 3 poles
 			_if pole_count < 3
 			_then
-				write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner, " Line:", pole_line_type)
+			#	write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner, " Line:", pole_line_type)
 			_endif
 
 			# Check if pole matches folder criteria
 			matches? << _true
 
 			# Filter by LINE (A, B, C, D) if we're inside a LINE folder
-			_if line_id _isnt _unset
+			write("    Current LINE TYPE: ", line_type, " Pole LINE Type: ", pole_line_type)
+			_if line_type _isnt _unset
 			_then
-				_if pole_line_type.uppercase <> line_id.uppercase
+				_if pole_line_type.uppercase <> line_type.uppercase
 				_then
 					matches? << _false
 					# DEBUG: Show why pole was rejected
 					_if pole_count < 3
 					_then
-						write("      REJECTED: pole line_type '", pole_line_type, "' does not match folder LINE '", line_id, "'")
+			#			write("      REJECTED: pole line_type '", pole_line_type, "' does not match folder LINE '", line_id, "'")
 					_endif
 				_endif
 			_endif

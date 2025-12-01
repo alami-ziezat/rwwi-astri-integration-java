@@ -286,12 +286,12 @@ _private _method astri_design_migrator.extract_boundary_area(placemarks)
 	_if convex_hull _is _unset
 	_then
 		write("  WARNING: Convex hull creation failed, suspect line geometry, using buffered points instead")
-		l_new_sectors << point_rope.buffer(200).sectors.an_element()
+		l_new_sectors << point_rope.buffer(400).sectors.an_element()
 		_return sector_rope.new_convex_hull(l_new_sectors)
 	_endif
 
 	write("  Created convex hull boundary from ", point_rope.size, " placemark points")
-	_return convex_hull.buffer(200).sectors
+	_return convex_hull.buffer(400).sectors
 _endmethod
 $
 
@@ -450,7 +450,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_self.create_aerial_route(pm)
 		_endif
 	_endloop
-
+	
 	write("  Pass 3: Creating poles...")
 	_for pm _over placemarks.fast_elements()
 	_loop

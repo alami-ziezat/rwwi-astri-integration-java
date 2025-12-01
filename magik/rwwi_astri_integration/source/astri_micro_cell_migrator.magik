@@ -70,11 +70,9 @@ _private _method astri_design_migrator.create_micro_cell(pm)
 		# Step 2: Check for LINE pattern (required for Micro Cell)
 		_local has_line << _false
 
-		_if fol[fsize] = "LINE A" _orif fol[fparent] = "LINE A" _orif
-		   fol[fsize] = "LINE B" _orif fol[fparent] = "LINE B" _orif
-		   fol[fsize] = "LINE C" _orif fol[fparent] = "LINE C" _orif
-		   fol[fsize] = "LINE D" _orif fol[fparent] = "LINE D" _orif
-		   fol[fsize] = "LINE E" _orif fol[fparent] = "LINE E"
+		_if fol[fsize].matches?("LINE A*") _orif fol[fparent].matches?("LINE A*") _orif
+		   fol[fsize].matches?("LINE B*") _orif fol[fparent].matches?("LINE B*") _orif
+		   fol[fsize].matches?("LINE C*") _orif fol[fparent].matches?("LINE C*")
 		_then
 			has_line << _true
 		_else
