@@ -22,7 +22,8 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:folder_builder, _unset, :writable},        # Folder builder instance
 	{:object_writer, _unset, :writable},         # Object writer instance
 	{:line_assigner, _unset, :writable},         # LINE assigner instance
-	{:total_pole_count, _unset, :writable}       # Total poles exported
+	{:total_pole_count, _unset, :writable},      # Total poles exported
+	{:pole_statistics, _unset, :writable}        # Property list tracking poles per folder
 }, :object)
 $
 
@@ -57,7 +58,7 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 	##   p_output_file - Output file path (e.g., "WO_12345.kmz")
 	##
 	## Returns:
-	##   String - Path to created KMZ file
+	##   property_list - {:output_file, string, :statistics, property_list}
 
 	write("Starting aerial KMZ export...")
 	write("  Project:", .project_name)
@@ -99,7 +100,14 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 	# kmz_file << _self.create_kmz_from_kml(kml_file)
 
 	write("Export complete:", kml_file)
-	>> kml_file
+
+	# Return output file and statistics
+	>> property_list.new_with(
+		:output_file, kml_file,
+		:total_poles, .total_pole_count,
+		:pole_statistics, .pole_statistics,
+		:project_name, .project_name,
+		:infrastructure_type, .infrastructure_type)
 _endmethod
 $
 
@@ -224,8 +232,9 @@ _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area, p_levels)
 	## Create KML file with dynamic folder structure using template
 
-	# Initialize pole counter
+	# Initialize pole counter and statistics
 	.total_pole_count << 0
+	.pole_statistics << property_list.new()
 
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
@@ -292,10 +301,8 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 
 	kml_stream.close()
 
-	# Display total pole count for validation
-	write("==========================================================")
-	write("TOTAL POLES EXPORTED: ", .total_pole_count)
-	write("==========================================================")
+	# Display detailed statistics report
+	_self.print_export_statistics()
 
 	>> kml_file
 _endmethod
@@ -308,6 +315,50 @@ _private _method rwi_export_to_aerial_kmz.write_kml_footer(p_stream)
 
 	p_stream.write("</Document>", newline_char)
 	p_stream.write("</kml>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.print_export_statistics()
+	## Print detailed export statistics report
+
+	write("╔════════════════════════════════════════════════════════════════╗")
+	write("║           AERIAL KML EXPORT - STATISTICS REPORT               ║")
+	write("╠════════════════════════════════════════════════════════════════╣")
+	write("║ Project: ", .project_name.default("Unknown"))
+	write("║ Infrastructure Type: ", .infrastructure_type.default("All"))
+	write("╠════════════════════════════════════════════════════════════════╣")
+	write("║ POLE EXPORT SUMMARY                                           ║")
+	write("╠════════════════════════════════════════════════════════════════╣")
+
+	# Sort folders by name for consistent display
+	folder_names << .pole_statistics.keys.as_sorted_collection()
+
+	# Display poles per folder
+	_if folder_names.size > 0
+	_then
+		_for folder_name _over folder_names.fast_elements()
+		_loop
+			count << .pole_statistics[folder_name]
+			# Format folder name (truncate if too long)
+			display_name << folder_name
+			_if display_name.size > 45
+			_then
+				display_name << display_name.slice(1, 42) + "..."
+			_endif
+
+			# Right-align count
+			count_str << count.write_string
+			spaces << "".fill_up_with(% , 50 - display_name.size)
+			write("║ ", display_name, spaces, count_str.right_pad(% , 8), " ║")
+		_endloop
+	_else
+		write("║ No poles exported                                            ║")
+	_endif
+
+	write("╠════════════════════════════════════════════════════════════════╣")
+	write("║ TOTAL POLES EXPORTED: ", .total_pole_count.write_string.right_pad(% , 38), " ║")
+	write("╚════════════════════════════════════════════════════════════════╝")
 _endmethod
 $
 
@@ -546,6 +597,12 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 				.total_pole_count +<< 1  # Increment total counter
 			_endif
 		_endloop
+
+		# Store statistics for this folder
+		_if pole_count > 0
+		_then
+			.pole_statistics[folder_name] << pole_count
+		_endif
 
 		write("  Wrote ", pole_count, " poles to folder: ", folder_name, " (Total so far: ", .total_pole_count, ")")
 	_endif

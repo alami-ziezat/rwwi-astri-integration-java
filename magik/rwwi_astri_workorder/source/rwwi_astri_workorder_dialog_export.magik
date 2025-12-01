@@ -139,7 +139,51 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_self.log_info(write_string("Starting export...", newline_char))
 
 		# Export with dynamic network detection
-		output_path << exporter.export_mixed_network(design_area, output_file)
+		export_result << exporter.export_mixed_network(design_area, output_file)
+
+		# Extract results
+		output_path << export_result[:output_file]
+		total_poles << export_result[:total_poles]
+		pole_stats << export_result[:pole_statistics]
+
+		# Display statistics in UI text window
+		_self.log_info(write_string(newline_char))
+		_self.log_info(write_string("╔════════════════════════════════════════════════════════════════╗", newline_char))
+		_self.log_info(write_string("║           AERIAL KML EXPORT - STATISTICS REPORT               ║", newline_char))
+		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
+		_self.log_info(write_string("║ Project: ", wo_number, newline_char))
+		_self.log_info(write_string("║ Infrastructure Type: ", infra_type, newline_char))
+		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
+		_self.log_info(write_string("║ POLE EXPORT SUMMARY                                           ║", newline_char))
+		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
+
+		# Display poles per folder
+		_if pole_stats.size > 0
+		_then
+			folder_names << pole_stats.keys.as_sorted_collection()
+			_for folder_name _over folder_names.fast_elements()
+			_loop
+				count << pole_stats[folder_name]
+				# Format folder name (truncate if too long)
+				display_name << folder_name
+				_if display_name.size > 45
+				_then
+					display_name << display_name.slice(1, 42) + "..."
+				_endif
+
+				# Right-align count
+				count_str << count.write_string
+				spaces << "".fill_up_with(% , 50 - display_name.size)
+				_self.log_info(write_string("║ ", display_name, spaces, count_str.right_pad(% , 8), " ║", newline_char))
+			_endloop
+		_else
+			_self.log_info(write_string("║ No poles exported                                            ║", newline_char))
+		_endif
+
+		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
+		_self.log_info(write_string("║ TOTAL POLES EXPORTED: ", total_poles.write_string.right_pad(% , 38), " ║", newline_char))
+		_self.log_info(write_string("╚════════════════════════════════════════════════════════════════╝", newline_char))
+		_self.log_info(write_string(newline_char))
 
 		# Success message
 		_self.show_message("Export Complete",

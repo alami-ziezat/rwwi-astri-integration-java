@@ -174,22 +174,17 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 		# Multiple FDTs - create separate FDT_[NAME] folder for each
 		_for fdt _over p_fdts.fast_elements()
 		_loop
-			fdt_name << fdt.perform_safely(:name).default("FDT_" + fdt.id.write_string)
+			fdt_name << fdt.perform(:name).default("FDT_" + fdt.id.write_string)
 
-			# Create FDT_[FDT_NAME] folder (NO "CLUSTER" prefix)
+			# Create FDT_[FDT_NAME] folder (NO extra FDT folder inside)
+			# LINEs are directly under FDT_[NAME]
 			cluster_folder << property_list.new_with(
 				:name, write_string("FDT_", fdt_name),
 				:visibility, _false,
 				:fdt_object, fdt,
 				:subfolders, rope.new())
 
-			# Add FDT folder inside
-			cluster_folder[:subfolders].add(property_list.new_with(
-				:name, "FDT",
-				:visibility, _false,
-				:fdt_object, fdt))
-
-			# Add 4 LINEs inside this FDT folder
+			# Add 4 LINEs directly inside FDT_[NAME] folder
 			_for line_id _over {"A", "B", "C", "D"}.fast_elements()
 			_loop
 				line_folder << _self.build_line_folders(line_id, fdt)
