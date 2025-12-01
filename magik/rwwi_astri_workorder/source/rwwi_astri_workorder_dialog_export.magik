@@ -90,9 +90,10 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 	# Get work order details
 	wo_number << .selected_wo[:wo_number]
 	infra_type << .selected_wo[:infrastructure_type].default("cluster")
+	infra_code << .selected_wo[:infra_code].default("UNKNOWN")
 
-	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type)
-	_self.log_info(write_string("Exporting KML for WO: ", wo_number, newline_char))
+	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type, " Code:", infra_code)
+	_self.log_info(write_string("Exporting KML for WO: ", wo_number, " Code: ", infra_code, newline_char))
 
 	# Get project and design
 	_try _with errCond
@@ -132,6 +133,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		exporter.project_name << wo_number
 		exporter.project_area << design_area
 		exporter.infrastructure_type << infra_type.as_symbol()
+		exporter.infrastructure_code << infra_code  # Pass infrastructure code for folder naming
 
 		# Show progress
 		_self.log_info(write_string("Starting export...", newline_char))

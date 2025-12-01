@@ -17,6 +17,7 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:project_area, _unset, :writable},          # Design boundary area
 	{:output_directory, _unset, :writable},      # Output directory
 	{:infrastructure_type, _unset, :writable},   # Infrastructure type filter (cluster/feeder/subfeeder)
+	{:infrastructure_code, _unset, :writable},   # Infrastructure code (e.g., "CLU001")
 	{:style_manager, _unset, :writable},         # Style manager instance
 	{:folder_builder, _unset, :writable},        # Folder builder instance
 	{:object_writer, _unset, :writable},         # Object writer instance
@@ -345,8 +346,14 @@ _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area, p_fdts)
 	## Write CLUSTER CODE section with dynamic FDT structure
 
+	# Use infrastructure code if available, otherwise default to "CLUSTER CODE"
+	folder_name << _if .infrastructure_code _isnt _unset
+	               _then >> .infrastructure_code + "_code"
+	               _else >> "CLUSTER CODE"
+	               _endif
+
 	p_stream.write("  <Folder>", newline_char)
-	p_stream.write("    <name>CLUSTER CODE</name>", newline_char)
+	p_stream.write("    <name>", folder_name, "</name>", newline_char)
 
 	# Get folder definitions from builder (dynamic based on FDT count)
 	folder_defs << .folder_builder.build_cluster_folders(p_fdts)
@@ -404,6 +411,7 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	##   p_indent - Indentation string
 
 	folder_name << p_folder_def[:name]
+	line_id << p_folder_def[:line_id]  # "A", "B", "C", or "D" if this is inside a LINE folder
 
 	# Check if this is a pole folder (EXISTING POLE or NEW POLE)
 	_if folder_name.index_of_seq("POLE") _isnt _unset
@@ -417,9 +425,9 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		is_emr? << folder_name.index_of_seq("EMR") _isnt _unset
 		is_partner? << folder_name.index_of_seq("PARTNER") _isnt _unset
 
-		# Extract pole spec if present (e.g., "7-2.5", "7-3", "7-4", "9-4")
+		# Extract pole spec if present (e.g., "7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5")
 		pole_spec << _unset
-		_for spec _over {"7-2.5", "7-3", "7-4", "9-4"}.fast_elements()
+		_for spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 		_loop
 			_if folder_name.index_of_seq(spec) _isnt _unset
 			_then
@@ -429,8 +437,8 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		_endloop
 
 		# DEBUG: Print folder criteria
-		write("  Processing folder: ", folder_name)
-		write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
+		#write("  Processing folder: ", folder_name)
+		#write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
 
 		# Filter and write poles based on folder criteria
 		pole_count << 0
@@ -440,15 +448,25 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			asset_owner << pole.perform(:asset_owner).default("")
 			pole_status << pole.perform(:construction_status).default("")
 			pole_type << pole.perform(:type).default("")  # e.g., "Pole 7-2.5"
+			pole_line_type << pole.perform(:line_type).default("")  # e.g., "A", "B", "C", "D"
 
 			# DEBUG: Print first 3 poles
-			_if pole_count < 3
-			_then
-				write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner)
-			_endif
+			#_if pole_count < 3
+			#_then
+			#	write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner, " Line:", pole_line_type)
+			#_endif
 
 			# Check if pole matches folder criteria
 			matches? << _true
+
+			# Filter by LINE (A, B, C, D) if we're inside a LINE folder
+			_if line_id _isnt _unset
+			_then
+				_if pole_line_type.uppercase <> line_id.uppercase
+				_then
+					matches? << _false
+				_endif
+			_endif
 
 			# Filter by NEW vs EXISTING (construction_status)
 			_if is_new_pole?

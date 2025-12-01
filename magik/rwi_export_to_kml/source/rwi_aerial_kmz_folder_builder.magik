@@ -256,10 +256,10 @@ _method rwi_aerial_kmz_folder_builder.build_line_folders(p_line_id, p_fdt)
 		:name, "HP UNCOVER",
 		:visibility, _false))
 
-	# 5-12. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-4)
+	# 5-12. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-3, 9-4, 9-5)
 	_for owner _over {"EMR", "PARTNER"}.fast_elements()
 	_loop
-		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-4"}.fast_elements()
+		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 		_loop
 			subfolders.add(property_list.new_with(
 				:name, write_string("EXISTING POLE ", owner, " ", pole_spec),
@@ -267,8 +267,8 @@ _method rwi_aerial_kmz_folder_builder.build_line_folders(p_line_id, p_fdt)
 		_endloop
 	_endloop
 
-	# 13-16. NEW POLE (7-4, 9-4) - only 2 variations for cluster
-	_for pole_spec _over {"7-4", "9-4"}.fast_elements()
+	# 13-16. NEW POLE (7-2.5, 7-3, 7-4, 9-3, 9-4, 9-5) - all pole variations
+	_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 	_loop
 		subfolders.add(property_list.new_with(
 			:name, write_string("NEW POLE ", pole_spec),
