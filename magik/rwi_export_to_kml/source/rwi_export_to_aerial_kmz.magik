@@ -625,6 +625,7 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_endif
 
 	# Handle FAT folders - export FAT equipment
+	write("  Processing folder for equipment: ", folder_name)
 	_if folder_name.index_of_seq("FAT") _isnt _unset _andif
 	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY FAT
 	_then
@@ -632,15 +633,117 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_endif
 
 	# Handle FDT folders - export FDT equipment
-	_if folder_name = "FDT"
+	_if folder_name.index_of_seq("FDT") _isnt _unset
 	_then
-		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "FDT", line_id)
+		# Export FDTs - they can be on poles or standalone (mit_terminal_enclosure)
+		write("  Exporting FDT equipment for folder: ", folder_name)
+		_self.write_fdt_equipment(p_stream, p_area, p_indent, p_parent_fdt_folder)
 	_endif
 
 	# Handle CLOSURE/JOINT CLOSURE folders - export CLOSURE equipment
-	_if folder_name = "JOINT CLOSURE" _orif folder_name = "CLOSURE"
+	_if folder_name.index_of_seq("JOINT CLOSURE") _isnt	_unset _orif 
+		folder_name.index_of_seq("CLOSURE") _isnt _unset 
 	_then
 		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "CLOSURE", line_id)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_fdt_equipment(p_stream, p_area, p_indent, _optional p_fdt_folder)
+	## Write FDT equipment - handles both pole-mounted and standalone FDTs
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_fdt_folder - FDT folder name for filtering (optional)
+
+	fdt_count << 0
+
+	# 1. Export FDTs on poles (sheath_splice with type FDT)
+	all_poles << .gc[:pole].select(
+		predicate.interacts(:location, p_area))
+
+	_for pole _over all_poles.fast_elements()
+	_loop
+		pole_geom << pole.location
+		_if pole_geom _is _unset _then _continue _endif
+
+		# Get equipment on pole
+		pole_equipment << pole.get_equipment()
+		_if pole_equipment.empty? _then _continue _endif
+
+		# Get sheath_splice equipment
+		pole_splices << pole_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :sheath_splice)))
+
+		_for splice _over pole_splices.fast_elements()
+		_loop
+			# Check if it's an FDT
+			splice_type << splice.sheath_splice_object_type
+			_if splice_type _is _unset _then _continue _endif
+
+			_if splice_type.uppercase = "FDT"
+			_then
+				# Filter by FDT folder if specified
+				_if p_fdt_folder _isnt _unset
+				_then
+					# Get FDT name from equipment
+					fdt_name << splice.perform(:name).default("")
+					# Extract expected name from folder (e.g., "FDT_FDT001" -> "FDT001")
+					_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+					_then
+						expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+						_if fdt_name.uppercase <> expected_fdt_name.uppercase
+						_then
+							_continue  # Skip if doesn't match this FDT folder
+						_endif
+					_endif
+				_endif
+
+				# Write the FDT
+				.object_writer.write_sheath_splice(splice, pole_geom, p_stream, p_indent)
+				fdt_count +<< 1
+				.total_fdt_count +<< 1
+			_endif
+		_endloop
+	_endloop
+
+	# 2. Export standalone FDTs (mit_terminal_enclosure)
+	terminal_enclosures << .gc[:mit_terminal_enclosure].select(
+		predicate.within(:location, p_area))
+
+	_for terminal _over terminal_enclosures.fast_elements()
+	_loop
+		terminal_geom << terminal.location
+		_if terminal_geom _is _unset _then _continue _endif
+
+		# Filter by FDT folder if specified
+		_if p_fdt_folder _isnt _unset
+		_then
+			terminal_name << terminal.perform(:name).default("")
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then
+				expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_if terminal_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue
+				_endif
+			_endif
+		_endif
+
+		# Write terminal enclosure as FDT
+		# Convert terminal to equipment-like format for writer
+		.object_writer.write_terminal_enclosure(terminal, terminal_geom, p_stream, p_indent)
+		fdt_count +<< 1
+		.total_fdt_count +<< 1
+	_endloop
+
+	_if fdt_count > 0
+	_then
+		write("  Wrote ", fdt_count, " FDT equipment")
 	_endif
 _endmethod
 $
@@ -679,7 +782,7 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 		_if pole_equipment.empty? _then _continue _endif
 
 		# DEBUG: First few poles
-		write("    Pole ", pole.telco_pole_tag, " has ", pole_equipment.size, " equipment items")
+		#write("    Pole ", pole.telco_pole_tag, " has ", pole_equipment.size, " equipment items")
 
 		# Get sheath_splice from equipment using predicate
 		pole_splices << pole_equipment.select(
@@ -691,7 +794,7 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 		splices_found +<< pole_splices.size
 
 		# DEBUG
-		write("    Found ", pole_splices.size, " sheath splices on pole ", pole.telco_pole_tag)
+		#write("    Found ", pole_splices.size, " sheath splices on pole ", pole.telco_pole_tag)
 
 		_for splice _over pole_splices.fast_elements()
 		_loop
@@ -704,10 +807,10 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 			_endif
 
 			# DEBUG
-			_if equipment_count < 3
-			_then
-				write("    Splice equipment ID:", splice.id, " Type:", splice_type)
-			_endif
+			#_if equipment_count < 3
+			#_then
+			#	write("    Splice equipment ID:", splice.id, " Type:", splice_type)
+			#_endif
 
 			# Filter by equipment type
 			matches_type? << _false
@@ -736,10 +839,10 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 				pole_line_type << pole.perform(:line_type).default("")
 
 				# DEBUG
-				_if equipment_count < 3
-				_then
-					write("      Checking LINE: pole line_type='", pole_line_type, "' expected='", expected_line_type, "'")
-				_endif
+				#_if equipment_count < 3
+				#_then
+				#	write("      Checking LINE: pole line_type='", pole_line_type, "' expected='", expected_line_type, "'")
+				#_endif
 
 				_if pole_line_type.uppercase <> expected_line_type.uppercase
 				_then
@@ -760,10 +863,10 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 						fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
 
 						# DEBUG
-						_if equipment_count < 3
-						_then
-							write("      Checking FDT: FAT ring_name='", fat_ring_name, "' expected FDT='", fdt_name, "'")
-						_endif
+						#_if equipment_count < 3
+						#_then
+						#	write("      Checking FDT: FAT ring_name='", fat_ring_name, "' expected FDT='", fdt_name, "'")
+						#_endif
 
 						# Check if ring_name matches FDT name
 						_if fat_ring_name.uppercase <> fdt_name.uppercase
