@@ -606,6 +606,25 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 				_endif
 			_endif
 
+			# Filter by FDT folder if we're inside an FDT_* folder (cluster structure)
+			_if p_parent_fdt_folder _isnt _unset
+			_then
+				# Get pole ring_name
+				pole_ring_name << pole.perform(:ring_name).default("")
+
+				# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
+				_if p_parent_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then
+					expected_fdt_name << p_parent_fdt_folder.slice(5, p_parent_fdt_folder.size)
+
+					# Check if ring_name matches FDT name
+					_if pole_ring_name.uppercase <> expected_fdt_name.uppercase
+					_then
+						matches? << _false
+					_endif
+				_endif
+			_endif
+
 			# Write pole if it matches
 			_if matches?
 			_then
