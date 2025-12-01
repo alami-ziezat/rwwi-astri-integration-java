@@ -93,7 +93,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 	infra_code << .selected_wo[:infra_code].default("UNKNOWN")
 
 	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type, " Code:", infra_code)
-	_self.log_info(write_string("Exporting KML for WO: ", wo_number, " Code: ", infra_code, newline_char))
+	_self.log_info(write_string("Exporting KML for WO: ", wo_number, " Code: ", infra_code))
 
 	# Get project and design
 	_try _with errCond
@@ -106,7 +106,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_endif
 
 		# Activate the design before export
-		_self.log_info(write_string("Activating design for project: ", wo_number, newline_char))
+		_self.log_info(write_string("Activating design for project: ", wo_number))
 		.engine.activate_design(wo_number)
 
 		# Get design boundary
@@ -136,7 +136,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		exporter.infrastructure_code << infra_code  # Pass infrastructure code for folder naming
 
 		# Show progress
-		_self.log_info(write_string("Starting export...", newline_char))
+		_self.log_info("Starting export...")
 
 		# Export with dynamic network detection
 		export_result << exporter.export_mixed_network(design_area, output_file)
@@ -147,15 +147,15 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		pole_stats << export_result[:pole_statistics]
 
 		# Display statistics in UI text window
-		_self.log_info(write_string(newline_char))
-		_self.log_info(write_string("╔════════════════════════════════════════════════════════════════╗", newline_char))
-		_self.log_info(write_string("║           AERIAL KML EXPORT - STATISTICS REPORT               ║", newline_char))
-		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
-		_self.log_info(write_string("║ Project: ", wo_number, newline_char))
-		_self.log_info(write_string("║ Infrastructure Type: ", infra_type, newline_char))
-		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
-		_self.log_info(write_string("║ POLE EXPORT SUMMARY                                           ║", newline_char))
-		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
+		_self.log_info("")
+		_self.log_info("="*60)
+		_self.log_info("AERIAL KML EXPORT - STATISTICS REPORT")
+		_self.log_info("="*60)
+		_self.log_info(write_string("Project: ", wo_number))
+		_self.log_info(write_string("Infrastructure Type: ", infra_type))
+		_self.log_info("-"*60)
+		_self.log_info("POLE EXPORT SUMMARY:")
+		_self.log_info("-"*60)
 
 		# Display poles per folder
 		_if pole_stats.size > 0
@@ -164,35 +164,25 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 			_for folder_name _over folder_names.fast_elements()
 			_loop
 				count << pole_stats[folder_name]
-				# Format folder name (truncate if too long)
-				display_name << folder_name
-				_if display_name.size > 45
-				_then
-					display_name << display_name.slice(1, 42) + "..."
-				_endif
-
-				# Right-align count
-				count_str << count.write_string
-				spaces << "".fill_up_with(% , 50 - display_name.size)
-				_self.log_info(write_string("║ ", display_name, spaces, count_str.right_pad(% , 8), " ║", newline_char))
+				_self.log_info(write_string("  ", folder_name, ": ", count))
 			_endloop
 		_else
-			_self.log_info(write_string("║ No poles exported                                            ║", newline_char))
+			_self.log_info("  No poles exported")
 		_endif
 
-		_self.log_info(write_string("╠════════════════════════════════════════════════════════════════╣", newline_char))
-		_self.log_info(write_string("║ TOTAL POLES EXPORTED: ", total_poles.write_string.right_pad(% , 38), " ║", newline_char))
-		_self.log_info(write_string("╚════════════════════════════════════════════════════════════════╝", newline_char))
-		_self.log_info(write_string(newline_char))
+		_self.log_info("-"*60)
+		_self.log_info(write_string("TOTAL POLES EXPORTED: ", total_poles))
+		_self.log_info("="*60)
+		_self.log_info("")
 
 		# Success message
 		_self.show_message("Export Complete",
 			write_string("Created: ", output_path))
-		_self.log_info(write_string("Export completed: ", output_path, newline_char))
+		_self.log_info(write_string("Export completed: ", output_path))
 
 	_when error
 		_self.show_alert("Export Failed", errCond.report_contents_string)
-		_self.log_info(write_string("Export failed: ", errCond.report_contents_string, newline_char))
+		_self.log_info(write_string("Export failed: ", errCond.report_contents_string))
 	_endtry
 _endmethod
 $

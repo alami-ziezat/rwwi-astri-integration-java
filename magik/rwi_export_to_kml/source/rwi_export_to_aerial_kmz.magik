@@ -322,14 +322,14 @@ _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.print_export_statistics()
 	## Print detailed export statistics report
 
-	write("╔════════════════════════════════════════════════════════════════╗")
-	write("║           AERIAL KML EXPORT - STATISTICS REPORT               ║")
-	write("╠════════════════════════════════════════════════════════════════╣")
-	write("║ Project: ", .project_name.default("Unknown"))
-	write("║ Infrastructure Type: ", .infrastructure_type.default("All"))
-	write("╠════════════════════════════════════════════════════════════════╣")
-	write("║ POLE EXPORT SUMMARY                                           ║")
-	write("╠════════════════════════════════════════════════════════════════╣")
+	write("="*60)
+	write("AERIAL KML EXPORT - STATISTICS REPORT")
+	write("="*60)
+	write("Project: ", .project_name.default("Unknown"))
+	write("Infrastructure Type: ", .infrastructure_type.default("All"))
+	write("-"*60)
+	write("POLE EXPORT SUMMARY:")
+	write("-"*60)
 
 	# Sort folders by name for consistent display
 	folder_names << .pole_statistics.keys.as_sorted_collection()
@@ -340,25 +340,15 @@ _private _method rwi_export_to_aerial_kmz.print_export_statistics()
 		_for folder_name _over folder_names.fast_elements()
 		_loop
 			count << .pole_statistics[folder_name]
-			# Format folder name (truncate if too long)
-			display_name << folder_name
-			_if display_name.size > 45
-			_then
-				display_name << display_name.slice(1, 42) + "..."
-			_endif
-
-			# Right-align count
-			count_str << count.write_string
-			spaces << "".fill_up_with(% , 50 - display_name.size)
-			write("║ ", display_name, spaces, count_str.right_pad(% , 8), " ║")
+			write("  ", folder_name, ": ", count)
 		_endloop
 	_else
-		write("║ No poles exported                                            ║")
+		write("  No poles exported")
 	_endif
 
-	write("╠════════════════════════════════════════════════════════════════╣")
-	write("║ TOTAL POLES EXPORTED: ", .total_pole_count.write_string.right_pad(% , 38), " ║")
-	write("╚════════════════════════════════════════════════════════════════╝")
+	write("-"*60)
+	write("TOTAL POLES EXPORTED: ", .total_pole_count)
+	write("="*60)
 _endmethod
 $
 
@@ -509,8 +499,8 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		_endloop
 
 		# DEBUG: Print folder criteria
-		write("  Processing folder: ", folder_name, " (LINE: ", line_type, ")")
-		write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
+		#write("  Processing folder: ", folder_name, " (LINE: ", line_type, ")")
+		#write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
 
 		# Filter and write poles based on folder criteria
 		pole_count << 0
@@ -532,7 +522,7 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			matches? << _true
 
 			# Filter by LINE (A, B, C, D) if we're inside a LINE folder
-			write("    Current LINE TYPE: ", line_type, " Pole LINE Type: ", pole_line_type)
+			#write("    Current LINE TYPE: ", line_type, " Pole LINE Type: ", pole_line_type)
 			_if line_type _isnt _unset
 			_then
 				_if pole_line_type.uppercase <> line_type.uppercase
