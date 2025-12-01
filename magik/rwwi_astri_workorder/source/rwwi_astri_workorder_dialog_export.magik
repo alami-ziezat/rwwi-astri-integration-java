@@ -145,6 +145,9 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		output_path << export_result[:output_file]
 		total_poles << export_result[:total_poles]
 		pole_stats << export_result[:pole_statistics]
+		total_fats << export_result[:total_fats]
+		total_fdts << export_result[:total_fdts]
+		total_closures << export_result[:total_closures]
 
 		# Display statistics in UI text window
 		_self.log_info("")
@@ -172,6 +175,12 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 
 		_self.log_info("-"*60)
 		_self.log_info(write_string("TOTAL POLES EXPORTED: ", total_poles))
+		_self.log_info("-"*60)
+		_self.log_info("EQUIPMENT EXPORT SUMMARY:")
+		_self.log_info("-"*60)
+		_self.log_info(write_string("  FAT: ", total_fats))
+		_self.log_info(write_string("  FDT: ", total_fdts))
+		_self.log_info(write_string("  CLOSURE: ", total_closures))
 		_self.log_info("="*60)
 		_self.log_info("")
 
