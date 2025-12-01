@@ -28,7 +28,8 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:total_fdt_count, _unset, :writable},       # Total FDTs exported
 	{:total_closure_count, _unset, :writable},   # Total CLOSUREs exported
 	{:total_slack_hanger_count, _unset, :writable},  # Total SLACK HANGERs exported
-	{:total_sling_wire_count, _unset, :writable}     # Total SLING WIREs exported
+	{:total_sling_wire_count, _unset, :writable},    # Total SLING WIREs exported
+	{:total_cable_count, _unset, :writable}          # Total CABLEs exported
 }, :object)
 $
 
@@ -116,6 +117,7 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 		:total_closures, .total_closure_count,
 		:total_slack_hangers, .total_slack_hanger_count,
 		:total_sling_wires, .total_sling_wire_count,
+		:total_cables, .total_cable_count,
 		:project_name, .project_name,
 		:infrastructure_type, .infrastructure_type)
 _endmethod
@@ -250,6 +252,7 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	.total_closure_count << 0
 	.total_slack_hanger_count << 0
 	.total_sling_wire_count << 0
+	.total_cable_count << 0
 
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
@@ -681,6 +684,13 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_then
 		_self.write_sling_wire_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
 	_endif
+
+	# Handle CABLE/DISTRIBUTION CABLE folders - export sheath_with_loc chains from poles
+	_if folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY folders
+	_then
+		_self.write_cable_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
+	_endif
 _endmethod
 $
 
@@ -1088,6 +1098,92 @@ _private _method rwi_export_to_aerial_kmz.write_sling_wire_for_folder(p_stream, 
 	_if chain_count > 0
 	_then
 		write("  Wrote ", chain_count, " SLING WIRE chains")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write cable/sheath_with_loc chains to folder
+	## Queries aerial_route in area, collects cables from each route
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_line_id - LINE ID (A/B/C/D) for filtering, _unset if not in LINE folder (first optional)
+	##   p_fdt_folder - FDT folder name (e.g., "FDT_FDT001") for filtering (second optional)
+
+	# Step 1: Query aerial_route objects in area
+	all_aerial_routes << .gc[:aerial_route].select(
+		predicate.interacts(:route, p_area))
+
+	# Step 2: Collect unique cables from all aerial routes using equality_set
+	unique_cables << equality_set.new()
+
+	_for aerial_route _over all_aerial_routes.fast_elements()
+	_loop
+		# Get cables from this aerial_route
+		route_cables << aerial_route.cables()
+		_if route_cables _is _unset _then _continue _endif
+
+		# Add cables to set (automatically handles duplicates)
+		_for cable _over route_cables.fast_elements()
+		_loop
+			unique_cables.add(cable)
+		_endloop
+	_endloop
+
+	cable_count << 0
+
+	# Step 3: Loop through unique cables and export them
+	_for cable _over unique_cables.fast_elements()
+	_loop
+		# Filter by LINE if we're in a LINE folder
+		_if p_line_id _isnt _unset
+		_then
+			# Convert p_line_id to line_type format (e.g., "A" -> "LINE A")
+			expected_line_type << "LINE " + p_line_id
+			cable_line_type << cable.perform(:line_type).default("")
+
+			_if cable_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue  # Skip cable if it doesn't match LINE
+			_endif
+		_endif
+
+		# Filter by FDT folder if we're inside an FDT folder (cluster structure)
+		_if p_fdt_folder _isnt _unset
+		_then
+			# Get cable ring_name
+			cable_ring_name << cable.perform(:ring_name).default("")
+
+			# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then
+				expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+
+				# Check if ring_name matches FDT name
+				_if cable_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue  # Skip cable if it doesn't belong to this FDT
+				_endif
+			_endif
+		_endif
+
+		# Step 4: Get cable geometry using route_sectors()
+		cable_sectors << cable.route_sectors()
+		_if cable_sectors _is _unset _orif cable_sectors.empty? _then _continue _endif
+
+		# Write the cable using its route sectors
+		.object_writer.write_cable(cable, cable_sectors, p_stream, p_indent)
+		cable_count +<< 1
+		.total_cable_count +<< 1
+	_endloop
+
+	_if cable_count > 0
+	_then
+		write("  Wrote ", cable_count, " CABLE chains")
 	_endif
 _endmethod
 $

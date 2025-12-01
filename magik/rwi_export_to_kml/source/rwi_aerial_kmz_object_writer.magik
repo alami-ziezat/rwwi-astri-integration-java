@@ -416,6 +416,87 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_route_sectors, p_stream, p_indent)
+	## Write cable/sheath_with_loc chain as LineString with coordinates and styling
+	##
+	## Parameters:
+	##   p_cable - Cable (sheath_with_loc) object
+	##   p_route_sectors - Route sectors from cable.route_sectors()
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	_if p_route_sectors _is _unset _then _return _endif
+
+	# Get database and view for coordinate conversion
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+
+	# Set up dynamics for coordinate system
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	# Get current coordinate system and WGS84 coordinate system
+	cs1 << v.world.coordinate_system
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+
+	# Create transform
+	t << transform.new_converting_cs_to_cs(cs1, cs2)
+
+	# Convert route sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	# p_route_sectors is already the sectors collection from route_sectors()
+	# Iterate through sectors and coordinates (like write_line in rwi_export_to_kml)
+	_for sector _over p_route_sectors.fast_elements()
+	_loop
+		_for coord _over sector.fast_elements()
+		_loop
+			# Convert coordinate to WGS84
+			t_coord << t.convert(coord)
+			# Format as "lon,lat,0 "
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Get cable attributes
+	cable_id << p_cable.perform(:id).default("Unknown")
+	cable_name << p_cable.perform(:name).default("")
+
+	# Build chain name
+	_if cable_name <> ""
+	_then
+		chain_name << cable_name
+	_else
+		chain_name << write_string("CABLE ", cable_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#cable_map</styleUrl>", newline_char)
+
+	# Write ExtendedData with cable attributes
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'>", newline_char)
+	p_stream.write(p_indent, "      <value>", cable_id, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'>", newline_char)
+	p_stream.write(p_indent, "      <value>CABLE</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write LineString geometry
+	p_stream.write(p_indent, "  <LineString>", newline_char)
+	p_stream.write(p_indent, "    <tessellate>1</tessellate>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </LineString>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_object_writer.write_hp_point(p_hp, p_stream, p_indent)
 	## Write homepass point placemark
 	## TODO: Implement in Phase 3
