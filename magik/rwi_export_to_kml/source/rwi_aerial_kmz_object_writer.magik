@@ -74,6 +74,7 @@ _method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
 
 	# Get pole attributes
 	pole_id << p_pole.perform(:id).default("Unknown")
+	telco_pole_tag << p_pole.perform(:telco_pole_tag).default("")
 	asset_owner << p_pole.perform(:asset_owner).default("")
 	# SKIP: pole_height and pole_class not needed
 	#pole_height << p_pole.perform(:height).default("")
@@ -90,8 +91,13 @@ _method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
 		style_url << "#pole_partner_map"
 	_endif
 
-	# Build pole name/label (just pole ID)
-	pole_name << write_string("Pole ", pole_id)
+	# Build pole name/label using telco_pole_tag if available, otherwise pole ID
+	_if telco_pole_tag <> ""
+	_then
+		pole_name << telco_pole_tag
+	_else
+		pole_name << write_string("Pole ", pole_id)
+	_endif
 
 	# Write KML Placemark
 	p_stream.write(p_indent, "<Placemark>", newline_char)

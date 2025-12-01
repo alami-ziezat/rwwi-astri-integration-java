@@ -434,24 +434,23 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		_loop
 			# Get pole attributes for filtering
 			asset_owner << pole.perform(:asset_owner).default("")
-			# SKIP: pole_height not needed
-			#pole_height << pole.perform(:height).default("")
-			pole_status << pole.perform(:status).default("")
+			pole_status << pole.perform(:construction_status).default("")
+			pole_type << pole.perform(:type).default("")  # e.g., "Pole 7-2.5"
 
 			# Check if pole matches folder criteria
 			matches? << _true
 
-			# Filter by NEW vs EXISTING
+			# Filter by NEW vs EXISTING (construction_status)
 			_if is_new_pole?
 			_then
-				# NEW POLE: status should be "Proposed" or similar
+				# NEW POLE: construction_status should be "Proposed"
 				_if pole_status.uppercase <> "PROPOSED"
 				_then
 					matches? << _false
 				_endif
 			_else
-				# EXISTING POLE: status should NOT be "Proposed"
-				_if pole_status.uppercase = "PROPOSED"
+				# EXISTING POLE: construction_status should be "In Service"
+				_if pole_status.uppercase <> "IN SERVICE"
 				_then
 					matches? << _false
 				_endif
@@ -460,26 +459,29 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			# Filter by owner (EMR vs PARTNER)
 			_if is_emr?
 			_then
+				# EMR means asset_owner is "Owned"
 				_if asset_owner.default("").uppercase <> "OWNED"
 				_then
 					matches? << _false
 				_endif
 			_elif is_partner?
 			_then
+				# PARTNER means asset_owner is NOT "Owned"
 				_if asset_owner.default("").uppercase = "OWNED"
 				_then
 					matches? << _false
 				_endif
 			_endif
 
-			# SKIP: Filter by pole spec (height/class) - not needed
-			#_if pole_spec _isnt _unset
-			#_then
-			#	_if pole_height <> pole_spec
-			#	_then
-			#		matches? << _false
-			#	_endif
-			#_endif
+			# Filter by pole type spec (e.g., "7-2.5" in "Pole 7-2.5")
+			_if pole_spec _isnt _unset
+			_then
+				# Check if pole type contains the spec (e.g., "Pole 7-2.5" contains "7-2.5")
+				_if pole_type.index_of_seq(pole_spec) _is _unset
+				_then
+					matches? << _false
+				_endif
+			_endif
 
 			# Write pole if it matches
 			_if matches?
