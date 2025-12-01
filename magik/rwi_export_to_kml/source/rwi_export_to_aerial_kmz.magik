@@ -26,7 +26,8 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:pole_statistics, _unset, :writable},       # Property list tracking poles per folder
 	{:total_fat_count, _unset, :writable},       # Total FATs exported
 	{:total_fdt_count, _unset, :writable},       # Total FDTs exported
-	{:total_closure_count, _unset, :writable}    # Total CLOSUREs exported
+	{:total_closure_count, _unset, :writable},   # Total CLOSUREs exported
+	{:total_slack_hanger_count, _unset, :writable}  # Total SLACK HANGERs exported
 }, :object)
 $
 
@@ -112,6 +113,7 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 		:total_fats, .total_fat_count,
 		:total_fdts, .total_fdt_count,
 		:total_closures, .total_closure_count,
+		:total_slack_hangers, .total_slack_hanger_count,
 		:project_name, .project_name,
 		:infrastructure_type, .infrastructure_type)
 _endmethod
@@ -244,6 +246,7 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	.total_fat_count << 0
 	.total_fdt_count << 0
 	.total_closure_count << 0
+	.total_slack_hanger_count << 0
 
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
@@ -644,7 +647,6 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_endif
 
 	# Handle FAT folders - export FAT equipment
-	write("  Processing folder for equipment: ", folder_name)
 	_if folder_name.index_of_seq("FAT") _isnt _unset _andif
 	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY FAT
 	_then
@@ -655,15 +657,20 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_if folder_name.index_of_seq("FDT") _isnt _unset
 	_then
 		# Export FDTs - they can be on poles or standalone (mit_terminal_enclosure)
-		write("  Exporting FDT equipment for folder: ", folder_name)
 		_self.write_fdt_equipment(p_stream, p_area, p_indent, p_parent_fdt_folder)
 	_endif
 
 	# Handle CLOSURE/JOINT CLOSURE folders - export CLOSURE equipment
-	_if folder_name.index_of_seq("JOINT CLOSURE") _isnt	_unset _orif 
-		folder_name.index_of_seq("CLOSURE") _isnt _unset 
+	_if folder_name.index_of_seq("JOINT CLOSURE") _isnt	_unset _orif
+		folder_name.index_of_seq("CLOSURE") _isnt _unset
 	_then
 		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "CLOSURE", line_id)
+	_endif
+
+	# Handle SLACK HANGER folders - export figure_eight equipment
+	_if folder_name.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		_self.write_figure_eight_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
 	_endif
 _endmethod
 $
@@ -915,6 +922,94 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 	_endloop
 
 	write("  ", p_equipment_type, " summary: Checked ", poles_checked, " poles, found ", splices_found, " total splices, wrote ", equipment_count, " matching ", p_equipment_type)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_figure_eight_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write figure_eight (SLACK HANGER) equipment to folder
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_line_id - LINE ID (A/B/C/D) for filtering, _unset if not in LINE folder (first optional)
+	##   p_fdt_folder - FDT folder name (e.g., "FDT_FDT001") for filtering (second optional)
+
+	# Query poles in area to find figure_eight equipment on them
+	all_poles << .gc[:pole].select(
+		predicate.interacts(:location, p_area))
+
+	equipment_count << 0
+
+	# Iterate through poles and find figure_eight equipment
+	_for pole _over all_poles.fast_elements()
+	_loop
+		pole_geom << pole.location
+		_if pole_geom _is _unset _then _continue _endif
+
+		# Get all equipment on this pole
+		pole_equipment << pole.get_equipment()
+		_if pole_equipment.empty? _then _continue _endif
+
+		# Get figure_eight from equipment using predicate
+		pole_figure_eights << pole_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :figure_eight)))
+
+		_if pole_figure_eights.empty? _then _continue _endif
+
+		_for fig8 _over pole_figure_eights.fast_elements()
+		_loop
+			# Filter by LINE if we're in a LINE folder
+			_if p_line_id _isnt _unset
+			_then
+				# Convert p_line_id to line_type format (e.g., "A" -> "LINE A")
+				expected_line_type << "LINE " + p_line_id
+				pole_line_type << pole.perform(:line_type).default("")
+
+				_if pole_line_type.uppercase <> expected_line_type.uppercase
+				_then
+					_continue  # Skip figure_eight if pole doesn't match LINE
+				_endif
+			_endif
+
+			# Filter by FDT folder if we're inside an FDT folder (cluster structure)
+			_if p_fdt_folder _isnt _unset
+			_then
+				# Get figure_eight ring_name or pole ring_name
+				fig8_ring_name << fig8.perform(:ring_name).default("")
+				_if fig8_ring_name = ""
+				_then
+					# Fall back to pole's ring_name
+					fig8_ring_name << pole.perform(:ring_name).default("")
+				_endif
+
+				# FDT folder format is "FDT_<name>", extract the name part
+				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then
+					# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
+					fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+
+					# Check if ring_name matches FDT name
+					_if fig8_ring_name.uppercase <> fdt_name.uppercase
+					_then
+						_continue  # Skip figure_eight if it doesn't belong to this FDT
+					_endif
+				_endif
+			_endif
+
+			# Write the figure_eight using pole coordinates
+			.object_writer.write_figure_eight(fig8, pole_geom, p_stream, p_indent)
+			equipment_count +<< 1
+			.total_slack_hanger_count +<< 1
+		_endloop
+	_endloop
+
+	_if equipment_count > 0
+	_then
+		write("  Wrote ", equipment_count, " SLACK HANGER equipment")
+	_endif
 _endmethod
 $
 

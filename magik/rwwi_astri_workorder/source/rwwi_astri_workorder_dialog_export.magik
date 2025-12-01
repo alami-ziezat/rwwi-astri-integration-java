@@ -148,6 +148,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		total_fats << export_result[:total_fats]
 		total_fdts << export_result[:total_fdts]
 		total_closures << export_result[:total_closures]
+		total_slack_hangers << export_result[:total_slack_hangers]
 
 		# Display statistics in UI text window
 		_self.log_info("")
@@ -181,6 +182,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_self.log_info(write_string("  FAT: ", total_fats))
 		_self.log_info(write_string("  FDT: ", total_fdts))
 		_self.log_info(write_string("  CLOSURE: ", total_closures))
+		_self.log_info(write_string("  SLACK HANGER: ", total_slack_hangers))
 		_self.log_info("="*60)
 		_self.log_info("")
 

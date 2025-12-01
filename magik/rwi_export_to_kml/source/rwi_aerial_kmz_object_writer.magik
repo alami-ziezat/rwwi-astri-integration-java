@@ -280,6 +280,61 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_figure_eight(p_figure_eight, p_pole_geom, p_stream, p_indent)
+	## Write figure_eight (SLACK HANGER) placemark with coordinates and styling
+	##
+	## Parameters:
+	##   p_figure_eight - Figure eight object
+	##   p_pole_geom - Pole geometry to use as coordinate
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	_if p_pole_geom _is _unset _then _return _endif
+
+	# Get coordinate from pole geometry
+	coord << p_pole_geom.coord
+	_if coord _is _unset _then _return _endif
+
+	# Convert coordinate to WGS84
+	coord_string << _self.convert_coord_to_wgs84_string(coord)
+
+	# Get figure_eight attributes
+	fig8_id << p_figure_eight.perform(:id).default("Unknown")
+	fig8_name << p_figure_eight.perform(:name).default("")
+
+	# Build equipment name
+	_if fig8_name <> ""
+	_then
+		equipment_name << fig8_name
+	_else
+		equipment_name << write_string("SLACK HANGER ", fig8_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", equipment_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#slack_hanger_map</styleUrl>", newline_char)
+
+	# Write ExtendedData with figure_eight attributes
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'>", newline_char)
+	p_stream.write(p_indent, "      <value>", fig8_id, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'>", newline_char)
+	p_stream.write(p_indent, "      <value>SLACK HANGER</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write Point geometry
+	p_stream.write(p_indent, "  <Point>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </Point>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_object_writer.write_hp_point(p_hp, p_stream, p_indent)
 	## Write homepass point placemark
 	## TODO: Implement in Phase 3
