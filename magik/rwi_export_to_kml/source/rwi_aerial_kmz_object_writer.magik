@@ -146,19 +146,6 @@ _method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent, _opt
 	p_stream.write(p_indent, "    <Data name='Owner'>", newline_char)
 	p_stream.write(p_indent, "      <value>", pole_owner, "</value>", newline_char)
 	p_stream.write(p_indent, "    </Data>", newline_char)
-	# SKIP: pole_height and pole_class not needed in export
-	#_if pole_height _isnt ""
-	#_then
-	#	p_stream.write(p_indent, "    <Data name='Height'>", newline_char)
-	#	p_stream.write(p_indent, "      <value>", pole_height, "</value>", newline_char)
-	#	p_stream.write(p_indent, "    </Data>", newline_char)
-	#_endif
-	#_if pole_class _isnt ""
-	#_then
-	#	p_stream.write(p_indent, "    <Data name='Class'>", newline_char)
-	#	p_stream.write(p_indent, "      <value>", pole_class, "</value>", newline_char)
-	#	p_stream.write(p_indent, "    </Data>", newline_char)
-	#_endif
 	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
 
 	# Write Point geometry

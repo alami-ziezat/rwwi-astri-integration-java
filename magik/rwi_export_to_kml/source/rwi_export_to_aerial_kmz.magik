@@ -1242,7 +1242,9 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_stream, p_area, p_indent, p_folder_name, _optional p_line_id, p_fdt_folder)
 	## Write demand points (home pass) to folder based on folder name and filters
-	## Filters by LINE and FDT ring_name from notes field
+	## For HP COVER: Creates subfolders based on last part of notes field (after last |)
+	## For HP UNCOVER: Exports directly without subfolders
+	## Filters by line_type field and FDT ring_name
 	##
 	## Parameters:
 	##   p_stream - Output stream
@@ -1258,65 +1260,172 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 
 	write("  Found ", all_demand_points.size, " demand points in area for folder: ", p_folder_name)
 
-	dp_count << 0
+	# Determine if this is HP COVER or HP UNCOVER
+	is_hp_cover? << p_folder_name.uppercase.index_of_seq("HP COVER") _isnt _unset
+	is_hp_uncover? << p_folder_name.uppercase.index_of_seq("HP UNCOVER") _isnt _unset
 
-	_for dp _over all_demand_points.fast_elements()
-	_loop
-		# Get location geometry
-		dp_geom << dp.location
-		_if dp_geom _is _unset _then _continue _endif
-
-		# Get notes field containing ring_name and line_type
-		# Format: "ring_name|line_type" or "ring_name|folders"
-		notes << dp.perform(:notes).default("")
-		_if notes = "" _then _continue _endif
-
-		# Parse notes to extract ring_name and line_type
-		pipe_pos << notes.index_of(%|)
-		_if pipe_pos _is _unset
-		_then
-			ring_name << notes
-			line_type << ""
-		_else
-			ring_name << notes.slice(1, pipe_pos - 1)
-			# The rest after pipe might contain line_type or full folders
-			# Try to extract line_type from db field first
-			line_type << dp.perform(:line_type).default("")
-		_endif
-
-		# Filter by LINE if specified
-		_if p_line_id _isnt _unset _andif line_type <> ""
-		_then
-			# Extract LINE number from line_type (e.g., "LINE 01" -> "01")
-			expected_line << p_line_id
-			_if line_type.index_of_seq(expected_line) _is _unset
-			_then
-				_continue
-			_endif
-		_endif
-
-		# Filter by FDT folder if specified (ring_name matching)
-		_if p_fdt_folder _isnt _unset _andif ring_name <> ""
-		_then
-			# Extract FDT name from folder (e.g., "FDT 01" -> "FDT 01")
-			expected_fdt_name << p_fdt_folder
-			_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
-			_then
-				_continue
-			_endif
-		_endif
-
-		# Write demand point
-		.object_writer.write_demand_point(dp, p_stream, p_indent, p_folder_name)
-		dp_count +<< 1
-	_endloop
-
-	# Update total counter
-	.total_hp_count +<< dp_count
-
-	_if dp_count > 0
+	# For HP COVER: Group DPs by subfolder name (from notes)
+	# For HP UNCOVER: Write directly
+	_if is_hp_cover?
 	_then
-		write("  Wrote ", dp_count, " demand points to folder: ", p_folder_name)
+		# Group demand points by subfolder (last part of notes after |)
+		dp_by_subfolder << equality_hash_table.new()
+
+		_for dp _over all_demand_points.fast_elements()
+		_loop
+			# Get location geometry
+			dp_geom << dp.location
+			_if dp_geom _is _unset _then _continue _endif
+
+			# Get notes and line_type
+			notes << dp.perform(:notes).default("")
+			line_type << dp.perform(:line_type).default("")
+			_if notes = "" _then _continue _endif
+
+			# Parse notes to extract ring_name and subfolder_name
+			# Format: "ring_name|full_folders"
+			# Example: "FDT 01|CLU001|LINE A|FDT 01|HP COVER|A01"
+			# We want the last part after last |
+			pipe_positions << rope.new()
+			_for i _over 1.upto(notes.size)
+			_loop
+				_if notes[i] = %| _then pipe_positions.add(i) _endif
+			_endloop
+
+			_if pipe_positions.empty?
+			_then
+				ring_name << notes
+				subfolder_name << ""
+			_else
+				first_pipe << pipe_positions.first
+				ring_name << notes.slice(1, first_pipe - 1)
+				last_pipe << pipe_positions.last
+				subfolder_name << notes.slice_to_end(last_pipe + 1)
+			_endif
+
+			# Check if this DP belongs to HP COVER (has subfolder name in notes)
+			_if subfolder_name = "" _orif
+			    notes.uppercase.index_of_seq("HP COVER") _is _unset
+			_then
+				_continue  # Not for HP COVER
+			_endif
+
+			# Filter by LINE if specified (use line_type field)
+			_if p_line_id _isnt _unset _andif line_type <> ""
+			_then
+				expected_line << p_line_id
+				_if line_type.uppercase.index_of_seq(expected_line.uppercase) _is _unset
+				_then
+					_continue
+				_endif
+			_endif
+
+			# Filter by FDT folder if specified
+			_if p_fdt_folder _isnt _unset _andif ring_name <> ""
+			_then
+				expected_fdt_name << p_fdt_folder
+				_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
+				_then
+					_continue
+				_endif
+			_endif
+
+			# Add to appropriate subfolder
+			_if dp_by_subfolder[subfolder_name] _is _unset
+			_then
+				dp_by_subfolder[subfolder_name] << rope.new()
+			_endif
+			dp_by_subfolder[subfolder_name].add(dp)
+		_endloop
+
+		# Write each subfolder with its DPs
+		dp_count << 0
+		_for subfolder_name, dps _over dp_by_subfolder.fast_keys_and_elements()
+		_loop
+			# Open subfolder
+			p_stream.write(p_indent, "<Folder>", newline_char)
+			p_stream.write(p_indent, "  <name>", subfolder_name, "</name>", newline_char)
+			p_stream.write(p_indent, "  <open>0</open>", newline_char)
+
+			# Write all DPs in this subfolder
+			subfolder_indent << p_indent + "  "
+			_for dp _over dps.fast_elements()
+			_loop
+				.object_writer.write_demand_point(dp, p_stream, subfolder_indent, p_folder_name)
+				dp_count +<< 1
+			_endloop
+
+			# Close subfolder
+			p_stream.write(p_indent, "</Folder>", newline_char)
+			write("    Wrote ", dps.size, " demand points to subfolder: ", subfolder_name)
+		_endloop
+
+		# Update total counter
+		.total_hp_count +<< dp_count
+
+	_elif is_hp_uncover?
+	_then
+		# HP UNCOVER: Write directly without subfolders
+		dp_count << 0
+
+		_for dp _over all_demand_points.fast_elements()
+		_loop
+			# Get location geometry
+			dp_geom << dp.location
+			_if dp_geom _is _unset _then _continue _endif
+
+			# Get notes and line_type
+			notes << dp.perform(:notes).default("")
+			line_type << dp.perform(:line_type).default("")
+			_if notes = "" _then _continue _endif
+
+			# Parse notes to extract ring_name
+			pipe_pos << notes.index_of(%|)
+			_if pipe_pos _isnt _unset
+			_then
+				ring_name << notes.slice(1, pipe_pos - 1)
+			_else
+				ring_name << notes
+			_endif
+
+			# Check if this DP belongs to HP UNCOVER (doesn't have HP COVER in notes)
+			_if notes.uppercase.index_of_seq("HP UNCOVER") _is _unset
+			_then
+				_continue  # Not for HP UNCOVER
+			_endif
+
+			# Filter by LINE if specified (use line_type field)
+			_if p_line_id _isnt _unset _andif line_type <> ""
+			_then
+				expected_line << p_line_id
+				_if line_type.uppercase.index_of_seq(expected_line.uppercase) _is _unset
+				_then
+					_continue
+				_endif
+			_endif
+
+			# Filter by FDT folder if specified
+			_if p_fdt_folder _isnt _unset _andif ring_name <> ""
+			_then
+				expected_fdt_name << p_fdt_folder
+				_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
+				_then
+					_continue
+				_endif
+			_endif
+
+			# Write demand point directly
+			.object_writer.write_demand_point(dp, p_stream, p_indent, p_folder_name)
+			dp_count +<< 1
+		_endloop
+
+		# Update total counter
+		.total_hp_count +<< dp_count
+
+		_if dp_count > 0
+		_then
+			write("  Wrote ", dp_count, " demand points to folder: ", p_folder_name)
+		_endif
 	_endif
 _endmethod
 $
