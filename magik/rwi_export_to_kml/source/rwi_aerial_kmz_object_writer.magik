@@ -11,13 +11,43 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 def_slotted_exemplar(:rwi_aerial_kmz_object_writer,
 {
+	{:database, _unset, :writable},           # GIS database
+	{:view, _unset, :writable},               # ACE view
+	{:cs_transform, _unset, :writable}        # Coordinate system transform (local to WGS84)
 }, :object)
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_object_writer.new()
-	## Create new object writer
-	>> _clone
+	## Create new object writer and initialize coordinate system
+	>> _clone.init()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.init()
+	## Initialize database, view, and coordinate transform
+
+	# Get database and view
+	.database << gis_program_manager.databases[:gis]
+	.view << gis_program_manager.ace_view
+
+	# Set up coordinate system transform (local to WGS84)
+	_if .database _isnt _unset _andif .view _isnt _unset
+	_then
+		# Set up dynamics for coordinate system
+		_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+
+		# Get current coordinate system and WGS84 coordinate system
+		cs1 << .database.world.coordinate_system
+		cs2 << .view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+
+		# Create transform
+		.cs_transform << transform.new_converting_cs_to_cs(cs1, cs2)
+	_endif
+
+	>> _self
 _endmethod
 $
 
@@ -26,23 +56,15 @@ _method rwi_aerial_kmz_object_writer.convert_coord_to_wgs84_string(p_coord)
 	## Convert coordinate from current coordinate system to WGS84 and format as string
 	## Returns: String in format "lon,lat,0" for KML
 
-	# Get database and view
-	v << gis_program_manager.databases[:gis]
-	a_view << gis_program_manager.ace_view
-
-	# Set up dynamics for coordinate system
-	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-
-	# Get current coordinate system and WGS84 coordinate system
-	cs1 << v.world.coordinate_system
-	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-
-	# Create transform
-	t << transform.new_converting_cs_to_cs(cs1, cs2)
+	# Use stored coordinate transform
+	_if .cs_transform _is _unset
+	_then
+		# Fallback: return empty string if transform not initialized
+		>> ""
+	_endif
 
 	# Convert coordinate
-	t_coord << t.convert(p_coord)
+	t_coord << .cs_transform.convert(p_coord)
 
 	# Format as string with precision
 	_dynamic !print_float_precision! << 16
@@ -421,21 +443,7 @@ _method rwi_aerial_kmz_object_writer.write_sling_wire(p_sling_wire, p_route_geom
 	##   p_indent - Indentation string
 
 	_if p_route_geom _is _unset _then _return _endif
-
-	# Get database and view for coordinate conversion
-	v << gis_program_manager.databases[:gis]
-	a_view << gis_program_manager.ace_view
-
-	# Set up dynamics for coordinate system
-	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-
-	# Get current coordinate system and WGS84 coordinate system
-	cs1 << v.world.coordinate_system
-	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-
-	# Create transform
-	t << transform.new_converting_cs_to_cs(cs1, cs2)
+	_if .cs_transform _is _unset _then _return _endif
 
 	# Convert route sectors to coordinate string
 	_dynamic !print_float_precision! << 16
@@ -448,7 +456,7 @@ _method rwi_aerial_kmz_object_writer.write_sling_wire(p_sling_wire, p_route_geom
 		_for coord _over sector.coords.fast_elements()
 		_loop
 			# Convert coordinate to WGS84
-			t_coord << t.convert(coord)
+			t_coord << .cs_transform.convert(coord)
 			# Format as "lon,lat,0 "
 			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
 		_endloop
@@ -502,21 +510,7 @@ _method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_route_sectors, p_str
 	##   p_indent - Indentation string
 
 	_if p_route_sectors _is _unset _then _return _endif
-
-	# Get database and view for coordinate conversion
-	v << gis_program_manager.databases[:gis]
-	a_view << gis_program_manager.ace_view
-
-	# Set up dynamics for coordinate system
-	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-
-	# Get current coordinate system and WGS84 coordinate system
-	cs1 << v.world.coordinate_system
-	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-
-	# Create transform
-	t << transform.new_converting_cs_to_cs(cs1, cs2)
+	_if .cs_transform _is _unset _then _return _endif
 
 	# Convert route sectors to coordinate string
 	_dynamic !print_float_precision! << 16
@@ -529,7 +523,7 @@ _method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_route_sectors, p_str
 		_for coord _over sector.fast_elements()
 		_loop
 			# Convert coordinate to WGS84
-			t_coord << t.convert(coord)
+			t_coord << .cs_transform.convert(coord)
 			# Format as "lon,lat,0 "
 			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
 		_endloop
@@ -674,21 +668,7 @@ _method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_fo
 	# Get cell geometry (polygon)
 	cell_geom << p_cell.location
 	_if cell_geom _is _unset _then _return _endif
-
-	# Get database and view for coordinate conversion
-	v << gis_program_manager.databases[:gis]
-	a_view << gis_program_manager.ace_view
-
-	# Set up dynamics for coordinate system
-	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-
-	# Get current coordinate system and WGS84 coordinate system
-	cs1 << v.world.coordinate_system
-	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-
-	# Create transform
-	t << transform.new_converting_cs_to_cs(cs1, cs2)
+	_if .cs_transform _is _unset _then _return _endif
 
 	# Convert polygon sectors to coordinate string
 	_dynamic !print_float_precision! << 16
@@ -700,7 +680,7 @@ _method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_fo
 	_loop
 		_for coord _over sector.coords.fast_elements()
 		_loop
-			t_coord << t.convert(coord)
+			t_coord << .cs_transform.convert(coord)
 			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
 		_endloop
 	_endloop
@@ -712,7 +692,7 @@ _method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_fo
 		_if first_sector.coords.size > 0
 		_then
 			first_coord << first_sector.coords.first
-			t_coord << t.convert(first_coord)
+			t_coord << .cs_transform.convert(first_coord)
 			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
 		_endif
 	_endif
@@ -735,14 +715,17 @@ _method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_fo
 	# Count demand points within cell area
 	hp_count << 0
 	_try
-		# Get demand points collection
-		dp_col << gis_program_manager.cached_dataset(:gis).collections[:ftth!demand_point]
-		_if dp_col _isnt _unset
+		# Use stored database to get demand points collection
+		_if .database _isnt _unset
 		_then
-			# Query demand points within cell polygon
-			demand_points_in_cell << dp_col.select(
-				predicate.within(:location, cell_geom))
-			hp_count << demand_points_in_cell.size
+			dp_col << .database.collections[:ftth!demand_point]
+			_if dp_col _isnt _unset
+			_then
+				# Query demand points within cell polygon
+				demand_points_in_cell << dp_col.select(
+					predicate.within(:location, cell_geom))
+				hp_count << demand_points_in_cell.size
+			_endif
 		_endif
 	_when error
 		# If error counting, set to 0
