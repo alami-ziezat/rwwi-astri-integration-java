@@ -83,170 +83,175 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			# Continue if annotation fails
 		_endtry
 
-		# Step 5: Find intersecting micro cell for splitter_id
-		_local sp_id << _unset
-		_local c_ll << ""
-		_try
-			_local a_point << pseudo_point.new(l_result.location.coord)
-			a_point.world << .database.world
-
-			_local a_predicate << predicate.interacts(:location, {a_point})
-			_local s_cell << .cell_col.select(a_predicate)
-
-			_if s_cell.size > 0
-			_then
-				_local a_cell << s_cell.an_element()
-				sp_id << a_cell.splitter_id
-
-				_if sp_id <> "" _andif sp_id _isnt _unset
-				_then
-					write("    >> Found micro cell, splitter: ", sp_id)
-
-					# Step 6: Lookup optical splitter for splice coordinates
-					_try
-						_local pred_sp << predicate.eq(:name, sp_id)
-						_local s_sp << .os_col.select(pred_sp)
-
-						_if s_sp.size > 0
-						_then
-							_local a_sp << s_sp.an_element()
-							_local l_sp << a_sp.get_splice()
-
-							_if l_sp _isnt _unset _andif l_sp.location _isnt _unset
-							_then
-								_local (latp, longp) << _self.get_latlong(l_sp.location.coord)
-								c_ll << latp + "  " + longp
-								write("    >> Splice coordinates: ", c_ll)
-							_endif
-						_endif
-					_when error
-						# Continue if splice lookup fails
-					_endtry
-				_endif
-			_endif
-		_when error
-			# Continue if micro cell lookup fails
-		_endtry
-
-		# Step 7: Find intersecting boundary for administrative data
-		_local propinsi << _unset
-		_local kabupaten << _unset
-		_local kecamatan << _unset
-		_local desa << _unset
-		_try
-			_local a_point << pseudo_point.new(l_result.location.coord)
-			a_point.world << .database.world
-
-			_local p_predicate << predicate.interacts(:boundary, {a_point})
-			_local s_pol << .pol_col.select(p_predicate)
-
-			_if s_pol.size > 0
-			_then
-				_for r _over s_pol.fast_elements()
-				_loop
-					_if r.type = "Town"
-					_then
-						propinsi << r.provinsi
-						kabupaten << r.kabupaten
-						kecamatan << r.kecamatan
-						desa << r.desa
-						write("    >> Found boundary: ", kecamatan, ", ", desa)
-						_leave
-					_endif
-				_endloop
-			_endif
-		_when error
-			# Continue if boundary lookup fails
-		_endtry
-
-		# Step 8: Convert demand point coordinate to lat/long
-		_local lat << ""
-		_local long << ""
-		_try
-			(lat, long) << _self.get_latlong(l_result.location.coord)
-			write("    >> Coordinates: ", lat, ", ", long)
-		_when error
-			# Continue if coordinate conversion fails
-		_endtry
-
-		# Step 9: Create customer premise
-		_try
-			_local tahun << date_time_now().year.write_string
-
-			_local l_prop_values_cs << property_list.new_with(
-				:identification, identification,
-				:customer_name, pm[:name],
-				:type, "Residential",
-
-				# Administrative fields from boundary
-				:province, propinsi,
-				:branch, kabupaten,
-				:city, kecamatan,
-				:district, desa,
-				:sub_district, "",
-				:postal_code, "",
-
-				# Address fields
-				:area_name, "",
-				:residence_type, "",
-				:residence_name, "",
-				:street_name, "",
-				:unit, "",
-
-				# Network fields
-				:pop_id, .pop_name,
-				:splitter_id, sp_id,
-				:spliter_distribution_coordinate, c_ll,
-
-				# Metadata
-				:remark, "",
-				:remark_2, "",
-				:rfs_year, tahun,
-				:rfs_status, "",
-				:submission_date, "",
-				:last_update, "",
-				:stf_item_code, "",
-
-				# Coordinates
-				:latitude, lat,
-				:longitude, long,
-
-				# Reference to demand point
-				:ftth!demand_point, l_result
-			)
-
-			_local l_rec_trans_cs << record_transaction.new_insert(.cs_col, l_prop_values_cs)
-			_local l_result_cs << l_rec_trans_cs.run()
-
-			.stats[:customer_premises] +<< 1
-			write("    [OK] Customer premise created with full data")
-		_when error
-			write("    WARNING: Error creating customer premise: ", condition.report_contents_string)
-		_endtry
-
-		# Step 10: Create building (optional) if descriptio = "GEDUNG"
-		_try
-			_local descriptio << pm[:descriptio].default("")
-			_if descriptio.lowercase = "gedung"
-			_then
-				_local bb << bounding_box.new_enclosing(l_result.location.bounds, 400)
-
-				_local l_prop_values_bld << property_list.new_with(
-					:type, "Residential",
-					:asset_owner, "Owned",
-					:name, pm[:name],
-					:boundary, bb
-				)
-
-				_local l_rec_trans_bld << record_transaction.new_insert(.bld_col, l_prop_values_bld)
-				_local l_result_bld << l_rec_trans_bld.run()
-
-				.stats[:buildings] +<< 1
-				write("    [OK] Building created (GEDUNG type)")
-			_endif
-		_when error
-			write("    WARNING: Error creating building: ", condition.report_contents_string)
-		_endtry
+		## Step 5: Find intersecting micro cell for splitter_id
+		## COMMENTED OUT - Not relevant for current use
+		#_local sp_id << _unset
+		#_local c_ll << ""
+		#_try
+		#	_local a_point << pseudo_point.new(l_result.location.coord)
+		#	a_point.world << .database.world
+		#
+		#	_local a_predicate << predicate.interacts(:location, {a_point})
+		#	_local s_cell << .cell_col.select(a_predicate)
+		#
+		#	_if s_cell.size > 0
+		#	_then
+		#		_local a_cell << s_cell.an_element()
+		#		sp_id << a_cell.splitter_id
+		#
+		#		_if sp_id <> "" _andif sp_id _isnt _unset
+		#		_then
+		#			write("    >> Found micro cell, splitter: ", sp_id)
+		#
+		#			# Step 6: Lookup optical splitter for splice coordinates
+		#			_try
+		#				_local pred_sp << predicate.eq(:name, sp_id)
+		#				_local s_sp << .os_col.select(pred_sp)
+		#
+		#				_if s_sp.size > 0
+		#				_then
+		#					_local a_sp << s_sp.an_element()
+		#					_local l_sp << a_sp.get_splice()
+		#
+		#					_if l_sp _isnt _unset _andif l_sp.location _isnt _unset
+		#					_then
+		#						_local (latp, longp) << _self.get_latlong(l_sp.location.coord)
+		#						c_ll << latp + "  " + longp
+		#						write("    >> Splice coordinates: ", c_ll)
+		#					_endif
+		#				_endif
+		#			_when error
+		#				# Continue if splice lookup fails
+		#			_endtry
+		#		_endif
+		#	_endif
+		#_when error
+		#	# Continue if micro cell lookup fails
+		#_endtry
+		#
+		## Step 7: Find intersecting boundary for administrative data
+		## COMMENTED OUT - Not relevant for current use
+		#_local propinsi << _unset
+		#_local kabupaten << _unset
+		#_local kecamatan << _unset
+		#_local desa << _unset
+		#_try
+		#	_local a_point << pseudo_point.new(l_result.location.coord)
+		#	a_point.world << .database.world
+		#
+		#	_local p_predicate << predicate.interacts(:boundary, {a_point})
+		#	_local s_pol << .pol_col.select(p_predicate)
+		#
+		#	_if s_pol.size > 0
+		#	_then
+		#		_for r _over s_pol.fast_elements()
+		#		_loop
+		#			_if r.type = "Town"
+		#			_then
+		#				propinsi << r.provinsi
+		#				kabupaten << r.kabupaten
+		#				kecamatan << r.kecamatan
+		#				desa << r.desa
+		#				write("    >> Found boundary: ", kecamatan, ", ", desa)
+		#				_leave
+		#			_endif
+		#		_endloop
+		#	_endif
+		#_when error
+		#	# Continue if boundary lookup fails
+		#_endtry
+		#
+		## Step 8: Convert demand point coordinate to lat/long
+		## COMMENTED OUT - Not relevant for current use
+		#_local lat << ""
+		#_local long << ""
+		#_try
+		#	(lat, long) << _self.get_latlong(l_result.location.coord)
+		#	write("    >> Coordinates: ", lat, ", ", long)
+		#_when error
+		#	# Continue if coordinate conversion fails
+		#_endtry
+		#
+		## Step 9: Create customer premise
+		## COMMENTED OUT - Not relevant for current use
+		#_try
+		#	_local tahun << date_time_now().year.write_string
+		#
+		#	_local l_prop_values_cs << property_list.new_with(
+		#		:identification, identification,
+		#		:customer_name, pm[:name],
+		#		:type, "Residential",
+		#
+		#		# Administrative fields from boundary
+		#		:province, propinsi,
+		#		:branch, kabupaten,
+		#		:city, kecamatan,
+		#		:district, desa,
+		#		:sub_district, "",
+		#		:postal_code, "",
+		#
+		#		# Address fields
+		#		:area_name, "",
+		#		:residence_type, "",
+		#		:residence_name, "",
+		#		:street_name, "",
+		#		:unit, "",
+		#
+		#		# Network fields
+		#		:pop_id, .pop_name,
+		#		:splitter_id, sp_id,
+		#		:spliter_distribution_coordinate, c_ll,
+		#
+		#		# Metadata
+		#		:remark, "",
+		#		:remark_2, "",
+		#		:rfs_year, tahun,
+		#		:rfs_status, "",
+		#		:submission_date, "",
+		#		:last_update, "",
+		#		:stf_item_code, "",
+		#
+		#		# Coordinates
+		#		:latitude, lat,
+		#		:longitude, long,
+		#
+		#		# Reference to demand point
+		#		:ftth!demand_point, l_result
+		#	)
+		#
+		#	_local l_rec_trans_cs << record_transaction.new_insert(.cs_col, l_prop_values_cs)
+		#	_local l_result_cs << l_rec_trans_cs.run()
+		#
+		#	.stats[:customer_premises] +<< 1
+		#	write("    [OK] Customer premise created with full data")
+		#_when error
+		#	write("    WARNING: Error creating customer premise: ", condition.report_contents_string)
+		#_endtry
+		#
+		## Step 10: Create building (optional) if descriptio = "GEDUNG"
+		## COMMENTED OUT - Not relevant for current use
+		#_try
+		#	_local descriptio << pm[:descriptio].default("")
+		#	_if descriptio.lowercase = "gedung"
+		#	_then
+		#		_local bb << bounding_box.new_enclosing(l_result.location.bounds, 400)
+		#
+		#		_local l_prop_values_bld << property_list.new_with(
+		#			:type, "Residential",
+		#			:asset_owner, "Owned",
+		#			:name, pm[:name],
+		#			:boundary, bb
+		#		)
+		#
+		#		_local l_rec_trans_bld << record_transaction.new_insert(.bld_col, l_prop_values_bld)
+		#		_local l_result_bld << l_rec_trans_bld.run()
+		#
+		#		.stats[:buildings] +<< 1
+		#		write("    [OK] Building created (GEDUNG type)")
+		#	_endif
+		#_when error
+		#	write("    WARNING: Error creating building: ", condition.report_contents_string)
+		#_endtry
 
 		>> l_result
 

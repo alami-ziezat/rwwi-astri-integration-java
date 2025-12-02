@@ -116,49 +116,55 @@ _private _method astri_design_migrator.create_pole(pm)
 			# Found existing pole - check if it's a placeholder
 			_if existing_pole.telco_pole_tag = "Existing Pole AR"
 			_then
-				# Update placeholder pole
+				# Update placeholder pole using property_list
 				write("  [UPDATE] Updating existing placeholder pole: ", existing_pole.id)
 
-				existing_pole.telco_pole_tag << pm[:name]
-				existing_pole.pop << .pop_name
-				existing_pole.olt << .pop_name
-				existing_pole.type << pole_type
-				existing_pole.pole_emr_status << pole_emr_status
-				existing_pole.folders << folders
-				existing_pole.fttx_network_type << "Cluster"
-				existing_pole.segment << segment_id
-				existing_pole.region << .region
-				existing_pole.cluster << .cluster
-				existing_pole.line_type << m_line
-				existing_pole.ring_name << ring_name
-				existing_pole.cluster_code << .cluster_code_db
-				existing_pole.subfeeder_code << .subfeeder_code_db
-				existing_pole.feeder_code << .feeder_code_db
-				existing_pole.olt_code << .olt_code
-				existing_pole.construction_status << pole_const_status
+				_local update_props << property_list.new_with(
+					:telco_pole_tag, pm[:name],
+					:pop, .pop_name,
+					:olt, .pop_name,
+					:type, pole_type,
+					:pole_emr_status, pole_emr_status,
+					:folders, folders,
+					:fttx_network_type, "Cluster",
+					:segment, segment_id,
+					:region, .region,
+					:cluster, .cluster,
+					:ring_name, ring_name,
+					:cluster_code, .cluster_code_db,
+					:subfeeder_code, .subfeeder_code_db,
+					:feeder_code, .feeder_code_db,
+					:olt_code, .olt_code,
+					:construction_status, pole_const_status
+				)
 
+				# Add optional fields if available
 				_if stf_item_code _isnt _unset
 				_then
-					existing_pole.stf_item_code << stf_item_code
+					update_props[:stf_item_code] << stf_item_code
 				_endif
 
 				_if line_type _isnt _unset
 				_then
-					existing_pole.line_type << line_type
+					update_props[:line_type] << line_type
 				_endif
+
+				# Execute update transaction
+				_local update_trans << record_transaction.new_update(existing_pole, update_props)
+				_local updated_pole << update_trans.run()
 
 				# Recreate annotation
 				_try
-					existing_pole.unset_geometry(:annotation_3)
-					_local anno << existing_pole.make_geometry(:annotation_3,
-						final_location.location, existing_pole.telco_pole_tag)
+					updated_pole.unset_geometry(:annotation_3)
+					_local anno << updated_pole.make_geometry(:annotation_3,
+						final_location.location, updated_pole.telco_pole_tag)
 				_when error
 					# Annotation may not exist or may fail - continue
 				_endtry
 
 				.stats[:poles] +<< 1
 				write("  [OK] Pole updated: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
-				_return existing_pole
+				_return updated_pole
 			_else
 				# Existing pole is not a placeholder - skip creation
 				write("  WARNING: Pole already exists nearby (", existing_pole.telco_pole_tag, ") - skipping")

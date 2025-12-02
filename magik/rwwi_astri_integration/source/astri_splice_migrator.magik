@@ -133,7 +133,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_local pp << pseudo_point.new(l_location_start)
 		pp.world << .database.world
 
-		_local (k1, pt) << _self.scan_pole_st(pp, 800)
+		_local (k1, pt) << _self.scan_pole_st(pp, 200)
 		_local sh_loc << _unset
 		_local l_result_pl << _unset
 
@@ -142,7 +142,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 			# Pole found - use its location
 			sh_loc << pt.location.coord
 			l_result_pl << pt
-			write("    >> Found existing pole within 800m")
+			write("    >> Found existing pole within 800m: ")
 		_else
 			# No pole found - create placeholder pole
 			write("    >> Creating placeholder pole")
@@ -214,7 +214,9 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		>> "Proposed"  # Default to Proposed
 	_endif
 
+
 	# Step 7: Create sheath splice
+	write("    >> Creating sheath splice")
 		_local l_prop_values << property_list.new_with(
 			:location, sh_loc,
 			:asset_owner, "Owned",

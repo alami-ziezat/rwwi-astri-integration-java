@@ -72,7 +72,7 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 
 	# Detect network levels in area
 	levels << _self.detect_network_levels_in_area(p_area)
-
+	levels.p
 	# Filter based on infrastructure type
 	_if .infrastructure_type _isnt _unset _and
 	    .infrastructure_type <> :all
@@ -152,7 +152,7 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 
 	# Get all poles in area first
 	all_poles << .gc[:pole].select(
-		predicate.within(:location, p_area))
+		predicate.interacts(:location, p_area))
 
 	write("  Found ", all_poles.size, " poles in area")
 
@@ -204,6 +204,8 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 			_endloop
 		_endif
 	_endloop
+
+	write(" Has Joint Closure: ", has_joint_closure, " | Has FDT: ", has_fdt, " | Has FAT: ", has_fat	)
 
 	# Check for mit_terminal_enclosure directly in area (world geometry)
 	terminal_enclosures << .gc[:mit_terminal_enclosure].select(
@@ -257,11 +259,11 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
 
-	# Load template file
-	template_file << smallworld_product.get_data_file("aerial_template.kml", :rwi_export_to_kml)
+	# Load template file (using new aerial_styles.kml)
+	template_file << smallworld_product.get_data_file("aerial_styles.kml", :rwi_export_to_kml)
 	_if template_file _is _unset
 	_then
-		condition.raise(:error, :string, "Template file aerial_template.kml not found")
+		condition.raise(:error, :string, "Template file aerial_styles.kml not found")
 	_endif
 
 	# Read template content
@@ -637,7 +639,7 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			# Write pole if it matches
 			_if matches?
 			_then
-				.object_writer.write_pole(pole, p_stream, p_indent)
+				.object_writer.write_pole(pole, p_stream, p_indent, folder_name)
 				pole_count +<< 1
 				.total_pole_count +<< 1  # Increment total counter
 			_endif

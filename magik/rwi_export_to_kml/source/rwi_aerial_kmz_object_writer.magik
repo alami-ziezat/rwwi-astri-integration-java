@@ -53,13 +53,14 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
+_method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent, _optional p_folder_name)
 	## Write pole placemark with coordinates and styling
 	##
 	## Parameters:
 	##   p_pole - Pole object
 	##   p_stream - Output stream
 	##   p_indent - Indentation string
+	##   p_folder_name - Optional folder name for style determination
 
 	# Get pole geometry (location point)
 	pole_geom << p_pole.location
@@ -80,15 +81,26 @@ _method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
 	#pole_height << p_pole.perform(:height).default("")
 	#pole_class << p_pole.perform(:class_value).default("")
 
-	# Determine owner and style based on asset_owner
-	# If asset_owner is "Owned" then EMR, otherwise PARTNER
+	# Determine style based on folder name using new aerial_styles.kml
+	_if p_folder_name _isnt _unset
+	_then
+		style_url << _self.get_pole_style_from_folder(p_folder_name)
+	_else
+		# Fallback to old logic if no folder name provided
+		_if asset_owner.default("").uppercase = "OWNED"
+		_then
+			style_url << "#existing_pole_emr_map"
+		_else
+			style_url << "#existing_pole_partner_map"
+		_endif
+	_endif
+
+	# Determine owner for ExtendedData
 	_if asset_owner.default("").uppercase = "OWNED"
 	_then
 		pole_owner << "EMR"
-		style_url << "#pole_emr_map"
 	_else
 		pole_owner << "PARTNER"
-		style_url << "#pole_partner_map"
 	_endif
 
 	# Build pole name/label using telco_pole_tag if available, otherwise pole ID
@@ -133,6 +145,70 @@ _method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent)
 	p_stream.write(p_indent, "  </Point>", newline_char)
 
 	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.get_pole_style_from_folder(p_folder_name)
+	## Determine pole style based on folder name
+	## Maps folder names to style IDs from aerial_styles.kml
+	##
+	## Parameters:
+	##   p_folder_name - Folder name (e.g., "NEW POLE 7-3", "EXISTING POLE EMR 7-4")
+	##
+	## Returns:
+	##   Style URL string (e.g., "#new_pole_7_3_map")
+
+	folder_upper << p_folder_name.uppercase
+
+	# NEW POLE folders - map to specific size styles
+	_if folder_upper.index_of_seq("NEW POLE") _isnt _unset
+	_then
+		_if folder_upper.index_of_seq("7-2.5") _isnt _unset _orif
+		    folder_upper.index_of_seq("7-2,5") _isnt _unset
+		_then
+			_return "#new_pole_7_2_5_map"
+		_elif folder_upper.index_of_seq("7-3") _isnt _unset
+		_then
+			_return "#new_pole_7_3_map"
+		_elif folder_upper.index_of_seq("7-4") _isnt _unset
+		_then
+			_return "#new_pole_7_4_map"
+		_elif folder_upper.index_of_seq("9-3") _isnt _unset
+		_then
+			_return "#new_pole_9_3_map"
+		_elif folder_upper.index_of_seq("9-4") _isnt _unset
+		_then
+			_return "#new_pole_9_4_map"
+		_elif folder_upper.index_of_seq("9-5") _isnt _unset
+		_then
+			_return "#new_pole_9_5_map"
+		_else
+			# Default to 7-3 for NEW POLE if size not specified
+			_return "#new_pole_7_3_map"
+		_endif
+	_endif
+
+	# EXISTING POLE folders - map based on owner
+	_if folder_upper.index_of_seq("EXISTING POLE") _isnt _unset
+	_then
+		_if folder_upper.index_of_seq("EMR") _isnt _unset
+		_then
+			_return "#existing_pole_emr_map"
+		_elif folder_upper.index_of_seq("PARTNER") _isnt _unset
+		_then
+			_return "#existing_pole_partner_map"
+		_elif folder_upper.index_of_seq("TELKOM") _isnt _unset
+		_then
+			_return "#existing_pole_telkom_map"
+		_else
+			# Default to EMR for EXISTING POLE if owner not specified
+			_return "#existing_pole_emr_map"
+		_endif
+	_endif
+
+	# Default fallback - existing pole EMR
+	_return "#existing_pole_emr_map"
 _endmethod
 $
 

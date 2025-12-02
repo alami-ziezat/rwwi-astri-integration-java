@@ -26,3 +26,10 @@ TestClient.java
 
 # Emacs backup files
 \#*\#
+magik/magik_20251202.7z
+magik/new_magik.7z
+magik/rwi_export_to_kml/source/add_aerial_route.magik
+magik/rwi_export_to_kml/source/add_pole.magik
+magik/rwi_export_to_kml/source/add_sheath_splice.magik
+magik/rwi_export_to_kml/source/add_sheath_with_loc.magik
+magik/rwi_export_to_kml/source/add_underground_route.magik
