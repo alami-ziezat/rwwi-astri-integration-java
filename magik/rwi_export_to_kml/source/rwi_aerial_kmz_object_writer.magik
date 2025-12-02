@@ -720,11 +720,8 @@ _method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_fo
 	_endtry
 
 	# Determine style based on folder name and cell type
-	_if p_folder_name.uppercase.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
-	_then
-		style_url << "#boundary_cluster_map"
-	_elif p_folder_name.uppercase.index_of_seq("BOUNDARY FAT") _isnt _unset _orif
-	      p_folder_name.uppercase.index_of_seq("FAT COVERAGE") _isnt _unset
+	_if p_folder_name.uppercase.index_of_seq("BOUNDARY FAT") _isnt _unset _orif
+	    p_folder_name.uppercase.index_of_seq("FAT COVERAGE") _isnt _unset
 	_then
 		style_url << "#boundary_fat_map"
 	_else
@@ -774,6 +771,70 @@ _method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_fo
 	p_stream.write(p_indent, "      <value>", hp_count, "</value>", newline_char)
 	p_stream.write(p_indent, "    </Data>", newline_char)
 	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write Polygon geometry
+	p_stream.write(p_indent, "  <Polygon>", newline_char)
+	p_stream.write(p_indent, "    <outerBoundaryIs>", newline_char)
+	p_stream.write(p_indent, "      <LinearRing>", newline_char)
+	p_stream.write(p_indent, "        <coordinates>", newline_char)
+	p_stream.write(p_indent, "          ", coord_string, newline_char)
+	p_stream.write(p_indent, "        </coordinates>", newline_char)
+	p_stream.write(p_indent, "      </LinearRing>", newline_char)
+	p_stream.write(p_indent, "    </outerBoundaryIs>", newline_char)
+	p_stream.write(p_indent, "  </Polygon>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_boundary(p_boundary_name, p_boundary_geom, p_stream, p_indent, p_folder_name)
+	## Write project boundary polygon placemark
+	## Used for BOUNDARY CLUSTER - exports the project area with project name
+	##
+	## Parameters:
+	##   p_boundary_name - Boundary name (project/scheme name)
+	##   p_boundary_geom - Boundary geometry (polygon from project_area)
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+	##   p_folder_name - Folder name for style determination
+
+	# Check geometry
+	_if p_boundary_geom _is _unset _then _return _endif
+	_if .cs_transform _is _unset _then _return _endif
+
+	# Convert polygon sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	# Get polygon sectors and convert each coordinate
+	polygon_sectors << p_boundary_geom.sectors
+	_for sector _over polygon_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			t_coord << .cs_transform.convert(coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Close the polygon (first coord = last coord)
+	_if polygon_sectors.size > 0
+	_then
+		first_sector << polygon_sectors.first
+		_if first_sector.coords.size > 0
+		_then
+			first_coord << first_sector.coords.first
+			t_coord << .cs_transform.convert(first_coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endif
+	_endif
+	
+	style_url << "#boundary_cluster_map"
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", p_boundary_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
 
 	# Write Polygon geometry
 	p_stream.write(p_indent, "  <Polygon>", newline_char)

@@ -132,6 +132,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		exporter.gc << gis_program_manager.cached_dataset(:gis).collections
 		exporter.project_name << wo_number
 		exporter.project_area << design_area
+		exporter.scheme_name << design.perform(:name).default(wo_number)
 		exporter.infrastructure_type << infra_type.as_symbol()
 		exporter.infrastructure_code << infra_code  # Pass infrastructure code for folder naming
 

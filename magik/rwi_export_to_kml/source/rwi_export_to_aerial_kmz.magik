@@ -15,6 +15,7 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:gc, _unset, :writable},                    # GIS case
 	{:project_name, _unset, :writable},          # Project name (from WO number)
 	{:project_area, _unset, :writable},          # Design boundary area
+	{:scheme_name, _unset, :writable},           # Design name (from Cluster Name)
 	{:output_directory, _unset, :writable},      # Output directory
 	{:infrastructure_type, _unset, :writable},   # Infrastructure type filter (cluster/feeder/subfeeder)
 	{:infrastructure_code, _unset, :writable},   # Infrastructure code (e.g., "CLU001")
@@ -707,8 +708,14 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		_self.write_demand_points_for_folder(p_stream, p_area, p_indent, folder_name, line_id, p_parent_fdt_folder)
 	_endif
 
+	# Handle BOUNDARY CLUSTER folder - export project boundary polygon
+	_if folder_name.uppercase = "BOUNDARY CLUSTER"
+	_then
+		_self.write_project_boundary(p_stream, p_area, p_indent, folder_name)
+	_endif
+
 	# Handle BOUNDARY folders - export cells (ftth!zone)
-	_if folder_name.index_of_seq("BOUNDARY") _isnt _unset _orif
+	_if folder_name.index_of_seq("BOUNDARY FAT") _isnt _unset _orif
 	    folder_name.index_of_seq("FAT COVERAGE") _isnt _unset
 	_then
 		_self.write_cells_for_folder(p_stream, p_area, p_indent, folder_name, line_id, p_parent_fdt_folder)
@@ -1515,6 +1522,37 @@ _private _method rwi_export_to_aerial_kmz.write_cells_for_folder(p_stream, p_are
 	_then
 		write("  Wrote ", cell_count, " cells to folder: ", p_folder_name)
 	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_project_boundary(p_stream, p_area, p_indent, p_folder_name)
+	## Write project boundary polygon using project_area and project_name
+	## Creates a single boundary polygon placemark with the scheme/project name
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area (polygon geometry)
+	##   p_indent - Indentation string
+	##   p_folder_name - Folder name (BOUNDARY CLUSTER)
+
+	write("  Exporting project boundary for: ", .project_name)
+
+	# Check if we have project area
+	_if .project_area _is _unset
+	_then
+		write("  WARNING: No project area available for boundary export")
+		_return
+	_endif
+
+	# Use project_name as the boundary name and project_area as the geometry
+	boundary_name << .scheme_name
+	boundary_geom << .project_area
+
+	# Write the boundary polygon using object writer
+	.object_writer.write_boundary(boundary_name, boundary_geom, p_stream, p_indent, p_folder_name)
+
+	write("  Wrote project boundary: ", boundary_name)
 _endmethod
 $
 
