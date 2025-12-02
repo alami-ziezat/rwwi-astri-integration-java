@@ -573,19 +573,249 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_method rwi_aerial_kmz_object_writer.write_hp_point(p_hp, p_stream, p_indent)
-	## Write homepass point placemark
-	## TODO: Implement in Phase 3
+_method rwi_aerial_kmz_object_writer.write_demand_point(p_dp, p_stream, p_indent, p_folder_name)
+	## Write demand point (home pass) placemark with coordinates and styling
+	##
+	## Parameters:
+	##   p_dp - Demand point object
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+	##   p_folder_name - Folder name (HP COVER or HP UNCOVER) for style determination
 
-	# Placeholder
+	# Get demand point geometry (location point)
+	dp_geom << p_dp.location
+	_if dp_geom _is _unset _then _return _endif
+
+	# Get coordinate
+	coord << dp_geom.coord
+	_if coord _is _unset _then _return _endif
+
+	# Convert coordinate to WGS84 (Google Earth coordinate system)
+	coord_string << _self.convert_coord_to_wgs84_string(coord)
+
+	# Get demand point attributes
+	dp_id << p_dp.perform(:identification).default("Unknown")
+	dp_name << p_dp.perform(:name).default("")
+	notes << p_dp.perform(:notes).default("")
+	line_type << p_dp.perform(:line_type).default("")
+
+	# Parse notes to extract ring_name (before pipe character)
+	pipe_pos << notes.index_of(%|)
+	_if pipe_pos _isnt _unset
+	_then
+		ring_name << notes.slice(1, pipe_pos - 1)
+	_else
+		ring_name << notes
+	_endif
+
+	# Determine style based on folder name
+	_if p_folder_name.uppercase.index_of_seq("HP COVER") _isnt _unset
+	_then
+		style_url << "#hp_cover_map"
+	_elif p_folder_name.uppercase.index_of_seq("HP UNCOVER") _isnt _unset
+	_then
+		style_url << "#hp_uncover_map"
+	_else
+		# Default to hp_cover_map
+		style_url << "#hp_cover_map"
+	_endif
+
+	# Build demand point label - use name if available, otherwise identification
+	_if dp_name <> ""
+	_then
+		placemark_name << dp_name
+	_else
+		placemark_name << write_string("HP ", dp_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", placemark_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+
+	# Write ExtendedData with demand point attributes
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'>", newline_char)
+	p_stream.write(p_indent, "      <value>", dp_id, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	_if ring_name <> ""
+	_then
+		p_stream.write(p_indent, "    <Data name='Ring'>", newline_char)
+		p_stream.write(p_indent, "      <value>", ring_name, "</value>", newline_char)
+		p_stream.write(p_indent, "    </Data>", newline_char)
+	_endif
+	_if line_type <> ""
+	_then
+		p_stream.write(p_indent, "    <Data name='Line'>", newline_char)
+		p_stream.write(p_indent, "      <value>", line_type, "</value>", newline_char)
+		p_stream.write(p_indent, "    </Data>", newline_char)
+	_endif
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write Point geometry
+	p_stream.write(p_indent, "  <Point>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </Point>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_method rwi_aerial_kmz_object_writer.write_boundary(p_boundary, p_stream, p_indent)
-	## Write polygon boundary placemark
-	## TODO: Implement in Phase 3
+_method rwi_aerial_kmz_object_writer.write_cell(p_cell, p_stream, p_indent, p_folder_name)
+	## Write cell (ftth!zone) polygon placemark with coordinates and styling
+	##
+	## Parameters:
+	##   p_cell - Cell object (ftth!zone)
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+	##   p_folder_name - Folder name for determining context
 
-	# Placeholder
+	# Get cell geometry (polygon)
+	cell_geom << p_cell.location
+	_if cell_geom _is _unset _then _return _endif
+
+	# Get database and view for coordinate conversion
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+
+	# Set up dynamics for coordinate system
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	# Get current coordinate system and WGS84 coordinate system
+	cs1 << v.world.coordinate_system
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+
+	# Create transform
+	t << transform.new_converting_cs_to_cs(cs1, cs2)
+
+	# Convert polygon sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	# Get polygon sectors and convert each coordinate
+	polygon_sectors << cell_geom.sectors
+	_for sector _over polygon_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			t_coord << t.convert(coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Close the polygon (first coord = last coord)
+	_if polygon_sectors.size > 0
+	_then
+		first_sector << polygon_sectors.first
+		_if first_sector.coords.size > 0
+		_then
+			first_coord << first_sector.coords.first
+			t_coord << t.convert(first_coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endif
+	_endif
+
+	# Get cell attributes
+	cell_id << p_cell.perform(:identification).default("Unknown")
+	cell_type << p_cell.perform(:type).default("Micro Cell")
+	note << p_cell.perform(:note).default("")
+	splitter_id << p_cell.perform(:splitter_id).default("")
+
+	# Parse note to extract ring_name (before pipe character)
+	pipe_pos << note.index_of(%|)
+	_if pipe_pos _isnt _unset
+	_then
+		ring_name << note.slice(1, pipe_pos - 1)
+	_else
+		ring_name << note
+	_endif
+
+	# Count demand points within cell area
+	hp_count << 0
+	_try
+		# Get demand points collection
+		dp_col << gis_program_manager.cached_dataset(:gis).collections[:ftth!demand_point]
+		_if dp_col _isnt _unset
+		_then
+			# Query demand points within cell polygon
+			demand_points_in_cell << dp_col.select(
+				predicate.within(:location, cell_geom))
+			hp_count << demand_points_in_cell.size
+		_endif
+	_when error
+		# If error counting, set to 0
+		hp_count << 0
+	_endtry
+
+	# Determine style based on folder name and cell type
+	_if p_folder_name.uppercase.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
+	_then
+		style_url << "#boundary_cluster_map"
+	_elif p_folder_name.uppercase.index_of_seq("BOUNDARY FAT") _isnt _unset _orif
+	      p_folder_name.uppercase.index_of_seq("FAT COVERAGE") _isnt _unset
+	_then
+		style_url << "#boundary_fat_map"
+	_else
+		# Default based on cell type
+		_if cell_type.uppercase = "MACRO CELL"
+		_then
+			style_url << "#boundary_cluster_map"
+		_else
+			style_url << "#boundary_fat_map"
+		_endif
+	_endif
+
+	# Build cell label
+	placemark_name << cell_id
+
+	# Build description with HP count
+	description << write_string("Home Pass Count: ", hp_count)
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", placemark_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <description>", description, "</description>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+
+	# Write ExtendedData with cell attributes
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'>", newline_char)
+	p_stream.write(p_indent, "      <value>", cell_id, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'>", newline_char)
+	p_stream.write(p_indent, "      <value>", cell_type, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	_if ring_name <> ""
+	_then
+		p_stream.write(p_indent, "    <Data name='Ring'>", newline_char)
+		p_stream.write(p_indent, "      <value>", ring_name, "</value>", newline_char)
+		p_stream.write(p_indent, "    </Data>", newline_char)
+	_endif
+	_if splitter_id <> ""
+	_then
+		p_stream.write(p_indent, "    <Data name='Splitter'>", newline_char)
+		p_stream.write(p_indent, "      <value>", splitter_id, "</value>", newline_char)
+		p_stream.write(p_indent, "    </Data>", newline_char)
+	_endif
+	# Add HP count to extended data
+	p_stream.write(p_indent, "    <Data name='HP_Count'>", newline_char)
+	p_stream.write(p_indent, "      <value>", hp_count, "</value>", newline_char)
+	p_stream.write(p_indent, "    </Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Write Polygon geometry
+	p_stream.write(p_indent, "  <Polygon>", newline_char)
+	p_stream.write(p_indent, "    <outerBoundaryIs>", newline_char)
+	p_stream.write(p_indent, "      <LinearRing>", newline_char)
+	p_stream.write(p_indent, "        <coordinates>", newline_char)
+	p_stream.write(p_indent, "          ", coord_string, newline_char)
+	p_stream.write(p_indent, "        </coordinates>", newline_char)
+	p_stream.write(p_indent, "      </LinearRing>", newline_char)
+	p_stream.write(p_indent, "    </outerBoundaryIs>", newline_char)
+	p_stream.write(p_indent, "  </Polygon>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
 _endmethod
 $

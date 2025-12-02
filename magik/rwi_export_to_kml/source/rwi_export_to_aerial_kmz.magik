@@ -29,7 +29,9 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:total_closure_count, _unset, :writable},   # Total CLOSUREs exported
 	{:total_slack_hanger_count, _unset, :writable},  # Total SLACK HANGERs exported
 	{:total_sling_wire_count, _unset, :writable},    # Total SLING WIREs exported
-	{:total_cable_count, _unset, :writable}          # Total CABLEs exported
+	{:total_cable_count, _unset, :writable},         # Total CABLEs exported
+	{:total_hp_count, _unset, :writable},            # Total HOME PASS (demand points) exported
+	{:total_cell_count, _unset, :writable}           # Total CELLs (ftth!zone) exported
 }, :object)
 $
 
@@ -118,6 +120,8 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 		:total_slack_hangers, .total_slack_hanger_count,
 		:total_sling_wires, .total_sling_wire_count,
 		:total_cables, .total_cable_count,
+		:total_home_pass, .total_hp_count,
+		:total_cells, .total_cell_count,
 		:project_name, .project_name,
 		:infrastructure_type, .infrastructure_type)
 _endmethod
@@ -255,6 +259,8 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	.total_slack_hanger_count << 0
 	.total_sling_wire_count << 0
 	.total_cable_count << 0
+	.total_hp_count << 0
+	.total_cell_count << 0
 
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
@@ -692,6 +698,20 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY folders
 	_then
 		_self.write_cable_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
+	_endif
+
+	# Handle HP COVER/HP UNCOVER folders - export demand points
+	_if folder_name.index_of_seq("HP COVER") _isnt _unset _orif
+	    folder_name.index_of_seq("HP UNCOVER") _isnt _unset
+	_then
+		_self.write_demand_points_for_folder(p_stream, p_area, p_indent, folder_name, line_id, p_parent_fdt_folder)
+	_endif
+
+	# Handle BOUNDARY folders - export cells (ftth!zone)
+	_if folder_name.index_of_seq("BOUNDARY") _isnt _unset _orif
+	    folder_name.index_of_seq("FAT COVERAGE") _isnt _unset
+	_then
+		_self.write_cells_for_folder(p_stream, p_area, p_indent, folder_name, line_id, p_parent_fdt_folder)
 	_endif
 _endmethod
 $
@@ -1215,6 +1235,176 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 	_if cable_count > 0
 	_then
 		write("  Wrote ", cable_count, " CABLE chains (merged by name)")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_stream, p_area, p_indent, p_folder_name, _optional p_line_id, p_fdt_folder)
+	## Write demand points (home pass) to folder based on folder name and filters
+	## Filters by LINE and FDT ring_name from notes field
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_folder_name - Folder name (HP COVER or HP UNCOVER)
+	##   p_line_id - LINE ID for filtering (optional)
+	##   p_fdt_folder - FDT folder name for filtering (optional)
+
+	# Get all demand points in area
+	all_demand_points << .gc[:ftth!demand_point].select(
+		predicate.interacts(:location, p_area))
+
+	write("  Found ", all_demand_points.size, " demand points in area for folder: ", p_folder_name)
+
+	dp_count << 0
+
+	_for dp _over all_demand_points.fast_elements()
+	_loop
+		# Get location geometry
+		dp_geom << dp.location
+		_if dp_geom _is _unset _then _continue _endif
+
+		# Get notes field containing ring_name and line_type
+		# Format: "ring_name|line_type" or "ring_name|folders"
+		notes << dp.perform(:notes).default("")
+		_if notes = "" _then _continue _endif
+
+		# Parse notes to extract ring_name and line_type
+		pipe_pos << notes.index_of(%|)
+		_if pipe_pos _is _unset
+		_then
+			ring_name << notes
+			line_type << ""
+		_else
+			ring_name << notes.slice(1, pipe_pos - 1)
+			# The rest after pipe might contain line_type or full folders
+			# Try to extract line_type from db field first
+			line_type << dp.perform(:line_type).default("")
+		_endif
+
+		# Filter by LINE if specified
+		_if p_line_id _isnt _unset _andif line_type <> ""
+		_then
+			# Extract LINE number from line_type (e.g., "LINE 01" -> "01")
+			expected_line << p_line_id
+			_if line_type.index_of_seq(expected_line) _is _unset
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Filter by FDT folder if specified (ring_name matching)
+		_if p_fdt_folder _isnt _unset _andif ring_name <> ""
+		_then
+			# Extract FDT name from folder (e.g., "FDT 01" -> "FDT 01")
+			expected_fdt_name << p_fdt_folder
+			_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Write demand point
+		.object_writer.write_demand_point(dp, p_stream, p_indent, p_folder_name)
+		dp_count +<< 1
+	_endloop
+
+	# Update total counter
+	.total_hp_count +<< dp_count
+
+	_if dp_count > 0
+	_then
+		write("  Wrote ", dp_count, " demand points to folder: ", p_folder_name)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_cells_for_folder(p_stream, p_area, p_indent, p_folder_name, _optional p_line_id, p_fdt_folder)
+	## Write cells (ftth!zone) to folder based on folder name and filters
+	## Filters by LINE and FDT ring_name from note field
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_folder_name - Folder name (BOUNDARY CLUSTER, BOUNDARY FAT, FAT COVERAGE, etc.)
+	##   p_line_id - LINE ID for filtering (optional)
+	##   p_fdt_folder - FDT folder name for filtering (optional)
+
+	# Get all cells in area
+	all_cells << .gc[:ftth!zone].select(
+		predicate.interacts(:location, p_area))
+
+	write("  Found ", all_cells.size, " cells in area for folder: ", p_folder_name)
+
+	cell_count << 0
+
+	_for cell _over all_cells.fast_elements()
+	_loop
+		# Get location geometry (polygon)
+		cell_geom << cell.location
+		_if cell_geom _is _unset _then _continue _endif
+
+		# Get note field containing ring_name and folders
+		# Format: "ring_name|folders"
+		note << cell.perform(:note).default("")
+		_if note = "" _then _continue _endif
+
+		# Parse note to extract ring_name and folders
+		pipe_pos << note.index_of(%|)
+		_if pipe_pos _is _unset
+		_then
+			ring_name << note
+			cell_folders << ""
+		_else
+			ring_name << note.slice(1, pipe_pos - 1)
+			cell_folders << note.slice_to_end(pipe_pos + 1)
+		_endif
+
+		# Check if this cell belongs to current folder by matching parent folders
+		# The cell_folders should contain the current p_folder_name hierarchy
+		_if cell_folders = "" _orif
+		    cell_folders.uppercase.index_of_seq(p_folder_name.uppercase) _is _unset
+		_then
+			_continue
+		_endif
+
+		# Filter by LINE if specified
+		_if p_line_id _isnt _unset _andif cell_folders <> ""
+		_then
+			# Check if folders contain the LINE pattern
+			expected_line << write_string("LINE ", p_line_id)
+			_if cell_folders.uppercase.index_of_seq(expected_line.uppercase) _is _unset
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Filter by FDT folder if specified (ring_name matching)
+		_if p_fdt_folder _isnt _unset _andif ring_name <> ""
+		_then
+			# Extract FDT name from folder (e.g., "FDT 01" -> "FDT 01")
+			expected_fdt_name << p_fdt_folder
+			_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Write cell
+		.object_writer.write_cell(cell, p_stream, p_indent, p_folder_name)
+		cell_count +<< 1
+	_endloop
+
+	# Update total counter
+	.total_cell_count +<< cell_count
+
+	_if cell_count > 0
+	_then
+		write("  Wrote ", cell_count, " cells to folder: ", p_folder_name)
 	_endif
 _endmethod
 $

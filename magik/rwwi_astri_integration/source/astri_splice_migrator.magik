@@ -127,27 +127,23 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 
 		# Step 3: Parse original location
 		_local original_location << _self.parse_point_geometry(pm[:coord])
-		_local l_location_start << original_location.coord
-
-		# Step 4: Find or create pole within 800m
-		_local pp << pseudo_point.new(l_location_start)
-		pp.world << .database.world
-
-		_local (k1, pt) << _self.scan_pole_st(pp, 200)
+		_local l_location_start << original_location
+		write("    >> Original location: ", l_location_start)
+		write("    >> Searching for pole within 200m...")
+		_local (k1, pt) << _self.scan_pole_st(l_location_start, 200)
 		_local sh_loc << _unset
 		_local l_result_pl << _unset
-
 		_if k1 _is _true
 		_then
 			# Pole found - use its location
 			sh_loc << pt.location.coord
 			l_result_pl << pt
-			write("    >> Found existing pole within 800m: ")
+			write("    >> Found existing pole within 200m: ")
 		_else
 			# No pole found - create placeholder pole
 			write("    >> Creating placeholder pole")
 			# Try to snap to aerial route
-			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(pp)
+			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(original_location)
 
 			_if tf _is _true
 			_then
