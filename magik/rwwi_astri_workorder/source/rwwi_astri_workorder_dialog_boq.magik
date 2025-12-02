@@ -124,7 +124,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			:vendor_name, wo[:vendor_name].default(_unset),
 			:subcont_vendor_name, wo[:subcont_vendor].default(_unset),
 			:remarks, "Service",                    # Default
-			:phase, "project_opname",               # Default
+			:phase, "drm",               # Default
 			:area, wo[:area].default(_unset),
 			:area_plant_code, wo[:area_plant_code].default(_unset),
 			:override_price_material, _unset,       # Optional

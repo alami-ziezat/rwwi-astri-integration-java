@@ -94,6 +94,23 @@ _private _method astri_design_migrator.create_pole(pm)
 
 		# Step 5: Check for duplicate poles within 200m
 		_local (h, existing_pole) << _self.scan_pole_st(final_location, 200)
+
+		# Determine construction status based on pole_emr_status
+			_local pole_const_status <<
+			_if .construction_status = "In Service"
+			_then
+				>> "In Service"
+			_elif pole_emr_status.matches?("New*")
+			_then
+				>> "Proposed"
+			_elif pole_emr_status.matches?("Existing*")
+			_then
+				>> "In Service"
+			_else
+				>> "Proposed"  # Default to Proposed
+			_endif
+
+
 		_if h _is _true _andif existing_pole _isnt _unset
 		_then
 			# Found existing pole - check if it's a placeholder
@@ -118,6 +135,7 @@ _private _method astri_design_migrator.create_pole(pm)
 				existing_pole.subfeeder_code << .subfeeder_code_db
 				existing_pole.feeder_code << .feeder_code_db
 				existing_pole.olt_code << .olt_code
+				existing_pole.construction_status << pole_const_status
 
 				_if stf_item_code _isnt _unset
 				_then
@@ -149,21 +167,6 @@ _private _method astri_design_migrator.create_pole(pm)
 			_endif
 		_else
 			# No existing pole - create new one
-
-			# Determine construction status based on pole_emr_status
-			_local pole_const_status <<
-			_if .construction_status = "In Service"
-			_then
-				>> "In Service"
-			_elif pole_emr_status.matches?("New*")
-			_then
-				>> "Proposed"
-			_elif pole_emr_status.matches?("Existing*")
-			_then
-				>> "In Service"
-			_else
-				>> "Proposed"  # Default to Proposed
-			_endif
 
 			_local prop_values << property_list.new_with(
 				:location, final_location,

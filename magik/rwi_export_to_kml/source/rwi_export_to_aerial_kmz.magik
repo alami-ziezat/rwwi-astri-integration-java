@@ -1106,6 +1106,7 @@ _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
 	## Write cable/sheath_with_loc chains to folder
 	## Queries aerial_route in area, collects cables from each route
+	## Merges sectors for cables with same name
 	##
 	## Parameters:
 	##   p_stream - Output stream
@@ -1134,9 +1135,9 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 		_endloop
 	_endloop
 
-	cable_count << 0
+	# Step 3: Group cables by name and collect their sectors
+	cables_by_name << property_list.new()
 
-	# Step 3: Loop through unique cables and export them
 	_for cable _over unique_cables.fast_elements()
 	_loop
 		# Filter by LINE if we're in a LINE folder
@@ -1171,20 +1172,115 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 			_endif
 		_endif
 
-		# Step 4: Get cable geometry using route_sectors()
+		# Get cable name for grouping
+		cable_name << cable.perform(:name).default("Unknown").as_symbol()
+
+		# Get cable geometry using route_sectors()
 		cable_sectors << cable.route_sectors()
 		_if cable_sectors _is _unset _orif cable_sectors.empty? _then _continue _endif
 
-		# Write the cable using its route sectors
-		.object_writer.write_cable(cable, cable_sectors, p_stream, p_indent)
-		cable_count +<< 1
-		.total_cable_count +<< 1
+		# Group by name - store cable and its sectors
+		_if cables_by_name[cable_name] _is _unset
+		_then
+			cables_by_name[cable_name] << property_list.new_with(
+				:cable, cable,
+				:sector_list, rope.new())
+		_endif
+
+		# Add sectors to the list
+		cables_by_name[cable_name][:sector_list].add_last(cable_sectors)
 	_endloop
+
+	# Step 4: Merge sectors for each cable name and export
+	# Cable count is based on unique cable names (after merging)
+	cable_count << cables_by_name.size
+
+	_for cable_name, cable_data _over cables_by_name.fast_keys_and_elements()
+	_loop
+		write("  Processing CABLE: ", cable_name)
+		cable << cable_data[:cable]
+		sector_list << cable_data[:sector_list]
+		# Merge sectors that connect (last coord of one = first coord of next)
+		merged_sectors << _self.merge_cable_sectors(sector_list)
+
+		# Write the cable using merged sectors
+		.object_writer.write_cable(cable, merged_sectors, p_stream, p_indent)
+	_endloop
+
+	# Update total cable count (based on unique cable names)
+	.total_cable_count +<< cable_count
 
 	_if cable_count > 0
 	_then
-		write("  Wrote ", cable_count, " CABLE chains")
+		write("  Wrote ", cable_count, " CABLE chains (merged by name)")
 	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.merge_cable_sectors(p_sector_list)
+	## Merge cable sectors that connect end-to-end
+	## If last coord of sector1 = first coord of sector2, merge them
+	## If first coord of sector1 = last coord of sector2, reverse sector2 and merge
+	##
+	## Parameters:
+	##   p_sector_list - Rope of sector lists
+	##
+	## Returns:
+	##   Rope of merged sectors
+
+	_if p_sector_list.empty? _then _return p_sector_list _endif
+
+	# Convert to working list
+	remaining_sectors << rope.new_from(p_sector_list)
+	write("    Merging ", remaining_sectors.size, " sectors")	
+	
+	# Start with first sector
+	merged_sectors << remaining_sectors.remove_first()
+
+	# Keep trying to merge until no more connections found
+	_loop
+		found_match? << _false
+		current_first << merged_sectors.first_coord
+		current_last << merged_sectors.last_coord
+
+		# Try to find a sector that connects to current
+		_for i _over 1.upto(remaining_sectors.size)
+		_loop
+			test_sector << remaining_sectors[i]
+			test_first << test_sector.first_coord
+			test_last << test_sector.last_coord
+
+			# Check if test_sector connects to end of current (forward)
+			# current.last = test.first
+			_if current_last = test_first
+			_then
+				# Connects forward - append it
+				merged_sectors.add_all_last(test_sector)
+				remaining_sectors.remove_nth(i)
+				found_match? << _true
+				_leave
+			# Check if test_sector connects to start of current 
+			# current.first = test.last
+			_elif current_first = test_last
+			_then
+				# Connects in reverse - reverse test_sector and prepend
+				merged_sectors.add_all_first(test_sector)
+				remaining_sectors.remove_nth(i)
+				found_match? << _true
+				_leave
+			_endif
+		_endloop
+
+		# If no match found and remaining sectors is empty then leave
+		_if _not found_match? _orif remaining_sectors.empty?
+		_then
+			write("    No connecting sector found: ", remaining_sectors.size, " sectors remaining")
+			_leave
+		_endif
+	_endloop
+
+	>> merged_sectors
 _endmethod
 $
 

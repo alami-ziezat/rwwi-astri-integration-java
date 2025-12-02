@@ -47,8 +47,6 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_return  # Not a cable - skip
 		_endif
 
-		write("  Processing aerial route: ", pm[:name])
-
 		# Step 2: Parse route geometry
 		_local route << _self.parse_line_geometry(pm[:coord])
 		_local pc << pseudo_chain.new(route)
@@ -146,7 +144,8 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
 					:olt_code, .olt_code,
-					:stf_item_code, "200001033"
+					:stf_item_code, "200001033",
+					:route, route
 				)
 				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
 				_local result_sw << rec_trans_sw.run()
@@ -277,7 +276,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:fttx_network_type, _self.get_fttx_network_type(),
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, .construction_status,
+				:construction_status, "In Service",
 				:cluster_code, .cluster_code_db,
 				:subfeeder_code, .subfeeder_code_db,
 				:feeder_code, .feeder_code_db,
@@ -380,7 +379,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				:type, "T7",
 				:folders, folders,
 				:uuid, .uuid,
-				:construction_status, .construction_status,
+				:construction_status, "In Service",
 				:cluster_code, .cluster_code_db,
 				:subfeeder_code, .subfeeder_code_db,
 				:feeder_code, .feeder_code_db,

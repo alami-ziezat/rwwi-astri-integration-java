@@ -22,7 +22,7 @@ _pragma(classify_level=basic, topic={boq, generator})
 ##       :subcont_vendor_name, "Subcon XYZ",
 ##       :description, "Project Management",
 ##       :remarks, "Service",
-##       :phase, "project_opname",
+##       :phase, "drm",
 ##       :area, "Jakarta",
 ##       :area_plant_code, "JKT01"
 ##   )
@@ -362,7 +362,7 @@ _private _method rwwi_astri_boq_generator.init(scheme, params)
 
 	_if .boq_params[:phase] _is _unset
 	_then
-		.boq_params[:phase] << "project_opname"
+		.boq_params[:phase] << "drm"
 	_endif
 
 	write("LOG: BoQ generator configured for design:", scheme.name, "| Type:", .infra_type)
@@ -582,7 +582,7 @@ _private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, se
 			:quantity_material, mat_value,
 			:quantity_service, svc_value,
 			:remarks, .boq_params[:remarks],          # Default: "Service"
-			:phase, .boq_params[:phase],              # Default: "project_opname"
+			:phase, .boq_params[:phase],              # Default: "drm"
 			:area, .boq_params[:area],
 			:area_plant_code, .boq_params[:area_plant_code],
 			:override_price_material, .boq_params[:override_price_material],
