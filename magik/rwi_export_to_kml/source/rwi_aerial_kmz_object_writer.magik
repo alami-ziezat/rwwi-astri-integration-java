@@ -850,3 +850,54 @@ _method rwi_aerial_kmz_object_writer.write_boundary(p_boundary_name, p_boundary_
 	p_stream.write(p_indent, "</Placemark>", newline_char)
 _endmethod
 $
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_olt(p_olt, p_stream, p_indent, p_folder_name)
+	## Write OLT (Optical Line Terminal) or mit_hub to KML
+	##
+	## Parameters:
+	##   p_olt - OLT object
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+	##   p_folder_name - Parent folder name
+
+	# Get OLT attributes
+	olt_name << p_olt.perform(:name).default("OLT")
+	olt_id << p_olt.perform(:identification).default("")
+	olt_type << p_olt.perform(:type).default("")
+	olt_location << p_olt.location
+
+	_if olt_location _is _unset _then _return _endif
+
+	# Convert coordinate to WGS84
+	coord_string << _self.convert_coord_to_wgs84_string(olt_location.coord)
+
+	# Build description
+	description << write_string(
+		"Name: ", olt_name, %newline,
+		"ID: ", olt_id, %newline,
+		"Type: ", olt_type)
+
+	# Determine style based on folder name
+	style_url << "#olt_map"
+
+	# Write placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", olt_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <description>", description, "</description>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", olt_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>", olt_type, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Point geometry
+	p_stream.write(p_indent, "  <Point>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </Point>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$

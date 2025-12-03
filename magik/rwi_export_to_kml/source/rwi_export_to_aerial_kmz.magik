@@ -390,18 +390,24 @@ $
 
 _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_feeder_section(p_stream, p_area)
-	## Write FEEDER CODE section with 15 folders
+	## Write FEEDER CODE section - flat structure
+	## All objects exported to folders based on their direct parent folder field
+
+	# Use infrastructure code if available, otherwise default to "FEEDER CODE"
+	folder_name << _if .infrastructure_code _isnt _unset
+	               _then >> .infrastructure_code
+	               _else >> "FEEDER CODE"
+	               _endif
 
 	p_stream.write("  <Folder>", newline_char)
-	p_stream.write("    <name>FEEDER CODE</name>", newline_char)
+	p_stream.write("    <name>", folder_name, "</name>", newline_char)
 
-	# Get folder definitions from builder
+	# Get folder definitions and write each folder
+	# Objects are exported based on their parent folder field
 	folder_defs << .folder_builder.build_feeder_folders()
-
-	# Write each folder
 	_for folder_def _over folder_defs.fast_elements()
 	_loop
-		_self.write_folder(p_stream, folder_def, p_area, 4)
+		_self.write_feeder_folder(p_stream, folder_def, p_area, 4)
 	_endloop
 
 	p_stream.write("  </Folder>", newline_char)
@@ -659,6 +665,201 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_folder_contents(p_stre
 	_if p_folder_name.index_of_seq("FDT") _isnt _unset
 	_then
 		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "FDT", _unset)
+	_endif
+
+	# Handle JOINT CLOSURE folders
+	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
+	_then
+		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "CLOSURE", _unset)
+	_endif
+
+	# Handle SLACK HANGER folders
+	_if p_folder_name.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		_self.write_figure_eight_for_folder(p_stream, p_area, p_indent, _unset, _unset)
+	_endif
+
+	# Handle CABLE folders
+	_if p_folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    p_folder_name.index_of_seq("BOUNDARY") _is _unset
+	_then
+		_self.write_cable_for_folder(p_stream, p_area, p_indent, _unset, _unset)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_feeder_folder(p_stream, p_folder_def, p_area, p_indent)
+	## Write a folder for feeder - exports objects based on parent folder field
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_indent - Indentation level
+
+	indent << "".fill_up_with(% , p_indent)
+	folder_name << p_folder_def[:name]
+
+	p_stream.write(indent, "<Folder>", newline_char)
+	p_stream.write(indent, "  <name>", folder_name, "</name>", newline_char)
+
+	# Write visibility if specified
+	_if p_folder_def[:visibility] _isnt _unset
+	_then
+		vis_str << _if p_folder_def[:visibility] _then "1" _else "0" _endif
+		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
+	_endif
+
+	# Write folder contents - objects exported based on their parent folder field
+	_self.write_feeder_folder_contents(p_stream, folder_name, p_area, indent + "  ")
+
+	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream, p_folder_name, p_area, p_indent)
+	## Write placemarks for feeder folders
+	## Objects exported based on their parent folder field matching p_folder_name
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_name - Name of current folder
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	# Handle OLT folders
+	_if p_folder_name.index_of_seq("OLT") _isnt _unset
+	_then
+		# Query OLT objects in area
+		all_olts << .gc[:olt].select(
+			predicate.interacts(:location, p_area))
+
+		olt_count << 0
+		_for olt _over all_olts.fast_elements()
+		_loop
+			# Get OLT folders field
+			olt_folders << olt.perform(:folders).default("")
+
+			# Check if OLT's folders field contains this folder name
+			_if olt_folders.index_of_seq(p_folder_name) _isnt _unset
+			_then
+				.object_writer.write_olt(olt, p_stream, p_indent, p_folder_name)
+				olt_count +<< 1
+			_endif
+		_endloop
+
+		_if olt_count > 0
+		_then
+			write("  Wrote ", olt_count, " OLTs to folder: ", p_folder_name)
+		_endif
+	_endif
+
+	# Handle POLE folders (EXISTING POLE or NEW POLE)
+	_if p_folder_name.index_of_seq("POLE") _isnt _unset
+	_then
+		# Query poles in area
+		all_poles << .gc[:pole].select(
+			predicate.interacts(:location, p_area))
+
+		# Determine filtering criteria from folder name
+		is_new_pole? << p_folder_name.index_of_seq("NEW POLE") _isnt _unset
+		is_telkom? << p_folder_name.index_of_seq("TELKOM") _isnt _unset
+		is_emr? << p_folder_name.index_of_seq("EMR") _isnt _unset
+		is_partner? << p_folder_name.index_of_seq("PARTNER") _isnt _unset
+
+		# Extract pole spec if present (e.g., "9-5", "9-4")
+		pole_spec << _unset
+		_for spec _over {"9-5", "9-4"}.fast_elements()
+		_loop
+			_if p_folder_name.index_of_seq(spec) _isnt _unset
+			_then
+				pole_spec << spec
+				_leave
+			_endif
+		_endloop
+
+		# Filter and write poles
+		pole_count << 0
+		_for pole _over all_poles.fast_elements()
+		_loop
+			# Get pole attributes
+			asset_owner << pole.perform(:asset_owner).default("")
+			pole_status << pole.perform(:construction_status).default("")
+			pole_type << pole.perform(:type).default("")
+			pole_folders << pole.perform(:folders).default("")
+
+			# Check if pole matches folder criteria
+			matches? << _true
+
+			# Filter by parent folder - pole must have this folder in its folders field
+			_if pole_folders.index_of_seq(p_folder_name) _is _unset
+			_then
+				matches? << _false
+			_endif
+
+			# Filter by NEW vs EXISTING (construction_status)
+			_if matches? _andif is_new_pole?
+			_then
+				_if pole_status.uppercase <> "PROPOSED"
+				_then
+					matches? << _false
+				_endif
+			_elif matches? _andif _not is_new_pole?
+			_then
+				_if pole_status.uppercase <> "IN SERVICE"
+				_then
+					matches? << _false
+				_endif
+			_endif
+
+			# Filter by owner (TELKOM/EMR/PARTNER)
+			_if matches? _andif is_telkom?
+			_then
+				# TELKOM specific owner check if needed
+				# For now, assume TELKOM means owned
+				_if asset_owner.default("").uppercase <> "OWNED"
+				_then
+					matches? << _false
+				_endif
+			_elif matches? _andif is_emr?
+			_then
+				_if asset_owner.default("").uppercase <> "OWNED"
+				_then
+					matches? << _false
+				_endif
+			_elif matches? _andif is_partner?
+			_then
+				_if asset_owner.default("").uppercase = "OWNED"
+				_then
+					matches? << _false
+				_endif
+			_endif
+
+			# Filter by pole type spec
+			_if matches? _andif pole_spec _isnt _unset
+			_then
+				_if pole_type.index_of_seq(pole_spec) _is _unset
+				_then
+					matches? << _false
+				_endif
+			_endif
+
+			# Write pole if it matches
+			_if matches?
+			_then
+				.object_writer.write_pole(pole, p_stream, p_indent, p_folder_name)
+				pole_count +<< 1
+				.total_pole_count +<< 1
+			_endif
+		_endloop
+
+		_if pole_count > 0
+		_then
+			.pole_statistics[p_folder_name] << pole_count
+			write("  Wrote ", pole_count, " poles to folder: ", p_folder_name)
+		_endif
 	_endif
 
 	# Handle JOINT CLOSURE folders
