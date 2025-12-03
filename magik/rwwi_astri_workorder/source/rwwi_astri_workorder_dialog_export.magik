@@ -213,11 +213,33 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.get_output_file_from_user(default_filename)
-	## Shows file chooser dialog for KMZ output
+	## Returns KMZ output file path in home directory under sw_kml folder
+	## Creates sw_kml directory if it doesn't exist
 
-	output_dir << system.temp_directory_name
+	# Get user home directory
+	home_dir << system.getenv("USERPROFILE")  # Windows
+	_if home_dir _is _unset _orif home_dir = ""
+	_then
+		# Fallback to TEMP if USERPROFILE not available
+		home_dir << system.temp_directory_name
+	_endif
 
-	# Simple file path construction (file chooser not available in SW)
+	# Create sw_kml subdirectory path
+	output_dir << system.pathname_from_components("sw_kml", home_dir)
+
+	# Create directory if it doesn't exist
+	_if _not system.file_exists?(output_dir)
+	_then
+		_try
+			system.mkdir(output_dir)
+			write("Created KML output directory: ", output_dir)
+		_when error
+			write("WARNING: Could not create sw_kml directory, using temp instead")
+			output_dir << system.temp_directory_name
+		_endtry
+	_endif
+
+	# Construct full file path
 	output_file << system.pathname_from_components(default_filename, output_dir)
 
 	>> output_file
