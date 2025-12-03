@@ -296,6 +296,38 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:name, "Fiber Optic Joint Closure Type Dome 288 Core",
 			:material_slot, :material,
 			:spec_id, "Join Closure Dome 288 Core"
+		),
+
+		# Project Management and Support Services
+		"500003890", property_list.new_with(
+			:code, "500003890",
+			:object, "Service",
+			:name, "Tranportasi, Mobilisasi Dan Demobilisasi",
+			:material_slot, :service
+		),
+		"500004774", property_list.new_with(
+			:code, "500004774",
+			:object, "Service",
+			:name, "Pengamanan Perizinan dan K3",
+			:material_slot, :service
+		),
+		"500002108", property_list.new_with(
+			:code, "500002108",
+			:object, "Service",
+			:name, "As Built Drawing A1 (1 set asli + 3 set copy + soft copy), KMZ, BOQ",
+			:material_slot, :service
+		),
+		"500001853", property_list.new_with(
+			:code, "500001853",
+			:object, "Service",
+			:name, "Warehouse",
+			:material_slot, :service
+		),
+		"500003800", property_list.new_with(
+			:code, "500003800",
+			:object, "Service",
+			:name, "Pengamanan Dan Persiapan",
+			:material_slot, :service
 		)
 	),
 	:public
@@ -451,6 +483,9 @@ _method rwwi_astri_boq_generator.generate()
 
 		# Special handling for sling_wire (not in change_set)
 		_self.add_sling_wire_to_result(result)
+
+		# Add fixed service items based on infrastructure type
+		_self.add_fixed_service_items(result)
 
 		write("LOG: BoQ generation complete. Total item types:", result.size)
 
@@ -708,6 +743,46 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
 
 	_when error
 		write("LOG: ERROR querying sling_wire:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_fixed_service_items(result)
+	## Add fixed service items based on infrastructure type
+	## For cluster: Add 500003890, 500004774, 500002108, 500001853 (qty 1 each)
+	## For subfeeder: Add 500003890, 500003800, 500002108, 500001853 (qty 1 each)
+	##
+	## Parameters:
+	##   result - property_list to update with fixed service items
+
+	_try _with errCond
+		write("LOG: Adding fixed service items for infra_type:", .infra_type)
+
+		_if .infra_type = "cluster"
+		_then
+			# Cluster fixed services
+			_self.add_to_boq_result(result, "500003890", 1)  # Tranportasi, Mobilisasi Dan Demobilisasi
+			_self.add_to_boq_result(result, "500004774", 1)  # Pengamanan Perizinan dan K3
+			_self.add_to_boq_result(result, "500002108", 1)  # As Built Drawing A1
+			_self.add_to_boq_result(result, "500001853", 1)  # Warehouse
+			write("LOG: Added 4 fixed cluster service items")
+
+		_elif .infra_type = "subfeeder" _orif .infra_type = "sub feeder"
+		_then
+			# Subfeeder fixed services
+			_self.add_to_boq_result(result, "500003890", 1)  # Tranportasi, Mobilisasi Dan Demobilisasi
+			_self.add_to_boq_result(result, "500003800", 1)  # Pengamanan Dan Persiapan
+			_self.add_to_boq_result(result, "500002108", 1)  # As Built Drawing A1
+			_self.add_to_boq_result(result, "500001853", 1)  # Warehouse
+			write("LOG: Added 4 fixed subfeeder service items")
+
+		_else
+			# No fixed services for feeder or other types
+			write("LOG: No fixed service items for infra_type:", .infra_type)
+		_endif
+
+	_when error
+		write("LOG: ERROR adding fixed service items:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $

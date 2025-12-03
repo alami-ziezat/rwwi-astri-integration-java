@@ -19,30 +19,24 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 	_try _with errCon
 		# Step 0: Parse folders
 		_local folders << pm[:parent].default("")
-		_local fol << _unset
-		_local fsize << 0
-		_local fparent << 0
 
-		_if folders _isnt _unset _andif folders <> ""
+		# Validate folders exist
+		_if folders _is _unset _orif folders = ""
 		_then
-			fol << folders.split_by("|")
-			fsize << fol.size
-			_if fsize > 1
-			_then
-				fparent << fsize - 1
-			_else
-				fparent << fsize
-			_endif
-		_else
 			_return  # No folders - skip
 		_endif
 
+		# Split folders and get sizes
+		_local fol << folders.split_by("|")
+		_local fsize << fol.size
+		_local fparent << _if fsize > 1 _then fsize - 1 _else fsize _endif
+
 		# Step 1: Validate cable folder pattern
-		_if fol[fsize] <> "KABEL" _andif
-		   fol[fsize] <> "CABLE" _andif
-		   fol[fsize] <> "CABEL" _andif
-		   fol[fsize] <> "DISTRIBUTION CABLE" _andif
-		   fol[fsize] <> "SLING WIRE"
+		_local last_folder << fol[fsize]
+		_local valid_cable_folders << {"KABEL", "KABEL FEEDER", "CABLE", "CABEL",
+		                                "DISTRIBUTION CABLE", "SLING WIRE"}
+
+		_if _not valid_cable_folders.includes?(last_folder)
 		_then
 			_return  # Not a cable - skip
 		_endif
