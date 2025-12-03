@@ -31,12 +31,21 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local fsize << fol.size
 		_local fparent << _if fsize > 1 _then fsize - 1 _else fsize _endif
 
-		# Step 1: Validate cable folder pattern
+		# Step 1: Validate cable folder pattern (substring matching)
 		_local last_folder << fol[fsize]
-		_local valid_cable_folders << {"KABEL", "KABEL FEEDER", "CABLE", "CABEL",
-		                                "DISTRIBUTION CABLE", "SLING WIRE"}
+		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "SLING WIRE"}
 
-		_if _not valid_cable_folders.includes?(last_folder)
+		_local is_cable? << _false
+		_for keyword _over valid_cable_keywords.fast_elements()
+		_loop
+			_if last_folder.index_of_seq(keyword) _isnt _unset
+			_then
+				is_cable? << _true
+				_leave
+			_endif
+		_endloop
+
+		_if _not is_cable?
 		_then
 			_return  # Not a cable - skip
 		_endif

@@ -58,6 +58,60 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.get_pole_template_folder_name(p_pole)
+	## Construct the template folder name for a pole based on its attributes
+	## Used to match poles to template folders when folders field doesn't match exactly
+	##
+	## Parameters:
+	##   p_pole - Pole object
+	##
+	## Returns:
+	##   String - Expected template folder name (e.g., "NEW POLE 7-4", "EXISTING POLE EMR 9-5")
+
+	pole_status << p_pole.perform(:construction_status).default("").uppercase
+	asset_owner << p_pole.perform(:asset_owner).default("").uppercase
+	pole_type << p_pole.perform(:type).default("")
+
+	# Determine NEW vs EXISTING
+	_local status_prefix << _if pole_status = "PROPOSED"
+	                        _then >> "NEW POLE"
+	                        _elif pole_status = "IN SERVICE"
+	                        _then >> "EXISTING POLE"
+	                        _else >> _unset
+	                        _endif
+
+	_if status_prefix _is _unset
+	_then
+		_return ""  # Can't determine status
+	_endif
+
+	# Determine owner for EXISTING poles (EMR = OWNED, PARTNER = not OWNED)
+	_local owner_str << ""
+	_if status_prefix = "EXISTING POLE"
+	_then
+		owner_str << _if asset_owner = "OWNED"
+		             _then >> " EMR"
+		             _else >> " PARTNER"
+		             _endif
+	_endif
+
+	# Extract pole spec from type field (look for patterns like "7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5")
+	_local pole_spec << ""
+	_for spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
+	_loop
+		_if pole_type.index_of_seq(spec) _isnt _unset
+		_then
+			pole_spec << " " + spec
+			_leave
+		_endif
+	_endloop
+
+	# Construct folder name: "NEW POLE 7-4" or "EXISTING POLE EMR 9-5"
+	>> status_prefix + owner_str + pole_spec
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
 _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 	## Main export method - exports with automatic network level detection
 	## and infrastructure type filtering
@@ -591,62 +645,11 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_folder_contents(p_stre
 		pole_count << 0
 		_for pole _over all_poles.fast_elements()
 		_loop
-			# Get pole attributes for filtering
-			asset_owner << pole.perform(:asset_owner).default("")
-			pole_status << pole.perform(:construction_status).default("")
-			pole_type << pole.perform(:type).default("")
-			pole_folders << pole.perform(:folders).default("")
+			# Construct template folder name from pole attributes
+			pole_template_folder << _self.get_pole_template_folder_name(pole)
 
-			# Check if pole matches folder criteria
-			matches? << _true
-
-			# Filter by parent folder - pole must have this folder in its folders field
-			_if pole_folders.index_of_seq(p_folder_name) _is _unset
-			_then
-				matches? << _false
-			_endif
-
-			# Filter by NEW vs EXISTING (construction_status)
-			_if matches? _andif is_new_pole?
-			_then
-				_if pole_status.uppercase <> "PROPOSED"
-				_then
-					matches? << _false
-				_endif
-			_elif matches? _andif _not is_new_pole?
-			_then
-				_if pole_status.uppercase <> "IN SERVICE"
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by owner (EMR vs PARTNER)
-			_if matches? _andif is_emr?
-			_then
-				_if asset_owner.default("").uppercase <> "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_elif matches? _andif is_partner?
-			_then
-				_if asset_owner.default("").uppercase = "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by pole type spec
-			_if matches? _andif pole_spec _isnt _unset
-			_then
-				_if pole_type.index_of_seq(pole_spec) _is _unset
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Write pole if it matches
-			_if matches?
+			# Check if constructed folder name matches current template folder
+			_if pole_template_folder = p_folder_name
 			_then
 				.object_writer.write_pole(pole, p_stream, p_indent, p_folder_name)
 				pole_count +<< 1
@@ -783,62 +786,11 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 		pole_count << 0
 		_for pole _over all_poles.fast_elements()
 		_loop
-			# Get pole attributes
-			asset_owner << pole.perform(:asset_owner).default("")
-			pole_status << pole.perform(:construction_status).default("")
-			pole_type << pole.perform(:type).default("")
-			pole_folders << pole.perform(:folders).default("")
+			# Construct template folder name from pole attributes
+			pole_template_folder << _self.get_pole_template_folder_name(pole)
 
-			# Check if pole matches folder criteria
-			matches? << _true
-
-			# Filter by parent folder - pole must have this folder in its folders field
-			_if pole_folders.index_of_seq(p_folder_name) _is _unset
-			_then
-				matches? << _false
-			_endif
-
-			# Filter by NEW vs EXISTING (construction_status)
-			_if matches? _andif is_new_pole?
-			_then
-				_if pole_status.uppercase <> "PROPOSED"
-				_then
-					matches? << _false
-				_endif
-			_elif matches? _andif _not is_new_pole?
-			_then
-				_if pole_status.uppercase <> "IN SERVICE"
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by owner (EMR/PARTNER)
-			_if matches? _andif is_emr?
-			_then
-				_if asset_owner.default("").uppercase <> "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_elif matches? _andif is_partner?
-			_then
-				_if asset_owner.default("").uppercase = "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by pole type spec
-			_if matches? _andif pole_spec _isnt _unset
-			_then
-				_if pole_type.index_of_seq(pole_spec) _is _unset
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Write pole if it matches
-			_if matches?
+			# Check if constructed folder name matches current template folder
+			_if pole_template_folder = p_folder_name
 			_then
 				.object_writer.write_pole(pole, p_stream, p_indent, p_folder_name)
 				pole_count +<< 1
@@ -922,104 +874,15 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		pole_count << 0
 		_for pole _over all_poles.fast_elements()
 		_loop
-			# Get pole attributes for filtering
-			asset_owner << pole.perform(:asset_owner).default("")
-			pole_status << pole.perform(:construction_status).default("")
-			pole_type << pole.perform(:type).default("")  # e.g., "Pole 7-2.5"
-			pole_line_type << pole.perform(:line_type).default("")  # e.g., "A", "B", "C", "D"
+			# Construct template folder name from pole attributes
+			pole_template_folder << _self.get_pole_template_folder_name(pole)
 
-			# DEBUG: Print first 3 poles
-			_if pole_count < 3
-			_then
-			#	write("    Checking pole ID:", pole.id, " Type:", pole_type, " Status:", pole_status, " Owner:", asset_owner, " Line:", pole_line_type)
-			_endif
-
-			# Check if pole matches folder criteria
-			matches? << _true
-
-			# Filter by LINE (A, B, C, D) if we're inside a LINE folder
-			#write("    Current LINE TYPE: ", line_type, " Pole LINE Type: ", pole_line_type)
-			_if line_type _isnt _unset
-			_then
-				_if pole_line_type.uppercase <> line_type.uppercase
-				_then
-					matches? << _false
-					# DEBUG: Show why pole was rejected
-					_if pole_count < 3
-					_then
-			#			write("      REJECTED: pole line_type '", pole_line_type, "' does not match folder LINE '", line_id, "'")
-					_endif
-				_endif
-			_endif
-
-			# Filter by NEW vs EXISTING (construction_status)
-			_if is_new_pole?
-			_then
-				# NEW POLE: construction_status should be "Proposed"
-				_if pole_status.uppercase <> "PROPOSED"
-				_then
-					matches? << _false
-				_endif
-			_else
-				# EXISTING POLE: construction_status should be "In Service"
-				_if pole_status.uppercase <> "IN SERVICE"
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by owner (EMR vs PARTNER)
-			_if is_emr?
-			_then
-				# EMR means asset_owner is "Owned"
-				_if asset_owner.default("").uppercase <> "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_elif is_partner?
-			_then
-				# PARTNER means asset_owner is NOT "Owned"
-				_if asset_owner.default("").uppercase = "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by pole type spec (e.g., "7-2.5" in "Pole 7-2.5")
-			_if pole_spec _isnt _unset
-			_then
-				# Check if pole type contains the spec (e.g., "Pole 7-2.5" contains "7-2.5")
-				_if pole_type.index_of_seq(pole_spec) _is _unset
-				_then
-					matches? << _false
-				_endif
-			_endif
-
-			# Filter by FDT folder if we're inside an FDT_* folder (cluster structure)
-			_if p_parent_fdt_folder _isnt _unset
-			_then
-				# Get pole ring_name
-				pole_ring_name << pole.perform(:ring_name).default("")
-
-				# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
-				_if p_parent_fdt_folder.index_of_seq("FDT_") _isnt _unset
-				_then
-					expected_fdt_name << p_parent_fdt_folder.slice(5, p_parent_fdt_folder.size)
-
-					# Check if ring_name matches FDT name
-					_if pole_ring_name.uppercase <> expected_fdt_name.uppercase
-					_then
-						matches? << _false
-					_endif
-				_endif
-			_endif
-
-			# Write pole if it matches
-			_if matches?
+			# Check if constructed folder name matches current template folder
+			_if pole_template_folder = folder_name
 			_then
 				.object_writer.write_pole(pole, p_stream, p_indent, folder_name)
 				pole_count +<< 1
-				.total_pole_count +<< 1  # Increment total counter
+				.total_pole_count +<< 1
 			_endif
 		_endloop
 
