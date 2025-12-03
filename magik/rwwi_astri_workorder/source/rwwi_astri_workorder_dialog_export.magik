@@ -30,7 +30,29 @@ _method rwwi_astri_workorder_dialog.download_kmz()
 		# astri_download_cluster_kmz(uuid, outputDir)
 		# astri_download_subfeeder_kmz(uuid, outputDir)
 		# astri_download_feeder_kmz(uuid, outputDir)
-		_local output_dir << system.getenv("TEMP").default("C:\temp")
+
+		# Get home directory and create astri_kml subdirectory
+		_local home_dir << system.getenv("USERPROFILE")  # Windows
+		_if home_dir _is _unset _orif home_dir = ""
+		_then
+			# Fallback to TEMP if USERPROFILE not available
+			home_dir << system.getenv("TEMP").default("C:\temp")
+		_endif
+
+		_local output_dir << system.pathname_from_components("astri_kml", home_dir)
+
+		# Create directory if it doesn't exist
+		_if _not system.file_exists?(output_dir)
+		_then
+			_try
+				system.mkdir(output_dir)
+				write("Created ASTRI KML download directory: ", output_dir)
+			_when error
+				write("WARNING: Could not create astri_kml directory, using temp instead")
+				output_dir << system.getenv("TEMP").default("C:\temp")
+			_endtry
+		_endif
+
 		_local infra_type << .filters[:infrastructure_type].default("cluster")
 		write("infra type: ",infra_type)
 		_local xml_result << _if infra_type = "cluster"
