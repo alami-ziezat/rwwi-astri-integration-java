@@ -299,18 +299,25 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 	levels[:fdts] << all_fdts
 	levels[:closures] << all_closures
 
-	# 2. SUBFEEDER: Poles have Joint Closure AND FDT
-	_if has_joint_closure _and has_fdt
-	_then
-		levels[:subfeeder] << _true
-		write("  Detected SUBFEEDER network (has Joint Closures and FDTs on poles)")
-	_endif
-
-	# 3. CLUSTER: Poles have FDT AND FAT
+	# 3. CLUSTER: Poles have FDT AND FAT (check first - highest priority)
 	_if has_fdt _and has_fat
 	_then
 		levels[:cluster] << _true
 		write("  Detected CLUSTER network (", all_fdts.size, " FDTs and FATs on poles)")
+	_endif
+
+	# 2. SUBFEEDER: Poles have Joint Closure (with or without FDT)
+	# Special case: Some subfeeder designs only have Closures, no FDTs
+	# Note: If CLUSTER is already detected, don't set SUBFEEDER (cluster takes precedence)
+	_if has_joint_closure _andif levels[:cluster] _is _false
+	_then
+		levels[:subfeeder] << _true
+		_if has_fdt
+		_then
+			write("  Detected SUBFEEDER network (has Joint Closures and FDTs on poles)")
+		_else
+			write("  Detected SUBFEEDER network (has Joint Closures only, no FDTs)")
+		_endif
 	_endif
 
 	>> levels
