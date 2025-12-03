@@ -80,19 +80,24 @@ $
 
 _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_folder_builder.build_subfeeder_folders()
-	## Build SUBFEEDER CODE folder structure (14 folders)
+	## Build SUBFEEDER CODE folder structure (16 folders)
 	##
 	## Returns:
 	##   rope of property_lists - Folder definitions
 
 	folder_defs << rope.new()
 
-	# 1. JOINT CLOSURE (at top for subfeeder)
+	# 1. FDT (at top for subfeeder)
+	folder_defs.add(property_list.new_with(
+		:name, "FDT",
+		:visibility, _false))
+
+	# 2. JOINT CLOSURE
 	folder_defs.add(property_list.new_with(
 		:name, "JOINT CLOSURE",
 		:visibility, _false))
 
-	# 2-9. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-4)
+	# 3-10. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-4)
 	_for owner _over {"EMR", "PARTNER"}.fast_elements()
 	_loop
 		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-4"}.fast_elements()

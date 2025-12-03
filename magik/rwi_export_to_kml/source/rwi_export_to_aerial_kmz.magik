@@ -655,6 +655,12 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_folder_contents(p_stre
 		_endif
 	_endif
 
+	# Handle FDT folders
+	_if p_folder_name.index_of_seq("FDT") _isnt _unset
+	_then
+		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "FDT", _unset)
+	_endif
+
 	# Handle JOINT CLOSURE folders
 	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
 	_then
