@@ -863,7 +863,7 @@ _method rwi_aerial_kmz_object_writer.write_olt(p_olt, p_stream, p_indent, p_fold
 
 	# Get OLT attributes
 	olt_name << p_olt.perform(:name).default("OLT")
-	olt_id << p_olt.perform(:identification).default("")
+	olt_id << p_olt.id.write_string  # Use object ID instead of identification field
 	olt_type << p_olt.perform(:type).default("")
 	olt_location << p_olt.location
 
@@ -875,7 +875,7 @@ _method rwi_aerial_kmz_object_writer.write_olt(p_olt, p_stream, p_indent, p_fold
 	# Build description
 	description << write_string(
 		"Name: ", olt_name, %newline,
-		"ID: ", olt_id, %newline,
+		"Object ID: ", olt_id, %newline,
 		"Type: ", olt_type)
 
 	# Determine style based on folder name

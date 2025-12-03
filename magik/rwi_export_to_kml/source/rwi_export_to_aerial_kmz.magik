@@ -733,7 +733,7 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 	_if p_folder_name.index_of_seq("OLT") _isnt _unset
 	_then
 		# Query OLT objects in area
-		all_olts << .gc[:olt].select(
+		all_olts << .gc[:mit_hub].select(
 			predicate.interacts(:location, p_area))
 
 		olt_count << 0
