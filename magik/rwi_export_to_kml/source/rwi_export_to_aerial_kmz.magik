@@ -142,8 +142,21 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 			levels[:subfeeder] << _false
 		_elif .infrastructure_type _is :feeder
 		_then
-			levels[:subfeeder] << _false
-			levels[:cluster] << _false
+			# Special case: If feeder work order has FDTs+Closures (subfeeder network),
+			# export as subfeeder but keep feeder flag for folder naming
+			_if levels[:subfeeder] _is _true
+			_then
+				write("  Special case: Feeder work order with subfeeder network detected")
+				write("  Will export as SUBFEEDER structure using FEEDER CODE as parent folder")
+				# Keep both feeder (for folder naming) and subfeeder (for structure)
+				levels[:feeder] << _true
+				levels[:subfeeder] << _true
+				levels[:cluster] << _false
+			_else
+				# Normal feeder - no subfeeder network
+				levels[:subfeeder] << _false
+				levels[:cluster] << _false
+			_endif
 		_elif .infrastructure_type _is :subfeeder
 		_then
 			levels[:feeder] << _false
@@ -362,22 +375,31 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	_endloop
 
 	# Write network level folders
-	_if p_levels[:feeder]
+	# Special case: If both feeder and subfeeder flags are true,
+	# it means feeder work order has subfeeder network - export only subfeeder structure
+	_if p_levels[:feeder] _and p_levels[:subfeeder]
 	_then
-		write("Exporting FEEDER network...")
-		_self.write_feeder_section(kml_stream, p_area)
-	_endif
-
-	_if p_levels[:subfeeder]
-	_then
-		write("Exporting SUBFEEDER network...")
+		write("Exporting SUBFEEDER network structure with FEEDER CODE...")
 		_self.write_subfeeder_section(kml_stream, p_area, p_levels[:closures])
-	_endif
+	_else
+		# Normal cases - export each level independently
+		_if p_levels[:feeder]
+		_then
+			write("Exporting FEEDER network...")
+			_self.write_feeder_section(kml_stream, p_area)
+		_endif
 
-	_if p_levels[:cluster]
-	_then
-		write("Exporting CLUSTER network...")
-		_self.write_cluster_section(kml_stream, p_area, p_levels[:fdts])
+		_if p_levels[:subfeeder]
+		_then
+			write("Exporting SUBFEEDER network...")
+			_self.write_subfeeder_section(kml_stream, p_area, p_levels[:closures])
+		_endif
+
+		_if p_levels[:cluster]
+		_then
+			write("Exporting CLUSTER network...")
+			_self.write_cluster_section(kml_stream, p_area, p_levels[:fdts])
+		_endif
 	_endif
 
 	# Write KML footer
