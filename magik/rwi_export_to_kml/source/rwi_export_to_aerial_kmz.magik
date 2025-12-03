@@ -769,9 +769,9 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 		is_emr? << p_folder_name.index_of_seq("EMR") _isnt _unset
 		is_partner? << p_folder_name.index_of_seq("PARTNER") _isnt _unset
 
-		# Extract pole spec if present (e.g., "9-5", "9-4")
+		# Extract pole spec if present (e.g., "7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5")
 		pole_spec << _unset
-		_for spec _over {"9-5", "9-4"}.fast_elements()
+		_for spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 		_loop
 			_if p_folder_name.index_of_seq(spec) _isnt _unset
 			_then

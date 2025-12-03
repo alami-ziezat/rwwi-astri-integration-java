@@ -23,7 +23,7 @@ $
 
 _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_folder_builder.build_feeder_folders()
-	## Build FEEDER CODE folder structure (15 folders)
+	## Build FEEDER CODE folder structure with all pole types from subfeeder and cluster
 	##
 	## Returns:
 	##   rope of property_lists - Folder definitions
@@ -35,10 +35,10 @@ _method rwi_aerial_kmz_folder_builder.build_feeder_folders()
 		:name, "OLT",
 		:visibility, _false))
 
-	# 2-9. EXISTING POLE variations (TELKOM, EMR, PARTNER) x (9-5, 9-4)
+	# 2-19. EXISTING POLE variations (TELKOM, EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-3, 9-4, 9-5)
 	_for owner _over {"TELKOM", "EMR", "PARTNER"}.fast_elements()
 	_loop
-		_for pole_spec _over {"9-5", "9-4"}.fast_elements()
+		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 		_loop
 			folder_defs.add(property_list.new_with(
 				:name, write_string("EXISTING POLE ", owner, " ", pole_spec),
@@ -46,30 +46,30 @@ _method rwi_aerial_kmz_folder_builder.build_feeder_folders()
 		_endloop
 	_endloop
 
-	# 10-11. NEW POLE (9-5, 9-4)
-	_for pole_spec _over {"9-5", "9-4"}.fast_elements()
+	# 20-25. NEW POLE (7-2.5, 7-3, 7-4, 9-3, 9-4, 9-5)
+	_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 	_loop
 		folder_defs.add(property_list.new_with(
 			:name, write_string("NEW POLE ", pole_spec),
 			:visibility, _false))
 	_endloop
 
-	# 12. JOINT CLOSURE
+	# 26. JOINT CLOSURE
 	folder_defs.add(property_list.new_with(
 		:name, "JOINT CLOSURE",
 		:visibility, _false))
 
-	# 13. SLACK HANGER
+	# 27. SLACK HANGER
 	folder_defs.add(property_list.new_with(
 		:name, "SLACK HANGER",
 		:visibility, _false))
 
-	# 14. HANDHOLE 80X80X130
+	# 28. HANDHOLE 80X80X130
 	folder_defs.add(property_list.new_with(
 		:name, "HANDHOLE 80X80X130",
 		:visibility, _false))
 
-	# 15. CABLE
+	# 29. CABLE
 	folder_defs.add(property_list.new_with(
 		:name, "CABLE",
 		:visibility, _false))
