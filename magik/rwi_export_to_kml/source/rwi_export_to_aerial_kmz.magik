@@ -767,70 +767,23 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents_with_closure(p_s
 	# Handle JOINT CLOSURE folders
 	_if folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
 	_then
-		# Query closures in area
-		all_closures << .gc[:sheath_splice].select(
-			predicate.interacts(:location, p_area))
-
-		closure_count << 0
-		_for splice _over all_closures.fast_elements()
-		_loop
-			splice_type << splice.sheath_splice_object_type
-			_if splice_type _isnt _unset _andif
-			    (splice_type.lowercase = "join closure" _or splice_type.lowercase = "closure")
-			_then
-				# Write closure
-				.object_writer.write_closure(splice, p_stream, p_indent, folder_name)
-				closure_count +<< 1
-				.total_closure_count +<< 1
-			_endif
-		_endloop
-
-		_if closure_count > 0
-		_then
-			write("  Wrote ", closure_count, " closures to folder: ", folder_name)
-		_endif
+		# Write closures using the standard method
+		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "CLOSURE", _unset)
 	_endif
 
-	# Handle SLACK HANGER folders
+	# Handle SLACK HANGER folders - export figure_eight equipment
 	_if folder_name.index_of_seq("SLACK HANGER") _isnt _unset
 	_then
-		# Query slack hangers in area
-		all_slack_hangers << .gc[:slack_hanger].select(
-			predicate.interacts(:location, p_area))
-
-		slack_hanger_count << 0
-		_for slack_hanger _over all_slack_hangers.fast_elements()
-		_loop
-			.object_writer.write_slack_hanger(slack_hanger, p_stream, p_indent, folder_name)
-			slack_hanger_count +<< 1
-			.total_slack_hanger_count +<< 1
-		_endloop
-
-		_if slack_hanger_count > 0
-		_then
-			write("  Wrote ", slack_hanger_count, " slack hangers to folder: ", folder_name)
-		_endif
+		# For subfeeder, don't filter by line_id/fdt_folder
+		_self.write_figure_eight_for_folder(p_stream, p_area, p_indent, _unset, _unset)
 	_endif
 
-	# Handle CABLE folders
-	_if folder_name.index_of_seq("CABLE") _isnt _unset
+	# Handle CABLE folders - export sheath_with_loc chains from poles
+	_if folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY folders
 	_then
-		# Query cables in area
-		all_cables << .gc[:cable].select(
-			predicate.interacts(:centre_line, p_area))
-
-		cable_count << 0
-		_for cable _over all_cables.fast_elements()
-		_loop
-			.object_writer.write_cable(cable, p_stream, p_indent, folder_name)
-			cable_count +<< 1
-			.total_cable_count +<< 1
-		_endloop
-
-		_if cable_count > 0
-		_then
-			write("  Wrote ", cable_count, " cables to folder: ", folder_name)
-		_endif
+		# For subfeeder, don't filter by line_id/fdt_folder
+		_self.write_cable_for_folder(p_stream, p_area, p_indent, _unset, _unset)
 	_endif
 _endmethod
 $
