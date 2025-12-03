@@ -774,8 +774,9 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents_with_closure(p_s
 		closure_count << 0
 		_for splice _over all_closures.fast_elements()
 		_loop
-			splice_type << splice.perform(:type).default("")
-			_if splice_type.lowercase = "join closure" _or splice_type.lowercase = "closure"
+			splice_type << splice.sheath_splice_object_type
+			_if splice_type _isnt _unset _andif
+			    (splice_type.lowercase = "join closure" _or splice_type.lowercase = "closure")
 			_then
 				# Write closure
 				.object_writer.write_closure(splice, p_stream, p_indent, folder_name)
