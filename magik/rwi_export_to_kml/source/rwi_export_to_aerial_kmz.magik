@@ -765,7 +765,6 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 
 		# Determine filtering criteria from folder name
 		is_new_pole? << p_folder_name.index_of_seq("NEW POLE") _isnt _unset
-		is_telkom? << p_folder_name.index_of_seq("TELKOM") _isnt _unset
 		is_emr? << p_folder_name.index_of_seq("EMR") _isnt _unset
 		is_partner? << p_folder_name.index_of_seq("PARTNER") _isnt _unset
 
@@ -814,16 +813,8 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 				_endif
 			_endif
 
-			# Filter by owner (TELKOM/EMR/PARTNER)
-			_if matches? _andif is_telkom?
-			_then
-				# TELKOM specific owner check if needed
-				# For now, assume TELKOM means owned
-				_if asset_owner.default("").uppercase <> "OWNED"
-				_then
-					matches? << _false
-				_endif
-			_elif matches? _andif is_emr?
+			# Filter by owner (EMR/PARTNER)
+			_if matches? _andif is_emr?
 			_then
 				_if asset_owner.default("").uppercase <> "OWNED"
 				_then

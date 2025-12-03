@@ -23,7 +23,8 @@ $
 
 _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_folder_builder.build_feeder_folders()
-	## Build FEEDER CODE folder structure with all pole types from subfeeder and cluster
+	## Build FEEDER CODE folder structure (23 folders)
+	## All pole types from subfeeder and cluster (EMR and PARTNER only)
 	##
 	## Returns:
 	##   rope of property_lists - Folder definitions
@@ -35,8 +36,8 @@ _method rwi_aerial_kmz_folder_builder.build_feeder_folders()
 		:name, "OLT",
 		:visibility, _false))
 
-	# 2-19. EXISTING POLE variations (TELKOM, EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-3, 9-4, 9-5)
-	_for owner _over {"TELKOM", "EMR", "PARTNER"}.fast_elements()
+	# 2-13. EXISTING POLE variations (EMR, PARTNER) x (7-2.5, 7-3, 7-4, 9-3, 9-4, 9-5)
+	_for owner _over {"EMR", "PARTNER"}.fast_elements()
 	_loop
 		_for pole_spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 		_loop
