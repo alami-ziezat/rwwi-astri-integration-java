@@ -173,7 +173,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		total_closures << export_result[:total_closures]
 		total_slack_hangers << export_result[:total_slack_hangers]
 		total_sling_wires << export_result[:total_sling_wires]
-		total_cables << export_result[:total_cables]
+		total_cable_length << export_result[:total_cable_length].default(0.0)
 
 		# Display statistics in UI text window
 		_self.log_info("")
@@ -209,7 +209,10 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_self.log_info(write_string("  CLOSURE: ", total_closures))
 		_self.log_info(write_string("  SLACK HANGER: ", total_slack_hangers))
 		_self.log_info(write_string("  SLING WIRE: ", total_sling_wires))
-		_self.log_info(write_string("  CABLE: ", total_cables))
+		_self.log_info("-"*60)
+		_self.log_info("CABLE EXPORT SUMMARY:")
+		_self.log_info("-"*60)
+		_self.log_info(write_string("  TOTAL CABLE LENGTH: ", total_cable_length.rounded, " meters"))
 		_self.log_info("-"*60)
 		_self.log_info("HOME PASS EXPORT SUMMARY:")
 		_self.log_info("-"*60)
@@ -225,6 +228,20 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_self.show_message("Export Complete",
 			write_string("Created: ", output_path))
 		_self.log_info(write_string("Export completed: ", output_path))
+
+		# Auto-open KML file in default application (Google Earth, etc.)
+		_try
+			_self.log_info("Opening KML file in default application...")
+			# Use start command to open file with default application
+			# The empty quotes after start are for the window title (required when path has spaces)
+			command << write_string("cmd /c start ", %", %", " ", %", output_path, %")
+			write("Opening KML with command: ", command)
+			system.do_command(command)
+			_self.log_info("KML file opened successfully")
+		_when error
+			write("WARNING: Could not auto-open KML file: ", condition.report_contents_string)
+			_self.log_info("Note: Could not auto-open KML file automatically")
+		_endtry
 
 	_when error
 		_self.show_alert("Export Failed", errCond.report_contents_string)

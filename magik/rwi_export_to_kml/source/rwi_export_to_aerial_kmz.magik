@@ -30,7 +30,7 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:total_closure_count, _unset, :writable},   # Total CLOSUREs exported
 	{:total_slack_hanger_count, _unset, :writable},  # Total SLACK HANGERs exported
 	{:total_sling_wire_count, _unset, :writable},    # Total SLING WIREs exported
-	{:total_cable_count, _unset, :writable},         # Total CABLEs exported
+	{:total_cable_length, _unset, :writable},        # Total cable length exported (meters)
 	{:total_hp_count, _unset, :writable},            # Total HOME PASS (demand points) exported
 	{:total_cell_count, _unset, :writable}           # Total CELLs (ftth!zone) exported
 }, :object)
@@ -187,7 +187,7 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 		:total_closures, .total_closure_count,
 		:total_slack_hangers, .total_slack_hanger_count,
 		:total_sling_wires, .total_sling_wire_count,
-		:total_cables, .total_cable_count,
+		:total_cable_length, .total_cable_length,
 		:total_home_pass, .total_hp_count,
 		:total_cells, .total_cell_count,
 		:project_name, .project_name,
@@ -336,7 +336,7 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	.total_closure_count << 0
 	.total_slack_hanger_count << 0
 	.total_sling_wire_count << 0
-	.total_cable_count << 0
+	.total_cable_length << 0.0
 	.total_hp_count << 0
 	.total_cell_count << 0
 
@@ -467,6 +467,12 @@ _private _method rwi_export_to_aerial_kmz.print_export_statistics()
 	write("  FAT: ", .total_fat_count)
 	write("  FDT: ", .total_fdt_count)
 	write("  CLOSURE: ", .total_closure_count)
+	write("  SLACK HANGER: ", .total_slack_hanger_count)
+	write("  SLING WIRE: ", .total_sling_wire_count)
+	write("-"*60)
+	write("CABLE EXPORT SUMMARY:")
+	write("-"*60)
+	write("  TOTAL CABLE LENGTH: ", .total_cable_length.rounded, " meters")
 	write("="*60)
 _endmethod
 $
@@ -1484,8 +1490,9 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 	_endloop
 
 	# Step 4: Merge sectors for each cable name and export
-	# Cable count is based on unique cable names (after merging)
+	# Calculate total cable length using calculated_fiber_length field
 	cable_count << cables_by_name.size
+	cable_length_sum << 0.0
 
 	_for cable_name, cable_data _over cables_by_name.fast_keys_and_elements()
 	_loop
@@ -1495,16 +1502,28 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 		# Merge sectors that connect (last coord of one = first coord of next)
 		merged_sectors << _self.merge_cable_sectors(sector_list)
 
+		# Get cable length from calculated_fiber_length field
+		cable_length << cable.calculated_fiber_length
+		_if cable_length _isnt _unset
+		_then
+			length_value << cable_length.value
+			_if length_value _isnt _unset
+			_then
+				cable_length_sum +<< length_value
+				write("    Cable length: ", length_value.rounded, " meters")
+			_endif
+		_endif
+
 		# Write the cable using merged sectors
 		.object_writer.write_cable(cable, merged_sectors, p_stream, p_indent)
 	_endloop
 
-	# Update total cable count (based on unique cable names)
-	.total_cable_count +<< cable_count
+	# Update total cable length
+	.total_cable_length +<< cable_length_sum
 
 	_if cable_count > 0
 	_then
-		write("  Wrote ", cable_count, " CABLE chains (merged by name)")
+		write("  Wrote ", cable_count, " CABLE chains (total length: ", cable_length_sum.rounded, " meters)")
 	_endif
 _endmethod
 $
