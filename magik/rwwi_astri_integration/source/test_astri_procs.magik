@@ -27,10 +27,10 @@ $
 ##                         _optional label, _optional sap_vendor_code) - Get vendor list
 ##
 ## BOQ DRM API:
-## - astri_add_boq_drm_cluster(cluster_code, vendor_name, subcont_vendor_name, equipment_name,
-##                             description, quantity_material, quantity_service, remarks, phase,
-##                             area, area_plant_code, override_price_material,
-##                             override_price_service) - Add BOQ DRM cluster
+## - astri_add_boq_drm(infra_type, infra_type_code, vendor_name, subcont_vendor_name,
+##                     equipment_name, description, quantity_material, quantity_service,
+##                     remarks, phase, area, area_plant_code, override_price_material,
+##                     override_price_service) - Add BOQ DRM (supports cluster, subfeeder, feeder)
 ##
 ## OLT Rollout API:
 ## - astri_get_olt_list(limit, offset, _optional device_code, _optional name,
@@ -367,16 +367,17 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_add_boq_drm << _proc()
-	## Test Add BOQ DRM Cluster API
+	## Test Add BOQ DRM API (supports cluster, subfeeder, feeder)
 
 	write("=" * 60)
-	write("Testing ASTRI Add BOQ DRM Cluster API")
+	write("Testing ASTRI Add BOQ DRM API")
 	write("=" * 60)
 
 	_try
 		# Call the @MagikProc with test data
-		json_result << astri_add_boq_drm_cluster(
-			"TEST-CLUSTER-001",      # cluster_code
+		json_result << astri_add_boq_drm(
+			"cluster",               # infra_type ("cluster", "subfeeder", "feeder")
+			"TEST-CLUSTER-001",      # infra_type_code
 			"PT Test Vendor",        # vendor_name
 			"PT Subcont Vendor",     # subcont_vendor_name
 			"Test Equipment",        # equipment_name

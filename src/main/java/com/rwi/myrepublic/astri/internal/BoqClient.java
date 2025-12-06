@@ -33,21 +33,39 @@ public class BoqClient {
     }
 
     /**
-     * Add BOQ DRM Cluster.
+     * Add BOQ DRM for any infrastructure type (cluster, subfeeder, feeder).
      * Accepts nullable Double values to support Magik _unset values and decimal quantities.
+     *
+     * @param infraType The infrastructure type: "cluster", "subfeeder", or "feeder"
+     * @param infraTypeCode The infrastructure code value
      */
-    public String addBoqDrmCluster(String clusterCode, String vendorName, String subcontVendorName,
-                                   String equipmentName, String description, Double quantityMaterial,
-                                   Double quantityService, String remarks, String phase, String area,
-                                   String areaPlantCode, Double overridePriceMaterial,
-                                   Double overridePriceService) throws IOException, InterruptedException {
+    public String addBoqDrm(String infraType, String infraTypeCode, String vendorName, String subcontVendorName,
+                            String equipmentName, String description, Double quantityMaterial,
+                            Double quantityService, String remarks, String phase, String area,
+                            String areaPlantCode, Double overridePriceMaterial,
+                            Double overridePriceService) throws IOException, InterruptedException {
         String baseUrl = config.getApiBaseUrl();
-        String path = "/osp/cluster/boq/add";
+        String path;
+        String codeFieldName;
+
+        // Route to correct endpoint based on infrastructure type
+        if (infraType != null && infraType.equalsIgnoreCase("subfeeder")) {
+            path = "/osp/cluster/boq/add/subfeeder";
+            codeFieldName = "subfeeder_code";
+        } else if (infraType != null && infraType.equalsIgnoreCase("feeder")) {
+            path = "/osp/cluster/boq/add/feeder";
+            codeFieldName = "feeder_code";
+        } else {
+            // Default to cluster
+            path = "/osp/cluster/boq/add";
+            codeFieldName = "cluster_code";
+        }
+
         String url = baseUrl + path;
 
-        // Build JSON request body
+        // Build JSON request body with appropriate field name
         String jsonBody = buildJsonBody(
-            clusterCode, vendorName, subcontVendorName, equipmentName, description,
+            codeFieldName, infraTypeCode, vendorName, subcontVendorName, equipmentName, description,
             quantityMaterial, quantityService, remarks, phase, area, areaPlantCode,
             overridePriceMaterial, overridePriceService
         );
@@ -69,14 +87,14 @@ public class BoqClient {
         return jsonResponse;
     }
 
-    private String buildJsonBody(String clusterCode, String vendorName, String subcontVendorName,
+    private String buildJsonBody(String codeFieldName, String codeValue, String vendorName, String subcontVendorName,
                                   String equipmentName, String description, Double quantityMaterial,
                                   Double quantityService, String remarks, String phase, String area,
                                   String areaPlantCode, Double overridePriceMaterial,
                                   Double overridePriceService) {
         StringBuilder json = new StringBuilder();
         json.append("{");
-        appendJsonField(json, "cluster_code", clusterCode, true);
+        appendJsonField(json, codeFieldName, codeValue, true);
         appendJsonField(json, "vendor_name", vendorName, true);
         appendJsonField(json, "subcont_vendor_name", subcontVendorName, true);
         appendJsonField(json, "equipment_name", equipmentName, true);

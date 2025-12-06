@@ -12,16 +12,17 @@ import com.rwi.myrepublic.astri.internal.BoqClient;
 public class AstriBoqProcs {
 
     /**
-     * Add BOQ DRM Cluster to ASTRI API.
+     * Add BOQ DRM to ASTRI API (supports cluster, subfeeder, and feeder).
      *
-     * Creates global Magik procedure: astri_add_boq_drm_cluster(cluster_code, vendor_name,
-     *                                   subcont_vendor_name, equipment_name, description,
+     * Creates global Magik procedure: astri_add_boq_drm(infra_type, infra_type_code,
+     *                                   vendor_name, subcont_vendor_name, equipment_name, description,
      *                                   quantity_material, quantity_service, remarks,
      *                                   phase, area, area_plant_code, override_price_material,
      *                                   override_price_service)
      *
      * @param proc The Magik proc object
-     * @param clusterCode Cluster code (Magik string)
+     * @param infraType Infrastructure type: "cluster", "subfeeder", or "feeder" (Magik string)
+     * @param infraTypeCode Infrastructure type code (cluster_code/subfeeder_code/feeder_code) (Magik string)
      * @param vendorName Vendor name (Magik string)
      * @param subcontVendorName Subcontractor vendor name (Magik string)
      * @param equipmentName Equipment name (Magik string)
@@ -36,9 +37,10 @@ public class AstriBoqProcs {
      * @param overridePriceService Override price for service (Magik number - integer or float)
      * @return String - JSON response with {"success":true/false, "error":"..."} format
      */
-    @MagikProc(@Name("astri_add_boq_drm_cluster"))
-    public static Object addBoqDrmCluster(Object proc,
-                                          Object clusterCode,
+    @MagikProc(@Name("astri_add_boq_drm"))
+    public static Object addBoqDrm(Object proc,
+                                          Object infraType,
+                                          Object infraTypeCode,
                                           Object vendorName,
                                           Object subcontVendorName,
                                           Object equipmentName,
@@ -51,26 +53,12 @@ public class AstriBoqProcs {
                                           Object areaPlantCode,
                                           Object overridePriceMaterial,
                                           Object overridePriceService) {
-        System.out.println("=== DEBUG: astri_add_boq_drm_cluster called ===");
-        /*System.out.println("Parameters received: "+
-              "clusterCode="+ clusterCode +
-              ", vendorName="+ vendorName +
-              ", subcontVendorName="+ subcontVendorName +
-              ", equipmentName="+ equipmentName +
-              ", description="+ description +
-              ", quantityMaterial="+ quantityMaterial +
-              ", quantityService="+ quantityService +
-              ", remarks="+ remarks +
-              ", phase="+ phase +
-              ", area="+ area +
-              ", areaPlantCode="+ areaPlantCode +
-              ", overridePriceMaterial="+ overridePriceMaterial +
-              ", overridePriceService="+ overridePriceService);
-        */
+        System.out.println("=== DEBUG: astri_add_boq_drm called ===");
         BoqClient client = null;
         try {
             // Handle _unset (null) values from Magik
-            String clusterCodeStr = (clusterCode == null) ? null : MagikInteropUtils.fromMagikString(clusterCode);
+            String infraTypeStr = (infraType == null) ? "cluster" : MagikInteropUtils.fromMagikString(infraType);
+            String infraTypeCodeStr = (infraTypeCode == null) ? null : MagikInteropUtils.fromMagikString(infraTypeCode);
             String vendorNameStr = (vendorName == null) ? null : MagikInteropUtils.fromMagikString(vendorName);
             String subcontVendorNameStr = (subcontVendorName == null) ? null : MagikInteropUtils.fromMagikString(subcontVendorName);
             String equipmentNameStr = (equipmentName == null) ? null : MagikInteropUtils.fromMagikString(equipmentName);
@@ -88,25 +76,25 @@ public class AstriBoqProcs {
             String areaStr = (area == null) ? null : MagikInteropUtils.fromMagikString(area);
             String areaPlantCodeStr = (areaPlantCode == null) ? null : MagikInteropUtils.fromMagikString(areaPlantCode);
 
-            System.out.println("Parameters: cluster_code=" + clusterCodeStr +
+            System.out.println("Parameters: infra_type=" + infraTypeStr + ", infra_type_code=" + infraTypeCodeStr +
                              ", vendor=" + vendorNameStr + ", equipment=" + equipmentNameStr);
             System.out.println("Quantities: material=" + quantityMaterialDbl + ", service=" + quantityServiceDbl);
 
             client = new BoqClient();
-            String jsonResponse = client.addBoqDrmCluster(
-                clusterCodeStr, vendorNameStr, subcontVendorNameStr, equipmentNameStr,
+            String jsonResponse = client.addBoqDrm(
+                infraTypeStr, infraTypeCodeStr, vendorNameStr, subcontVendorNameStr, equipmentNameStr,
                 descriptionStr, quantityMaterialDbl, quantityServiceDbl, remarksStr,
                 phaseStr, areaStr, areaPlantCodeStr, overridePriceMaterialDbl, overridePriceServiceDbl
             );
 
-            System.out.println("=== DEBUG: BOQ DRM Cluster added successfully ===");
+            System.out.println("=== DEBUG: BOQ DRM added successfully ===");
 
             // Convert Java String to Magik string
             Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
             return magikString;
 
         } catch (Exception e) {
-            System.err.println("=== DEBUG: ERROR in addBoqDrmCluster ===");
+            System.err.println("=== DEBUG: ERROR in addBoqDrm ===");
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
 
@@ -121,7 +109,7 @@ public class AstriBoqProcs {
                     System.err.println("Error closing client: " + e.getMessage());
                 }
             }
-            System.out.println("=== DEBUG: astri_add_boq_drm_cluster completed ===");
+            System.out.println("=== DEBUG: astri_add_boq_drm completed ===");
         }
     }
 
@@ -154,6 +142,7 @@ public class AstriBoqProcs {
             }
         }
     }
+
 
     /**
      * Escape special characters in JSON strings.

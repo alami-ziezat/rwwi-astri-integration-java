@@ -164,17 +164,17 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 		_self.log_info("  Total BOQ items: " + boq_result.size.write_string)
 		_self.log_info("")
 
-		# Send BOQ data to ASTRI API (only for cluster infrastructure type)
+		# Send BOQ data to ASTRI API (supports cluster, subfeeder, and feeder)
 		_local api_success_count << 0
 		_local api_error_count << 0
 		_local api_skipped_count << 0
 		_local success_items << rope.new()  # Track successful items
 		_local failed_items << rope.new()   # Track failed items with error details
 
-		_if infra_type = "cluster" _andif boq_result _isnt _unset _andif boq_result.size > 0
+		_if boq_result _isnt _unset _andif boq_result.size > 0
 		_then
 			_self.log_info("Step 5: Sending BOQ items to ASTRI API...")
-			_self.log_info("  Infrastructure type is 'cluster' - API submission enabled")
+			_self.log_info("  Infrastructure type: '" + infra_type + "' - API submission enabled")
 			_self.log_info("  Processing " + boq_result.size.write_string + " BOQ items...")
 			_self.log_info("")
 			write("Sending BOQ items to ASTRI API...")
@@ -187,11 +187,12 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				_local qty_service << item[:quantity_service]
 
 				_try _with apiErrCond
-					# Call astri_add_boq_drm_cluster Java procedure
+					# Call astri_add_boq_drm Java procedure (supports cluster, subfeeder, feeder)
 					write("Sending BOQ item:", equipment_name)
 
-					_local json_response << astri_add_boq_drm_cluster(
-						infra_code,                                    # cluster_code
+					_local json_response << astri_add_boq_drm(
+						infra_type,                                    # infra_type ("cluster", "subfeeder", "feeder")
+						infra_code,                                    # infra_type_code
 						item[:vendor_name].default(""),                # vendor_name
 						item[:subcont_vendor_name].default(""),        # subcont_vendor_name
 						equipment_name,                                # equipment_name
