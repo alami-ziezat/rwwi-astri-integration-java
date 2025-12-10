@@ -429,11 +429,12 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		_loop
 			row +<< 1
 			_local wo_number << wo[:wo_number].default("")
+			_local infra_code << wo[:infra_code].default("")
 
 			# Add cells to table
 			.items[:table].add_label(row, 1, row.write_string)
 			.items[:table].add_label(row, 2, wo_number)
-			.items[:table].add_label(row, 3, wo[:infra_code].default(""))
+			.items[:table].add_label(row, 3, infra_code)
 			.items[:table].add_label(row, 4, wo[:infra_name].default(""))
 			.items[:table].add_label(row, 5, wo[:category].default(""))
 			.items[:table].add_label(row, 6, wo[:status].default(""))
@@ -445,9 +446,9 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			.items[:table].add_label(row, 12, wo[:kmz_uuid].default(""))
 			.items[:table].add_label(row, 13, wo[:kmz_source].default(""))
 
-			# Store work order data in cache by WO number (unique identifier)
+			# Store work order data in cache by infra_code as symbol (unique identifier)
 			# This ensures correct lookup even after table sorting
-			.wo_cache[wo_number] << wo
+			.wo_cache[infra_code.as_symbol()] << wo
 		_endloop
 
 		# Update record count
@@ -610,16 +611,20 @@ _method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
 	# Get selected row (visual row number after sorting)
 	_local selected_row << selection.an_element()
 
-	# Get WO number from column 2 of selected row
-	# This works correctly even after sorting because we're reading the actual cell value
-	_local wo_number << table.cell_value_at(selected_row, 2)
+	# Get infra_code from column 3 of selected row
+	# cell() returns the label item, so we need to get its value
+	_local infra_code_item << table.cell(selected_row, 3)
+	_local infra_code << infra_code_item.value
 
-	# Look up work order data by WO number (unique identifier)
-	_local wo << .wo_cache[wo_number]
+	# Convert to symbol for cache lookup
+	_local cache_key << infra_code.as_symbol()
+
+	# Look up work order data by infra_code symbol (unique identifier)
+	_local wo << .wo_cache[cache_key]
 
 	_if wo _is _unset
 	_then
-		write("WARNING: Work order not found in cache for WO number:", wo_number)
+		write("WARNING: Work order not found in cache for infra_code:", infra_code, " (key:", cache_key, ")")
 		.selected_wo << _unset
 		_self.update_detail_panel(_unset)
 		_return
