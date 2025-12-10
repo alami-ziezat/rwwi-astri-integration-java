@@ -603,8 +603,16 @@ _method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
 		_self.update_detail_panel(_unset)
 		_return
 	_endif
-	_local selected_row << selection.an_element()
-	_local wo << .wo_cache[selected_row]
+
+	# Get selected row - this is the visual row number after sorting
+	_local visual_row << selection.an_element()
+
+	# Get the actual row identifier (original row number) from the table
+	# sw_table stores original row identifiers that remain consistent after sorting
+	_local actual_row << table.row_at(visual_row)
+
+	# Use actual_row to retrieve work order from cache
+	_local wo << .wo_cache[actual_row]
 
 	.selected_wo << wo
 	_self.clear_log()
