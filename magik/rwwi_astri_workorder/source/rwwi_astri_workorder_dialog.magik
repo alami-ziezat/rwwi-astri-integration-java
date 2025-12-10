@@ -428,9 +428,11 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		_for wo _over workorders.fast_elements()
 		_loop
 			row +<< 1
+			_local wo_number << wo[:wo_number].default("")
+
 			# Add cells to table
 			.items[:table].add_label(row, 1, row.write_string)
-			.items[:table].add_label(row, 2, wo[:wo_number].default(""))
+			.items[:table].add_label(row, 2, wo_number)
 			.items[:table].add_label(row, 3, wo[:infra_code].default(""))
 			.items[:table].add_label(row, 4, wo[:infra_name].default(""))
 			.items[:table].add_label(row, 5, wo[:category].default(""))
@@ -443,8 +445,9 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			.items[:table].add_label(row, 12, wo[:kmz_uuid].default(""))
 			.items[:table].add_label(row, 13, wo[:kmz_source].default(""))
 
-			# Store work order data in cache by row number
-			.wo_cache[row] << wo
+			# Store work order data in cache by WO number (unique identifier)
+			# This ensures correct lookup even after table sorting
+			.wo_cache[wo_number] << wo
 		_endloop
 
 		# Update record count
@@ -604,15 +607,23 @@ _method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
 		_return
 	_endif
 
-	# Get selected row - this is the visual row number after sorting
-	_local visual_row << selection.an_element()
+	# Get selected row (visual row number after sorting)
+	_local selected_row << selection.an_element()
 
-	# Get the actual row identifier (original row number) from the table
-	# sw_table stores original row identifiers that remain consistent after sorting
-	_local actual_row << table.row_at(visual_row)
+	# Get WO number from column 2 of selected row
+	# This works correctly even after sorting because we're reading the actual cell value
+	_local wo_number << table.cell_value_at(selected_row, 2)
 
-	# Use actual_row to retrieve work order from cache
-	_local wo << .wo_cache[actual_row]
+	# Look up work order data by WO number (unique identifier)
+	_local wo << .wo_cache[wo_number]
+
+	_if wo _is _unset
+	_then
+		write("WARNING: Work order not found in cache for WO number:", wo_number)
+		.selected_wo << _unset
+		_self.update_detail_panel(_unset)
+		_return
+	_endif
 
 	.selected_wo << wo
 	_self.clear_log()
