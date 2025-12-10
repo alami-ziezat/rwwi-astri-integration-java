@@ -65,11 +65,12 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 
 	# Create outer container with flexible row sizing
 	# 4 rows: Toolbar (fixed), Table (flexible), Text Window (flexible), Detail Panel (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 4, 1,
-		:row_resize_values, {0, 1, 1, 0})  # Toolbar fixed, Table flexible, Text Window flexible, Detail fixed
+	.items[:outer] << outer << sw_container.new(top_c, 5, 1,
+		:row_resize_values, {0, 1, 1, 1, 0})  # Toolbar fixed, Table flexible, Text Window flexible, Detail fixed
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
+	_self.build_toolbar2(outer)
 
 	# Build work order table
 	_self.build_table(outer)
@@ -100,22 +101,9 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 	# Get the actual toolbar to add items to
 	a_toolbar << toolbar_con.create_toolbar()
 
-	# Row 1: Refresh button, Source selector, Record count
-	sw_button_item.new(a_toolbar,
-		:image, {:refresh, :ui_resources},
-		:model, _self,
-		:selector, :refresh_data|()|,
-		:tooltip, "Refresh work order data")
-
+	# Row 1: Source label (static), Record count
 	sw_label_item.new(a_toolbar, "  Source:  ")
-
-	.items[:source] << sw_text_item.new(a_toolbar,
-		:model, _self,
-		:display_length, 25,
-		:editable?, _false,
-		:change_selector, {:|source_selection()|})
-	.items[:source].text_items << {"ASTRI API", "Database (Construction)"}
-	.items[:source].value << "ASTRI API"
+	sw_label_item.new(a_toolbar, "ASTRI API  ")
 
 	.items[:record_count] << sw_label_item.new(a_toolbar, "  Total Records: 0  ")
 
@@ -141,16 +129,56 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 	.items[:filter_category].text_items << {"All", "Cluster BOQ", "Installation", "Maintenance"}
 	.items[:filter_category].value << "All"
 
-	sw_label_item.new(filter_toolbar, "  Status:  ")
-	.items[:filter_status] << sw_text_item.new(filter_toolbar,
+#	sw_label_item.new(filter_toolbar, "  Status:  ")
+#	.items[:filter_status] << sw_text_item.new(filter_toolbar,
+#		:model, _self,
+#		:display_length, 15,
+#		:editable?, _false)
+#	.items[:filter_status].text_items << {"All", "new", "in_progress", "closed", "cancelled", "successful"}
+#	.items[:filter_status].value << "All"
+
+#	.items[:label_topology] << sw_label_item.new(filter_toolbar, "  Topology:  ")
+#	.items[:filter_topology] << sw_text_item.new(filter_toolbar,
+#		:model, _self,
+#		:display_length, 10,
+#		:editable?, _false)
+#	.items[:filter_topology].text_items << {"All", "AE", "UG", "OH"}
+#	.items[:filter_topology].value << "All"
+#
+#	# Create third toolbar for cluster filter and pagination
+#	pagination_toolbar << toolbar_con.create_toolbar()
+#
+#	.items[:label_code] << sw_label_item.new(pagination_toolbar, "  Cluster Code:  ")
+#	.items[:filter_cluster] << sw_text_item.new(pagination_toolbar,
+#		:model, _self,
+#		:display_length, 20,
+#		:editable?, _true)
+
+_endmethod
+$
+_private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
+	## Build toolbar with source selector and filters using SW_SWIFT components
+
+	# Create sw_toolbar_container with separator styling
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
+
+	
+	# Get the actual toolbar to add items to
+	pagination_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(pagination_toolbar, "  Status:  ")
+	.items[:filter_status] << sw_text_item.new(pagination_toolbar,
 		:model, _self,
 		:display_length, 15,
 		:editable?, _false)
 	.items[:filter_status].text_items << {"All", "new", "in_progress", "closed", "cancelled", "successful"}
 	.items[:filter_status].value << "All"
 
-	.items[:label_topology] << sw_label_item.new(filter_toolbar, "  Topology:  ")
-	.items[:filter_topology] << sw_text_item.new(filter_toolbar,
+	.items[:label_topology] << sw_label_item.new(pagination_toolbar, "  Topology:  ")
+	.items[:filter_topology] << sw_text_item.new(pagination_toolbar,
 		:model, _self,
 		:display_length, 10,
 		:editable?, _false)
@@ -158,7 +186,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 	.items[:filter_topology].value << "All"
 
 	# Create third toolbar for cluster filter and pagination
-	pagination_toolbar << toolbar_con.create_toolbar()
+	#pagination_toolbar << toolbar_con.create_toolbar()
 
 	.items[:label_code] << sw_label_item.new(pagination_toolbar, "  Cluster Code:  ")
 	.items[:filter_cluster] << sw_text_item.new(pagination_toolbar,
@@ -166,6 +194,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 		:display_length, 20,
 		:editable?, _true)
 
+	
 	sw_label_item.new(pagination_toolbar, "  Limit:  ")
 	.items[:filter_limit] << sw_text_item.new(pagination_toolbar,
 		:model, _self,
@@ -202,6 +231,7 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 		:row_lines?, _true,
 		:column_lines?, _true,
 		:row_stripes?, _true,
+		:enable_horizontal_scrollbar?, _true,
 		:data_selector, :|workorder_list_data()|,
 		:selection_notifier, :workorder_selection|()|,
 		:enable_manage_columns?, _true,
@@ -213,7 +243,7 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 		"Category", "Status", "Topology", "Vendor", "Area", "Area Plant Code", "Created", "KMZ UUID", "KML Source"})
 
 	# Set column resize values (relative widths)
-	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1.5, 1.5, 1, 2.5, 1.5, 1.5, 1.5, 2, 0.8}
+	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1.5, 1, 1, 2.5, 1.5, 1, 1, 1, 0.8}
 
 	# Enable column filtering
 	.items[:table].enable_column_filter(2, _true)  # WO Number
@@ -435,23 +465,6 @@ _method rwwi_astri_workorder_dialog.refresh_data()
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={astri_integration})
-_method rwwi_astri_workorder_dialog.source_selection()
-	## Handle source dropdown change
-
-	_local source_text << .items[:source].value
-
-	.filters[:source] << _if source_text = "ASTRI API"
-	_then
-		>> :api
-	_else
-		>> :db
-	_endif
-
-	write("Source changed to:", .filters[:source])
-	_self.refresh_data()
-_endmethod
-$
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.infrastructure_type_changed()
@@ -594,6 +607,7 @@ _method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
 	_local wo << .wo_cache[selected_row]
 
 	.selected_wo << wo
+	_self.clear_log()
 	_self.update_detail_panel(wo)
 _endmethod
 $
@@ -708,6 +722,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 			"Use the buttons below to perform actions on this work order.", %newline)
 
 		# Display message in single log call
+		#_self.log_info("")
 		_self.log_info(msg)
 
 		# Enable buttons based on work order state
