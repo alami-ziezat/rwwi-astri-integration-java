@@ -473,21 +473,13 @@ _private _method rwwi_astri_workorder_dialog.should_skip_boq_hardcode?(infra_cod
 	##   Boolean - true if should skip hardcode (use actual value), false if can use hardcode
 
 	# List of infrastructure codes that should NOT use hardcoded value
-	_local skip_list << {"SBY002938", "PLB006436", "PLB006435", "JKT006806",
-	                     "FSBY0069", "FPLB0113", "FJKT0275"}
+	_local skip_list << rope.new_with("SBY002938", "PLB006436", "PLB006435", "JKT006806",
+	                                  "FSBY0069", "FPLB0113", "FJKT0275")
 
 	# Normalize infra_code (trim whitespace and uppercase)
 	_local normalized_code << infra_code.default("").trim_spaces().uppercase
 
-	# Check if normalized code is in skip list
-	_for skip_code _over skip_list.fast_elements()
-	_loop
-		_if normalized_code = skip_code.uppercase
-		_then
-			_return _true  # Should skip hardcode - use actual value
-		_endif
-	_endloop
-
-	_return _false  # Not in skip list - can use hardcode
+	# Check if normalized code is in skip list using includes?()
+	_return skip_list.includes?(normalized_code)
 _endmethod
 $
