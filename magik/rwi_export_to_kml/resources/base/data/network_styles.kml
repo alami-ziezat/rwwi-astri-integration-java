@@ -1,0 +1,1759 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>AERIAL KMZ STYLES - PROJECT_NAME_PLACEHOLDER</name>
+
+	<!-- ============================================ -->
+	<!-- BOUNDARY STYLES -->
+	<!-- ============================================ -->
+
+	<!-- BOUNDARY CLUSTER -->
+	<Style id="boundary_cluster">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>3</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>3f00ffff</color>
+			<fill>1</fill>
+			<outline>1</outline>
+		</PolyStyle>
+	</Style>
+	<Style id="boundary_cluster_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>4</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>3f00ffff</color>
+			<fill>1</fill>
+			<outline>1</outline>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="boundary_cluster_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#boundary_cluster</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#boundary_cluster_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- BOUNDARY FAT -->
+	<Style id="boundary_fat">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff00aaff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>80ff0000</color>
+		</PolyStyle>
+	</Style>
+	<Style id="boundary_fat_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff00aaff</color>
+			<width>3</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>80ff0000</color>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="boundary_fat_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#boundary_fat</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#boundary_fat_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- EQUIPMENT STYLES (FDT, FAT, CLOSURE) -->
+	<!-- ============================================ -->
+
+	<!-- FDT -->
+	<Style id="fdt">
+		<IconStyle>
+			<color>ffff00ff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<Style id="fdt_highlight">
+		<IconStyle>
+			<color>ffff00ff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fdt_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FAT -->
+	<Style id="fat">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="fat_highlight">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fat_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CLOSURE -->
+	<Style id="closure">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- OLT STYLES -->
+	<!-- ============================================ -->
+
+	<!-- OLT -->
+	<Style id="olt">
+		<IconStyle>
+			<color>ffffffff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/ranger_station.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="olt_highlight">
+		<IconStyle>
+			<color>ffffffff</color>
+			<scale>1.4</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/ranger_station.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="olt_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#olt</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#olt_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- FDT STYLES (Core Count Variations) -->
+	<!-- ============================================ -->
+
+	<!-- FDT 288C -->
+	<Style id="fdt_288c">
+		<IconStyle>
+			<color>ff0000aa</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<Style id="fdt_288c_highlight">
+		<IconStyle>
+			<color>ff0000aa</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fdt_288c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt_288c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_288c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FDT 144C -->
+	<Style id="fdt_144c">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<Style id="fdt_144c_highlight">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fdt_144c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt_144c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_144c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FDT 96C -->
+	<Style id="fdt_96c">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<Style id="fdt_96c_highlight">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fdt_96c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt_96c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_96c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FDT 72C -->
+	<Style id="fdt_72c">
+		<IconStyle>
+			<color>ffff0000</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<Style id="fdt_72c_highlight">
+		<IconStyle>
+			<color>ffff0000</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fdt_72c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt_72c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_72c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FDT 48C -->
+	<Style id="fdt_48c">
+		<IconStyle>
+			<color>ffff00aa</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<Style id="fdt_48c_highlight">
+		<IconStyle>
+			<color>ffff00aa</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/cross-hairs.png</href>
+			</Icon>
+			<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fdt_48c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fdt_48c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fdt_48c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- FAT STYLES (Core Count Variations) -->
+	<!-- ============================================ -->
+
+	<!-- FAT 48C -->
+	<Style id="fat_48c">
+		<IconStyle>
+			<color>ffff0000</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="fat_48c_highlight">
+		<IconStyle>
+			<color>ffff0000</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fat_48c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat_48c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_48c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FAT 32C -->
+	<Style id="fat_32c">
+		<IconStyle>
+			<color>ffff00ff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="fat_32c_highlight">
+		<IconStyle>
+			<color>ffff00ff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fat_32c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat_32c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_32c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FAT 24C -->
+	<Style id="fat_24c">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="fat_24c_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fat_24c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat_24c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_24c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FAT 16C -->
+	<Style id="fat_16c">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="fat_16c_highlight">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fat_16c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat_16c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_16c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- FAT 8C -->
+	<Style id="fat_8c">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="fat_8c_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="fat_8c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#fat_8c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#fat_8c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- JOINT CLOSURE STYLES (Core Count Variations) -->
+	<!-- ============================================ -->
+
+	<!-- JOINT CLOSURE 24C -->
+	<Style id="closure_24c">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_24c_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_24c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_24c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_24c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- JOINT CLOSURE 36C -->
+	<Style id="closure_36c">
+		<IconStyle>
+			<color>ffff00ff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_36c_highlight">
+		<IconStyle>
+			<color>ffff00ff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_36c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_36c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_36c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- JOINT CLOSURE 48C -->
+	<Style id="closure_48c">
+		<IconStyle>
+			<color>ffff00aa</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_48c_highlight">
+		<IconStyle>
+			<color>ffff00aa</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_48c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_48c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_48c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- JOINT CLOSURE 72C -->
+	<Style id="closure_72c">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_72c_highlight">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_72c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_72c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_72c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- JOINT CLOSURE 96C -->
+	<Style id="closure_96c">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_96c_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_96c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_96c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_96c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- JOINT CLOSURE 144C -->
+	<Style id="closure_144c">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_144c_highlight">
+		<IconStyle>
+			<color>ff00ffff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_144c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_144c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_144c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- JOINT CLOSURE 288C -->
+	<Style id="closure_288c">
+		<IconStyle>
+			<color>ff00aaff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="closure_288c_highlight">
+		<IconStyle>
+			<color>ff00aaff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/forbidden.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="closure_288c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#closure_288c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#closure_288c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- SLACK CABLE STYLES -->
+	<!-- ============================================ -->
+
+	<!-- SLACK CABLE -->
+	<Style id="slack_cable">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="slack_cable_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="slack_cable_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#slack_cable</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#slack_cable_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- HANDHOLE STYLES (Dimension Variations) -->
+	<!-- ============================================ -->
+
+	<!-- HANDHOLE 80x80x130 -->
+	<Style id="handhole_80x80x130">
+		<IconStyle>
+			<color>ff00aaff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="handhole_80x80x130_highlight">
+		<IconStyle>
+			<color>ff00aaff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="handhole_80x80x130_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#handhole_80x80x130</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#handhole_80x80x130_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- HANDHOLE 40x40x60 -->
+	<Style id="handhole_40x40x60">
+		<IconStyle>
+			<color>ffff0000</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="handhole_40x40x60_highlight">
+		<IconStyle>
+			<color>ffff0000</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="handhole_40x40x60_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#handhole_40x40x60</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#handhole_40x40x60_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- HANDHOLE 20x20x60 -->
+	<Style id="handhole_20x20x60">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="handhole_20x20x60_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/square.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="handhole_20x20x60_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#handhole_20x20x60</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#handhole_20x20x60_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- HANDHOLE PEDESTAL -->
+	<Style id="handhole_pedestal">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/paddle/grn-blank.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="handhole_pedestal_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/paddle/grn-blank.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="handhole_pedestal_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#handhole_pedestal</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#handhole_pedestal_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- CABLE ADSS STYLES (Core Count Variations) -->
+	<!-- ============================================ -->
+
+	<!-- CABLE ADSS 24C -->
+	<Style id="cable_adss_24c">
+		<LineStyle>
+			<color>ff00ff00</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_24c_highlight">
+		<LineStyle>
+			<color>ff00ff00</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_24c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_24c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_24c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CABLE ADSS 36C -->
+	<Style id="cable_adss_36c">
+		<LineStyle>
+			<color>ffff00ff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_36c_highlight">
+		<LineStyle>
+			<color>ffff00ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_36c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_36c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_36c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CABLE ADSS 48C -->
+	<Style id="cable_adss_48c">
+		<LineStyle>
+			<color>ffff00aa</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_48c_highlight">
+		<LineStyle>
+			<color>ffff00aa</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_48c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_48c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_48c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CABLE ADSS 72C -->
+	<Style id="cable_adss_72c">
+		<LineStyle>
+			<color>ff000055</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_72c_highlight">
+		<LineStyle>
+			<color>ff000055</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_72c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_72c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_72c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CABLE ADSS 96C -->
+	<Style id="cable_adss_96c">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_96c_highlight">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_96c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_96c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_96c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CABLE ADSS 144C -->
+	<Style id="cable_adss_144c">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_144c_highlight">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_144c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_144c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_144c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CABLE ADSS 288C -->
+	<Style id="cable_adss_288c">
+		<LineStyle>
+			<color>ff00aaff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_adss_288c_highlight">
+		<LineStyle>
+			<color>ff00aaff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_adss_288c_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable_adss_288c</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_adss_288c_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- SUB DUCT STYLES (Spec Variations) -->
+	<!-- ============================================ -->
+
+	<!-- SUB DUCT 40/34 -->
+	<Style id="sub_duct_40_34">
+		<LineStyle>
+			<color>ff0000aa</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="sub_duct_40_34_highlight">
+		<LineStyle>
+			<color>ff0000aa</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="sub_duct_40_34_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sub_duct_40_34</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sub_duct_40_34_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- SUB DUCT 32/28 -->
+	<Style id="sub_duct_32_28">
+		<LineStyle>
+			<color>ff7f00aa</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="sub_duct_32_28_highlight">
+		<LineStyle>
+			<color>ff7f00aa</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="sub_duct_32_28_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sub_duct_32_28</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sub_duct_32_28_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- POLE STYLES (Simplified - New Naming Convention) -->
+	<!-- ============================================ -->
+
+	<!-- POLE 9M 4INCH (Proposed) -->
+	<Style id="pole_9m_4inch">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="pole_9m_4inch_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.5</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="pole_9m_4inch_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_9m_4inch</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_9m_4inch_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- POLE 7M 4INCH (Proposed) -->
+	<Style id="pole_7m_4inch">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="pole_7m_4inch_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="pole_7m_4inch_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_7m_4inch</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_7m_4inch_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- POLE 7M 3INCH (Proposed) -->
+	<Style id="pole_7m_3inch">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="pole_7m_3inch_highlight">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="pole_7m_3inch_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_7m_3inch</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_7m_3inch_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- POLE 7M 2.5INCH (Proposed) -->
+	<Style id="pole_7m_2_5inch">
+		<IconStyle>
+			<color>ffff00aa</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="pole_7m_2_5inch_highlight">
+		<IconStyle>
+			<color>ffff00aa</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="pole_7m_2_5inch_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_7m_2_5inch</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_7m_2_5inch_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- POLE EXISTING (Non-Proposed) -->
+	<Style id="pole_existing">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="pole_existing_highlight">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="pole_existing_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#pole_existing</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#pole_existing_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- POLE STYLES (Legacy - For Backwards Compatibility) -->
+	<!-- ============================================ -->
+
+	<!-- NEW POLE 7-2.5 -->
+	<Style id="new_pole_7_2_5">
+		<IconStyle>
+			<color>ffaa00ff</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="new_pole_7_2_5_highlight">
+		<IconStyle>
+			<color>ffaa00ff</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="new_pole_7_2_5_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#new_pole_7_2_5</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#new_pole_7_2_5_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- NEW POLE 7-3 -->
+	<Style id="new_pole_7_3">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="new_pole_7_3_highlight">
+		<IconStyle>
+			<color>ffffff00</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="new_pole_7_3_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#new_pole_7_3</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#new_pole_7_3_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- NEW POLE 7-4 -->
+	<Style id="new_pole_7_4">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="new_pole_7_4_highlight">
+		<IconStyle>
+			<color>ff00ff00</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="new_pole_7_4_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#new_pole_7_4</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#new_pole_7_4_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- NEW POLE 9-3 -->
+	<Style id="new_pole_9_3">
+		<IconStyle>
+			<color>ff00aa00</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="new_pole_9_3_highlight">
+		<IconStyle>
+			<color>ff00aa00</color>
+			<scale>1.4</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="new_pole_9_3_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#new_pole_9_3</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#new_pole_9_3_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- NEW POLE 9-4 -->
+	<Style id="new_pole_9_4">
+		<IconStyle>
+			<color>ff55ff00</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="new_pole_9_4_highlight">
+		<IconStyle>
+			<color>ff55ff00</color>
+			<scale>1.4</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="new_pole_9_4_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#new_pole_9_4</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#new_pole_9_4_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- NEW POLE 9-5 -->
+	<Style id="new_pole_9_5">
+		<IconStyle>
+			<color>ff00ffaa</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="new_pole_9_5_highlight">
+		<IconStyle>
+			<color>ff00ffaa</color>
+			<scale>1.4</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="new_pole_9_5_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#new_pole_9_5</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#new_pole_9_5_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- EXISTING POLE EMR (all sizes use similar style with variations) -->
+	<Style id="existing_pole_emr">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="existing_pole_emr_highlight">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="existing_pole_emr_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#existing_pole_emr</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#existing_pole_emr_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- EXISTING POLE PARTNER (all sizes) -->
+	<Style id="existing_pole_partner">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="existing_pole_partner_highlight">
+		<IconStyle>
+			<color>ff000055</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="existing_pole_partner_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#existing_pole_partner</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#existing_pole_partner_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- EXISTING POLE TELKOM (for feeder) -->
+	<Style id="existing_pole_telkom">
+		<IconStyle>
+			<color>ffaa0000</color>
+			<scale>1.0</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="existing_pole_telkom_highlight">
+		<IconStyle>
+			<color>ffaa0000</color>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="existing_pole_telkom_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#existing_pole_telkom</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#existing_pole_telkom_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- HOME PASS STYLES -->
+	<!-- ============================================ -->
+
+	<!-- HP COVER -->
+	<Style id="hp_cover">
+		<IconStyle>
+			<color>ff00ff55</color>
+			<scale>0.8</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png</href>
+			</Icon>
+			<hotSpot x="32" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="hp_cover_highlight">
+		<IconStyle>
+			<color>ff00ff55</color>
+			<scale>0.933333</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png</href>
+			</Icon>
+			<hotSpot x="32" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="hp_cover_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#hp_cover</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#hp_cover_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- HP UNCOVER -->
+	<Style id="hp_uncover">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.8</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png</href>
+			</Icon>
+			<hotSpot x="32" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="hp_uncover_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.933333</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png</href>
+			</Icon>
+			<hotSpot x="32" y="1" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="hp_uncover_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#hp_uncover</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#hp_uncover_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- ============================================ -->
+	<!-- CABLE AND WIRE STYLES -->
+	<!-- ============================================ -->
+
+	<!-- DISTRIBUTION CABLE -->
+	<Style id="cable">
+		<LineStyle>
+			<color>ffff0000</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="cable_highlight">
+		<LineStyle>
+			<color>ffff0000</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="cable_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#cable</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#cable_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- SLING WIRE -->
+	<Style id="sling_wire">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="sling_wire_highlight">
+		<LineStyle>
+			<color>ff00ffff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="sling_wire_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sling_wire</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sling_wire_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- SLACK HANGER -->
+	<Style id="slack_hanger">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="slack_hanger_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="slack_hanger_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#slack_hanger</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#slack_hanger_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- CONTENT_PLACEHOLDER -->
+
+</Document>
+</kml>

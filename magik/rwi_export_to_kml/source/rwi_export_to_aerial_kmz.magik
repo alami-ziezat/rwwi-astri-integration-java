@@ -343,11 +343,11 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
 
-	# Load template file (using new aerial_styles.kml)
-	template_file << smallworld_product.get_data_file("aerial_styles.kml", :rwi_export_to_kml)
+	# Load template file (network_styles.kml - covers both aerial and underground)
+	template_file << smallworld_product.get_data_file("network_styles.kml", :rwi_export_to_kml)
 	_if template_file _is _unset
 	_then
-		condition.raise(:error, :string, "Template file aerial_styles.kml not found")
+		condition.raise(:error, :string, "Template file network_styles.kml not found")
 	_endif
 
 	# Read template content

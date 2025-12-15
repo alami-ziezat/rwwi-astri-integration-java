@@ -103,7 +103,7 @@ _method rwi_aerial_kmz_object_writer.write_pole(p_pole, p_stream, p_indent, _opt
 	#pole_height << p_pole.perform(:height).default("")
 	#pole_class << p_pole.perform(:class_value).default("")
 
-	# Determine style based on folder name using new aerial_styles.kml
+	# Determine style based on folder name using network_styles.kml
 	_if p_folder_name _isnt _unset
 	_then
 		style_url << _self.get_pole_style_from_folder(p_folder_name)
@@ -160,64 +160,44 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_object_writer.get_pole_style_from_folder(p_folder_name)
 	## Determine pole style based on folder name
-	## Maps folder names to style IDs from aerial_styles.kml
+	## Maps folder names to style IDs from network_styles.kml
+	## Simplified logic: PROPOSED poles get specific colors by spec,
+	## all non-PROPOSED poles use single existing style
 	##
 	## Parameters:
-	##   p_folder_name - Folder name (e.g., "NEW POLE 7-3", "EXISTING POLE EMR 7-4")
+	##   p_folder_name - Folder name (e.g., "NEW POLE 7-3", "EXISTING POLE")
 	##
 	## Returns:
-	##   Style URL string (e.g., "#new_pole_7_3_map")
+	##   Style URL string (e.g., "#pole_7m_3inch_map", "#pole_existing_map")
 
 	folder_upper << p_folder_name.uppercase
 
-	# NEW POLE folders - map to specific size styles
-	_if folder_upper.index_of_seq("NEW POLE") _isnt _unset
+	# Check if this is a PROPOSED or NEW POLE
+	_if folder_upper.index_of_seq("PROPOSED") _isnt _unset _orif
+	    folder_upper.index_of_seq("NEW POLE") _isnt _unset
 	_then
-		_if folder_upper.index_of_seq("7-2.5") _isnt _unset _orif
-		    folder_upper.index_of_seq("7-2,5") _isnt _unset
+		# Extract pole specification and map to specific style
+		_if folder_upper.index_of_seq("9-4") _isnt _unset
 		_then
-			_return "#new_pole_7_2_5_map"
-		_elif folder_upper.index_of_seq("7-3") _isnt _unset
-		_then
-			_return "#new_pole_7_3_map"
+			_return "#pole_9m_4inch_map"
 		_elif folder_upper.index_of_seq("7-4") _isnt _unset
 		_then
-			_return "#new_pole_7_4_map"
-		_elif folder_upper.index_of_seq("9-3") _isnt _unset
+			_return "#pole_7m_4inch_map"
+		_elif folder_upper.index_of_seq("7-3") _isnt _unset
 		_then
-			_return "#new_pole_9_3_map"
-		_elif folder_upper.index_of_seq("9-4") _isnt _unset
+			_return "#pole_7m_3inch_map"
+		_elif folder_upper.index_of_seq("7-2.5") _isnt _unset _orif
+		      folder_upper.index_of_seq("7-2,5") _isnt _unset
 		_then
-			_return "#new_pole_9_4_map"
-		_elif folder_upper.index_of_seq("9-5") _isnt _unset
-		_then
-			_return "#new_pole_9_5_map"
+			_return "#pole_7m_2_5inch_map"
 		_else
-			# Default to 7-3 for NEW POLE if size not specified
-			_return "#new_pole_7_3_map"
+			# Default to 7-4 for PROPOSED poles if size not specified
+			_return "#pole_7m_4inch_map"
 		_endif
+	_else
+		# All non-PROPOSED poles use single existing style
+		_return "#pole_existing_map"
 	_endif
-
-	# EXISTING POLE folders - map based on owner
-	_if folder_upper.index_of_seq("EXISTING POLE") _isnt _unset
-	_then
-		_if folder_upper.index_of_seq("EMR") _isnt _unset
-		_then
-			_return "#existing_pole_emr_map"
-		_elif folder_upper.index_of_seq("PARTNER") _isnt _unset
-		_then
-			_return "#existing_pole_partner_map"
-		_elif folder_upper.index_of_seq("TELKOM") _isnt _unset
-		_then
-			_return "#existing_pole_telkom_map"
-		_else
-			# Default to EMR for EXISTING POLE if owner not specified
-			_return "#existing_pole_emr_map"
-		_endif
-	_endif
-
-	# Default fallback - existing pole EMR
-	_return "#existing_pole_emr_map"
 _endmethod
 $
 
@@ -312,21 +292,24 @@ _method rwi_aerial_kmz_object_writer.write_sheath_splice(p_splice_equipment, p_p
 	splice_id << p_splice_equipment.perform(:id).default("Unknown")
 	splice_name << p_splice_equipment.perform(:name).default("")
 
-	# Determine equipment type (FAT, FDT, or CLOSURE)
+	# Determine equipment type (FAT, FDT, or CLOSURE) and get appropriate style
 	equip_type << _unset
 	_if splice_type.index_of_seq("FAT") _isnt _unset
 	_then
 		equip_type << "FAT"
-		style_url << "#fat_map"
+		core_count << _self.extract_equipment_core_count(p_splice_equipment)
+		style_url << _self.get_fat_style(core_count)
 	_elif splice_type.index_of_seq("FDT") _isnt _unset
 	_then
 		equip_type << "FDT"
-		style_url << "#fdt_map"
+		core_count << _self.extract_equipment_core_count(p_splice_equipment)
+		style_url << _self.get_fdt_style(core_count)
 	_elif splice_type.index_of_seq("Closure") _isnt _unset _orif
 	      splice_type.index_of_seq("Joint") _isnt _unset
 	_then
 		equip_type << "CLOSURE"
-		style_url << "#closure_map"
+		core_count << _self.extract_equipment_core_count(p_splice_equipment)
+		style_url << _self.get_closure_style(core_count)
 	_else
 		# Unknown type, skip
 		_return
@@ -398,7 +381,7 @@ _method rwi_aerial_kmz_object_writer.write_figure_eight(p_figure_eight, p_pole_g
 	# Write KML Placemark
 	p_stream.write(p_indent, "<Placemark>", newline_char)
 	p_stream.write(p_indent, "  <name>", equipment_name, "</name>", newline_char)
-	p_stream.write(p_indent, "  <styleUrl>#slack_hanger_map</styleUrl>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#slack_cable_map</styleUrl>", newline_char)
 
 	# Write ExtendedData with figure_eight attributes
 	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
@@ -519,6 +502,10 @@ _method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_route_sectors, p_str
 	# Get cable attributes
 	cable_id << p_cable.perform(:id).default("Unknown")
 	cable_name << p_cable.perform(:name).default("")
+	cable_spec << p_cable.perform(:spec_id).default("")
+
+	# Determine style based on cable specification (ADSS detection and core count)
+	style_url << _self.get_cable_style(cable_spec)
 
 	# Build chain name
 	_if cable_name <> ""
@@ -531,7 +518,7 @@ _method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_route_sectors, p_str
 	# Write KML Placemark
 	p_stream.write(p_indent, "<Placemark>", newline_char)
 	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
-	p_stream.write(p_indent, "  <styleUrl>#cable_map</styleUrl>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
 
 	# Write ExtendedData with cable attributes
 	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
@@ -899,5 +886,267 @@ _method rwi_aerial_kmz_object_writer.write_olt(p_olt, p_stream, p_indent, p_fold
 	p_stream.write(p_indent, "  </Point>", newline_char)
 
 	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+# ============================================================================
+# UTILITY METHODS FOR CORE COUNT EXTRACTION AND STYLE MAPPING
+# ============================================================================
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.extract_equipment_core_count(p_equipment)
+	## Extract core count from equipment object
+	## Uses wildcard matching pattern to detect core counts:
+	## 576, 288, 144, 96, 72, 48, 36, 32, 24, 16, 8
+	##
+	## Parameters:
+	##   p_equipment - Equipment object (sheath_splice)
+	##
+	## Returns:
+	##   String - Core count ("288", "144", etc.) or _unset if not found
+
+	# Get the splice type field
+	splice_type << p_equipment.sheath_splice_object_type
+	_if splice_type _is _unset
+	_then
+		_return _unset
+	_endif
+
+	# Use extract_core_count_from_string utility
+	_return _self.extract_core_count_from_string(splice_type)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.extract_core_count_from_string(p_string)
+	## Extract core count from string using wildcard matching
+	## Checks for core count patterns in descending order (largest first)
+	## to avoid false matches (e.g., "288" not matching "28")
+	##
+	## Parameters:
+	##   p_string - String to search (e.g., "FDT 288C", "SM G652D-ADSS 24C")
+	##
+	## Returns:
+	##   String - Core count ("288", "24", etc.) or _unset if not found
+
+	_if p_string _is _unset
+	_then
+		_return _unset
+	_endif
+
+	name_lc << p_string.lowercase
+
+	# Check for core count patterns (largest first to avoid false matches)
+	_if name_lc.matches?("*576*")
+	_then
+		_return "576"
+	_elif name_lc.matches?("*288*")
+	_then
+		_return "288"
+	_elif name_lc.matches?("*144*")
+	_then
+		_return "144"
+	_elif name_lc.matches?("*96*")
+	_then
+		_return "96"
+	_elif name_lc.matches?("*72*")
+	_then
+		_return "72"
+	_elif name_lc.matches?("*48*")
+	_then
+		_return "48"
+	_elif name_lc.matches?("*36*")
+	_then
+		_return "36"
+	_elif name_lc.matches?("*32*")
+	_then
+		_return "32"
+	_elif name_lc.matches?("*24*")
+	_then
+		_return "24"
+	_elif name_lc.matches?("*16*")
+	_then
+		_return "16"
+	_elif name_lc.matches?("*8*")
+	_then
+		_return "8"
+	_else
+		_return _unset
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.get_fdt_style(p_core_count)
+	## Map FDT core count to style URL
+	## Returns core count-specific style or fallback to generic style
+	##
+	## Parameters:
+	##   p_core_count - Core count string ("288", "144", etc.) or _unset
+	##
+	## Returns:
+	##   String - Style URL (e.g., "#fdt_288c_map", "#fdt_map")
+
+	_if p_core_count _is _unset
+	_then
+		_return "#fdt_map"  # Fallback
+	_endif
+
+	# Map core count to style
+	_if p_core_count = "288"
+	_then
+		_return "#fdt_288c_map"
+	_elif p_core_count = "144"
+	_then
+		_return "#fdt_144c_map"
+	_elif p_core_count = "96"
+	_then
+		_return "#fdt_96c_map"
+	_elif p_core_count = "72"
+	_then
+		_return "#fdt_72c_map"
+	_elif p_core_count = "48"
+	_then
+		_return "#fdt_48c_map"
+	_else
+		_return "#fdt_map"  # Fallback for unknown
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.get_fat_style(p_core_count)
+	## Map FAT core count to style URL
+	## Returns core count-specific style or fallback to generic style
+	##
+	## Parameters:
+	##   p_core_count - Core count string ("48", "32", etc.) or _unset
+	##
+	## Returns:
+	##   String - Style URL (e.g., "#fat_48c_map", "#fat_map")
+
+	_if p_core_count _is _unset
+	_then
+		_return "#fat_map"  # Fallback
+	_endif
+
+	# Map core count to style
+	_if p_core_count = "48"
+	_then
+		_return "#fat_48c_map"
+	_elif p_core_count = "32"
+	_then
+		_return "#fat_32c_map"
+	_elif p_core_count = "24"
+	_then
+		_return "#fat_24c_map"
+	_elif p_core_count = "16"
+	_then
+		_return "#fat_16c_map"
+	_elif p_core_count = "8"
+	_then
+		_return "#fat_8c_map"
+	_else
+		_return "#fat_map"  # Fallback for unknown
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.get_closure_style(p_core_count)
+	## Map Joint Closure core count to style URL
+	## Returns core count-specific style or fallback to generic style
+	##
+	## Parameters:
+	##   p_core_count - Core count string ("24", "288", etc.) or _unset
+	##
+	## Returns:
+	##   String - Style URL (e.g., "#closure_24c_map", "#closure_map")
+
+	_if p_core_count _is _unset
+	_then
+		_return "#closure_map"  # Fallback
+	_endif
+
+	# Map core count to style
+	_if p_core_count = "288"
+	_then
+		_return "#closure_288c_map"
+	_elif p_core_count = "144"
+	_then
+		_return "#closure_144c_map"
+	_elif p_core_count = "96"
+	_then
+		_return "#closure_96c_map"
+	_elif p_core_count = "72"
+	_then
+		_return "#closure_72c_map"
+	_elif p_core_count = "48"
+	_then
+		_return "#closure_48c_map"
+	_elif p_core_count = "36"
+	_then
+		_return "#closure_36c_map"
+	_elif p_core_count = "24"
+	_then
+		_return "#closure_24c_map"
+	_else
+		_return "#closure_map"  # Fallback for unknown
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_aerial_kmz_object_writer.get_cable_style(p_cable_spec)
+	## Map cable specification to style URL
+	## Detects ADSS cable type and core count
+	##
+	## Parameters:
+	##   p_cable_spec - Cable spec_id (e.g., "SM G652D-ADSS 24C")
+	##
+	## Returns:
+	##   String - Style URL (e.g., "#cable_adss_24c_map", "#cable_map")
+
+	_if p_cable_spec _is _unset _orif p_cable_spec = ""
+	_then
+		_return "#cable_map"  # Fallback
+	_endif
+
+	spec_upper << p_cable_spec.uppercase
+
+	# Check if this is ADSS cable
+	_if spec_upper.index_of_seq("ADSS") _is _unset
+	_then
+		_return "#cable_map"  # Not ADSS
+	_endif
+
+	# Extract core count from spec
+	core_count << _self.extract_core_count_from_string(p_cable_spec)
+
+	# Map ADSS core count to style
+	_if core_count = "288"
+	_then
+		_return "#cable_adss_288c_map"
+	_elif core_count = "144"
+	_then
+		_return "#cable_adss_144c_map"
+	_elif core_count = "96"
+	_then
+		_return "#cable_adss_96c_map"
+	_elif core_count = "72"
+	_then
+		_return "#cable_adss_72c_map"
+	_elif core_count = "48"
+	_then
+		_return "#cable_adss_48c_map"
+	_elif core_count = "36"
+	_then
+		_return "#cable_adss_36c_map"
+	_elif core_count = "24"
+	_then
+		_return "#cable_adss_24c_map"
+	_else
+		_return "#cable_map"  # Fallback
+	_endif
 _endmethod
 $
