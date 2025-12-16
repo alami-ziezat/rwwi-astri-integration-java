@@ -154,8 +154,9 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 	# Initialize statistics
 	.stats << property_list.new_with(
 		:aerial_routes, 0,
-		:poles, 0,
-		:sheaths, 0,
+		:new_poles, 0,
+		:existing_poles, 0,
+		:sheath_length, 0.0,
 		:sheath_splices, 0,
 		:optical_splitters, 0,
 		:figure_eights, 0,
@@ -553,8 +554,9 @@ _method astri_design_migrator.print_statistics()
 	write("Design Migration Statistics")
 	write("=" * 60)
 	write("Aerial Routes:      ", .stats[:aerial_routes])
-	write("Poles:              ", .stats[:poles])
-	write("Sheaths:            ", .stats[:sheaths])
+	write("New Poles:          ", .stats[:new_poles])
+	write("Existing Poles:     ", .stats[:existing_poles])
+	write("Sheath Length (m):  ", .stats[:sheath_length].rounded)
 	write("Sheath Splices:     ", .stats[:sheath_splices])
 	write("Optical Splitters:  ", .stats[:optical_splitters])
 	write("Figure Eights:      ", .stats[:figure_eights])
@@ -570,7 +572,7 @@ _method astri_design_migrator.print_statistics()
 	write("Errors:             ", .stats[:errors])
 	write("Skipped:            ", .stats[:skipped])
 	write("")
-	_local total_created << .stats[:aerial_routes] + .stats[:poles] + .stats[:sheaths] +
+	_local total_created << .stats[:aerial_routes] + .stats[:new_poles] + .stats[:existing_poles] +
 	                         .stats[:sheath_splices] + .stats[:optical_splitters] +
 	                         .stats[:figure_eights] + .stats[:sling_wires] +
 	                         .stats[:demand_points] + .stats[:customer_premises] +

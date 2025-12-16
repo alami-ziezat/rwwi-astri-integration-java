@@ -109,7 +109,7 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 				:olt, .pop_name,
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, .construction_status,
+				:construction_status, "In Service",
 				:cluster_code, .cluster_code_db,
 				:subfeeder_code, .subfeeder_code_db,
 				:feeder_code, .feeder_code_db,
@@ -119,8 +119,9 @@ _private _method astri_design_migrator.create_figure_eight(pm)
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
 			n_obj << l_rec_trans_pl.run()
 
-			.stats[:poles] +<< 1
-			write("    >> Placeholder pole created")
+			# All figure_eight placeholder poles are counted as existing
+			.stats[:existing_poles] +<< 1
+			write("    >> Placeholder pole created (In Service)")
 		_endif
 
 		# Step 3: Create figure_eight

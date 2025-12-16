@@ -278,37 +278,41 @@ _method rwi_aerial_kmz_object_writer.write_sheath_splice(p_splice_equipment, p_p
 	_if p_pole_geom _is _unset _then _return _endif
 
 	# Get coordinate from pole geometry
-	coord << p_pole_geom.coord
+	_local coord << p_pole_geom.coord
 	_if coord _is _unset _then _return _endif
 
 	# Convert coordinate to WGS84
-	coord_string << _self.convert_coord_to_wgs84_string(coord)
+	_local coord_string << _self.convert_coord_to_wgs84_string(coord)
 
 	# Get splice type from equipment
-	splice_type << p_splice_equipment.sheath_splice_object_type
+	_local splice_type << p_splice_equipment.sheath_splice_object_type
 	_if splice_type _is _unset _then _return _endif
 
 	# Get splice attributes (p_splice_equipment IS the sheath_splice)
-	splice_id << p_splice_equipment.perform(:id).default("Unknown")
-	splice_name << p_splice_equipment.perform(:name).default("")
+	_local splice_id << p_splice_equipment.perform(:id).default("Unknown")
+	_local splice_name << p_splice_equipment.perform(:name).default("")
 
 	# Determine equipment type (FAT, FDT, or CLOSURE) and get appropriate style
-	equip_type << _unset
+	_local equip_type << _unset
+	_local core_count
+	_local style_url
+	_local l_spec << p_splice_equipment.get_spec_record().perform(:model).default("")
+
 	_if splice_type.index_of_seq("FAT") _isnt _unset
 	_then
 		equip_type << "FAT"
-		core_count << _self.extract_equipment_core_count(p_splice_equipment)
+		core_count << _self.extract_core_count_from_string(l_spec)
 		style_url << _self.get_fat_style(core_count)
 	_elif splice_type.index_of_seq("FDT") _isnt _unset
 	_then
 		equip_type << "FDT"
-		core_count << _self.extract_equipment_core_count(p_splice_equipment)
+		core_count << _self.extract_core_count_from_string(l_spec)
 		style_url << _self.get_fdt_style(core_count)
 	_elif splice_type.index_of_seq("Closure") _isnt _unset _orif
 	      splice_type.index_of_seq("Joint") _isnt _unset
 	_then
 		equip_type << "CLOSURE"
-		core_count << _self.extract_equipment_core_count(p_splice_equipment)
+		core_count << _self.extract_core_count_from_string(l_spec)
 		style_url << _self.get_closure_style(core_count)
 	_else
 		# Unknown type, skip
@@ -316,6 +320,7 @@ _method rwi_aerial_kmz_object_writer.write_sheath_splice(p_splice_equipment, p_p
 	_endif
 
 	# Build equipment name using name if available, otherwise type + ID
+	_local equipment_name
 	_if splice_name <> ""
 	_then
 		equipment_name << splice_name
@@ -894,30 +899,6 @@ $
 # ============================================================================
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_aerial_kmz_object_writer.extract_equipment_core_count(p_equipment)
-	## Extract core count from equipment object
-	## Uses wildcard matching pattern to detect core counts:
-	## 576, 288, 144, 96, 72, 48, 36, 32, 24, 16, 8
-	##
-	## Parameters:
-	##   p_equipment - Equipment object (sheath_splice)
-	##
-	## Returns:
-	##   String - Core count ("288", "144", etc.) or _unset if not found
-
-	# Get the splice type field
-	splice_type << p_equipment.sheath_splice_object_type
-	_if splice_type _is _unset
-	_then
-		_return _unset
-	_endif
-
-	# Use extract_core_count_from_string utility
-	_return _self.extract_core_count_from_string(splice_type)
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_aerial_kmz_object_writer.extract_core_count_from_string(p_string)
 	## Extract core count from string using wildcard matching
 	## Checks for core count patterns in descending order (largest first)
@@ -934,7 +915,7 @@ _private _method rwi_aerial_kmz_object_writer.extract_core_count_from_string(p_s
 		_return _unset
 	_endif
 
-	name_lc << p_string.lowercase
+	_local name_lc << p_string.lowercase
 
 	# Check for core count patterns (largest first to avoid false matches)
 	_if name_lc.matches?("*576*")
@@ -987,30 +968,37 @@ _private _method rwi_aerial_kmz_object_writer.get_fdt_style(p_core_count)
 	## Returns:
 	##   String - Style URL (e.g., "#fdt_288c_map", "#fdt_map")
 
+	#write("DEBUG get_fdt_style: p_core_count = ", p_core_count)
+
 	_if p_core_count _is _unset
 	_then
+		#write("DEBUG get_fdt_style: returning #fdt_map (fallback - unset)")
 		_return "#fdt_map"  # Fallback
 	_endif
 
 	# Map core count to style
+	_local style_url
 	_if p_core_count = "288"
 	_then
-		_return "#fdt_288c_map"
+		style_url << "#fdt_288c_map"
 	_elif p_core_count = "144"
 	_then
-		_return "#fdt_144c_map"
+		style_url << "#fdt_144c_map"
 	_elif p_core_count = "96"
 	_then
-		_return "#fdt_96c_map"
+		style_url << "#fdt_96c_map"
 	_elif p_core_count = "72"
 	_then
-		_return "#fdt_72c_map"
+		style_url << "#fdt_72c_map"
 	_elif p_core_count = "48"
 	_then
-		_return "#fdt_48c_map"
+		style_url << "#fdt_48c_map"
 	_else
-		_return "#fdt_map"  # Fallback for unknown
+		style_url << "#fdt_map"  # Fallback for unknown
 	_endif
+
+	#write("DEBUG get_fdt_style: returning ", style_url)
+	_return style_url
 _endmethod
 $
 

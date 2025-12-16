@@ -80,7 +80,30 @@ _method rwwi_astri_workorder_dialog.download_kmz()
 		    file_path_elem _isnt _unset
 		_then
 			_local file_path << file_path_elem.xml_result
+
+			# Log the successful download with file path
+			_self.log_separator()
+			_self.log_success("KMZ DOWNLOAD COMPLETE!")
+			_self.log_info("File saved to:")
+			_self.log_info("  " + file_path)
+			_self.log_separator()
+
 			_self.user_info(write_string("KMZ downloaded successfully:", %newline, file_path))
+
+			# Auto-open KMZ file in default application (Google Earth, etc.)
+			_try
+				write("Opening KMZ file in default application...")
+				_self.log_info("Opening KMZ file in default application...")
+				# Use start command to open file with default application
+				# The empty quotes after start are for the window title (required when path has spaces)
+				_local command << write_string("cmd /c start ", %", %", " ", %", file_path, %")
+				write("Opening KMZ with command: ", command)
+				system.do_command(command)
+				_self.log_info("KMZ file opened successfully")
+			_when error
+				write("WARNING: Could not auto-open KMZ file: ", condition.report_contents_string)
+				_self.log_info("Note: Could not auto-open KMZ file automatically")
+			_endtry
 		_else
 			_local error_elem << xml_doc.element_matching_name(:error)
 			_local error_msg << _if error_elem _isnt _unset

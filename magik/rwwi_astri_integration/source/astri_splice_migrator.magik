@@ -185,7 +185,6 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 			l_result_pl << l_rec_trans_pl.run()
 
 			sh_loc << l_result_pl.location.coord
-			.stats[:poles] +<< 1
 		_endif
 
 		# Step 5: Get line type for sheath splice

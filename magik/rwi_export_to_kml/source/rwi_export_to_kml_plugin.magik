@@ -20,13 +20,19 @@ $
 #			       :type, :symbol, :default_value, :gis,
 #			       :description, "User dataset name (symbol) for updating" )
 #$
-# Create an action
+# Create actions
 _method rwi_export_to_kml_plugin.init_actions()
 	_self.add_action(
 	sw_action.new( :activate_export_to_kml,
 		:engine, _self,
 		:image, {:activate,_self.module_name},
 		:action_message, :activate_export_to_kml|()| ) )
+
+	_self.add_action(
+	sw_action.new( :export_current_job_to_kmz,
+		:engine, _self,
+		:image, {:export,_self.module_name},
+		:action_message, :export_current_job_to_kmz|()| ) )
 _endmethod
 $
 # method for a plugin to activate the dialog box
@@ -50,5 +56,205 @@ _method rwi_export_to_kml_plugin.activate_export_to_kml()
 	_endif
 	d.activate()
 	>> d
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={rwi_export_to_kml_plugin})
+_method rwi_export_to_kml_plugin.export_current_job_to_kmz()
+	## Export current design job to KMZ file
+	## Gets design from swg_dsn_admin_engine.get_current_job()
+
+	_try _with errCond
+		# Get current job from design manager
+		_local design << swg_dsn_admin_engine.get_current_job()
+		_if design _is _unset
+		_then
+			_self.user_error("No Current Design", "Please open a design job first")
+			_return
+		_endif
+
+		# Get design name for filename
+		_local design_name << design.perform(:name).default("design")
+		_local project_name << design.project.perform(:name).default(design_name)
+
+		write("Exporting KML for Design:", design_name, " Project:", project_name)
+
+		# Get design boundary using helper
+		_local design_area << _self.get_design_boundary(design)
+		_if design_area _is _unset
+		_then
+			_self.user_error("Design Area Not Found", "Design has no boundary area defined")
+			_return
+		_endif
+
+		# Show file chooser dialog
+		_local safe_filename << design_name.substitute_string("/", "_").substitute_string(" ", "_") + ".kmz"
+		_local output_file << _self.get_output_file_from_user(safe_filename)
+		_if output_file _is _unset
+		_then
+			_return  # User cancelled
+		_endif
+
+		# Create exporter
+		_local exporter << rwi_export_to_aerial_kmz.new()
+		exporter.gc << gis_program_manager.cached_dataset(:gis).collections
+		exporter.project_name << project_name
+		exporter.project_area << design_area
+		exporter.scheme_name << design_name
+		exporter.infrastructure_type << :cluster  # Default to cluster
+		exporter.infrastructure_code << project_name
+
+		write("Starting export...")
+
+		# Export with dynamic network detection
+		_local export_result << exporter.export_mixed_network(design_area, output_file)
+
+		# Extract results
+		_local output_path << export_result[:output_file]
+		_local total_poles << export_result[:total_poles]
+		_local pole_stats << export_result[:pole_statistics]
+		_local total_fats << export_result[:total_fats]
+		_local total_fdts << export_result[:total_fdts]
+		_local total_closures << export_result[:total_closures]
+		_local total_slack_hangers << export_result[:total_slack_hangers]
+		_local total_sling_wires << export_result[:total_sling_wires]
+		_local total_cable_length << export_result[:total_cable_length].default(0.0)
+
+		# Display statistics
+		write("")
+		write("="*60)
+		write("AERIAL KML EXPORT - STATISTICS REPORT")
+		write("="*60)
+		write("Project: ", project_name)
+		write("Design: ", design_name)
+		write("-"*60)
+		write("POLE EXPORT SUMMARY:")
+		write("-"*60)
+
+		# Display poles per folder
+		_if pole_stats.size > 0
+		_then
+			_local folder_names << pole_stats.keys.as_sorted_collection()
+			_for folder_name _over folder_names.fast_elements()
+			_loop
+				_local count << pole_stats[folder_name]
+				write("  ", folder_name, ": ", count)
+			_endloop
+		_else
+			write("  No poles exported")
+		_endif
+
+		write("-"*60)
+		write("TOTAL POLES EXPORTED: ", total_poles)
+		write("-"*60)
+		write("EQUIPMENT EXPORT SUMMARY:")
+		write("-"*60)
+		write("  FAT: ", total_fats)
+		write("  FDT: ", total_fdts)
+		write("  CLOSURE: ", total_closures)
+		write("  SLACK HANGER: ", total_slack_hangers)
+		write("  SLING WIRE: ", total_sling_wires)
+		write("-"*60)
+		write("CABLE EXPORT SUMMARY:")
+		write("-"*60)
+		write("  TOTAL CABLE LENGTH: ", total_cable_length.rounded, " meters")
+		write("-"*60)
+		write("HOME PASS EXPORT SUMMARY:")
+		write("-"*60)
+		write("  HOME PASS: ", export_result[:total_home_pass].default(0))
+		write("-"*60)
+		write("CELL EXPORT SUMMARY:")
+		write("-"*60)
+		write("  CELLS (BOUNDARY): ", export_result[:total_cells].default(0))
+		write("="*60)
+		write("")
+
+		# Success message
+		#_self.user_error("Export Complete", write_string("Created: ", output_path))
+		write("Export completed: ", output_path)
+
+		# Auto-open KMZ file in default application (Google Earth, etc.)
+		_try	
+			write("Opening KMZ file in default application...")
+			# Use start command to open file with default application
+			# The empty quotes after start are for the window title (required when path has spaces)
+			_local command << write_string("cmd /c start ", %", %", " ", %", output_path, %")
+			write("Opening KMZ with command: ", command)
+			system.do_command(command)
+			write("KMZ file opened successfully")
+		_when error
+			write("WARNING: Could not auto-open KMZ file: ", condition.report_contents_string)
+		_endtry
+
+	_when error
+		_self.user_error("Export Failed", errCond.report_contents_string)
+		write("Export failed: ", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={rwi_export_to_kml_plugin})
+_method rwi_export_to_kml_plugin.get_design_boundary(design)
+	## Extract boundary polygon from design using rwwi_astri_workorder_engine
+	##
+	## Parameters:
+	##   design - Smallworld design object
+	##
+	## Returns:
+	##   pseudo_polygon - Design boundary area for spatial filtering
+
+	_try _with errCond
+		# Get from project boundary
+		_local l_project << design.project
+		_for a _over l_project.project_areas.fast_elements()
+		_loop
+			_if a.area _isnt _unset
+			_then
+				_return a.area
+			_endif
+		_endloop
+
+		write("WARNING: No boundary found for design:", design.name)
+		_return _unset
+
+	_when error
+		write("Error getting design boundary:", errCond.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={rwi_export_to_kml_plugin})
+_method rwi_export_to_kml_plugin.get_output_file_from_user(default_filename)
+	## Returns KMZ output file path in home directory under sw_kml folder
+	## Creates sw_kml directory if it doesn't exist
+
+	# Get user home directory
+	_local home_dir << system.getenv("USERPROFILE")  # Windows
+	_if home_dir _is _unset _orif home_dir = ""
+	_then
+		# Fallback to TEMP if USERPROFILE not available
+		home_dir << system.temp_directory_name
+	_endif
+
+	# Create sw_kml subdirectory path
+	_local output_dir << system.pathname_from_components("sw_kml", home_dir)
+
+	# Create directory if it doesn't exist
+	_if _not system.file_exists?(output_dir)
+	_then
+		_try
+			system.mkdir(output_dir)
+			write("Created KML output directory: ", output_dir)
+		_when error
+			write("WARNING: Could not create sw_kml directory, using temp instead")
+			output_dir << system.temp_directory_name
+		_endtry
+	_endif
+
+	# Construct full file path
+	_local output_file << system.pathname_from_components(default_filename, output_dir)
+
+	>> output_file
 _endmethod
 $

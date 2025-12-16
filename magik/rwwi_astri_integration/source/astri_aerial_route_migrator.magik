@@ -287,8 +287,6 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			)
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
 			l_result_pl << l_rec_trans_pl.run()
-
-			.stats[:poles] +<< 1
 		_endif
 
 		# Step 8: Handle END POINT
@@ -390,8 +388,6 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			)
 			_local l_rec_trans_pl2 << record_transaction.new_insert(.pole_col, l_prop_values_pl2)
 			l_result_pl2 << l_rec_trans_pl2.run()
-
-			.stats[:poles] +<< 1
 		_endif
 
 		# Step 9: Collect all structures
@@ -445,8 +441,10 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		# Place sheath in structures
 		l_result_swl.place_in_structures(l_structures)
 
-		.stats[:sheaths] +<< 1
-		write("    [OK] Sheath created and placed in structures")
+		# Track sheath length in meters using calculated fibre length
+		_local sheath_length << l_result_swl.calculated_fiber_length.value_in(:m).as_number()
+		.stats[:sheath_length] +<< sheath_length
+		write("    [OK] Sheath created and placed in structures (Fibre Length: ", sheath_length.rounded, "m)")
 
 		_return l_result
 

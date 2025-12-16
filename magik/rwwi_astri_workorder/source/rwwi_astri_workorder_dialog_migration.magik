@@ -162,7 +162,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_info("")
 
 			# Display results
-			_local total_objs << stats[:aerial_routes] + stats[:poles] + stats[:sheaths] +
+			_local total_objs << stats[:aerial_routes] + stats[:new_poles] + stats[:existing_poles] +
 			                      stats[:sling_wires] + stats[:demand_points] +
 			                      stats[:micro_cells] + stats[:areas_created]
 
@@ -174,8 +174,9 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_info("")
 			_self.log_info("MIGRATION STATISTICS:")
 			_self.log_info("  Aerial Routes:      " + stats[:aerial_routes].write_string)
-			_self.log_info("  Poles:              " + stats[:poles].write_string)
-			_self.log_info("  Sheaths:            " + stats[:sheaths].write_string)
+			_self.log_info("  New Poles:          " + stats[:new_poles].write_string)
+			_self.log_info("  Existing Poles:     " + stats[:existing_poles].write_string)
+			_self.log_info("  Sheath Length (m):  " + stats[:sheath_length].rounded.write_string)
 			_self.log_info("  Sheath Splices:     " + stats[:sheath_splices].write_string)
 			_self.log_info("  Optical Splitters:  " + stats[:optical_splitters].write_string)
 			_self.log_info("  Figure Eights:      " + stats[:figure_eights].write_string)
@@ -399,8 +400,9 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 			_self.log_info("")
 			_self.log_info("MIGRATION STATISTICS:")
 			_self.log_info("  Aerial Routes:      " + stats[:aerial_routes].write_string)
-			_self.log_info("  Poles:              " + stats[:poles].write_string)
-			_self.log_info("  Sheaths:            " + stats[:sheaths].write_string)
+			_self.log_info("  New Poles:          " + stats[:new_poles].write_string)
+			_self.log_info("  Existing Poles:     " + stats[:existing_poles].write_string)
+			_self.log_info("  Sheath Length (m):  " + stats[:sheath_length].rounded.write_string)
 			_self.log_info("  Sheath Splices:     " + stats[:sheath_splices].write_string)
 			_self.log_info("  Optical Splitters:  " + stats[:optical_splitters].write_string)
 			_self.log_info("  Figure Eights:      " + stats[:figure_eights].write_string)
@@ -425,8 +427,9 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 				"KML File:            ", kml_file_path, %newline,
 				"=" * 70, %newline,
 				"Aerial Routes:       ", stats[:aerial_routes], %newline,
-				"Poles:               ", stats[:poles], %newline,
-				"Sheaths:             ", stats[:sheaths], %newline,
+				"New Poles:           ", stats[:new_poles], %newline,
+				"Existing Poles:      ", stats[:existing_poles], %newline,
+				"Sheath Length (m):   ", stats[:sheath_length].rounded, %newline,
 				"Sheath Splices:      ", stats[:sheath_splices], %newline,
 				"Optical Splitters:   ", stats[:optical_splitters], %newline,
 				"Figure Eights:       ", stats[:figure_eights], %newline,

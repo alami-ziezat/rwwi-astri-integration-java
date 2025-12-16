@@ -162,7 +162,13 @@ _private _method astri_design_migrator.create_pole(pm)
 					# Annotation may not exist or may fail - continue
 				_endtry
 
-				.stats[:poles] +<< 1
+				# Update stats based on pole construction status
+				_if updated_pole.construction_status = "Proposed"
+				_then
+					.stats[:new_poles] +<< 1
+				_else
+					.stats[:existing_poles] +<< 1
+				_endif
 				write("  [OK] Pole updated: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
 				_return updated_pole
 			_else
@@ -216,7 +222,13 @@ _private _method astri_design_migrator.create_pole(pm)
 			_local rec_trans << record_transaction.new_insert(.pole_col, prop_values)
 			_local result << rec_trans.run()
 
-			.stats[:poles] +<< 1
+			# Update stats based on pole construction status
+			_if result.construction_status = "Proposed"
+			_then
+				.stats[:new_poles] +<< 1
+			_else
+				.stats[:existing_poles] +<< 1
+			_endif
 			write("  [OK] Pole created: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
 			_return result
 		_endif
