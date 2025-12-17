@@ -241,7 +241,19 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_local l_rec_trans << record_transaction.new_insert(.sc_col, l_prop_values)
 		_local l_result << l_rec_trans.run()
 
-		.stats[:sheath_splices] +<< 1
+		# Increment specific counter based on closure type
+		_if closure_type = "FDT"
+		_then
+			.stats[:fdts] +<< 1
+		_elif closure_type = "FAT"
+		_then
+			.stats[:fats] +<< 1
+		_elif closure_type.index_of_seq("Joint") _isnt _unset _orif
+		      closure_type.index_of_seq("Closure") _isnt _unset
+		_then
+			.stats[:joint_closures] +<< 1
+		_endif
+		.stats[:sheath_splices] +<< 1  # Keep total for backwards compatibility
 		write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
 
 		# Step 7: Associate to pole structure

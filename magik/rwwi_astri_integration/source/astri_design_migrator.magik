@@ -158,6 +158,9 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 		:existing_poles, 0,
 		:sheath_length, 0.0,
 		:sheath_splices, 0,
+		:fdts, 0,
+		:fats, 0,
+		:joint_closures, 0,
 		:optical_splitters, 0,
 		:figure_eights, 0,
 		:sling_wires, 0,
@@ -214,15 +217,15 @@ _private _method astri_design_migrator.is_boundary_area?(pm)
 	## Boundary area has parent = null or empty AND type = "area"
 	##
 	## Parameters:
-	##   pm (property_list) - Placemark data
+	##   pm (property_list) - Placemark datam
 	##
 	## Returns:
 	##   boolean - True if this is the boundary area
 
-	_local parent << pm[:parent]
+	_local parent << pm[:parent].default("").lowercase
 	_local type << pm[:type]
 
-	>> type = "area" _andif (parent _is _unset _orif parent = "")
+	>> type = "area" _andif (parent _is _unset _orif parent = "" _orif parent.index_of_seq("boundary cluster") _isnt _unset)
 _endmethod
 $
 
@@ -451,7 +454,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_self.create_aerial_route(pm)
 		_endif
 	_endloop
-	
+	#_return 
 	write("  Pass 3: Creating poles...")
 	_for pm _over placemarks.fast_elements()
 	_loop
@@ -481,7 +484,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 		_local is_splice << _self.is_splice?(pm)
 		_local is_fig8 << _self.is_figure_eight?(pm)
-		_local is_dp << _self.is_demand_point?(pm[:parent])
+		_local is_dp << _self.is_demand_point?(pm)
 		#write("    Checking: ", pm[:name], " | is_splice?: ", is_splice, " | is_figure_eight?: ", is_fig8, " | is_demand_point?: ", is_dp, " | Folders: ", pm[:parent].default(""))
 
 		_if is_splice
@@ -503,6 +506,11 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	write("  Pass 5: Creating micro/macro cells...")
 	_for pm _over placemarks.fast_elements()
 	_loop
+		# Skip boundary area (ONLY areas with parent=null/empty)
+		_if _self.is_boundary_area?(pm)
+		_then
+			_continue
+		_endif
 		# Sheath splices (point-based: Join Closure, FDT, FAT)
 		# Micro cells / zones (area-based with parent folders)
 		_local is_cell << _self.is_micro_cell?(pm)
@@ -558,6 +566,9 @@ _method astri_design_migrator.print_statistics()
 	write("Existing Poles:     ", .stats[:existing_poles])
 	write("Sheath Length (m):  ", .stats[:sheath_length].rounded)
 	write("Sheath Splices:     ", .stats[:sheath_splices])
+	write("  - FDT:            ", .stats[:fdts])
+	write("  - FAT:            ", .stats[:fats])
+	write("  - JOINT CLOSURE:  ", .stats[:joint_closures])
 	write("Optical Splitters:  ", .stats[:optical_splitters])
 	write("Figure Eights:      ", .stats[:figure_eights])
 	write("Sling Wires:        ", .stats[:sling_wires])
