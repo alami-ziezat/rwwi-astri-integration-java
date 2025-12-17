@@ -15,7 +15,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 	## - Placeholder pole creation when poles not found
 	## - Additional AR segments to connect to poles
 	## - Sheath creation with structure placement
-
+	write("  Processing Aerial Route: ", pm[:name], .stats)
 	_try _with errCon
 		# Step 0: Parse folders
 		_local folders << pm[:parent].default("")
@@ -33,12 +33,12 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 
 		# Step 1: Validate cable folder pattern (substring matching)
 		_local last_folder << fol[fsize]
-		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "SLING WIRE"}
+		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "SLING WIRE","FO"}
 
 		_local is_cable? << _false
 		_for keyword _over valid_cable_keywords.fast_elements()
 		_loop
-			_if last_folder.index_of_seq(keyword) _isnt _unset
+			_if pm[:name].index_of_seq(keyword) _isnt _unset
 			_then
 				is_cable? << _true
 				_leave

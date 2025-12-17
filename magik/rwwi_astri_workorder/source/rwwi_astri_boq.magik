@@ -515,10 +515,10 @@ $
 
 
 _global create_boq <<
-_proc()
+_proc(design, infra_type)
 
 
-	s << swg_dsn_admin_engine.get_current_job()
+	#s << swg_dsn_admin_engine.get_current_job()
 
 	_if s _is _unset
 	_then

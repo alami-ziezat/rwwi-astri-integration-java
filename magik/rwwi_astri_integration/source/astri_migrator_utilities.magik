@@ -75,31 +75,31 @@ _private _method astri_design_migrator.is_pole?(pm)
 	## Folder must contain "pole" pattern (case-insensitive)
 
 	_local parent << pm[:parent].default("").lowercase
-	>> parent.matches?("*pole*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> parent.matches?("*pole*") _orif network_type = "pole"
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_cable?(pm)
 	## Check if placemark is a cable
-
-	_local parent << pm[:parent].default("").lowercase
-
-	>> parent.matches?("*cable*") _orif
-	   parent.matches?("*kabel*") _orif
-	   parent.matches?("*distribution cable*") _orif
-	   parent.matches?("*sling wire*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "cable"
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.is_demand_point?(folders)
+_private _method astri_design_migrator.is_demand_point?(pm)
 	## Check if placemark is a demand point based on multi-level folder patterns
 	## Checks at three levels: fsize (last), fparent, fgp (grandparent)
 	## Uses simplified wildcard patterns: "*homepass*", "*hp*", "*reduce*", "*customer*"
 
+	_local network_type << pm[:network_type].default("").lowercase
+	_if network_type = "homepass" _then _return _true _endif 
+
+	_local folders << pm[:parent].default("").lowercase
 	_if folders _is _unset _orif folders = ""
-	_then
+	_then 
 		_return _false
 	_endif
 
@@ -141,36 +141,9 @@ _private _method astri_design_migrator.is_splice?(pm)
 	## Checks for: CLOSURE, JOINT CLOSURE, FAT, FDT patterns
 	## IMPORTANT: This is for POINT type (not area)
 
-	_local folders << pm[:parent].default("")
-
-	_if folders = "" _orif folders _is _unset
-	_then
-		_return _false
-	_endif
-
-	# STEP 1: Convert to lowercase FIRST
-	_local folders_lc << folders.lowercase
-
-	# STEP 2: Check if it's a POINT type (not area)
-	_if pm[:type] <> "point"
-	_then
-		_return _false
-	_endif
-
-	# Check if it matches other specific point types
-	# STEP 3: If it matches any of these, it's NOT an access point
-	_if _self.is_pole?(pm) _orif
-	    _self.is_figure_eight?(pm) _orif 
-		_self.is_demand_point?(pm[:parent])
-	_then
-		_return _false
-	_endif
-
-	# STEP 4: Check simplified wildcard patterns
-	>> folders_lc.matches?("*closure*") _orif
-	   folders_lc.matches?("*joint*") _orif
-	   folders_lc.matches?("*fdt*") _orif
-	   folders_lc.matches?("*fat*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "fdt" _orif network_type = "fat" _orif
+	   network_type = "joint_closure" _orif network_type = "handhole"
 _endmethod
 $
 
@@ -179,27 +152,8 @@ _private _method astri_design_migrator.is_figure_eight?(pm)
 	## Check if placemark is a point-based figure_eight (slack, coil)
 	## Checks for: SLACK, SLACK HANGER, COIL patterns
 	## IMPORTANT: This is for POINT type (not area/line)
-
-	_local folders << pm[:parent].default("")
-
-	_if folders = "" _orif folders _is _unset
-	_then
-		_return _false
-	_endif
-
-	# STEP 1: Convert to lowercase FIRST
-	_local folders_lc << folders.lowercase
-
-	# STEP 2: Check if it's a POINT type (not area/line)
-	_if pm[:type] <> "point"
-	_then
-		_return _false
-	_endif
-
-	# STEP 3: Check simplified wildcard patterns
-	>> folders_lc.matches?("*slack*") _orif
-	   folders_lc.matches?("*slack hanger*") _orif
-	   folders_lc.matches?("*coil*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "slack_cable"
 _endmethod
 $
 
@@ -209,8 +163,9 @@ _private _method astri_design_migrator.is_micro_cell?(pm)
 	## Accepts ALL area types - validation happens in create_micro_cell()
 	## - Areas WITHOUT folders = Macro Cell (boundary areas)
 	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
+	_local network_type << pm[:network_type].default("").lowercase
 
-	>> pm[:type] = "area"
+	>> pm[:type] = "area" _andif network_type = "cell"
 _endmethod
 $
 
@@ -226,19 +181,8 @@ _private _method astri_design_migrator.is_olt?(pm)
 	##   _true if OLT, _false otherwise
 
 	# Must be point type
-	_if pm[:type] <> "point"
-	_then
-		_return _false
-	_endif
-
-	# Check if name contains "OLT" (case-sensitive)
-	_local name << pm[:name].default("")
-	_if name = "" _orif name _is _unset
-	_then
-		_return _false
-	_endif
-
-	>> name.matches?("*OLT*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "olt"
 _endmethod
 $
 
@@ -295,7 +239,7 @@ _private _method astri_design_migrator.is_access_point?(pm)
 	    _self.is_figure_eight?(pm) _orif
 	    _self.is_olt?(pm) _orif
 	    _self.is_riser?(pm) _orif
-	    _self.is_demand_point?(pm[:parent])
+	    _self.is_demand_point?(pm)
 	_then
 		_return _false
 	_endif
@@ -613,14 +557,12 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.is_sling_wire?(folders)
+_private _method astri_design_migrator.is_sling_wire?(pm)
 	## Check if this is a sling wire based on folder pattern
 	## Returns: boolean
 
-	_local fs << folders.lowercase
-
-	>> fs.matches?("*sling wire*") _orif
-	   fs.matches?("*sling_wire*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "sling_wire"
 _endmethod
 $
 
@@ -637,10 +579,10 @@ _private _method astri_design_migrator.get_latlong(coord)
 	_local cs_local << .database.world.coordinate_system
 
 	# Create transform from local to WGS84
-	_local transform << transform.new_converting_cs_to_cs(cs_local, cs_wgs84)
+	_local wgs_transform << transform.new_converting_cs_to_cs(cs_local, cs_wgs84)
 
 	# Convert coordinate
-	_local wgs84_coord << transform.convert(coord)
+	_local wgs84_coord << wgs_transform.convert(coord)
 
 	# Format as strings with precision
 	_dynamic !print_float_precision! << 12

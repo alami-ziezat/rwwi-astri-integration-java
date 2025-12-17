@@ -839,30 +839,30 @@ _private _method rwwi_astri_workorder_dialog.activate_design_for_wo(wo)
 _endmethod
 $
 
+_pragma(classify_level=debug, topic={astri_integration})
 _private _method rwwi_astri_workorder_dialog.get_infra_type_from_wo(wo)
-	## Determine infrastructure type from work order category
+	## Determine infrastructure type from work order infrastructure_type field
 	##
 	## Parameters:
 	##   wo (property_list) - Work order data
 	##
 	## Returns:
 	##   string - Infrastructure type: "cluster", "subfeeder", or "feeder"
+	_local infra_type << wo[:infrastructure_type].default("").lowercase
 
-	_local category << wo[:category].default("").lowercase
-
-	_if category.index_of_seq("cluster") _isnt _unset
+	_if infra_type.index_of_seq("cluster") _isnt _unset
 	_then
 		_return "cluster"
-	_elif category.index_of_seq("subfeeder") _isnt _unset _orif
-	      category.index_of_seq("sub feeder") _isnt _unset
+	_elif infra_type.index_of_seq("subfeeder") _isnt _unset _orif
+	      infra_type.index_of_seq("sub feeder") _isnt _unset
 	_then
 		_return "subfeeder"
-	_elif category.index_of_seq("feeder") _isnt _unset
+	_elif infra_type.index_of_seq("feeder") _isnt _unset
 	_then
 		_return "feeder"
 	_else
-		# Default to cluster if category is unclear
-		write("LOG: WARNING - Unknown category '", category, "', defaulting to 'cluster'")
+		# Default to cluster if infra_type is unclear
+		write("LOG: WARNING - Unknown infra_type '", infra_type, "', defaulting to 'cluster'")
 		_return "cluster"
 	_endif
 _endmethod

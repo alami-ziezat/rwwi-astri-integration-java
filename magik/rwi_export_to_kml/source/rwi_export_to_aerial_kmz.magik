@@ -215,9 +215,10 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 	# 1. FEEDER: Check for mit_hub in area
 	olts << .gc[:mit_hub].select(
 		predicate.within(:location, p_area))
-
+	has_olt << _false
 	_if olts.size > 0
 	_then
+		has_olt << _true
 		levels[:feeder] << _true
 		write("  Detected FEEDER network (", olts.size, " OLTs/hubs)")
 	_endif
@@ -309,7 +310,7 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 	# 2. SUBFEEDER: Poles have Joint Closure (with or without FDT)
 	# Special case: Some subfeeder designs only have Closures, no FDTs
 	# Note: If CLUSTER is already detected, don't set SUBFEEDER (cluster takes precedence)
-	_if has_joint_closure _andif levels[:cluster] _is _false
+	_if _not has_olt _andif has_joint_closure _andif levels[:cluster] _is _false
 	_then
 		levels[:subfeeder] << _true
 		_if has_fdt
@@ -768,8 +769,10 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 	##   p_indent - Indentation string
 
 	# Handle OLT folders
+	write("Processing folder: ", p_folder_name)
 	_if p_folder_name.index_of_seq("OLT") _isnt _unset
 	_then
+		write("  Exporting OLTs...")
 		# Query OLT objects in area
 		all_olts << .gc[:mit_hub].select(
 			predicate.interacts(:location, p_area))
@@ -779,7 +782,7 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_folder_contents(p_stream,
 		_loop
 			# Get OLT folders field
 			olt_folders << olt.perform(:folders).default("")
-
+			write("	Checking OLT ID ", olt.object_id, " with folders: ", olt_folders)
 			# Check if OLT's folders field contains this folder name
 			_if olt_folders.index_of_seq(p_folder_name) _isnt _unset
 			_then
@@ -1594,7 +1597,7 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 
 			# Check if this DP belongs to HP COVER (has subfolder name in notes)
 			_if subfolder_name = "" _orif
-			    notes.uppercase.index_of_seq("HP COVER") _is _unset
+			    notes.uppercase.index_of_seq("HP UNCOVER") _isnt _unset
 			_then
 				_continue  # Not for HP COVER
 			_endif
@@ -1764,11 +1767,11 @@ _private _method rwi_export_to_aerial_kmz.write_cells_for_folder(p_stream, p_are
 
 		# Check if this cell belongs to current folder by matching parent folders
 		# The cell_folders should contain the current p_folder_name hierarchy
-		_if cell_folders = "" _orif
-		    cell_folders.uppercase.index_of_seq(p_folder_name.uppercase) _is _unset
-		_then
-			_continue
-		_endif
+		#_if cell_folders = "" _orif
+		#    cell_folders.uppercase.index_of_seq(p_folder_name.uppercase) _is _unset
+		#_then
+		#	_continue
+		#_endif
 
 		# Filter by LINE if specified
 		_if p_line_id _isnt _unset _andif cell_folders <> ""
