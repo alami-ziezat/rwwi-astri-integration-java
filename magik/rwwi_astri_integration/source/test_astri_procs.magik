@@ -319,6 +319,168 @@ _endproc
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
+_global test_astri_kml_network_types << _proc(kml_file_path)
+	## Test KML Parser Network Type Detection
+	## Parses KML file and displays 5 samples for each network object type
+	##
+	## Parameters:
+	##   kml_file_path: Full path to KML file to parse
+	##
+	## Usage:
+	##   test_astri_kml_network_types("C:/path/to/file.kml")
+
+	write("=" * 80)
+	write("Testing ASTRI KML Parser - Network Type Detection")
+	write("=" * 80)
+
+	_try
+		# Validate input
+		_if kml_file_path _is _unset _orif kml_file_path = ""
+		_then
+			write("ERROR: KML file path is required")
+			write("Usage: test_astri_kml_network_types(", %", "C:/path/to/file.kml", %", ")")
+			_return
+		_endif
+
+		write("KML file path: ", kml_file_path)
+		write("")
+
+		# Parse KML file
+		write("Parsing KML file...")
+		_local parser << astri_kml_parser.new(kml_file_path)
+		_local placemarks << parser.parse()
+
+		write("✓ Parsed ", placemarks.size, " placemarks")
+		write("")
+
+		# Group placemarks by network_type
+		_local grouped << equality_hash_table.new()
+		_for pm _over placemarks.fast_elements()
+		_loop
+			_local net_type << pm[:network_type]
+			_if net_type _is _unset
+			_then
+				net_type << "unknown"
+			_endif
+
+			_if grouped[net_type] _is _unset
+			_then
+				grouped[net_type] << rope.new()
+			_endif
+
+			grouped[net_type].add_last(pm)
+		_endloop
+
+		# Display statistics
+		write("=" * 80)
+		write("NETWORK TYPE STATISTICS")
+		write("=" * 80)
+		write("")
+
+		# Build list of (network_type, count) pairs and sort by count
+		_local type_counts << rope.new()
+		_for net_type, items _over grouped.fast_keys_and_elements()
+		_loop
+			type_counts.add_last({net_type, items.size})
+		_endloop
+
+		# Sort by count (descending) - using simple_vector comparison
+		_local sorted_types << sorted_collection.new_from(type_counts,
+			_proc(a, b)
+				_return b[2] _cf a[2]  # Compare counts (second element)
+			_endproc)
+
+		_for pair _over sorted_types.fast_elements()
+		_loop
+			_local net_type << pair[1]
+			_local count << pair[2]
+			write(net_type.write_string.uppercase.space_pad(20, _true), " : ", count)
+		_endloop
+
+		write("")
+		write("=" * 80)
+		write("SAMPLE PLACEMARKS (5 per network type)")
+		write("=" * 80)
+		write("")
+
+		# Display 5 samples for each network type
+		_for pair _over sorted_types.fast_elements()
+		_loop
+			_local net_type << pair[1]
+			_local items << grouped[net_type]
+			_local sample_count << items.size.min(5)
+
+			write("-" * 80)
+			write("Network Type: ", net_type.write_string.uppercase)
+			write("Total Count: ", items.size)
+			write("Showing ", sample_count, " sample(s)")
+			write("-" * 80)
+
+			_for i _over 1.upto(sample_count)
+			_loop
+				_local pm << items[i]
+
+				write("")
+				write("Sample #", i, ":")
+				write("  Name        : ", pm[:name])
+				write("  Type        : ", pm[:type])
+				write("  Network Type: ", pm[:network_type])
+				write("  Parent      : ", pm[:parent])
+
+				# Display coordinates (truncate if too long)
+				_local coord_str << pm[:coord]
+				_if coord_str _isnt _unset _andif coord_str.size > 60
+				_then
+					coord_str << coord_str.subseq(1, 60) + "..."
+				_endif
+				write("  Coordinates: ", coord_str)
+
+				# Display description (truncate if too long)
+				_local desc_str << pm[:desc]
+				_if desc_str _isnt _unset _andif desc_str <> "" _andif desc_str.size > 60
+				_then
+					desc_str << desc_str.subseq(1, 60) + "..."
+				_endif
+				_if desc_str _isnt _unset _andif desc_str <> ""
+				_then
+					write("  Description: ", desc_str)
+				_endif
+
+				# Display extended data if available
+				_if pm[:extended] _isnt _unset _andif pm[:extended].size > 0
+				_then
+					write("  Extended Data:")
+					_local ext_count << 0
+					_for key, val _over pm[:extended].fast_keys_and_elements()
+					_loop
+						ext_count +<< 1
+						_if ext_count > 3  # Limit to 3 extended fields per sample
+						_then
+							write("    ... (", pm[:extended].size - 3, " more fields)")
+							_leave
+						_endif
+						write("    ", key, ": ", val)
+					_endloop
+				_endif
+			_endloop
+
+			write("")
+		_endloop
+
+		write("=" * 80)
+		write("Test completed successfully")
+		write("=" * 80)
+		write("")
+
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+		write("")
+	_endtry
+
+_endproc
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_vendor_list << _proc()
 	## Test Vendor List API
 
@@ -524,3 +686,17 @@ _global test_all_astri_apis << _proc()
 	write("")
 _endproc
 $
+
+## Usage Examples:
+##
+## Test network type detection with a KML file:
+##   test_astri_kml_network_types("C:/Users/user/sw_kml/myfile.kml")
+##
+## Test KML parser with default UUID:
+##   test_astri_kml_parser()
+##
+## Test KML parser with specific UUID:
+##   test_astri_kml_parser("2989eecc-3fd0-402c-bd81-99e02caa7ef5")
+##
+## Run all API tests:
+##   test_all_astri_apis()
