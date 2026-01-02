@@ -796,24 +796,27 @@ $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_kml_parser.extract_linestring_coords(linestr_elem, pl)
-	## Extract LineString coordinates
+	## Extract LineString coordinates using tag-based search
+	## Handles LineString with optional elements like <tessellate>, <altitudeMode>
 
 	_constant C_COORD << "coordinates"
 
-	coord_elem << _unset
-	_if linestr_elem.xml_elements.size = 1
-	_then
-		coord_elem << linestr_elem.xml_elements.an_element()
-	_elif linestr_elem.xml_elements.size > 1
-	_then
-		coord_elem << linestr_elem.xml_elements[2]
-	_endif
-
-	_if coord_elem _isnt _unset
-	_then
-		pl[:coord] << coord_elem.xml_elements.an_element().write_string
-		pl[:type] << "line"
-	_endif
+	# Search for <coordinates> element by tag name instead of using index
+	_for child _over linestr_elem.xml_elements.fast_elements()
+	_loop
+		_if child _isnt _unset _andif
+		    child.type.write_string.matches?(C_COORD)
+		_then
+			# Found coordinates element
+			_local coord_text_elem << child.xml_elements.an_element()
+			_if coord_text_elem _isnt _unset
+			_then
+				pl[:coord] << coord_text_elem.write_string
+				pl[:type] << "line"
+			_endif
+			_leave
+		_endif
+	_endloop
 _endmethod
 $
 
