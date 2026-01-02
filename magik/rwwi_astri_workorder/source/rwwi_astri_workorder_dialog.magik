@@ -430,6 +430,7 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			row +<< 1
 			_local wo_number << wo[:wo_number].default("")
 			_local infra_code << wo[:infra_code].default("")
+			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
 
 			# Add cells to table
 			.items[:table].add_label(row, 1, row.write_string)

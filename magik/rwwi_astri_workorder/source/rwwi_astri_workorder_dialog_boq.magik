@@ -114,8 +114,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 		                           _endif
 
 		# Get infrastructure code from database result (already fetched from PostgreSQL)
-		_local infra_code << wo[infra_code_field].default(wo[:infra_code])
-
+		_local infra_code << wo[:infra_code]
 		# Check if this infra_code should skip hardcoded value
 		_if _not _self.should_skip_boq_hardcode?(infra_code)
 		_then
@@ -300,15 +299,6 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			write("API Send Summary:")
 			write("  Success:", api_success_count)
 			write("  Errors:", api_error_count)
-		_else
-			_if infra_type <> "cluster"
-			_then
-				_self.log_info("Step 5: Skipping API submission...")
-				_self.log_warning("Infrastructure type '" + infra_type + "' does not support API submission")
-				_self.log_info("  API submission is only available for 'cluster' infrastructure type")
-				write("Skipping API send - infrastructure type is:", infra_type, "(only 'cluster' supported)")
-				api_skipped_count << boq_result.size
-			_endif
 		_endif
 		_self.log_info("")
 
@@ -323,79 +313,72 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			_self.log_info("Total BOQ Items: " + boq_result.size.write_string)
 			_self.log_info("")
 
-			# Add API send summary if cluster type
-			_if infra_type = "cluster"
+			# Add API send summary
+			_self.log_info("API SUBMISSION SUMMARY:")
+			_self.log_info("  Successfully sent: " + api_success_count.write_string)
+			_self.log_info("  Errors:            " + api_error_count.write_string)
+			_self.log_info("")
+			
+			# Display detailed successful items
+			_if success_items.size > 0
 			_then
-				_self.log_info("API SUBMISSION SUMMARY:")
-				_self.log_info("  Successfully sent: " + api_success_count.write_string)
-				_self.log_info("  Errors:            " + api_error_count.write_string)
-				_self.log_info("")
+				_local success_msg << write_string("SUCCESSFUL ITEMS (", success_items.size, "):", %newline, "-" * 80, %newline)
 
-				# Display detailed successful items
-				_if success_items.size > 0
-				_then
-					_local success_msg << write_string(
-						"SUCCESSFUL ITEMS (", success_items.size, "):", %newline,
-						"-" * 80, %newline)
+				_for item _over success_items.fast_elements()
+				_loop
+					_local mat_qty << _if item[:qty_material] _is _unset
+				              _then >> "N/A"
+					              _else >> write_string(item[:qty_material])
+					              _endif
+					_local svc_qty << _if item[:qty_service] _is _unset
+					              _then >> "N/A"
+					              _else >> write_string(item[:qty_service])
+					              _endif
 
-					_for item _over success_items.fast_elements()
-					_loop
-						_local mat_qty << _if item[:qty_material] _is _unset
-						              _then >> "N/A"
-						              _else >> write_string(item[:qty_material])
-						              _endif
-						_local svc_qty << _if item[:qty_service] _is _unset
-						              _then >> "N/A"
-						              _else >> write_string(item[:qty_service])
-						              _endif
-
-						success_msg << success_msg + write_string(
-							"  Equipment Code   : ", item[:equipment_name], %newline,
-							"  Description      : ", item[:description], %newline,
-							"  Material Qty     : ", mat_qty, %newline,
-							"  Service Qty      : ", svc_qty, %newline,
-							"  Status           : SUCCESS", %newline,
-							%newline)
-					_endloop
-					_self.log_info(success_msg)
-				_endif
-
-				# Display detailed failed items
-				_if failed_items.size > 0
-				_then
-					_local failed_msg << write_string(
-						"FAILED ITEMS (", failed_items.size, "):", %newline,
-						"-" * 80, %newline)
-
-					_for item _over failed_items.fast_elements()
-					_loop
-						_local mat_qty << _if item[:qty_material] _is _unset
-						              _then >> "N/A"
-						              _else >> write_string(item[:qty_material])
-						              _endif
-						_local svc_qty << _if item[:qty_service] _is _unset
-						              _then >> "N/A"
-						              _else >> write_string(item[:qty_service])
-						              _endif
-
-						failed_msg << failed_msg + write_string(
-							"  Equipment Code   : ", item[:equipment_name], %newline,
-							"  Description      : ", item[:description], %newline,
-							"  Material Qty     : ", mat_qty, %newline,
-							"  Service Qty      : ", svc_qty, %newline,
-							"  Error            : ", item[:error], %newline,
-							%newline)
-					_endloop
-					_self.log_warning(failed_msg)
-				_endif
-
-				_if api_error_count > 0
-				_then
-					_self.log_warning("  Some BOQ items failed to send to ASTRI API")
-				_endif
-			_else
-				_self.log_info("API SUBMISSION: Skipped (only cluster infrastructure supported)")
+					success_msg << success_msg + write_string(
+						"  Equipment Code   : ", item[:equipment_name], %newline,
+						"  Description      : ", item[:description], %newline,
+						"  Material Qty     : ", mat_qty, %newline,
+						"  Service Qty      : ", svc_qty, %newline,
+						"  Status           : SUCCESS", %newline,
+						%newline)
+				_endloop
+				_self.log_info(success_msg)
 			_endif
+
+			# Display detailed failed items
+			_if failed_items.size > 0
+			_then
+				_local failed_msg << write_string(
+					"FAILED ITEMS (", failed_items.size, "):", %newline,
+					"-" * 80, %newline)
+				_for item _over failed_items.fast_elements()
+				_loop
+					_local mat_qty << _if item[:qty_material] _is _unset
+						              _then >> "N/A"
+						              _else >> write_string(item[:qty_material])
+						              _endif
+					_local svc_qty << _if item[:qty_service] _is _unset
+						              _then >> "N/A"
+						              _else >> write_string(item[:qty_service])
+						              _endif
+
+					failed_msg << failed_msg + write_string(
+						"  Equipment Code   : ", item[:equipment_name], %newline,
+						"  Description      : ", item[:description], %newline,
+						"  Material Qty     : ", mat_qty, %newline,
+						"  Service Qty      : ", svc_qty, %newline,
+						"  Error            : ", item[:error], %newline,
+						%newline)
+				_endloop
+				_self.log_warning(failed_msg)
+			_endif
+
+			_if api_error_count > 0
+			_then
+				_self.log_warning("  Some BOQ items failed to send to ASTRI API")
+			_endif
+		
 			_self.log_separator()
 
 			_local msg << write_string(
@@ -405,20 +388,13 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				"Total items: ", boq_result.size, %newline,
 				%newline)
 
-			# Add API send summary if cluster type
-			_if infra_type = "cluster"
-			_then
-				msg << msg + write_string(
-					"API Send Summary:", %newline,
-					"  Successful: ", api_success_count, %newline,
-					"  Errors: ", api_error_count, %newline,
-					%newline)
-			_else
-				msg << msg + write_string(
-					"API Send: Skipped (only cluster infrastructure supported)", %newline,
-					%newline)
-			_endif
-
+			# Add API send summary
+			msg << msg + write_string(
+				"API Send Summary:", %newline,
+				"  Successful: ", api_success_count, %newline,
+				"  Errors: ", api_error_count, %newline,
+				%newline)
+	
 			msg << msg + write_string("BoQ Report Summary:", %newline)
 
 			# Show first 5 items as preview
@@ -479,6 +455,6 @@ _private _method rwwi_astri_workorder_dialog.should_skip_boq_hardcode?(infra_cod
 	# Normalize infra_code (trim whitespace and uppercase)
 	_local normalized_code << infra_code.default("").trim_spaces().uppercase
 	# Check if normalized code is in skip list using includes?()
-	_return skip_list.includes?(normalized_code)
+	_return skip_list.eq_includes?(normalized_code)
 _endmethod
 $

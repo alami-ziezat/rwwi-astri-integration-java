@@ -21,7 +21,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_local segment_id << _self.match_segment(folders)
 
 		# Step 2: Determine closure type
-		_local closure_type << _self.match_closure_type(folders)
+		_local closure_type << _self.match_closure_type(folders, pm[:infrastructure_type].default("cluster"))
 		write("  Processing ", closure_type, ": ", pm[:name])
 
 		# Step 2: Detect core count from name (for Join Closure and FDT)
@@ -156,7 +156,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 
 			_local l_prop_values_pl << property_list.new_with(
 				:location, l_location_start,
-				:telco_pole_tag, "Pole" + pm[:name],
+				:telco_pole_tag, "Pole - " + pm[:name],
 				:usage, "Telco",
 				:material_type, "Steel",
 				:extension_arm, _false,
@@ -174,7 +174,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 				:olt, .pop_name,
 				:segment, segment_id,
 				:uuid, .uuid,
-				:construction_status, .construction_status,
+				:construction_status, "In Service",
 				:cluster_code, .cluster_code_db,
 				:subfeeder_code, .subfeeder_code_db,
 				:feeder_code, .feeder_code_db,
@@ -245,15 +245,16 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_if closure_type = "FDT"
 		_then
 			.stats[:fdts] +<< 1
+			.stats[:sheath_splices] +<< 1 
 		_elif closure_type = "FAT"
 		_then
 			.stats[:fats] +<< 1
+			.stats[:sheath_splices] +<< 1
 		_elif closure_type.index_of_seq("Joint") _isnt _unset _orif
 		      closure_type.index_of_seq("Closure") _isnt _unset
 		_then
 			.stats[:joint_closures] +<< 1
 		_endif
-		.stats[:sheath_splices] +<< 1  # Keep total for backwards compatibility
 		write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
 
 		# Step 7: Associate to pole structure
@@ -392,7 +393,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		write("  Placemark name:", pm[:name].default("(unnamed)"))
 		write("  Folders:", pm[:parent].default("(none)"))
 		write("  Coordinates:", pm[:coord].default("(none)"))
-		write("  Closure type:", _self.match_closure_type(pm[:parent].default("")).default("(unknown)"))
+		write("  Closure type:", _self.match_closure_type(pm[:parent].default(""), pm[:infrastructure_type].default("cluster")).default("(unknown)"))
 		.stats[:errors] +<< 1
 	_endtry
 _endmethod

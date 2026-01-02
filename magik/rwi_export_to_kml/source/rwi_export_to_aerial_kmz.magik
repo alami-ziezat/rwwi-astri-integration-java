@@ -71,7 +71,7 @@ _private _method rwi_export_to_aerial_kmz.get_pole_template_folder_name(p_pole)
 	pole_status << p_pole.perform(:construction_status).default("").uppercase
 	asset_owner << p_pole.perform(:asset_owner).default("").uppercase
 	pole_type << p_pole.perform(:type).default("")
-
+	
 	# Determine NEW vs EXISTING
 	_local status_prefix << _if pole_status = "PROPOSED"
 	                        _then >> "NEW POLE"
@@ -79,7 +79,7 @@ _private _method rwi_export_to_aerial_kmz.get_pole_template_folder_name(p_pole)
 	                        _then >> "EXISTING POLE"
 	                        _else >> _unset
 	                        _endif
-
+	
 	_if status_prefix _is _unset
 	_then
 		_return ""  # Can't determine status
@@ -95,7 +95,7 @@ _private _method rwi_export_to_aerial_kmz.get_pole_template_folder_name(p_pole)
 		             _endif
 	_endif
 
-	# Extract pole spec from type field (look for patterns like "7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5")
+	# Extract pole spec from type field (look for patterns like "7-2.5", "7-3", "7-4", "7-5", "9-3", "9-4", "9-5")
 	_local pole_spec << ""
 	_for spec _over {"7-2.5", "7-3", "7-4", "9-3", "9-4", "9-5"}.fast_elements()
 	_loop
@@ -105,7 +105,7 @@ _private _method rwi_export_to_aerial_kmz.get_pole_template_folder_name(p_pole)
 			_leave
 		_endif
 	_endloop
-
+	
 	# Construct folder name: "NEW POLE 7-4" or "EXISTING POLE EMR 9-5"
 	>> status_prefix + owner_str + pole_spec
 _endmethod
@@ -254,6 +254,7 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 			_for splice _over pole_splices.fast_elements()
 			_loop
 				splice_type << splice.sheath_splice_object_type
+				write("	>> Found sheath_splice on pole ", pole.telco_pole_tag, " of type: ", splice_type)
 				_if splice_type _is _unset _then _continue _endif
 
 				# Check for Joint Closure (SUBFEEDER indicator)
@@ -683,7 +684,7 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_folder_contents(p_stre
 		_loop
 			# Construct template folder name from pole attributes
 			pole_template_folder << _self.get_pole_template_folder_name(pole)
-
+			write(pole.telco_pole_tag, ": Constructed folder name: ", pole_template_folder, " | Checking against: ", p_folder_name)
 			# Check if constructed folder name matches current template folder
 			_if pole_template_folder = p_folder_name
 			_then
@@ -1504,18 +1505,12 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 		sector_list << cable_data[:sector_list]
 		# Merge sectors that connect (last coord of one = first coord of next)
 		merged_sectors << _self.merge_cable_sectors(sector_list)
+		
 
 		# Get cable length from calculated_fiber_length field
-		cable_length << cable.calculated_fiber_length
-		_if cable_length _isnt _unset
-		_then
-			length_value << cable_length.value
-			_if length_value _isnt _unset
-			_then
-				cable_length_sum +<< length_value
-				write("    Cable length: ", length_value.rounded, " meters")
-			_endif
-		_endif
+		cable_length << merged_sectors.line_length / 100.0
+		cable_length_sum << cable_length.rounded  # Convert cm to meters
+		write("    >> Merge Cable length: ", cable_length_sum, " meters")	
 
 		# Write the cable using merged sectors
 		.object_writer.write_cable(cable, merged_sectors, p_stream, p_indent)
@@ -1526,7 +1521,7 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 
 	_if cable_count > 0
 	_then
-		write("  Wrote ", cable_count, " CABLE chains (total length: ", cable_length_sum.rounded, " meters)")
+		write("  Wrote ", cable_count, " CABLE chains (total length: ", cable_length_sum, " meters)")
 	_endif
 _endmethod
 $

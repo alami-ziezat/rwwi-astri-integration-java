@@ -76,7 +76,7 @@ _private _method astri_design_migrator.is_pole?(pm)
 
 	_local parent << pm[:parent].default("").lowercase
 	_local network_type << pm[:network_type].default("").lowercase
-	>> parent.matches?("*pole*") _orif network_type = "pole"
+	>> parent.matches?("*pole*") _orif network_type = "pole" _orif parent.matches?("*tiang*")
 _endmethod
 $
 
@@ -140,6 +140,11 @@ _private _method astri_design_migrator.is_splice?(pm)
 	## Check if placemark is a point-based sheath splice
 	## Checks for: CLOSURE, JOINT CLOSURE, FAT, FDT patterns
 	## IMPORTANT: This is for POINT type (not area)
+
+	_if _self.is_pole?(pm)
+	_then
+		_return _false  # Poles are not splices
+	_endif	
 
 	_local network_type << pm[:network_type].default("").lowercase
 	>> network_type = "fdt" _orif network_type = "fat" _orif
@@ -256,22 +261,19 @@ _private _method astri_design_migrator.match_pole_type(fs)
 
 	# Match patterns with wildcards (* = any character)
 	_local pole_type <<
-	_if fs.matches?("*7*2.5*")
+	_if fs.matches?("*|*7*2.5*")
 	_then
 		>> "Pole 7-2.5"
-	_elif fs.matches?("*7*3*")
+	_elif fs.matches?("*|*7*3*")
 	_then
 		>> "Pole 7-3"
-	_elif fs.matches?("*7*4*")
+	_elif fs.matches?("*|*7*4*")
 	_then
 		>> "Pole 7-4"
-	_elif fs.matches?("*7*5*")
-	_then
-		>> "Pole 7-5"
-	_elif fs.matches?("*9*4*")
+	_elif fs.matches?("*|*9*4*")
 	_then
 		>> "Pole 9-4"
-	_elif fs.matches?("*9*5*")
+	_elif fs.matches?("*|*9*5*")
 	_then
 		>> "Pole 9-5"
 	_else
@@ -519,34 +521,33 @@ _private _method astri_design_migrator.match_cable_core(cable_name)
 	## (e.g., check 576 before 57, check 288 before 28, check 144 before 14)
 
 	_local cn << cable_name.lowercase
-
 	_local cable_core <<
 		# Check largest numbers first
-		_if cn.matches?("*fo*576*")
+		_if cn.matches?("*576*")
 		_then
 			>> "576"
-		_elif cn.matches?("*fo*288*")
+		_elif cn.matches?("*288*")
 		_then
 			>> "288"
-		_elif cn.matches?("*fo*144*")
+		_elif cn.matches?("*144*")
 		_then
 			>> "144"
-		_elif cn.matches?("*fo*96*")
+		_elif cn.matches?("*96*") 
 		_then
 			>> "96"
-		_elif cn.matches?("*fo*72*")
+		_elif cn.matches?("*72*") 
 		_then
 			>> "72"
-		_elif cn.matches?("*fo*48*")
+		_elif (cn.matches?("*fo*48*") _orif cn.matches?("*48c*"))
 		_then
 			>> "48"
-		_elif cn.matches?("*fo*36*")
+		_elif (cn.matches?("*fo*36*") _orif cn.matches?("*36c*"))
 		_then
 			>> "36"
-		_elif cn.matches?("*fo*24*")
+		_elif (cn.matches?("*fo*24*") _orif cn.matches?("*24c*"))
 		_then
 			>> "24"
-		_elif cn.matches?("*fo*12*")
+		_elif (cn.matches?("*fo*12*") _orif cn.matches?("*12c*"))
 		_then
 			>> "12"
 		_else
@@ -617,7 +618,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.match_closure_type(folders)
+_private _method astri_design_migrator.match_closure_type(folders, infra_type)
 	## Determine closure type from folder string
 	## Order: CLOSURE/JOINT >> FAT >> FDT
 	## Returns: "Join Closure", "FAT", or "FDT"
@@ -639,8 +640,14 @@ _private _method astri_design_migrator.match_closure_type(folders)
 		_elif folders_lc.matches?("*fdt*")
 		_then
 			>> "FDT"
+		_elif infra_type = "feeder"
+		_then 
+			>> "Join Closure"  # Default Feeder
+		_elif infra_type = "subfeeder"
+		_then 
+			>> "FDT"  # Default Subfeeder
 		_else
-			>> "Join Closure"  # Default
+			>> "FAT"  # Default Cluster
 		_endif
 	_return closure_type
 _endmethod

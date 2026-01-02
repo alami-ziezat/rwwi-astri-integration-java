@@ -454,7 +454,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_self.create_aerial_route(pm)
 		_endif
 	_endloop
-	#_return 
+	
 	write("  Pass 3: Creating poles...")
 	_for pm _over placemarks.fast_elements()
 	_loop

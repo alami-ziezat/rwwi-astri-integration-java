@@ -167,8 +167,8 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 			:fdt_object, fdt,
 			:subfolders, rope.new())
 
-		# Add 4 LINEs inside FDT folder
-		_for line_id _over {"A", "B", "C", "D"}.fast_elements()
+		# Add 2 LINEs inside FDT folder
+		_for line_id _over {"A", "B"}.fast_elements()
 		_loop
 			line_folder << _self.build_line_folders(line_id, fdt)
 			fdt_folder[:subfolders].add(line_folder)
@@ -177,7 +177,7 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 		folder_defs.add(fdt_folder)
 
 	_else
-		# Multiple FDTs - create separate FDT_[NAME] folder for each
+		# Multiple FDTs - create separate FDT_[NAME] folder for each	
 		_for fdt _over p_fdts.fast_elements()
 		_loop
 			fdt_name << fdt.perform(:name).default("FDT_" + fdt.id.write_string)
@@ -190,8 +190,8 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 				:fdt_object, fdt,
 				:subfolders, rope.new())
 
-			# Add 4 LINEs directly inside FDT_[NAME] folder
-			_for line_id _over {"A", "B", "C", "D"}.fast_elements()
+			# Add 2 LINEs directly inside FDT_[NAME] folder
+			_for line_id _over {"A", "B"}.fast_elements()
 			_loop
 				line_folder << _self.build_line_folders(line_id, fdt)
 				cluster_folder[:subfolders].add(line_folder)
