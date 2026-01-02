@@ -254,6 +254,14 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:spec_id, "Join Closure In-line 288 Core"
 		),
 
+		# Cable Hanger (Figure Eight)
+		"200000185", property_list.new_with(
+			:code, "200000185",
+			:object, "Cable Hanger",
+			:name, "CABLE HANGER",
+			:material_slot, :material
+		),
+
 		# Closures - Dome
 		"200000180", property_list.new_with(
 			:code, "200000180",
@@ -433,7 +441,8 @@ _method rwwi_astri_boq_generator.generate()
 			    col_name _isnt :pole _andif
 			    col_name _isnt :sheath_with_loc _andif
 			    col_name _isnt :sling_wire _andif
-			    col_name _isnt :riser
+			    col_name _isnt :riser _andif
+			    col_name _isnt :figure_eight
 			_then
 				_continue
 			_endif
