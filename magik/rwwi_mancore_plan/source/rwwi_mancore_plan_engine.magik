@@ -1,0 +1,82 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2025 Realworld Systems. All Rights Reserved.
+# 					       
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwwi_mancore_plan_engine)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwwi_mancore_plan_engine,
+	{
+		{ :current_selection_ur1,_unset },
+		{ :current_selection_ur2,_unset },
+	#	{ :items,            _unset },
+	#	{ :table_list,       _unset },
+	#	{ :table_list2,  _unset },
+		{ :styles,           _unset },
+		{ :owner,            _unset },
+		{ :grs,              _unset },
+		{ :mapman,           _unset },
+		{ :ed,               _unset },
+		{ :ev,               _unset },
+	#	{ :records,          _unset },
+		{ :rekom,          _unset },
+		{ :tin,              _unset },
+		{ :tin_sub,          _unset },
+		{ :world_for_draw,   _unset },
+		{ :thread_engine,    _unset },
+		{ :current_trail,    _unset },
+		{ :result_geometries, _unset},
+		{ :show_results,     _unset },
+		{:engine, _unset}
+	},{:model})
+$
+
+_pragma(classify_level=restricted)
+rwwi_mancore_plan_engine.define_shared_constant( :databus_consumer_data_types,
+    { :map_selection },
+    :public )
+
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_engine.new(_optional owner, framework)
+	## 
+	## 
+	_return _clone.init(owner, framework)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_engine.init( owner , framework )
+	## 
+	## 
+
+	.grs << framework
+	.ev << gis_program_manager.cached_dataset(:gis)
+	.owner << owner
+	.mapman << .grs.plugin(:map_plugin)
+	.ed << .grs.plugin(:editor_manager)
+
+	# Holder for widgets
+	#	.items << hash_table.new()
+	.current_selection_ur1 << _unset
+	.current_selection_ur2 << _unset
+	
+	# Data holder
+	#.table_list << rope.new()
+	#.table_list2 << rope.new()
+	#.records << rope.new()
+	
+	# Add dependent dialog to plugin
+	_self.add_dependent(.owner)
+
+	_return _self
+_endmethod
+$

@@ -1,0 +1,106 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2025 Realworld Systems. All Rights Reserved.
+# 
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwwi_mancore_plan_plugin)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwwi_mancore_plan_plugin,
+	##
+	##
+	{
+		{:doc, _unset },
+		{:frame,_unset }
+	},
+	:plugin)
+$
+
+_pragma(classify_level=advanced)
+rwwi_mancore_plan_plugin.define_shared_constant(:databus_producer_data_types,
+				      {
+					      :goto_request,
+					      :geometry_to_draw,
+					      :post_render_sets
+				      },
+				      :private
+	       )
+$
+
+_pragma(classify_level=advanced)
+rwwi_mancore_plan_plugin.define_shared_constant(:post_render_sets,
+				      equality_geometry_set.new(),
+				      :private
+	       )
+$
+
+
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_plugin.init_actions()
+	## 
+	##
+	
+	_self.add_action( sw_action.new( :activate_mancore_plan,
+					 :caption,         "Mancore Plan",
+					 :engine, _self,
+					 :image, {:associate, :mit_base_gui},
+					 :action_message, :|activate_mancore_plan()|,
+					 :help_id, 5030 ) )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_plugin.activate_mancore_plan()
+	## 
+	## Activate
+
+	
+	d << _self.get_dialog( :mancore_plan )
+	
+	_if  d  _is _unset
+	_then
+		d << rwwi_mancore_plan_dialog.new( _self, _self.application )
+		_self.cache_dialog( :mancore_plan, d )
+
+	_endif
+	
+	d.activate()
+	
+	>> d	
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method rwwi_mancore_plan_plugin.sw_databus_data_requested(data_type, _gather args)
+	## 
+	## 
+	
+	>> _if data_type _is :post_render_sets
+	   _then
+		   _self.post_render_sets.empty()
+
+		   >> _if _self.dialogs.an_element() _isnt _unset
+		      _then
+			      dg << _self.dialogs.an_element()
+
+			      _if dg.get_render_status() _is _true _then
+				      
+				      >> dg.kml_direction()
+			      _else
+				      >>_self.post_render_sets.empty()
+
+			      _endif
+			      
+		      _endif	
+	   _endif
+	
+_endmethod
+$

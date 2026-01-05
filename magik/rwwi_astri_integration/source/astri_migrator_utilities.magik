@@ -81,6 +81,13 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_route?(pm)
+	## Check if placemark is a cable
+	>> _self.is_cable?(pm) _orif _self.is_sling_wire?(pm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_cable?(pm)
 	## Check if placemark is a cable
 	_local network_type << pm[:network_type].default("").lowercase

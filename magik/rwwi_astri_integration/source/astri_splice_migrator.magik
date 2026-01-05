@@ -342,6 +342,7 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 					:folders, folders,
 					:fttx_network_type, _self.get_fttx_network_type(),
 					:segment, segment_id,
+					:stf_item_code, "200000185",
 					:pop, .pop_name,
 					:olt, .pop_name,
 					:uuid, .uuid,

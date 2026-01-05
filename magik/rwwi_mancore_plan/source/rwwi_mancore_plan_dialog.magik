@@ -1,0 +1,595 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2025 Realworld Systems. All Rights Reserved.
+# 
+# 
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwwi_mancore_plan_dialog)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwwi_mancore_plan_dialog,
+	{
+		{ :current_selection_ur1,_unset },
+		{ :current_selection_ur2,_unset },
+		{ :items,            _unset },
+		{ :table_list,       _unset },
+		{ :table_list2,  _unset },
+		{ :styles,           _unset },
+		{ :owner,            _unset },
+		{ :grs,              _unset },
+		{ :mapman,           _unset },
+		{ :ed,               _unset },
+		{ :a_sc,               _unset },
+		{ :ev,               _unset },
+		{ :records,          _unset },
+		{ :swl1,          _unset },
+		{ :swl2,          _unset },
+		{ :swl3,          _unset },
+
+		{:engine, _unset}
+	},{:model})
+$
+
+_pragma(classify_level=restricted)
+rwwi_mancore_plan_dialog.define_shared_constant( :databus_consumer_data_types,
+    { :map_selection },
+    :public )
+
+$
+#rwwi_mancore_plan_dialog.define_shared_variable(
+#                 :items,_unset,:public)
+#$
+
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.new(_optional owner, framework)
+	## 
+	## 
+	>> _clone.init(owner, framework)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.init(owner, framework)
+	## 
+	##
+	_super.init()
+
+	.ev << gis_program_manager.cached_dataset(:gis)
+	.owner << owner
+	.grs << framework
+
+	.grs << smallworld_product.pni_application()
+	.mapman << .grs.plugin(:map_plugin)
+	.ed << .grs.plugin(:editor_manager)
+	.items << hash_table.new()
+	.current_selection_ur1 << _unset
+	.current_selection_ur2 << _unset
+	.swl1 << _unset
+	.swl2 << _unset
+	.swl3 << _unset 
+	# Data holder
+	.table_list << rope.new()
+	.table_list2 << rope.new()
+	.records << rope.new()
+	.a_sc << _unset 
+	.engine << ""
+
+	# Add dependent dialog to plugin
+	_self.add_dependent(.owner)
+        >> _self
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.activate_in( parent )
+	## 
+	##
+	parent.title << "FTTx Mancore Plan"
+
+	mb << menubar.new( parent )
+
+	m << _unset
+
+	# Create the first pulldown menu and its button items
+	p << pulldown_menu.new()
+	#button_item.new( p, "Load KML...", _self , :get_kml|()| )
+	button_item.new( p, "Clear",  _self , :clear|()| )
+	button_item.new( p, "Refresh", _self , :refresh|()| )
+	# Create the "File" button in the menubar
+	menu_button_item.new( mb, "File", p )
+
+	
+	top_outer << sw_container.new( parent, _unset, 1,
+				       :outer_spacing, 4,
+				       :row_spacing, 4,
+				       :row_resize_values, {0,1},
+				       :width, 700,
+				       :height, 800 )
+
+	first_con << sw_border_container.new( top_outer, _unset, 1,
+					      :label, "",
+					      :row_resize_values,{0,1})
+	
+	_self.build_toolbar( first_con )
+
+	thirt_con << sw_border_container.new( top_outer, _unset, 1,
+					      :label, "",
+					      :width, 30,
+					      :row_resize_values,{0})
+	
+	_self.build_toolbar_second( thirt_con )
+	_self.build_label_result2( thirt_con )
+	
+	second_con << sw_border_container.new( top_outer, _unset, 2,
+					      :label, "",
+					      :width, 500,
+					      :row_resize_values,{0})
+
+	#_self.build_toolbar_exec( second_con )
+	_self.build_table_ur1( second_con )
+	_self.build_table_ur2( second_con )
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.build_toolbar( parent )
+	## 
+	##
+	toolbar << sw_container.new( parent, 1, _unset,
+				     :col_spacing, 15  
+				)
+	file_toolbar << sw_toolbar_container.new( toolbar, _false,
+						  :background_type, :button_group,
+						  :button_group_height, sw_item.default_item_height )
+
+	sw_label_item.new( file_toolbar, "Infrastructure:")
+	
+	.items[:infra] << sw_text_item.new( file_toolbar, :model, _self,
+					       :editable?, _false,
+					       :text_items, {{:feeder,"Feeder"},
+							     {:subfeeder,"SubFeeder"},
+							     {:cluster,"Cluster"}
+					       }
+					   )
+
+
+	sw_label_item.new( file_toolbar, "Source:")
+	
+	.items[:kmlsource] << sw_text_item.new( file_toolbar, :model, _self,
+					       :editable?, _false,
+					       :text_items, { {:selected,"Selected Object"},
+							       {:cable,"Cable"},
+							       {:trail,"Trail"},
+							       {:olt,"OLT"},
+							       {:closure,"CLosure"},
+							       {:fdt,"FDT"},
+							       {:fat,"FAT"},
+							       {:cable,"Cable"},
+							       {:kml,"KML"}
+					       }
+					   )
+
+
+
+	.items[:add_ur1] << sw_button_item.new( file_toolbar,
+					       :image, {:find, :ui_resources},
+					       :model, _self,
+					       :selector, :get_cable|()|,
+					       :tooltip, "Cari Closure Terdekat" )
+
+
+	sw_label_item.new( file_toolbar, "    Cluster " )
+	
+	.items[:nm] << sw_text_item.new( file_toolbar,
+					 :editable?, _true,
+					 :enabled?, _false,
+					 :display_length, 25)
+
+
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.build_toolbar_second( parent )
+	## 
+	##
+	toolbar << sw_container.new( parent, 1, _unset,
+				     :col_spacing, 15  
+				)
+	file_toolbar << sw_toolbar_container.new( toolbar, _false,
+						  :background_type, :button_group,
+						  #:col_alignment, :fill,
+						  :button_group_height, sw_item.default_item_height )
+
+	.items[:run_check] << sw_button_item.new( file_toolbar,
+					       :image, {:run, :ui_resources},
+					       :model, _self,
+					       :selector, :get_result|()|,
+					       #:enabled?, _false,
+					       :tooltip, "Check " )
+
+	.items[:clear] << sw_button_item.new( file_toolbar,
+					       :image, {:clear, :ui_resources},
+					       :model, _self,
+					       :selector, :clear|()|,
+					       :tooltip, "Clear" )
+
+	sw_label_item.new( file_toolbar, "        " )
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.build_toolbar_exec( parent )
+	## 
+	##
+	toolbar << sw_container.new( parent, 1, _unset,
+				     :col_spacing, 15  
+				)
+	file_toolbar << sw_toolbar_container.new( toolbar, _false,
+						  :background_type, :button_group,
+						  #:col_alignment, :fill,
+						  :button_group_height, sw_item.default_item_height )
+
+	.items[:run_check] << sw_button_item.new( file_toolbar,
+					       :image, {:run, :ui_resources},
+					       :model, _self,
+					       :selector, :get_result|()|,
+					       #:enabled?, _false,
+					       :tooltip, "Check " )
+
+	.items[:clear] << sw_button_item.new( file_toolbar,
+					       :image, {:clear, :ui_resources},
+					       :model, _self,
+					       :selector, :clear|()|,
+					       :tooltip, "Clear" )
+
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.build_label_result2( parent )
+	## 
+	##
+	
+	text_container << sw_container.new( parent, _unset, 1, :row_spacing, 5, :outer_spacing, 10)
+
+	.items[:result2] << sw_text_window.new( text_container,
+					       :col_alignment, :fill
+					  )
+	.items[:result2].text <<""
+	
+	.items[:result2].colour << colour.called(:white)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.build_label_result( parent )
+	## 
+	##
+	
+	text_container << sw_container.new( parent, _unset, 1, :row_spacing, 5, :outer_spacing, 10)
+
+	.items[:result] << sw_text_window.new( text_container,
+					       :col_alignment, :fill
+					  )
+	.items[:result].text <<""
+	
+	.items[:result].colour << colour.called(:white)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwwi_mancore_plan_dialog.build_table_ur1( parent )
+	## 
+	##
+	.items[:table] << a_table << sw_table.new( parent,
+				 :model, _self,
+				 :label, "Cable Connectifity",
+				 :aspect, :table_ur1,
+				 :data_selector, :populate_ur1|()|,
+				 #:text_style , .styles[:true_style],
+				 :selection_notifier, :table_selected_ur1|()|,
+				 :double_click_notifier,:|open_editor_ur1()|,
+				 :row_lines?, _true,
+				 #:enabled?,  _false ,
+				 :selection_type, :row, # :row or :cell
+				 :selection_mode, :one, # :many or :one
+				 :min_height, 350 )
+	a_table.n_cols << 6
+	a_table.set_column_labels({"Fiber",
+				   "Name",
+				   " ",
+				   "Priority",
+				   "Cable",
+				   "Status"
+				  })
+ 
+	a_table.col_resize_values << {0.5,1,0.1,0.3,1,0.3}
+	
+	# The table can be filtered, sorted and columns can be
+	# reordered and hidden
+	a_table.enable_filter? << _true
+	a_table.enable_sort? << _true
+	a_table.enable_manage_columns? << _true
+
+	a_table.set_column_sort_procedure(1, a_table.strings_with_numbers_sort_proc)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwwi_mancore_plan_dialog.build_table_ur2( parent )
+	## 
+	##
+	.items[:table2] << a_table2 << sw_table.new( parent,
+				 :model, _self,
+				 :label, "New Cable Connectifity",
+				 :aspect, :table_ur2,
+				 :data_selector, :populate_ur2|()|,
+				 :selection_notifier, :table_selected_ur2|()|,
+				 :double_click_notifier,:|open_editor_ur2()|,
+				 :row_lines?, _true,
+				 :selection_type, :row, # :row or :cell
+				 :selection_mode, :one, # :many or :one
+				 :min_height, 350 )
+	a_table2.n_cols << 4
+	a_table2.set_column_labels({"Fiber",
+				    "Name",
+				    " ",
+				    "Priority",
+				    "Cable",
+				    "Status"
+				  })
+	a_table2.col_resize_values << {0.5,1,0.1,0.3,1,0.3}
+	# The table can be filtered, sorted and columns can be
+	# reordered and hidden
+	a_table2.enable_filter? << _true
+	a_table2.enable_sort? << _true
+	a_table2.enable_manage_columns? << _true
+
+	a_table2.set_column_sort_procedure(1, a_table2.strings_with_numbers_sort_proc)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.get_cable()
+
+	r << _self.selected_str()
+	write("obj :",r)
+	
+	_if r.external_name ="Aerial Route" _orif r.external_name = "Underground Route"
+	_then
+		rr << r.cables()
+		_if rr.size  = 1 _then
+			cab << rr.an_element()
+			.items[:result2].text <<""
+			.items[:result2].append("DATA CABLE SELECTED")
+			.items[:result2].append(newline_char)
+			.items[:result2].append("===================")
+			.items[:result2].append(newline_char)
+			.items[:result2].append(newline_char)
+			.items[:result2].append("Name    : "+ cab.name)
+			.items[:result2].append(newline_char)
+			.items[:result2].append("Spec    : "+ cab.spec_id)
+			.items[:result2].append(newline_char)
+			.items[:result2].append("OLT    : "+ cab.olt)
+			.items[:result2].append(newline_char)
+			.items[:result2].append("Feeder    : "+ cab.feeder_code.default(""))
+			.items[:result2].append(newline_char)
+			.items[:result2].append("SubFeeder    : "+ cab.subfeeder_code.default(""))
+			.items[:result2].append(newline_char)
+			.items[:result2].append(newline_char)
+			
+			.items[:result2].append("DATA Astri")
+			.items[:result2].append(newline_char)
+			.items[:result2].append("===========")
+		_else
+			cab << _unset 
+		_endif
+
+
+	
+
+	_else
+		_self.show_message("Pilih Kabel")	
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.get_ur1()
+	##
+	##
+
+	#.engine.get_ur2(.items, .records)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.get_ur2()
+	##
+	##
+
+	#.engine.get_ur2(.items, .records)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.clear()
+#	## 
+#	##
+
+	.current_selection_ur1 << _unset
+	.current_selection_ur2 << _unset
+	.swl1 << _unset
+	.swl2 << _unset
+	.swl3 << _unset
+
+
+	.table_list.empty()
+	.table_list2.empty()
+	.items[:table].refresh()
+	.items[:table2].refresh()
+#
+#
+	.items[:table].clear_selection()
+	_self.changed(:table_ur1, :refresh)
+	_self.changed(:table_ur2, :refresh)
+
+	.items[:result2].text << ""
+
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.populate_ur1( a_table )
+	## 
+	##
+
+	row << 1
+	rd << {:traffic_light_red, :ui_resources}
+	gr << {:traffic_light_grey, :ui_resources}
+	gn << {:traffic_light_green, :ui_resources}
+	tk << {:tick, :ui_resources}
+	
+	_for a_rec  _over .table_list.fast_elements()
+	_loop
+		a_table.set_row_data( row, a_rec )
+		a_table.add_cell(row, 1, {}, {:label, a_rec.fiber_number.as_number() })
+		a_table.add_cell( row, 2, {}, {:label, a_rec.owner })
+		a_table.add_cell( row, 3, {}, {:label, "" })
+		a_table.add_cell( row, 4, {}, {:label, a_rec.priority })
+		a_table.add_cell( row, 5, {}, {:label, a_rec.sheath_with_loc.name })
+		
+		_if a_rec.owner = "Kosong" _orif a_rec.owner = "Idle" _orif a_rec.owner = "Port Kosong" _orif a_rec.owner _is _unset _orif a_rec.owner = ""
+		_then 
+			a_table.add_cell( row, 6, {}, {:image, rd })
+		_else
+			a_table.add_cell( row, 6, {}, {:image, gn })	
+		_endif
+		
+		row +<< 1
+	_endloop
+
+	a_table.apply_sorting(_true )
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.populate_ur2( a_table )
+	## 
+	##
+
+	row << 1
+	rd << {:traffic_light_red, :ui_resources}
+	gr << {:traffic_light_grey, :ui_resources}
+	gn << {:traffic_light_green, :ui_resources}
+	tk << {:tick, :ui_resources}
+	_for a_rec  _over .table_list2.fast_elements()
+	_loop
+		a_table.set_row_data( row, a_rec )
+		a_table.add_cell(row, 1, {}, {:label, a_rec.fiber_number.as_number(),:row_alignment, :centre})
+		a_table.add_cell( row, 2, {}, {:label, a_rec.owner })
+		a_table.add_cell( row, 3, {}, {:label, "" })
+		a_table.add_cell( row, 4, {}, {:label, a_rec.priority })
+		a_table.add_cell( row, 5, {}, {:label, a_rec.sheath_with_loc.name })
+		_if a_rec.owner = "Kosong" _orif a_rec.owner = "Idle" _orif a_rec.owner = "Port Kosong" _orif a_rec.owner _is _unset _orif a_rec.owner = ""
+		_then 
+			a_table.add_cell( row, 6, {}, {:image, rd })
+		_else
+			a_table.add_cell( row, 6, {}, {:image, gn })	
+		_endif
+		
+		row +<< 1
+	_endloop
+
+	a_table.apply_sorting(_true )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.table_selected_ur1( selection )
+#	## 
+#	##
+	_global sel
+	sel << selection
+	.current_selection_ur1 << selection.get_row_data_from_selection().an_element()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.table_selected_ur2( selection )
+	## 
+	##
+	_global sel
+	sel << selection
+	.current_selection_ur2 << selection.get_row_data_from_selection().an_element()
+	
+_endmethod
+$
+
+
+
+
+ _pragma(classify_level=advanced)
+_method rwwi_mancore_plan_dialog.selected_str()
+
+	#setvars()
+	#grs << smallworld_product.pni_application()
+
+	grs << smallworld_product.application(:pni)
+	#mapman << grs.plugin(:maps)
+	mapman << grs.plugin(:map_plugin)
+
+	sel << mapman.current_map.current_selection
+
+	write(sel)
+	_if sel.size = 0
+	_then
+		_self.show_message("Pilih Kabel")	
+	_else
+		an_rwo << sel.an_element().rwo
+		write(an_rwo.id)
+	
+	_endif
+		>> an_rwo
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.wm_close()
+	## 
+	## 
+	#	_self.clear()
+	_self.wm_close()
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.get_result()
+
+	_self.show_message("Under Construction")
+_endmethod
+$

@@ -447,14 +447,12 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_continue
 		_endif
 
-		_local is_cable << _self.is_cable?(pm)
-		#write("    Checking: ", pm[:name], " | is_cable?: ", is_cable, " | Folders: ", pm[:parent].default(""))
-		_if is_cable
+		_local is_route << _self.is_route?(pm)
+		_if is_route
 		_then
 			_self.create_aerial_route(pm)
 		_endif
 	_endloop
-	
 	write("  Pass 3: Creating poles...")
 	_for pm _over placemarks.fast_elements()
 	_loop
