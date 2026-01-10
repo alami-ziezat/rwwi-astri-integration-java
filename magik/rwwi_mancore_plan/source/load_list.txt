@@ -1,3 +1,4 @@
 rwwi_mancore_plan_dialog
 rwwi_mancore_plan_engine
 rwwi_mancore_plan_plugin
+test_astri_device_connection_api

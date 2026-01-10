@@ -37,9 +37,12 @@ _method rwwi_astri_workorder_plugin.activate_workorder()
 
 	write("Activating ASTRI Work Order Manager...")
 
-	_if .dialog _is _unset
+	name << :workorder_manager
+	.dialog << _self.get_dialog( name )
+	_if .dialog _is _unset 
 	_then
-		.dialog << rwwi_astri_workorder_dialog.new(_self)
+		.dialog << rwwi_astri_workorder_dialog.new(_self, _self.application)
+		_self.cache_dialog( name, .dialog)
 	_endif
 
 	_if .dialog.active?.not
@@ -48,6 +51,7 @@ _method rwwi_astri_workorder_plugin.activate_workorder()
 	_else
 		write("Dialog already active")
 	_endif
+	>> .dialog
 _endmethod
 $
 

@@ -846,98 +846,704 @@ Returning JSON response directly
 
 ### 8.2 Integration Testing (Magik)
 
-**Test Script Location:** `pni_custom/rwwi_astri_integration_java/magik/rwwi_astri_integration/source/test_device_connection_procs.magik`
+**Test Script Location:** `pni_custom/rwwi_astri_integration_java/magik/rwwi_mancore_plan/source/test_astri_device_connection_api.magik`
 
-**Test Cases:**
+**Complete Test Procedure File** (see Section 8.3 for full implementation)
 
-1. **Basic Feeder Query**
+**Test Overview:**
+
+The Magik test suite validates:
+1. ✅ Basic feeder query functionality
+2. ✅ Basic subfeeder query functionality
+3. ✅ Pagination (limit/offset handling)
+4. ✅ Error handling (invalid codes, invalid types)
+5. ✅ Large response handling (100+ connections)
+6. ✅ JSON response structure validation
+7. ✅ Core status parsing (AVAILABLE/TAKEN/RESERVED)
+8. ✅ Performance measurement
+
+### 8.3 Complete Magik Test Implementation
+
+**File:** `pni_custom/rwwi_astri_integration_java/magik/rwwi_mancore_plan/source/test_astri_device_connection_api.magik`
+
+**Complete Test Suite Code:**
+
+```magik
+#% text_encoding = iso8859_1
+_package user
+$
+
+## ===========================================================================
+## ASTRI Device Connection API - Comprehensive Test Suite
+## ===========================================================================
+## Purpose: Test astri_get_device_connections() Magik procedure
+## Location: pni_custom/rwwi_astri_integration_java/magik/rwwi_mancore_plan/source/
+##
+## Test Coverage:
+##   - Basic feeder/subfeeder queries
+##   - Pagination
+##   - Error handling
+##   - JSON response validation
+##   - Performance testing
+##   - Core status filtering
+## ===========================================================================
+
+## ---------------------------------------------------------------------------
+## TEST 1: Basic Feeder Query
+## ---------------------------------------------------------------------------
+_global test_device_connection_feeder << _proc()
+	## Test basic feeder connection query
+	## Expected: JSON response with success=true and data array
+
+	write("========================================")
+	write("TEST 1: Basic Feeder Query")
+	write("========================================")
+
+	_try
+		_local json_result << astri_get_device_connections(
+			"feeder",        # infra_type
+			"FPLB0073",      # infra_code (example feeder)
+			50,              # limit
+			0                # offset
+		)
+
+		write("✓ API call succeeded")
+		write("Response type: ", json_result.class_name)
+		write("Response length: ", json_result.size, " characters")
+
+		# Check for success indicator
+		_if json_result.index_of_seq(%"success":true%) _isnt _unset
+		_then
+			write("✓ Response contains success:true")
+		_else
+			write("✗ FAILED: Response does not contain success:true")
+			write("Response preview: ", json_result.subseq(1, 200.min(json_result.size)))
+		_endif
+
+		# Check for data array
+		_if json_result.index_of_seq(%"data":[%) _isnt _unset
+		_then
+			write("✓ Response contains data array")
+		_else
+			write("✗ FAILED: Response missing data array")
+		_endif
+
+		# Display first 1000 chars for inspection
+		write("")
+		write("Response preview (first 1000 chars):")
+		write(json_result.subseq(1, 1000.min(json_result.size)))
+
+		write("")
+		write("✓ TEST 1 COMPLETED")
+
+	_when error
+		write("✗ TEST 1 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 2: Basic Subfeeder Query
+## ---------------------------------------------------------------------------
+_global test_device_connection_subfeeder << _proc()
+	## Test basic subfeeder connection query
+	## Expected: JSON response with success=true and data array
+
+	write("========================================")
+	write("TEST 2: Basic Subfeeder Query")
+	write("========================================")
+
+	_try
+		_local json_result << astri_get_device_connections(
+			"subfeeder",     # infra_type
+			"PLB005917",     # infra_code (example subfeeder)
+			50,              # limit
+			0                # offset
+		)
+
+		write("✓ API call succeeded")
+		write("Response type: ", json_result.class_name)
+		write("Response length: ", json_result.size, " characters")
+
+		# Check for success indicator
+		_if json_result.index_of_seq(%"success":true%) _isnt _unset
+		_then
+			write("✓ Response contains success:true")
+		_else
+			write("✗ FAILED: Response does not contain success:true")
+		_endif
+
+		# Check for subfeeder_code in response
+		_if json_result.index_of_seq(%"transport_subfeeder_code":"PLB005917"%) _isnt _unset
+		_then
+			write("✓ Response contains expected subfeeder code")
+		_else
+			write("⚠ WARNING: Expected subfeeder code not found in response")
+		_endif
+
+		write("")
+		write("✓ TEST 2 COMPLETED")
+
+	_when error
+		write("✗ TEST 2 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 3: Pagination Test
+## ---------------------------------------------------------------------------
+_global test_device_connection_pagination << _proc()
+	## Test pagination with limit/offset parameters
+	## Expected: Different responses for different offsets
+
+	write("========================================")
+	write("TEST 3: Pagination Test")
+	write("========================================")
+
+	_try
+		# First page (offset 0)
+		_local page1 << astri_get_device_connections("feeder", "FPLB0073", 10, 0)
+		write("Page 1 (offset 0, limit 10):")
+		write("  Response length: ", page1.size, " characters")
+
+		# Second page (offset 10)
+		_local page2 << astri_get_device_connections("feeder", "FPLB0073", 10, 10)
+		write("Page 2 (offset 10, limit 10):")
+		write("  Response length: ", page2.size, " characters")
+
+		# Third page (offset 20)
+		_local page3 << astri_get_device_connections("feeder", "FPLB0073", 10, 20)
+		write("Page 3 (offset 20, limit 10):")
+		write("  Response length: ", page3.size, " characters")
+
+		# Verify pages are different
+		_if page1 <> page2
+		_then
+			write("✓ Page 1 and Page 2 are different (pagination working)")
+		_else
+			write("✗ FAILED: Page 1 and Page 2 are identical")
+		_endif
+
+		write("")
+		write("✓ TEST 3 COMPLETED")
+
+	_when error
+		write("✗ TEST 3 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 4: Error Handling - Invalid Code
+## ---------------------------------------------------------------------------
+_global test_device_connection_invalid_code << _proc()
+	## Test error handling with invalid feeder code
+	## Expected: JSON response with success=false and error message
+
+	write("========================================")
+	write("TEST 4: Error Handling - Invalid Code")
+	write("========================================")
+
+	_try
+		_local json_result << astri_get_device_connections(
+			"feeder",
+			"INVALID_CODE_999",  # Invalid code
+			10,
+			0
+		)
+
+		write("Response received:")
+		write("Response length: ", json_result.size, " characters")
+
+		# Check for error indicator
+		_if json_result.index_of_seq(%"success":false%) _isnt _unset
+		_then
+			write("✓ Response contains success:false (expected for invalid code)")
+		_elif json_result.index_of_seq(%"success":true%) _isnt _unset
+		_then
+			write("⚠ WARNING: Response contains success:true (API may have returned empty data)")
+		_else
+			write("✗ FAILED: Response missing success field")
+		_endif
+
+		write("")
+		write("Full response:")
+		write(json_result)
+
+		write("")
+		write("✓ TEST 4 COMPLETED")
+
+	_when error
+		write("✗ TEST 4 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 5: Error Handling - Invalid Infrastructure Type
+## ---------------------------------------------------------------------------
+_global test_device_connection_invalid_type << _proc()
+	## Test error handling with invalid infrastructure type
+	## Expected: Error JSON response
+
+	write("========================================")
+	write("TEST 5: Error Handling - Invalid Type")
+	write("========================================")
+
+	_try
+		_local json_result << astri_get_device_connections(
+			"cluster",       # Invalid type (should be feeder or subfeeder)
+			"PLB005917",
+			10,
+			0
+		)
+
+		write("Response received (should be error):")
+		write(json_result)
+
+		# Check for error message
+		_if json_result.index_of_seq(%"success":false%) _isnt _unset _orif
+		    json_result.index_of_seq(%"error"%) _isnt _unset
+		_then
+			write("✓ API correctly rejected invalid infrastructure type")
+		_else
+			write("✗ FAILED: API did not return error for invalid type")
+		_endif
+
+		write("")
+		write("✓ TEST 5 COMPLETED")
+
+	_when error
+		write("✗ TEST 5 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 6: Large Response Handling
+## ---------------------------------------------------------------------------
+_global test_device_connection_large_response << _proc()
+	## Test handling of large response (high limit)
+	## Expected: Response with many connection objects
+
+	write("========================================")
+	write("TEST 6: Large Response Handling")
+	write("========================================")
+
+	_try
+		_local start_time << system.elapsed_milliseconds()
+
+		_local json_result << astri_get_device_connections(
+			"feeder",
+			"FPLB0073",
+			100,             # Large limit
+			0
+		)
+
+		_local end_time << system.elapsed_milliseconds()
+		_local elapsed << end_time - start_time
+
+		write("✓ API call succeeded")
+		write("Response length: ", json_result.size, " characters")
+		write("Response time: ", elapsed, " ms")
+
+		# Check for data array
+		_if json_result.index_of_seq(%"data":[%) _isnt _unset
+		_then
+			write("✓ Response contains data array")
+		_endif
+
+		# Performance check
+		_if elapsed < 5000
+		_then
+			write("✓ Response time is acceptable (<5 seconds)")
+		_else
+			write("⚠ WARNING: Response time exceeded 5 seconds (", elapsed, " ms)")
+		_endif
+
+		write("")
+		write("✓ TEST 6 COMPLETED")
+
+	_when error
+		write("✗ TEST 6 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 7: JSON Structure Validation
+## ---------------------------------------------------------------------------
+_global test_device_connection_json_structure << _proc()
+	## Test JSON response structure validation
+	## Expected: Response contains all expected fields
+
+	write("========================================")
+	write("TEST 7: JSON Structure Validation")
+	write("========================================")
+
+	_try
+		_local json_result << astri_get_device_connections(
+			"feeder",
+			"FPLB0073",
+			5,
+			0
+		)
+
+		write("Checking for required fields in JSON response...")
+
+		# Check top-level fields
+		_local required_fields << {"success", "count", "count_all", "data"}
+		_for field _over required_fields.fast_elements()
+		_loop
+			_if json_result.index_of_seq(write_string(%", field, %")) _isnt _unset
+			_then
+				write("  ✓ Field '", field, "' present")
+			_else
+				write("  ✗ Field '", field, "' MISSING")
+			_endif
+		_endloop
+
+		# Check data object fields (sample of key fields)
+		_local data_fields << {
+			"uuid",
+			"transport_status",
+			"transport_tube_number",
+			"transport_core_number",
+			"transport_feeder_code",
+			"transport_subfeeder_code",
+			"source_feeder_code",
+			"destination_cluster_code"
+		}
+
+		write("")
+		write("Checking for key data fields in response...")
+		_for field _over data_fields.fast_elements()
+		_loop
+			_if json_result.index_of_seq(write_string(%", field, %")) _isnt _unset
+			_then
+				write("  ✓ Field '", field, "' present")
+			_else
+				write("  ⚠ Field '", field, "' not found (may be null)")
+			_endif
+		_endloop
+
+		write("")
+		write("✓ TEST 7 COMPLETED")
+
+	_when error
+		write("✗ TEST 7 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 8: Core Status Check (Simple String Parsing)
+## ---------------------------------------------------------------------------
+_global test_device_connection_status_check << _proc()
+	## Test extracting transport_status from JSON response
+	## Uses simple string search (not full JSON parsing)
+	## Expected: Find AVAILABLE, TAKEN, or RESERVED statuses
+
+	write("========================================")
+	write("TEST 8: Core Status Check")
+	write("========================================")
+
+	_try
+		_local json_result << astri_get_device_connections(
+			"subfeeder",
+			"PLB005917",
+			50,
+			0
+		)
+
+		write("Searching for connection statuses...")
+
+		# Count status occurrences using simple string search
+		_local available_count << 0
+		_local taken_count << 0
+		_local reserved_count << 0
+
+		_local search_pos << 1
+		_loop
+			# Search for transport_status field
+			_local status_pos << json_result.index_of_seq(%"transport_status"%, search_pos)
+			_if status_pos _is _unset _then _leave _endif
+
+			# Extract status value (simple approach: look for next quote after colon)
+			_local value_start << json_result.index_of_seq(%:%, status_pos)
+			_if value_start _isnt _unset
+			_then
+				_local snippet << json_result.subseq(value_start,
+					(value_start + 50).min(json_result.size))
+
+				_if snippet.index_of_seq(%"AVAILABLE"%) _isnt _unset
+				_then
+					available_count +<< 1
+				_elif snippet.index_of_seq(%"TAKEN"%) _isnt _unset
+				_then
+					taken_count +<< 1
+				_elif snippet.index_of_seq(%"RESERVED"%) _isnt _unset
+				_then
+					reserved_count +<< 1
+				_endif
+			_endif
+
+			search_pos << status_pos + 20
+		_endloop
+
+		write("")
+		write("Status Summary:")
+		write("  AVAILABLE cores: ", available_count)
+		write("  TAKEN cores:     ", taken_count)
+		write("  RESERVED cores:  ", reserved_count)
+		write("  TOTAL:           ", available_count + taken_count + reserved_count)
+
+		_if available_count + taken_count + reserved_count > 0
+		_then
+			write("✓ Successfully extracted connection statuses")
+		_else
+			write("⚠ WARNING: No connection statuses found in response")
+		_endif
+
+		write("")
+		write("✓ TEST 8 COMPLETED")
+
+	_when error
+		write("✗ TEST 8 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## TEST 9: Performance Benchmark
+## ---------------------------------------------------------------------------
+_global test_device_connection_performance << _proc()
+	## Test API performance with multiple requests
+	## Expected: All requests complete within acceptable time
+
+	write("========================================")
+	write("TEST 9: Performance Benchmark")
+	write("========================================")
+
+	_try
+		_local test_cases << {
+			{"feeder", "FPLB0073", 10},
+			{"feeder", "FPLB0073", 50},
+			{"subfeeder", "PLB005917", 10},
+			{"subfeeder", "PLB005917", 50}
+		}
+
+		write("Running ", test_cases.size, " performance tests...")
+		write("")
+
+		_local total_time << 0
+		_local test_num << 0
+
+		_for test_case _over test_cases.fast_elements()
+		_loop
+			test_num +<< 1
+			_local infra_type << test_case[1]
+			_local infra_code << test_case[2]
+			_local limit << test_case[3]
+
+			_local start_time << system.elapsed_milliseconds()
+
+			_local json_result << astri_get_device_connections(
+				infra_type,
+				infra_code,
+				limit,
+				0
+			)
+
+			_local end_time << system.elapsed_milliseconds()
+			_local elapsed << end_time - start_time
+			total_time +<< elapsed
+
+			write("Test ", test_num, ": ", infra_type, " / ", infra_code, " / limit=", limit)
+			write("  Time: ", elapsed, " ms")
+			write("  Response size: ", json_result.size, " chars")
+
+			_if elapsed > 5000
+			_then
+				write("  ⚠ WARNING: Slow response (>5 seconds)")
+			_else
+				write("  ✓ Acceptable performance")
+			_endif
+			write("")
+		_endloop
+
+		_local avg_time << total_time _div test_cases.size
+		write("Performance Summary:")
+		write("  Total time: ", total_time, " ms")
+		write("  Average time: ", avg_time, " ms")
+		write("  Tests run: ", test_cases.size)
+
+		_if avg_time < 5000
+		_then
+			write("✓ Overall performance is acceptable")
+		_else
+			write("⚠ WARNING: Average performance below target")
+		_endif
+
+		write("")
+		write("✓ TEST 9 COMPLETED")
+
+	_when error
+		write("✗ TEST 9 FAILED WITH ERROR:")
+		write("Error: ", condition.report_contents_string)
+	_endtry
+
+	write("")
+_endproc
+$
+
+## ---------------------------------------------------------------------------
+## MASTER TEST RUNNER
+## ---------------------------------------------------------------------------
+_global run_all_device_connection_tests << _proc()
+	## Run all device connection API tests
+	## This is the main test entry point
+
+	write("")
+	write("===========================================================================")
+	write("ASTRI DEVICE CONNECTION API - COMPREHENSIVE TEST SUITE")
+	write("===========================================================================")
+	write("Start time: ", date_time.now().write_string)
+	write("")
+
+	_local overall_start << system.elapsed_milliseconds()
+
+	# Run all tests
+	test_device_connection_feeder()
+	test_device_connection_subfeeder()
+	test_device_connection_pagination()
+	test_device_connection_invalid_code()
+	test_device_connection_invalid_type()
+	test_device_connection_large_response()
+	test_device_connection_json_structure()
+	test_device_connection_status_check()
+	test_device_connection_performance()
+
+	_local overall_end << system.elapsed_milliseconds()
+	_local total_elapsed << overall_end - overall_start
+
+	write("===========================================================================")
+	write("ALL TESTS COMPLETED")
+	write("===========================================================================")
+	write("End time: ", date_time.now().write_string)
+	write("Total test duration: ", total_elapsed, " ms (",
+		(total_elapsed / 1000.0).rounded, " seconds)")
+	write("")
+	write("To run individual tests, use:")
+	write("  test_device_connection_feeder()")
+	write("  test_device_connection_subfeeder()")
+	write("  test_device_connection_pagination()")
+	write("  test_device_connection_invalid_code()")
+	write("  test_device_connection_invalid_type()")
+	write("  test_device_connection_large_response()")
+	write("  test_device_connection_json_structure()")
+	write("  test_device_connection_status_check()")
+	write("  test_device_connection_performance()")
+	write("")
+	write("===========================================================================")
+
+_endproc
+$
+
+## ===========================================================================
+## USAGE INSTRUCTIONS
+## ===========================================================================
+##
+## To run all tests:
+##   MagikSF> run_all_device_connection_tests()
+##
+## To run individual tests:
+##   MagikSF> test_device_connection_feeder()
+##   MagikSF> test_device_connection_subfeeder()
+##   MagikSF> test_device_connection_pagination()
+##   MagikSF> test_device_connection_invalid_code()
+##   MagikSF> test_device_connection_invalid_type()
+##   MagikSF> test_device_connection_large_response()
+##   MagikSF> test_device_connection_json_structure()
+##   MagikSF> test_device_connection_status_check()
+##   MagikSF> test_device_connection_performance()
+##
+## Prerequisites:
+##   1. Java implementation compiled and JAR deployed
+##   2. Smallworld session restarted to load new procedure
+##   3. ASTRI API server accessible (http://172.17.75.22/astri-api-v2/v4)
+##   4. Valid credentials configured in astri_config.properties
+##
+## Expected Results:
+##   - All tests should pass with ✓ markers
+##   - Performance tests should complete in <5 seconds each
+##   - JSON responses should contain expected fields
+##   - Error tests should receive proper error JSON responses
+##
+## ===========================================================================
+```
+
+**Test Execution Instructions:**
+
+1. **File Location:**
+   - Save above code to: `pni_custom/rwwi_astri_integration_java/magik/rwwi_mancore_plan/source/test_astri_device_connection_api.magik`
+
+2. **Load in Magik Session:**
    ```magik
-   _global test_device_connection_feeder << _proc()
-       ## Test basic feeder connection query
-
-       _local json_result << astri_get_device_connections(
-           "feeder",        # infra_type
-           "FPLB0073",      # infra_code
-           50,              # limit
-           0                # offset
-       )
-
-       write("JSON Response:")
-       write(json_result)
-
-       # TODO: Parse JSON in Magik
-       # (Magik JSON parsing to be implemented separately)
-   _endproc
-   $
+   # Compile the test file
+   MagikSF> load_file("pni_custom/rwwi_astri_integration_java/magik/rwwi_mancore_plan/source/test_astri_device_connection_api.magik")
    ```
 
-2. **Basic Subfeeder Query**
+3. **Run All Tests:**
    ```magik
-   _global test_device_connection_subfeeder << _proc()
-       ## Test basic subfeeder connection query
-
-       _local json_result << astri_get_device_connections(
-           "subfeeder",     # infra_type
-           "PLB005917",     # infra_code
-           50,              # limit
-           0                # offset
-       )
-
-       write("JSON Response:")
-       write(json_result)
-   _endproc
-   $
+   MagikSF> run_all_device_connection_tests()
    ```
 
-3. **Pagination Test**
+4. **Run Individual Tests:**
    ```magik
-   _global test_device_connection_pagination << _proc()
-       ## Test pagination
-
-       # First page
-       _local page1 << astri_get_device_connections("feeder", "FPLB0073", 10, 0)
-       write("Page 1 length:", page1.size)
-
-       # Second page
-       _local page2 << astri_get_device_connections("feeder", "FPLB0073", 10, 10)
-       write("Page 2 length:", page2.size)
-   _endproc
-   $
+   MagikSF> test_device_connection_feeder()
+   MagikSF> test_device_connection_subfeeder()
+   MagikSF> test_device_connection_pagination()
    ```
 
-4. **Error Handling Test**
-   ```magik
-   _global test_device_connection_invalid_code << _proc()
-       ## Test error handling with invalid code
+**Test Coverage:**
 
-       _local json_result << astri_get_device_connections(
-           "feeder",
-           "INVALID999",  # Invalid code
-           10,
-           0
-       )
-
-       write("Error response:")
-       write(json_result)
-       # Should contain: {"success":false,"error":"..."}
-   _endproc
-   $
-   ```
-
-5. **Status Filter Test**
-   ```magik
-   _global test_device_connection_status << _proc()
-       ## Test extracting connection status
-
-       _local json_result << astri_get_device_connections("feeder", "FPLB0073", 5, 0)
-
-       write("JSON Response (first 500 chars):")
-       write(json_result.subseq(1, 500.min(json_result.size)))
-
-       # TODO: Parse JSON and filter by transport_status = "AVAILABLE"
-   _endproc
-   $
-   ```
+| Test # | Test Name | Purpose | Expected Result |
+|--------|-----------|---------|-----------------|
+| 1 | Feeder Query | Basic feeder API call | JSON with success:true and data array |
+| 2 | Subfeeder Query | Basic subfeeder API call | JSON with success:true and data array |
+| 3 | Pagination | Test limit/offset | Different responses for different offsets |
+| 4 | Invalid Code | Error handling | JSON with success:false |
+| 5 | Invalid Type | Parameter validation | Error JSON response |
+| 6 | Large Response | High-volume data | Response <5 seconds, large data array |
+| 7 | JSON Structure | Field validation | All required fields present |
+| 8 | Status Check | Parse transport_status | Count AVAILABLE/TAKEN/RESERVED cores |
+| 9 | Performance | Multiple requests | Average response time <5 seconds |
 
 ### 8.3 Manual Testing Checklist
 

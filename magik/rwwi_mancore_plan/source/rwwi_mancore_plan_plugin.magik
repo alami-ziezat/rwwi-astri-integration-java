@@ -16,8 +16,7 @@ def_slotted_exemplar(:rwwi_mancore_plan_plugin,
 	##
 	##
 	{
-		{:doc, _unset },
-		{:frame,_unset }
+		{:dialog, _unset }
 	},
 	:plugin)
 $
@@ -48,7 +47,7 @@ _method rwwi_mancore_plan_plugin.init_actions()
 	##
 	
 	_self.add_action( sw_action.new( :activate_mancore_plan,
-					 :caption,         "Mancore Plan",
+					 :caption,         "Mancore Plan Manager...",
 					 :engine, _self,
 					 :image, {:associate, :mit_base_gui},
 					 :action_message, :|activate_mancore_plan()|,
@@ -61,46 +60,51 @@ _method rwwi_mancore_plan_plugin.activate_mancore_plan()
 	## 
 	## Activate
 
-	
-	d << _self.get_dialog( :mancore_plan )
-	
-	_if  d  _is _unset
+	write("Activating ASTRI ManCore Manager...")
+
+	name << :mancore_plan_manager
+	.dialog << _self.get_dialog( name )
+	_if .dialog _is _unset 
 	_then
-		d << rwwi_mancore_plan_dialog.new( _self, _self.application )
-		_self.cache_dialog( :mancore_plan, d )
-
+		.dialog << rwwi_mancore_plan_dialog.new(_self, _self.application)
+		_self.cache_dialog( name, .dialog )
 	_endif
+
 	
-	d.activate()
-	
-	>> d	
+	_if .dialog.active?.not
+	_then
+		.dialog.activate()
+	_else
+		write("Dialog already active")
+	_endif
+	>> .dialog
 _endmethod
 $
 
-
-_pragma(classify_level=advanced)
-_method rwwi_mancore_plan_plugin.sw_databus_data_requested(data_type, _gather args)
-	## 
-	## 
-	
-	>> _if data_type _is :post_render_sets
-	   _then
-		   _self.post_render_sets.empty()
-
-		   >> _if _self.dialogs.an_element() _isnt _unset
-		      _then
-			      dg << _self.dialogs.an_element()
-
-			      _if dg.get_render_status() _is _true _then
-				      
-				      >> dg.kml_direction()
-			      _else
-				      >>_self.post_render_sets.empty()
-
-			      _endif
-			      
-		      _endif	
-	   _endif
-	
-_endmethod
-$
+## COMMENTED OUT - Currently unused
+#_pragma(classify_level=advanced)
+#_method rwwi_mancore_plan_plugin.sw_databus_data_requested(data_type, _gather args)
+#	##
+#	##
+#
+#	>> _if data_type _is :post_render_sets
+#	   _then
+#		   _self.post_render_sets.empty()
+#
+#		   >> _if _self.dialogs.an_element() _isnt _unset
+#		      _then
+#			      dg << _self.dialogs.an_element()
+#
+#			      _if dg.get_render_status() _is _true _then
+#
+#				      >> dg.kml_direction()
+#			      _else
+#				      >>_self.post_render_sets.empty()
+#
+#			      _endif
+#
+#		      _endif
+#	   _endif
+#
+#_endmethod
+#$

@@ -62,7 +62,11 @@ _private _method astri_design_migrator.create_demand_point(pm)
 			:line_type, m_line,
 			:notes, ring_name.default("") + "|" + folders,
 			:location, location,
-			:uuid, .uuid
+			:uuid, .uuid,
+			:olt_code, .olt_code,
+			:feeder_code, .feeder_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:cluster_code, .cluster_code_db
 		)
 
 		_local rec_trans << record_transaction.new_insert(.dp_col, prop_values)
@@ -262,6 +266,73 @@ _private _method astri_design_migrator.create_demand_point(pm)
 		write("  Coordinates:", pm[:coord].default("(none)"))
 		.stats[:errors] +<< 1
 	_endtry
+_endmethod
+$
+
+_private _method astri_design_migrator.update_fdt_tp_field()
+	## Update :tp field of FDT (sheath_splice) with total demand points
+	##
+	## This method:
+	## - Queries sheath_splice by cluster_code_db AND sheath_splice_object_type contains "FDT"
+	## - Updates :tp field with total demand point count from .stats[:demand_points]
+
+	_local total_dp << .stats[:demand_points]
+
+	_if total_dp = 0
+	_then
+		write("  No demand points to update FDT :tp field")
+		_return
+	_endif
+
+	_if .cluster_code_db _is _unset _orif .cluster_code_db = ""
+	_then
+		write("  WARNING: No cluster_code_db available, skipping FDT :tp update")
+		_return
+	_endif
+
+	write("  Updating FDT :tp field with total demand points: ", total_dp)
+
+	_local updated_count << 0
+	_local not_found_count << 0
+
+	_try _with err
+		# Query sheath_splice by cluster_code AND sheath_splice_object_type contains "FDT"
+		_local pred_cluster << predicate.eq(:cluster_code, .cluster_code_db)
+		_local pred_type << predicate.contains(:sheath_splice_object_type, "FDT", _true)
+		_local pred << predicate.and(pred_cluster, pred_type)
+
+		_local fdts << .sc_col.select(pred)
+
+		_if fdts.empty?
+		_then
+			write("    WARNING: No FDT found for cluster_code: ", .cluster_code_db)
+			not_found_count << 1
+		_else
+			# Update :tp field for all matching FDTs
+			_for fdt _over fdts.fast_elements()
+			_loop
+				_try
+					_local old_tp << fdt.tp.default(0)
+					fdt.tp << total_dp
+
+					updated_count +<< 1
+					write("    [OK] Updated FDT ", fdt.name.default("(unnamed)"),
+					      " cluster: ", .cluster_code_db,
+					      " :tp ", old_tp, " -> ", total_dp)
+				_when error
+					write("    ERROR updating FDT: ", condition.report_contents_string)
+				_endtry
+			_endloop
+		_endif
+
+	_when error
+		write("    ERROR querying FDT for cluster ", .cluster_code_db, ": ", err.report_contents_string)
+	_endtry
+
+	write("  FDT :tp field update complete:")
+	write("    - Updated: ", updated_count)
+	write("    - Not found: ", not_found_count)
+
 _endmethod
 $
 

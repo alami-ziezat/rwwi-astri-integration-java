@@ -1,7 +1,9 @@
-rwwi_mancore_plan	1
+rwwi_mancore_plan 1
 
 description
-	RW module APD Check Management Core
+	ASTRI Manual Core Planning
+	Provides device connection API testing and manual core planning utilities.
 end
 
+language en_gb
 

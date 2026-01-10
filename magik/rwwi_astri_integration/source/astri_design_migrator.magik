@@ -500,6 +500,13 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_endif
 	_endloop
 
+	# Update FDT :tp field with total demand points (only for cluster infrastructure)
+	_if .infra_type = "cluster"
+	_then
+		write("  Pass 4.5: Updating FDT :tp field...")
+		_self.update_fdt_tp_field()
+	_endif
+
 	# Fourth: Create macro and micro cell
 	write("  Pass 5: Creating micro/macro cells...")
 	_for pm _over placemarks.fast_elements()

@@ -31,6 +31,8 @@ def_slotted_exemplar(:rwwi_mancore_plan_dialog,
 		{ :swl1,          _unset },
 		{ :swl2,          _unset },
 		{ :swl3,          _unset },
+		{ :selected_rwo,     _unset },
+		{ :current_infra_type, _unset },
 
 		{:engine, _unset}
 	},{:model})
@@ -57,33 +59,33 @@ $
 
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.init(owner, framework)
-	## 
 	##
-	_super.init()
+	## Initialize dialog - using SW_SWIFT components
+	##
 
-	.ev << gis_program_manager.cached_dataset(:gis)
 	.owner << owner
 	.grs << framework
 
-	.grs << smallworld_product.pni_application()
+	.ev << gis_program_manager.cached_dataset(:gis)
 	.mapman << .grs.plugin(:map_plugin)
 	.ed << .grs.plugin(:editor_manager)
-	.items << hash_table.new()
+	.items << property_list.new()
 	.current_selection_ur1 << _unset
 	.current_selection_ur2 << _unset
 	.swl1 << _unset
 	.swl2 << _unset
-	.swl3 << _unset 
+	.swl3 << _unset
+	.selected_rwo << _unset
 	# Data holder
 	.table_list << rope.new()
 	.table_list2 << rope.new()
 	.records << rope.new()
-	.a_sc << _unset 
-	.engine << ""
+	.a_sc << _unset
+	.engine << rwwi_mancore_plan_engine.new(_self, framework)
 
 	# Add dependent dialog to plugin
 	_self.add_dependent(.owner)
-        >> _self
+	>> _super.init()
 _endmethod
 $
 
@@ -93,129 +95,99 @@ _method rwwi_mancore_plan_dialog.activate_in( parent )
 	##
 	parent.title << "FTTx Mancore Plan"
 
-	mb << menubar.new( parent )
+	#mb << menubar.new( parent )
 
-	m << _unset
+	#m << _unset
 
 	# Create the first pulldown menu and its button items
-	p << pulldown_menu.new()
+	#p << pulldown_menu.new()
 	#button_item.new( p, "Load KML...", _self , :get_kml|()| )
-	button_item.new( p, "Clear",  _self , :clear|()| )
-	button_item.new( p, "Refresh", _self , :refresh|()| )
+	#button_item.new( p, "Clear",  _self , :clear|()| )
+	#button_item.new( p, "Refresh", _self , :refresh|()| )
 	# Create the "File" button in the menubar
-	menu_button_item.new( mb, "File", p )
+	#menu_button_item.new( mb, "File", p )
 
-	
-	top_outer << sw_container.new( parent, _unset, 1,
-				       :outer_spacing, 4,
-				       :row_spacing, 4,
-				       :row_resize_values, {0,1},
-				       :width, 700,
-				       :height, 800 )
+	# Create top-level sw_canvas_container (required for SWIFT)
+	.items[:top] << top_c << sw_canvas_container.new(
+		parent, 4, 1,
+		:width, 900,
+		:height, 600,
+		:outer_spacing, 5,
+		:row_spacing, 5,
+		:identifier, :top_container,
+		:model, _self)
 
-	first_con << sw_border_container.new( top_outer, _unset, 1,
-					      :label, "",
-					      :row_resize_values,{0,1})
-	
-	_self.build_toolbar( first_con )
+	# Create outer container with flexible row sizing
+	# 4 rows: Toolbar (fixed), Table1 (flexible), Table2 (flexible), Log (flexible)
+	.items[:outer] << outer << sw_container.new(top_c, 4, 1,
+		:row_resize_values, {0, 1, 1, 1})  # Toolbar fixed, Tables flexible, Log flexible
 
-	thirt_con << sw_border_container.new( top_outer, _unset, 1,
-					      :label, "",
-					      :width, 30,
-					      :row_resize_values,{0})
-	
-	_self.build_toolbar_second( thirt_con )
-	_self.build_label_result2( thirt_con )
-	
-	second_con << sw_border_container.new( top_outer, _unset, 2,
-					      :label, "",
-					      :width, 500,
-					      :row_resize_values,{0})
+	# Build toolbar
+	_self.build_toolbar( outer )
 
-	#_self.build_toolbar_exec( second_con )
-	_self.build_table_ur1( second_con )
-	_self.build_table_ur2( second_con )
-	
+	# Build tables
+	_self.build_device_connection_table( outer )
+	_self.build_table_ur2( outer )
+
+	# Build log window
+	_self.build_log( outer )
+
+	# Return the top-level container (required)
+	_return top_c
 _endmethod
 $
 
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.build_toolbar( parent )
-	## 
+	##
+	## Build main toolbar with source selector and action buttons
 	##
 	toolbar << sw_container.new( parent, 1, _unset,
-				     :col_spacing, 15  
+				     :col_spacing, 15
 				)
 	file_toolbar << sw_toolbar_container.new( toolbar, _false,
 						  :background_type, :button_group,
 						  :button_group_height, sw_item.default_item_height )
-
-	sw_label_item.new( file_toolbar, "Infrastructure:")
-	
-	.items[:infra] << sw_text_item.new( file_toolbar, :model, _self,
-					       :editable?, _false,
-					       :text_items, {{:feeder,"Feeder"},
-							     {:subfeeder,"SubFeeder"},
-							     {:cluster,"Cluster"}
-					       }
-					   )
-
 
 	sw_label_item.new( file_toolbar, "Source:")
-	
+
 	.items[:kmlsource] << sw_text_item.new( file_toolbar, :model, _self,
 					       :editable?, _false,
-					       :text_items, { {:selected,"Selected Object"},
-							       {:cable,"Cable"},
-							       {:trail,"Trail"},
-							       {:olt,"OLT"},
-							       {:closure,"CLosure"},
-							       {:fdt,"FDT"},
-							       {:fat,"FAT"},
-							       {:cable,"Cable"},
-							       {:kml,"KML"}
+					       :value, :cable,
+					       :text_items, {{:olt, "OLT"},
+							     {:cable, "Cable"}
 					       }
 					   )
 
-
-
-	.items[:add_ur1] << sw_button_item.new( file_toolbar,
+	.items[:get_rwo] << sw_button_item.new( file_toolbar,
 					       :image, {:find, :ui_resources},
 					       :model, _self,
-					       :selector, :get_cable|()|,
-					       :tooltip, "Cari Closure Terdekat" )
+					       :selector, :get_rwo|()|,
+					       :tooltip, "Get Selected Object" )
 
+	sw_label_item.new( file_toolbar, "Limit:" )
 
-	sw_label_item.new( file_toolbar, "    Cluster " )
-	
-	.items[:nm] << sw_text_item.new( file_toolbar,
-					 :editable?, _true,
-					 :enabled?, _false,
-					 :display_length, 25)
+	.items[:limit_field] << sw_text_item.new( file_toolbar,
+						  :display_length, 10,
+						  :model, _self,
+						  :value, "100",
+						  :tooltip, "Limit for device connection query (default: fiber count)" )
 
+	sw_label_item.new( file_toolbar, "  " )
 
-
-_endmethod
-$
-
-_pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.build_toolbar_second( parent )
-	## 
-	##
-	toolbar << sw_container.new( parent, 1, _unset,
-				     :col_spacing, 15  
-				)
-	file_toolbar << sw_toolbar_container.new( toolbar, _false,
-						  :background_type, :button_group,
-						  #:col_alignment, :fill,
-						  :button_group_height, sw_item.default_item_height )
-
-	.items[:run_check] << sw_button_item.new( file_toolbar,
-					       :image, {:run, :ui_resources},
+	.items[:check_upstream] << sw_button_item.new( file_toolbar,
+					       :image, {:back, :ui_resources},
 					       :model, _self,
-					       :selector, :get_result|()|,
-					       #:enabled?, _false,
-					       :tooltip, "Check " )
+					       :selector, :check_upstream|()|,
+					       :tooltip, "Check Upstream Device Connection" )
+	.items[:check_upstream].enabled? << _false
+
+	.items[:check_current] << sw_button_item.new( file_toolbar,
+					       :image, {:forward, :ui_resources},
+					       :model, _self,
+					       :selector, :check_current|()|,
+					       :tooltip, "Check Current Device Connection" )
+	.items[:check_current].enabled? << _false
 
 	.items[:clear] << sw_button_item.new( file_toolbar,
 					       :image, {:clear, :ui_resources},
@@ -223,53 +195,33 @@ _method rwwi_mancore_plan_dialog.build_toolbar_second( parent )
 					       :selector, :clear|()|,
 					       :tooltip, "Clear" )
 
-	sw_label_item.new( file_toolbar, "        " )
+	.items[:assign_fiber] << sw_button_item.new( file_toolbar,
+					       :image, {:export_settings, :ui_resources},
+					       :model, _self,
+					       :selector, :assign_fiber|()|,
+					       :tooltip, "Assign Fiber" )
+	.items[:assign_fiber].enabled? << _false
 
 _endmethod
 $
 
-_pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.build_toolbar_exec( parent )
-	## 
-	##
-	toolbar << sw_container.new( parent, 1, _unset,
-				     :col_spacing, 15  
-				)
-	file_toolbar << sw_toolbar_container.new( toolbar, _false,
-						  :background_type, :button_group,
-						  #:col_alignment, :fill,
-						  :button_group_height, sw_item.default_item_height )
-
-	.items[:run_check] << sw_button_item.new( file_toolbar,
-					       :image, {:run, :ui_resources},
-					       :model, _self,
-					       :selector, :get_result|()|,
-					       #:enabled?, _false,
-					       :tooltip, "Check " )
-
-	.items[:clear] << sw_button_item.new( file_toolbar,
-					       :image, {:clear, :ui_resources},
-					       :model, _self,
-					       :selector, :clear|()|,
-					       :tooltip, "Clear" )
-
-
-_endmethod
-$
+## Removed build_toolbar_second and build_toolbar_exec methods
+## All toolbar items now consolidated in build_toolbar method
 
 _pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.build_label_result2( parent )
-	## 
+_method rwwi_mancore_plan_dialog.build_log( parent )
 	##
-	
-	text_container << sw_container.new( parent, _unset, 1, :row_spacing, 5, :outer_spacing, 10)
+	## Build log window for displaying messages and status
+	##
 
-	.items[:result2] << sw_text_window.new( text_container,
-					       :col_alignment, :fill
+	.items[:log] << sw_text_window.new( parent,
+					       :col_alignment, :fill,
+					       :row_alignment, :fill,
+					       :min_height, 150
 					  )
-	.items[:result2].text <<""
-	
-	.items[:result2].colour << colour.called(:white)
+	.items[:log].text <<""
+
+	.items[:log].colour << colour.called(:white)
 
 _endmethod
 $
@@ -292,33 +244,38 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwwi_mancore_plan_dialog.build_table_ur1( parent )
-	## 
+_method rwwi_mancore_plan_dialog.build_device_connection_table( parent )
+	##
+	## Build table to display device connection data from ASTRI API
 	##
 	.items[:table] << a_table << sw_table.new( parent,
 				 :model, _self,
-				 :label, "Cable Connectifity",
-				 :aspect, :table_ur1,
-				 :data_selector, :populate_ur1|()|,
+				 :label, "Source - Astri Cable Connectivity",
+				 :aspect, :device_connection_table,
+				 :data_selector, :populate_device_connection_table|()|,
 				 #:text_style , .styles[:true_style],
-				 :selection_notifier, :table_selected_ur1|()|,
+				 :selection_notifier, :device_connection_table_selected|()|,
 				 :double_click_notifier,:|open_editor_ur1()|,
 				 :row_lines?, _true,
 				 #:enabled?,  _false ,
 				 :selection_type, :row, # :row or :cell
-				 :selection_mode, :one, # :many or :one
-				 :min_height, 350 )
-	a_table.n_cols << 6
-	a_table.set_column_labels({"Fiber",
-				   "Name",
-				   " ",
-				   "Priority",
-				   "Cable",
-				   "Status"
+				 :selection_mode, :many, # :many or :one
+				 :col_alignment, :fill,
+				 :row_alignment, :fill,
+				 :min_height, 250,
+				 :enable_horizontal_scrollbar?, _true)
+	a_table.n_cols << 7
+	a_table.set_column_labels({"Tube Count",
+				   "Core Count",
+				   "Tube Number",
+				   "Core Number",
+				   "Status",
+				   "Destination Code",
+				   "Destination Name"
 				  })
- 
-	a_table.col_resize_values << {0.5,1,0.1,0.3,1,0.3}
-	
+
+	a_table.col_resize_values << {0.6,0.6,0.6,0.6,0.6,0.8,3}
+
 	# The table can be filtered, sorted and columns can be
 	# reordered and hidden
 	a_table.enable_filter? << _true
@@ -326,6 +283,9 @@ _method rwwi_mancore_plan_dialog.build_table_ur1( parent )
 	a_table.enable_manage_columns? << _true
 
 	a_table.set_column_sort_procedure(1, a_table.strings_with_numbers_sort_proc)
+	a_table.set_column_sort_procedure(2, a_table.strings_with_numbers_sort_proc)
+	a_table.set_column_sort_procedure(3, a_table.strings_with_numbers_sort_proc)
+	a_table.set_column_sort_procedure(4, a_table.strings_with_numbers_sort_proc)
 
 _endmethod
 $
@@ -336,7 +296,7 @@ _method rwwi_mancore_plan_dialog.build_table_ur2( parent )
 	##
 	.items[:table2] << a_table2 << sw_table.new( parent,
 				 :model, _self,
-				 :label, "New Cable Connectifity",
+				 :label, "Target - FDT Splice Connectifity",
 				 :aspect, :table_ur2,
 				 :data_selector, :populate_ur2|()|,
 				 :selection_notifier, :table_selected_ur2|()|,
@@ -344,89 +304,126 @@ _method rwwi_mancore_plan_dialog.build_table_ur2( parent )
 				 :row_lines?, _true,
 				 :selection_type, :row, # :row or :cell
 				 :selection_mode, :one, # :many or :one
-				 :min_height, 350 )
-	a_table2.n_cols << 4
-	a_table2.set_column_labels({"Fiber",
-				    "Name",
-				    " ",
-				    "Priority",
-				    "Cable",
+				 :col_alignment, :fill,
+				 :row_alignment, :fill,
+				 :min_height, 250 )
+	a_table2.n_cols << 5
+	a_table2.set_column_labels({"Destination Code",
+				    "Splitter Name",
+				    "Dest. Tube Number",
+				    "Dest. Core Number",
 				    "Status"
 				  })
-	a_table2.col_resize_values << {0.5,1,0.1,0.3,1,0.3}
+	a_table2.col_resize_values << {1.0, 1.5, 0.8, 0.8, 0.6}
 	# The table can be filtered, sorted and columns can be
 	# reordered and hidden
 	a_table2.enable_filter? << _true
 	a_table2.enable_sort? << _true
 	a_table2.enable_manage_columns? << _true
 
-	a_table2.set_column_sort_procedure(1, a_table2.strings_with_numbers_sort_proc)
-	
+	a_table2.set_column_sort_procedure(3, a_table2.strings_with_numbers_sort_proc)
+	a_table2.set_column_sort_procedure(4, a_table2.strings_with_numbers_sort_proc)
+
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.get_cable()
+_method rwwi_mancore_plan_dialog.get_rwo()
+	## Get RWO from selected object and store in .selected_rwo slot
 
 	r << _self.selected_str()
-	write("obj :",r)
-	
-	_if r.external_name ="Aerial Route" _orif r.external_name = "Underground Route"
+
+	_if r _isnt _unset _andif (r.external_name ="Aerial Route" _orif r.external_name = "Underground Route")
 	_then
 		rr << r.cables()
 		_if rr.size  = 1 _then
 			cab << rr.an_element()
-			.items[:result2].text <<""
-			.items[:result2].append("DATA CABLE SELECTED")
-			.items[:result2].append(newline_char)
-			.items[:result2].append("===================")
-			.items[:result2].append(newline_char)
-			.items[:result2].append(newline_char)
-			.items[:result2].append("Name    : "+ cab.name)
-			.items[:result2].append(newline_char)
-			.items[:result2].append("Spec    : "+ cab.spec_id)
-			.items[:result2].append(newline_char)
-			.items[:result2].append("OLT    : "+ cab.olt)
-			.items[:result2].append(newline_char)
-			.items[:result2].append("Feeder    : "+ cab.feeder_code.default(""))
-			.items[:result2].append(newline_char)
-			.items[:result2].append("SubFeeder    : "+ cab.subfeeder_code.default(""))
-			.items[:result2].append(newline_char)
-			.items[:result2].append(newline_char)
-			
-			.items[:result2].append("DATA Astri")
-			.items[:result2].append(newline_char)
-			.items[:result2].append("===========")
+
+			# Store selected RWO in slot
+			.selected_rwo << cab
+
+			# Set limit field to fiber_count (default value)
+			_local fiber_count << cab.fiber_count.default(100)
+			.items[:limit_field].value << fiber_count.write_string
+
+			.items[:log].text <<""
+			.items[:log].append("DATA CABLE SELECTED")
+			.items[:log].append(newline_char)
+			.items[:log].append("===================")
+			.items[:log].append(newline_char)
+			.items[:log].append(newline_char)
+			.items[:log].append("Name         : "+ cab.name)
+			.items[:log].append(newline_char)
+			.items[:log].append("Spec         : "+ cab.spec_id)
+			.items[:log].append(newline_char)
+			.items[:log].append("OLT          : "+ cab.olt)
+			.items[:log].append(newline_char)
+			.items[:log].append("Cluster Code : "+ cab.cluster_code.default(""))
+			.items[:log].append(newline_char)
+			.items[:log].append("Feeder       : "+ cab.feeder_code.default(""))
+			.items[:log].append(newline_char)
+			.items[:log].append("SubFeeder    : "+ cab.subfeeder_code.default(""))
+			.items[:log].append(newline_char)
+			.items[:log].append(newline_char)
+
+			# Get fttx_network_type to determine button states
+			_local network_type << cab.fttx_network_type.default("").lowercase
+			.items[:log].append("Network Type : "+ network_type)
+			.items[:log].append(newline_char)
+			.items[:log].append(newline_char)
+
+			.items[:log].append("DATA Astri")
+			.items[:log].append(newline_char)
+			.items[:log].append("===========")
+
+			# Enable/Disable buttons based on fttx_network_type
+			# check_upstream: disable for feeder, enable for subfeeder and cluster
+			# check_current: disable for cluster, enable for feeder and subfeeder
+			_if network_type = "feeder"
+			_then
+				.items[:check_upstream].enabled? << _false
+				.items[:check_current].enabled? << _true
+				write("    >> Check Upstream button DISABLED (feeder level)")
+				write("    >> Check Current button ENABLED")
+			_elif network_type = "subfeeder"
+			_then
+				.items[:check_upstream].enabled? << _true
+				.items[:check_current].enabled? << _true
+				write("    >> Check Upstream button ENABLED")
+				write("    >> Check Current button ENABLED")
+			_elif network_type = "cluster"
+			_then
+				.items[:check_upstream].enabled? << _true
+				.items[:check_current].enabled? << _false
+				write("    >> Check Upstream button ENABLED")
+				write("    >> Check Current button DISABLED (cluster level)")
+			_else
+				.items[:check_upstream].enabled? << _false
+				.items[:check_current].enabled? << _false
+				write("    >> Both buttons DISABLED (unknown network type)")
+			_endif
+
+			# Clear both tables when new cable is selected
+			.table_list.empty()
+			.table_list2.empty()
+			_self.changed(:device_connection_table, :refresh)
+			_self.changed(:table_ur2, :refresh)
+			.items[:table].refresh()
+			.items[:table2].refresh()
 		_else
-			cab << _unset 
+			cab << _unset
+			.selected_rwo << _unset
+			# No cable selected - disable buttons
+			.items[:check_upstream].enabled? << _false
+			.items[:check_current].enabled? << _false
 		_endif
-
-
-	
-
 	_else
-		_self.show_message("Pilih Kabel")	
+		_self.show_message("Pilih Kabel")
+		.selected_rwo << _unset
+		# No valid selection - disable buttons
+		.items[:check_upstream].enabled? << _false
+		.items[:check_current].enabled? << _false
 	_endif
-	
-_endmethod
-$
-
-_pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.get_ur1()
-	##
-	##
-
-	#.engine.get_ur2(.items, .records)
-
-_endmethod
-$
-
-_pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.get_ur2()
-	##
-	##
-
-	#.engine.get_ur2(.items, .records)
 
 _endmethod
 $
@@ -450,43 +447,101 @@ _method rwwi_mancore_plan_dialog.clear()
 #
 #
 	.items[:table].clear_selection()
-	_self.changed(:table_ur1, :refresh)
+	_self.changed(:device_connection_table, :refresh)
 	_self.changed(:table_ur2, :refresh)
 
-	.items[:result2].text << ""
+	.items[:log].text << ""
+
+	# Disable buttons when cleared
+	.items[:check_upstream].enabled? << _false
+	.items[:check_current].enabled? << _false
+	.items[:assign_fiber].enabled? << _false
 
 _endmethod
 $
 
-
-
 _pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.populate_ur1( a_table )
-	## 
+_method rwwi_mancore_plan_dialog.assign_fiber()
+	##
+	## Assign fiber to selected device connections
+	## Currently under construction
 	##
 
-	row << 1
-	rd << {:traffic_light_red, :ui_resources}
-	gr << {:traffic_light_grey, :ui_resources}
-	gn << {:traffic_light_green, :ui_resources}
-	tk << {:tick, :ui_resources}
-	
-	_for a_rec  _over .table_list.fast_elements()
+	_self.show_message("Under Construction")
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
+	##
+	## Populate table with device connection data from API response
+
+	_local row << 1
+
+	# Sort data by Tube Number, then by Core Number
+	_local sorted_data << .table_list.as_sorted_collection(
+		_proc(a, b)
+			_local tube_a << a[:transport_tube_number].default(0)
+			_local tube_b << b[:transport_tube_number].default(0)
+			_local core_a << a[:transport_core_number].default(0)
+			_local core_b << b[:transport_core_number].default(0)
+
+			_if tube_a <> tube_b
+			_then
+				_return tube_a < tube_b
+			_else
+				_return core_a < core_b
+			_endif
+		_endproc)
+
+	_for a_rec _over sorted_data.fast_elements()
 	_loop
 		a_table.set_row_data( row, a_rec )
-		a_table.add_cell(row, 1, {}, {:label, a_rec.fiber_number.as_number() })
-		a_table.add_cell( row, 2, {}, {:label, a_rec.owner })
-		a_table.add_cell( row, 3, {}, {:label, "" })
-		a_table.add_cell( row, 4, {}, {:label, a_rec.priority })
-		a_table.add_cell( row, 5, {}, {:label, a_rec.sheath_with_loc.name })
-		
-		_if a_rec.owner = "Kosong" _orif a_rec.owner = "Idle" _orif a_rec.owner = "Port Kosong" _orif a_rec.owner _is _unset _orif a_rec.owner = ""
-		_then 
-			a_table.add_cell( row, 6, {}, {:image, rd })
+		# Column 1: Tube Count - depends on infra_type
+		_local tube_count
+		_if .current_infra_type _is :feeder
+		_then
+			tube_count << a_rec[:transport_feeder_tube_count]
 		_else
-			a_table.add_cell( row, 6, {}, {:image, gn })	
+			tube_count << a_rec[:transport_subfeeder_tube_count]
 		_endif
-		
+		a_table.add_cell(row, 1, {}, {:label, tube_count.default("").write_string, :row_alignment, :centre})
+
+		# Column 2: Core Count - depends on infra_type
+		_local core_count
+		_if .current_infra_type _is :feeder
+		_then
+			core_count << a_rec[:transport_feeder_core_count]
+		_else
+			core_count << a_rec[:transport_subfeeder_core_count]
+		_endif
+		a_table.add_cell(row, 2, {}, {:label, core_count.default("").write_string, :row_alignment, :centre})
+
+		# Column 3: Tube Number
+		a_table.add_cell(row, 3, {}, {:label, a_rec[:transport_tube_number].default("").write_string, :row_alignment, :centre})
+
+		# Column 4: Core Number
+		a_table.add_cell(row, 4, {}, {:label, a_rec[:transport_core_number].default("").write_string, :row_alignment, :centre})
+
+		# Column 5: Status - show TAKEN or IDLE
+		_local icon_status
+		_if a_rec[:transport_status] = "TAKEN"
+		_then
+			icon_status << {:traffic_light_red, :ui_resources}
+		_else
+			icon_status << {:traffic_light_green, :ui_resources}
+		_endif
+		a_table.add_cell(row, 5, {}, {:image, icon_status })
+
+		# Column 6: Destination Code - depends on infra_type
+		_local dest_code << a_rec[:destination_cluster_code]
+		a_table.add_cell(row, 6, {}, {:label, dest_code.default("").write_string })
+
+		# Column 7: Destination Name - depends on infra_type
+		_local dest_name << a_rec[:destination_cluster_name]
+		a_table.add_cell(row, 7, {}, {:label, dest_name.default("").write_string })
+
 		row +<< 1
 	_endloop
 
@@ -497,44 +552,87 @@ $
 
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.populate_ur2( a_table )
-	## 
 	##
+	## Populate table2 with optical splitter data
+	## Displays: Destination Code, Splitter Name, Dest. Tube Number, Dest. Core Number, Status
 
-	row << 1
-	rd << {:traffic_light_red, :ui_resources}
-	gr << {:traffic_light_grey, :ui_resources}
-	gn << {:traffic_light_green, :ui_resources}
-	tk << {:tick, :ui_resources}
-	_for a_rec  _over .table_list2.fast_elements()
+	_local row << 1
+
+	# Sort data by splitter name
+	_local sorted_data << .table_list2.as_sorted_collection(
+		_proc(a, b)
+			_local name_a << a[:splitter_name].default("")
+			_local name_b << b[:splitter_name].default("")
+			_return name_a < name_b
+		_endproc)
+
+	_for a_rec _over sorted_data.fast_elements()
 	_loop
 		a_table.set_row_data( row, a_rec )
-		a_table.add_cell(row, 1, {}, {:label, a_rec.fiber_number.as_number(),:row_alignment, :centre})
-		a_table.add_cell( row, 2, {}, {:label, a_rec.owner })
-		a_table.add_cell( row, 3, {}, {:label, "" })
-		a_table.add_cell( row, 4, {}, {:label, a_rec.priority })
-		a_table.add_cell( row, 5, {}, {:label, a_rec.sheath_with_loc.name })
-		_if a_rec.owner = "Kosong" _orif a_rec.owner = "Idle" _orif a_rec.owner = "Port Kosong" _orif a_rec.owner _is _unset _orif a_rec.owner = ""
-		_then 
-			a_table.add_cell( row, 6, {}, {:image, rd })
+
+		# Column 1: Destination Code
+		a_table.add_cell(row, 1, {}, {:label, a_rec[:destination_code].default("").write_string})
+
+		# Column 2: Splitter Name
+		a_table.add_cell(row, 2, {}, {:label, a_rec[:splitter_name].default("").write_string})
+
+		# Column 3: Dest. Tube Number (always 1)
+		a_table.add_cell(row, 3, {}, {:label, a_rec[:dest_tube_number].default("1").write_string, :row_alignment, :centre})
+
+		# Column 4: Dest. Core Number (extracted from splitter name)
+		a_table.add_cell(row, 4, {}, {:label, a_rec[:dest_core_number].default("").write_string, :row_alignment, :centre})
+
+		# Column 5: Status (construction_status)
+		_local status << a_rec[:status].default("")
+		_local icon_status
+		_if status = "In Service" _orif status = "IN SERVICE"
+		_then
+			icon_status << {:traffic_light_green, :ui_resources}
+		_elif status = "Proposed" _orif status = "PROPOSED"
+		_then
+			icon_status << {:traffic_light_yellow, :ui_resources}
 		_else
-			a_table.add_cell( row, 6, {}, {:image, gn })	
+			icon_status << {:traffic_light_red, :ui_resources}
 		_endif
-		
+		a_table.add_cell(row, 5, {}, {:image, icon_status})
+
 		row +<< 1
 	_endloop
 
-	a_table.apply_sorting(_true )
+	a_table.apply_sorting(_true)
 _endmethod
 $
 
 
 _pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.table_selected_ur1( selection )
-#	## 
-#	##
+_method rwwi_mancore_plan_dialog.device_connection_table_selected( selection )
+	##
+	## Handle selection in device connection table
+	## Enable assign_fiber button only if selected records are not TAKEN
+	##
 	_global sel
 	sel << selection
 	.current_selection_ur1 << selection.get_row_data_from_selection().an_element()
+
+	# Enable assign_fiber button only if selected records are not TAKEN
+	_local selected_records << selection.get_row_data_from_selection()
+	_local all_non_taken? << _true
+
+	_if selected_records.empty?
+	_then
+		.items[:assign_fiber].enabled? << _false
+	_else
+		_for rec _over selected_records.fast_elements()
+		_loop
+			_if rec[:transport_status] = "TAKEN"
+			_then
+				all_non_taken? << _false
+				_leave
+			_endif
+		_endloop
+
+		.items[:assign_fiber].enabled? << all_non_taken?
+	_endif
 
 _endmethod
 $
@@ -565,31 +663,359 @@ _method rwwi_mancore_plan_dialog.selected_str()
 
 	sel << mapman.current_map.current_selection
 
-	write(sel)
-	_if sel.size = 0
+	_if sel.size > 0
 	_then
-		_self.show_message("Pilih Kabel")	
-	_else
-		an_rwo << sel.an_element().rwo
-		write(an_rwo.id)
-	
+		_return sel.an_element().rwo
+		#_self.show_message("Pilih Kabel")	
+	#_else
+	#	an_rwo << sel.an_element().rwo
 	_endif
-		>> an_rwo
+	#	>> an_rwo
 _endmethod
 $
 
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.wm_close()
-	## 
-	## 
+	##
+	##
 	#	_self.clear()
 	_self.wm_close()
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwwi_mancore_plan_dialog.get_result()
+_method rwwi_mancore_plan_dialog.query_and_populate_tables(infra_type, infra_code, level_label)
+	## Common method to query API and database, then populate both tables
+	## Parameters:
+	##   infra_type   - "feeder" or "subfeeder"
+	##   infra_code   - feeder_code or subfeeder_code
+	##   level_label  - "Upstream" or "Current Level" for log display
 
-	_self.show_message("Under Construction")
+	_local cab << .selected_rwo
+	_local subfeeder_code << cab.subfeeder_code.default("")
+
+	# Get limit value from text field
+	_local limit_str << .items[:limit_field].value.default("100")
+	_local limit << limit_str.as_number().default(100)
+
+	# Call engine to get device connections
+	.items[:log].append(newline_char)
+	.items[:log].append("Calling Device Connection API (" + level_label + ")...")
+	.items[:log].append(newline_char)
+	.items[:log].append("  Infrastructure Type: " + infra_type)
+	.items[:log].append(newline_char)
+	.items[:log].append("  Infrastructure Code: " + infra_code)
+	.items[:log].append(newline_char)
+	.items[:log].append("  Limit: " + limit.write_string)
+	.items[:log].append(newline_char)
+	.items[:log].append(newline_char)
+
+	_local result << .engine.get_device_connections(infra_type, infra_code, limit, 0)
+
+	# Check for errors from engine
+	_if result[:error_message] _isnt _unset
+	_then
+		.items[:log].append("ERROR: " + result[:error_message])
+		.items[:log].append(newline_char)
+		_self.show_message("Error calling device connection API:" + newline_char +
+				   result[:error_message])
+		_return
+	_endif
+
+	# Display DATA Astri section with parsed results
+	_if result[:success] _is _true
+	_then
+		.items[:log].append("DATA Astri (" + level_label + ")")
+		.items[:log].append(newline_char)
+		.items[:log].append("===========")
+		.items[:log].append(newline_char)
+		.items[:log].append("Fiber Count Query   : " + result[:count].write_string)
+		.items[:log].append(newline_char)
+		.items[:log].append("Total Fiber Count   : " + result[:count_all].write_string)
+		.items[:log].append(newline_char)
+		.items[:log].append("Taken               : " + result[:taken_count].write_string)
+		.items[:log].append(newline_char)
+		.items[:log].append("Idle (Not Taken)    : " + result[:idle_count].write_string)
+		.items[:log].append(newline_char)
+		.items[:log].append(newline_char)
+
+		# Query and display homepass information
+		_local homepass << .engine.get_homepass(infra_type, infra_code)
+		.items[:log].append("Homepass (Demand Points)")
+		.items[:log].append(newline_char)
+		.items[:log].append("=======================")
+		.items[:log].append(newline_char)
+		.items[:log].append("Total Homepass      : " + homepass.size.write_string)
+		.items[:log].append(newline_char)
+		.items[:log].append(newline_char)
+
+		# Store infra_type and populate table1 with device connection data
+		.current_infra_type << result[:infra_type].as_symbol()
+		.table_list.empty()
+
+		_if result[:data] _isnt _unset
+		_then
+			_for conn _over result[:data].fast_elements()
+			_loop
+				.table_list.add(conn)
+			_endloop
+		_endif
+
+		# Refresh table1
+		_self.changed(:device_connection_table, :refresh)
+		.items[:table].refresh()
+
+	_else
+		.items[:log].append(newline_char)
+		.items[:log].append("API returned success: false")
+		.items[:log].append(newline_char)
+	_endif
+
+	# Get destination code (subfeeder_code or project title from active design)
+	_local destination_code << subfeeder_code
+	_if destination_code = "" _orif destination_code _is _unset
+	_then
+		# Use project title from active design
+		_local design << swg_dsn_admin_engine.get_current_job()
+		_if design _isnt _unset
+		_then
+			destination_code << design.project.perform(:job_title).default("")
+			write("  Using project title from active design: ", destination_code)
+		_endif
+	_endif
+
+	_if destination_code = "" _orif destination_code _is _unset
+	_then
+		write("  WARNING: Cannot determine destination code for optical splitters")
+		_return
+	_endif
+
+	# Query sheath_splice by subfeeder_code to get optical splitters
+	.items[:log].append("Querying Optical Splitters...")
+	.items[:log].append(newline_char)
+	.items[:log].append("  Subfeeder Code: " + subfeeder_code)
+	.items[:log].append(newline_char)
+	.items[:log].append("  Destination Code: " + destination_code)
+	.items[:log].append(newline_char)
+	.items[:log].append(newline_char)
+
+	_try _with err
+		_local sc_col << .ev.collections[:sheath_splice]
+		_if sc_col _is _unset
+		_then
+			_self.show_message("Collection sheath_splice not found")
+			_return
+		_endif
+
+		_local pred << predicate.eq(:subfeeder_code, subfeeder_code)
+		_local sheath_splices << sc_col.select(pred)
+
+		write("  Found ", sheath_splices.size, " sheath_splice records with subfeeder_code: ", subfeeder_code)
+
+		# Clear table2 and populate with optical splitters
+		.table_list2.empty()
+		_local splitter_count << 0
+
+		_for ss _over sheath_splices.fast_elements()
+		_loop
+			# Get optical splitters from sheath_splice
+			_local splitters << ss.optical_splitters
+			_if splitters _isnt _unset
+			_then
+				_for splitter _over splitters.fast_elements()
+				_loop
+					_local splitter_name << splitter.name.default("")
+					_local construction_status << splitter.construction_status.default("")
+
+					# Extract core number from splitter name (last part after -)
+					# Example: "FAT-SP.1" -> extract "1"
+					_local dest_core_number << ""
+					_local parts << splitter_name.split_by(%-)
+					_if parts.size > 0
+					_then
+						_local last_part << parts.last.default("")
+						# Extract number from "SP.x" format
+						_if last_part.index_of_seq("SP.") _isnt _unset
+						_then
+							_local dot_parts << last_part.split_by(%.)
+							_if dot_parts.size >= 2
+							_then
+								dest_core_number << dot_parts[2].default("")
+							_endif
+						_endif
+					_endif
+
+					# Create property list for table2
+					_local splitter_data << property_list.new_with(
+						:destination_code, destination_code,
+						:splitter_name, splitter_name,
+						:dest_tube_number, "1",
+						:dest_core_number, dest_core_number,
+						:status, construction_status,
+						:splitter_object, splitter)
+
+					.table_list2.add(splitter_data)
+					splitter_count +<< 1
+				_endloop
+			_endif
+		_endloop
+
+		.items[:log].append("Optical Splitters Found")
+		.items[:log].append(newline_char)
+		.items[:log].append("=======================")
+		.items[:log].append(newline_char)
+		.items[:log].append("Total Splitters     : " + splitter_count.write_string)
+		.items[:log].append(newline_char)
+
+		# Refresh table2
+		_self.changed(:table_ur2, :refresh)
+		.items[:table2].refresh()
+
+	_when error
+		.items[:log].append("ERROR: " + err.report_contents_string)
+		.items[:log].append(newline_char)
+		_self.show_message("Error querying optical splitters:" + newline_char +
+				   err.report_contents_string)
+		write("ERROR querying optical splitters: ", err.report_contents_string)
+	_endtry
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.check_upstream()
+	## Check upstream device connections and optical splitters
+	## Uses fttx_network_type to determine infrastructure level:
+	##   - subfeeder network → query by feeder
+	##   - cluster network → query by subfeeder
+
+	# Ensure design is active
+	_try
+		_local design << swg_dsn_admin_engine.get_current_job()
+		_if design _is _unset
+		_then
+			_self.show_message("No active design. Please activate a design first.")
+			_return
+		_endif
+		_local project_name << design.project.perform(:job_title).default("")
+		write("Active design: ", project_name)
+	_when error
+		_self.show_message("Cannot get active design. Please activate a design first.")
+		_return
+	_endtry
+
+	_if .selected_rwo _is _unset
+	_then
+		_self.show_message("Please select a cable first using the Get RWO button")
+		_return
+	_endif
+
+	_local cab << .selected_rwo
+	_local network_type << cab.fttx_network_type.default("").lowercase
+	_local feeder_code << cab.feeder_code.default("")
+	_local subfeeder_code << cab.subfeeder_code.default("")
+
+	write("Checking upstream (network type: ", network_type, ")...")
+
+	_local infra_type << _unset
+	_local infra_code << _unset
+
+	# Determine infrastructure based on fttx_network_type
+	_if network_type = "subfeeder"
+	_then
+		# Subfeeder network → query by feeder (upstream)
+		infra_type << "feeder"
+		infra_code << feeder_code
+		write("  Network type: subfeeder → Using FEEDER (upstream): ", infra_code)
+	_elif network_type = "cluster"
+	_then
+		# Cluster network → query by subfeeder (upstream)
+		infra_type << "subfeeder"
+		infra_code << subfeeder_code
+		write("  Network type: cluster → Using SUBFEEDER (upstream): ", infra_code)
+	_else
+		_self.show_message("Invalid network type for upstream query: " + network_type + newline_char +
+				   "Expected: 'subfeeder' or 'cluster'")
+		_return
+	_endif
+
+	_if infra_code = "" _orif infra_code _is _unset
+	_then
+		_self.show_message("Missing infrastructure code for upstream query")
+		_return
+	_endif
+
+	# Call common method to query and populate both tables
+	_self.query_and_populate_tables(infra_type, infra_code, "Upstream")
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.check_current()
+	## Check current device connections and optical splitters
+	## Uses fttx_network_type to determine infrastructure level:
+	##   - feeder network → query by feeder
+	##   - subfeeder network → query by subfeeder
+
+	# Ensure design is active
+	_try
+		_local design << swg_dsn_admin_engine.get_current_job()
+		_if design _is _unset
+		_then
+			_self.show_message("No active design. Please activate a design first.")
+			_return
+		_endif
+		_local project_name << design.project.perform(:job_title).default("")
+		write("Active design: ", project_name)
+	_when error
+		_self.show_message("Cannot get active design. Please activate a design first.")
+		_return
+	_endtry
+
+	_if .selected_rwo _is _unset
+	_then
+		_self.show_message("Please select a cable first using the Get RWO button")
+		_return
+	_endif
+
+	_local cab << .selected_rwo
+	_local network_type << cab.fttx_network_type.default("").lowercase
+	_local feeder_code << cab.feeder_code.default("")
+	_local subfeeder_code << cab.subfeeder_code.default("")
+
+	write("Checking current level (network type: ", network_type, ")...")
+
+	_local infra_type << _unset
+	_local infra_code << _unset
+
+	# Determine infrastructure based on fttx_network_type
+	_if network_type = "feeder"
+	_then
+		# Feeder network → query by feeder (current)
+		infra_type << "feeder"
+		infra_code << feeder_code
+		write("  Network type: feeder → Using FEEDER (current): ", infra_code)
+	_elif network_type = "subfeeder"
+	_then
+		# Subfeeder network → query by subfeeder (current)
+		infra_type << "subfeeder"
+		infra_code << subfeeder_code
+		write("  Network type: subfeeder → Using SUBFEEDER (current): ", infra_code)
+	_else
+		_self.show_message("Invalid network type for current query: " + network_type + newline_char +
+				   "Expected: 'feeder' or 'subfeeder'")
+		_return
+	_endif
+
+	_if infra_code = "" _orif infra_code _is _unset
+	_then
+		_self.show_message("Missing infrastructure code for current query")
+		_return
+	_endif
+
+	# Call common method to query and populate both tables
+	_self.query_and_populate_tables(infra_type, infra_code, "Current Level")
+
 _endmethod
 $

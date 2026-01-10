@@ -408,8 +408,9 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 	## Returns: string - network_type ("olt", "fdt", "fat", etc.) or _unset
 
 	# PRIORITY 1: LineString with "sw" in name
+	_local l_name_lc << pl[:name].lowercase
 	_if pl[:type] = "line" _andif
-	    pl[:name].lowercase.index_of_seq("sw") _isnt _unset
+	    l_name_lc.index_of_seq("sw") _isnt _unset
 	_then
 		_return "sling_wire"
 	_endif
@@ -445,10 +446,12 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 		_then
 			_return _unset
 		_endif
+	
+		_local l_parent << pl[:parent].lowercase
+		_local l_name << l_parent+"|"+l_name_lc
 
 		# Map icon href to network type
-		_local network_type << _self.map_icon_to_network_type(icon_href)
-
+		_local network_type << _self.map_icon_to_network_type(icon_href, l_name)
 		# Cache the result
 		_if network_type _isnt _unset
 		_then
@@ -711,44 +714,53 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_kml_parser.map_icon_to_network_type(icon_filename)
+_private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optional p_name_lc)
 	## Map icon filename to network type
 	##
 	## Parameters:
 	##   icon_filename - Icon filename (e.g., "ranger_station.png")
 	##
 	## Returns: string - network_type or _unset
-
 	_if icon_filename _is _unset
 	_then
+		write("Icon filename _is unset")
 		_return _unset
 	_endif
 	#write("DEBUG map_icon_to_network_type: icon_filename = ", icon_filename)
 	_local filename_lc << icon_filename.lowercase
 
 	# Map icon filenames to network types
-	_if filename_lc.index_of_seq("ranger_station") _isnt _unset
+	_if filename_lc.index_of_seq("ranger_station") _isnt _unset _orif 
+		p_name_lc.index_of_seq("olt") _isnt _unset 
 	_then
 		_return "olt"
 
-	_elif filename_lc.index_of_seq("cross-hairs") _isnt _unset _orif
-	      filename_lc.index_of_seq("crosshairs") _isnt _unset
-	_then
-		_return "fdt"
-
-	_elif filename_lc.index_of_seq("placemark_circle") _isnt _unset
-	_then
+	_elif filename_lc.index_of_seq("placemark_circle") _isnt _unset _orif 
+		p_name_lc.index_of_seq("pole") _isnt _unset 
+	_then 
+		_if p_name_lc.index_of_seq("mr") _is _unset	
+		_then 
+			_return "homepass"
+		_endif 
 		_return "pole"
 
-	_elif filename_lc.index_of_seq("forbidden") _isnt _unset
-	_then
-		_return "joint_closure"
-
-	_elif filename_lc.index_of_seq("target") _isnt _unset
+	_elif filename_lc.index_of_seq("forbidden") _isnt _unset _andif
+		  p_name_lc.index_of_seq("coil") _isnt _unset
 	_then
 		_return "slack_cable"
 
-	_elif filename_lc.index_of_seq("homegardenbusiness") _isnt _unset
+	_elif filename_lc.index_of_seq("forbidden") _isnt _unset _orif 
+		  filename_lc.index_of_seq("c.png") _isnt _unset
+	_then 
+		_return "joint_closure"
+
+	_elif filename_lc.index_of_seq("target") _isnt _unset _orif 
+		p_name_lc.index_of_seq("slack") _isnt _unset 
+	_then
+		_return "slack_cable"
+
+	_elif filename_lc.index_of_seq("homegardenbusiness") _isnt _unset _orif 
+		p_name_lc.index_of_seq("cover") _isnt _unset 
 	_then
 		_return "homepass"
 
@@ -760,7 +772,12 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename)
 	_then
 		_return "handhole"  # Pedestal handhole
 
-	_elif filename_lc.index_of_seq("triangle") _isnt _unset
+	_elif filename_lc.index_of_seq("triangle") _isnt _unset _andif 
+		p_name_lc.index_of_seq("fdt") _isnt _unset 
+	_then 
+		_return "fdt"
+	_elif filename_lc.index_of_seq("triangle") _isnt _unset _orif 
+		p_name_lc.index_of_seq("fat") _isnt _unset 
 	_then
 		_return "fat"
 
@@ -768,8 +785,15 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename)
 	_then
 		_return "cell"
 
+	_elif filename_lc.index_of_seq("cross-hairs") _isnt _unset _orif
+	      filename_lc.index_of_seq("crosshairs") _isnt _unset _orif 
+		  p_name_lc.index_of_seq("fdt") _isnt _unset 
+	_then
+		_return "fdt"
+
 	_else
 		# Unknown icon
+		write("Unknow icon")
 		_return _unset
 	_endif
 _endmethod

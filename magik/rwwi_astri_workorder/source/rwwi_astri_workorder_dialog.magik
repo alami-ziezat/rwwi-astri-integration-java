@@ -13,7 +13,7 @@ def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 {
 	{:engine,     _unset, :writable},       # Engine instance
 	{:items,      _unset, :writable},       # UI components cache
-	{:plugin,     _unset, :writable},       # Parent plugin
+	{:owner,     _unset, :writable},        # Parent plugin
 	{:filters,    _unset, :writable},       # Current filter values
 	{:selected_wo, _unset, :writable},      # Currently selected work order
 	{:wo_cache,   _unset, :writable}        # Cache to store work orders by row number
@@ -21,16 +21,16 @@ def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
-_method rwwi_astri_workorder_dialog.new(plugin)
+_method rwwi_astri_workorder_dialog.new(_optional owner, framework)
 	## Create new dialog
-	>> _clone.init(plugin)
+	>> _clone.init(owner, framework)
 _endmethod
 $
 
-_private _method rwwi_astri_workorder_dialog.init(plugin)
+_private _method rwwi_astri_workorder_dialog.init(owner, framework)
 	## Initialize dialog
 
-	.plugin << plugin
+	.owner << owner
 	.engine << rwwi_astri_workorder_engine.new()
 	.engine.dialog << _self
 	.items << property_list.new()
@@ -43,6 +43,8 @@ _private _method rwwi_astri_workorder_dialog.init(plugin)
 	.filters[:limit] << 50
 	.filters[:offset] << 0
 
+	# Add dependent dialog to plugin
+	_self.add_dependent(.owner)
 	>> _super.init()
 _endmethod
 $
@@ -128,32 +130,6 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 		:editable?, _false)
 	.items[:filter_category].text_items << {"All", "Cluster BOQ", "Installation", "Maintenance"}
 	.items[:filter_category].value << "All"
-
-#	sw_label_item.new(filter_toolbar, "  Status:  ")
-#	.items[:filter_status] << sw_text_item.new(filter_toolbar,
-#		:model, _self,
-#		:display_length, 15,
-#		:editable?, _false)
-#	.items[:filter_status].text_items << {"All", "new", "in_progress", "closed", "cancelled", "successful"}
-#	.items[:filter_status].value << "All"
-
-#	.items[:label_topology] << sw_label_item.new(filter_toolbar, "  Topology:  ")
-#	.items[:filter_topology] << sw_text_item.new(filter_toolbar,
-#		:model, _self,
-#		:display_length, 10,
-#		:editable?, _false)
-#	.items[:filter_topology].text_items << {"All", "AE", "UG", "OH"}
-#	.items[:filter_topology].value << "All"
-#
-#	# Create third toolbar for cluster filter and pagination
-#	pagination_toolbar << toolbar_con.create_toolbar()
-#
-#	.items[:label_code] << sw_label_item.new(pagination_toolbar, "  Cluster Code:  ")
-#	.items[:filter_cluster] << sw_text_item.new(pagination_toolbar,
-#		:model, _self,
-#		:display_length, 20,
-#		:editable?, _true)
-
 _endmethod
 $
 _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
@@ -253,9 +229,6 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 
 	# Enable sorting after columns are configured
 	.items[:table].enable_sort? << _true
-
-	# Set selection notifier - receives (table, selection_rope) as arguments
-	#.items[:table].selection_notifier << {:|workorder_selection()|, _self, _unset, _unset}
 _endmethod
 $
 
@@ -270,6 +243,7 @@ _private _method rwwi_astri_workorder_dialog.build_text_window(parent)
 	.items[:text_window].enable_vertical_scrollbar? << _true
 	.items[:text_window].min_height << 150
 	.items[:text_window].editable? << _false  # Read-only
+	.items[:text_window].colour << colour.called(:white)
 
 	# Set initial welcome message
 	_self.log_info("ASTRI Work Order Manager - Ready")
@@ -866,5 +840,13 @@ _private _method rwwi_astri_workorder_dialog.get_infra_type_from_wo(wo)
 		write("LOG: WARNING - Unknown infra_type '", infra_type, "', defaulting to 'cluster'")
 		_return "cluster"
 	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_astri_workorder_dialog.wm_close()
+	## 
+	## 
+	_self.wm_close()
 _endmethod
 $

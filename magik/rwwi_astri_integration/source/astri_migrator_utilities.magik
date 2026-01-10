@@ -102,6 +102,7 @@ _private _method astri_design_migrator.is_demand_point?(pm)
 	## Uses simplified wildcard patterns: "*homepass*", "*hp*", "*reduce*", "*customer*"
 
 	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "homepass"
 	_if network_type = "homepass" _then _return _true _endif 
 
 	_local folders << pm[:parent].default("").lowercase
@@ -131,7 +132,6 @@ _private _method astri_design_migrator.is_demand_point?(pm)
 	_loop
 		_if fs.default("").matches?("*homepass*") _orif
 		   fs.default("").matches?("*hp*") _orif
-		   fs.default("").matches?("*reduce*") _orif
 		   fs.default("").matches?("*customer*")
 		_then
 			_return _true
@@ -147,7 +147,6 @@ _private _method astri_design_migrator.is_splice?(pm)
 	## Check if placemark is a point-based sheath splice
 	## Checks for: CLOSURE, JOINT CLOSURE, FAT, FDT patterns
 	## IMPORTANT: This is for POINT type (not area)
-
 	_if _self.is_pole?(pm)
 	_then
 		_return _false  # Poles are not splices

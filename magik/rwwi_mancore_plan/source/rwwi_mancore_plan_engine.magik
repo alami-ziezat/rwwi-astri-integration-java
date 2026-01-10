@@ -80,3 +80,147 @@ _method rwwi_mancore_plan_engine.init( owner , framework )
 	_return _self
 _endmethod
 $
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_engine.get_device_connections(infra_type, infra_code, limit, offset)
+	## Call ASTRI Device Connection API to retrieve device connections
+	## based on infrastructure type and code, then parse the response.
+	##
+	## Parameters:
+	##   infra_type  - "feeder" or "subfeeder" (string)
+	##   infra_code  - infrastructure code (string)
+	##   limit       - maximum number of records to fetch (integer)
+	##   offset      - starting offset for pagination (integer)
+	##
+	## Returns:
+	##   property_list with keys:
+	##     :success        - boolean (true/false)
+	##     :count          - number of records in response
+	##     :count_all      - total number of available records
+	##     :taken_count    - number of TAKEN connections
+	##     :idle_count     - number of idle (not TAKEN) connections
+	##     :data           - array of device connection records (for table display)
+	##     :infra_type     - infrastructure type used ("feeder" or "subfeeder")
+	##     :error_message  - error message if parsing fails
+	##
+	## Example:
+	##   result << _self.get_device_connections("subfeeder", "PLB005917", 100, 0)
+
+	_local result << property_list.new()
+
+	_try _with err
+		# Call Java procedure to get JSON response
+		_local json_result << astri_get_device_connections(infra_type.write_string, infra_code.write_string, limit, offset)
+
+		# Parse JSON response
+		_local json_obj << json_parser.parse(json_result)
+		_local success << json_obj[:success]
+		_local count << json_obj[:count]
+		_local count_all << json_obj[:count_all]
+
+		result[:success] << success
+		result[:count] << count
+		result[:count_all] << count_all
+		result[:infra_type] << infra_type
+
+		_if success _is _true
+		_then
+			# Count TAKEN and idle connections
+			_local data << json_obj[:data]
+			_local taken_count << 0
+			_local idle_count << 0
+
+			_if data _isnt _unset
+			_then
+				_for conn _over data.fast_elements()
+				_loop
+					_local status << conn[:transport_status]
+					_if status = "TAKEN"
+					_then
+						taken_count +<< 1
+					_else
+						# Not TAKEN = idle (includes AVAILABLE and RESERVED)
+						idle_count +<< 1
+					_endif
+				_endloop
+			_endif
+
+			result[:taken_count] << taken_count
+			result[:idle_count] << idle_count
+			result[:data] << data
+			result[:error_message] << _unset
+		_else
+			# API returned success: false
+			result[:taken_count] << 0
+			result[:idle_count] << 0
+			result[:data] << rope.new()
+			result[:error_message] << "API returned success: false"
+		_endif
+
+	_when error
+		# Handle parsing or API call errors
+		result[:success] << _false
+		result[:count] << 0
+		result[:count_all] << 0
+		result[:taken_count] << 0
+		result[:idle_count] << 0
+		result[:data] << rope.new()
+		result[:infra_type] << infra_type
+		result[:error_message] << err.report_contents_string
+		write("ERROR in get_device_connections(): ", err.report_contents_string)
+	_endtry
+
+	_return result
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_engine.get_homepass(infra_type, infra_code)
+	## Query demand points (homepass) based on infrastructure type and code
+	##
+	## Parameters:
+	##   infra_type  - "subfeeder" or "feeder" (string)
+	##   infra_code  - infrastructure code (string)
+	##
+	## Returns:
+	##   rope - Collection of demand point records
+
+	_local homepass_collection << rope.new()
+
+	_try _with err
+		_local dp_col << .ev.collections[:ftth!demand_point]
+		_if dp_col _is _unset
+		_then
+			write("  WARNING: ftth!demand_point collection not found")
+			_return homepass_collection
+		_endif
+
+		_local pred << _unset
+		_if infra_type = "subfeeder"
+		_then
+			# Query by subfeeder_code
+			pred << predicate.eq(:subfeeder_code, infra_code)
+		_elif infra_type = "feeder"
+		_then
+			# Query by feeder_code
+			pred << predicate.eq(:feeder_code, infra_code)
+		_else
+			write("  WARNING: Unknown infra_type: ", infra_type)
+			_return homepass_collection
+		_endif
+
+		_local homepass << dp_col.select(pred)
+		_for hp _over homepass.fast_elements()
+		_loop
+			homepass_collection.add(hp)
+		_endloop
+
+		write("  Found ", homepass_collection.size, " homepass for ", infra_type, ": ", infra_code)
+
+	_when error
+		write("ERROR in get_homepass(): ", err.report_contents_string)
+	_endtry
+
+	_return homepass_collection
+_endmethod
+$
