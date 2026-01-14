@@ -224,3 +224,139 @@ _method rwwi_mancore_plan_engine.get_homepass(infra_type, infra_code)
 	_return homepass_collection
 _endmethod
 $
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_engine.add_device_connection(connection_data)
+	## Add device connection to ASTRI API
+	##
+	## Parameters:
+	##   connection_data - property_list containing connection fields
+	##
+	## Returns:
+	##   property_list with:
+	##     :success - true/false
+	##     :data - array of IDs [{:id => internalId}]
+	##     :error_message - error message if failed
+
+	_local result << property_list.new()
+
+	_try _with err
+		# Build JSON request body from property_list
+		_local json_builder << internal_text_output_stream.new()
+		json_builder.write("{")
+
+		# Define all 35 fields
+		_local fields << {
+			:work_order_number,
+			:source_device_name,
+			:source_device_hardware_type,
+			:source_device_port_name,
+			:source_device_port_type,
+			:source_device_remarks,
+			:source_device_capacity,
+			:source_device_capacity_measurement,
+			:transport_name,
+			:transport_hardware_type,
+			:transport_capacity,
+			:transport_capacity_measurement,
+			:destination_device_name,
+			:destination_device_hardware_type,
+			:destination_device_port_name,
+			:destination_device_port_type,
+			:destination_device_remarks,
+			:destination_device_capacity,
+			:destination_device_capacity_measurement,
+			:source_type,
+			:source_code,
+			:source_tube_number,
+			:source_core_number,
+			:transport_code,
+			:transport_tube_number,
+			:transport_core_number,
+			:transport_status,
+			:transport_remarks,
+			:closure_code,
+			:destination_type,
+			:destination_code,
+			:destination_tube_number,
+			:destination_core_number,
+			:verified_by_username,
+			:verified_at
+		}
+
+		_local first? << _true
+		_for field _over fields.fast_elements()
+		_loop
+			_local value << connection_data[field]
+			_if value _isnt _unset _andif value <> ""
+			_then
+				_if _not first?
+				_then
+					json_builder.write(",")
+				_endif
+				# Write field as JSON: "field_name":"value"
+				json_builder.write(%", field.write_string.convert_to_non_escape_string(), %")
+				json_builder.write(":")
+				json_builder.write(%", _self.escape_json_string(value.write_string), %")
+				first? << _false
+			_endif
+		_endloop
+
+		json_builder.write("}")
+		_local json_request << json_builder.string
+
+		write("Calling ASTRI add device connection API...")
+		write("Request JSON: ", json_request)
+
+		# Call Java proc
+		_local json_response << astri_add_device_connection(json_request)
+		write("Response JSON: ", json_response)
+
+		# Parse JSON response
+		_local parser << json_parser.new()
+		_local response << parser.parse(json_response)
+
+		result[:success] << response[:success]
+		result[:data] << response[:data]
+		result[:error_message] << response[:error]
+
+	_when error
+		result[:success] << _false
+		result[:data] << rope.new()
+		result[:error_message] << err.report_contents_string
+		write("ERROR in add_device_connection(): ", err.report_contents_string)
+	_endtry
+
+	_return result
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_engine.escape_json_string(str)
+	## Escape special characters for JSON string
+	##
+	## Parameters:
+	##   str - string to escape
+	##
+	## Returns:
+	##   escaped string
+
+	_if str _is _unset _then _return "" _endif
+
+	_local result << str.copy()
+
+	# Escape backslash first (must be done before other escapes)
+	result << result.substitute_string(%\, write_string(%\, %\))
+
+	# Escape quote character
+	result << result.substitute_string(%", write_string(%\, %"))
+
+	# Escape newline
+	result << result.substitute_string(newline_char, write_string(%\, %n))
+
+	# Escape tab
+	result << result.substitute_string(character.tab, write_string(%\, %t))
+
+	_return result
+_endmethod
+$

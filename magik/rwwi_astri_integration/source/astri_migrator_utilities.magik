@@ -102,7 +102,6 @@ _private _method astri_design_migrator.is_demand_point?(pm)
 	## Uses simplified wildcard patterns: "*homepass*", "*hp*", "*reduce*", "*customer*"
 
 	_local network_type << pm[:network_type].default("").lowercase
-	>> network_type = "homepass"
 	_if network_type = "homepass" _then _return _true _endif 
 
 	_local folders << pm[:parent].default("").lowercase

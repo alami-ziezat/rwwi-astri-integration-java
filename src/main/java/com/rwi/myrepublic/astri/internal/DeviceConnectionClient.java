@@ -92,6 +92,58 @@ public class DeviceConnectionClient {
     }
 
     /**
+     * Add device connection to ASTRI API.
+     * Returns JSON string directly (no XML conversion).
+     *
+     * @param requestBody JSON request body containing all 35 fields
+     * @return JSON string directly from API response
+     *         Response structure: { "success": true/false, "data": [{id: internalId}] }
+     */
+    public String addDeviceConnection(String requestBody)
+        throws IOException, InterruptedException {
+
+        String baseUrl = config.getApiBaseUrl();
+        System.out.println("  [DeviceConnectionClient] Base URL: " + baseUrl);
+        System.out.println("  [DeviceConnectionClient] Adding device connection");
+
+        // Build endpoint - using same base path as get
+        // /v4/device/connection/add
+        String path = "/device/connection/add";
+        String url = baseUrl + path;
+
+        System.out.println("  [DeviceConnectionClient] URL: " + url);
+        System.out.println("  [DeviceConnectionClient] Request Body length: " +
+            (requestBody != null ? requestBody.length() : 0));
+
+        // Build POST request
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Authorization", authHeader)
+            .header("Content-Type", "application/json")
+            .timeout(Duration.ofMillis(config.getRequestTimeout()))
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .build();
+
+        System.out.println("  [DeviceConnectionClient] Sending HTTP POST request...");
+
+        HttpResponse<String> response = client.send(
+            request,
+            HttpResponse.BodyHandlers.ofString()
+        );
+
+        String jsonResponse = response.body();
+
+        System.out.println("  [DeviceConnectionClient] Response status: " +
+            response.statusCode());
+        System.out.println("  [DeviceConnectionClient] Response body length: " +
+            (jsonResponse != null ? jsonResponse.length() : 0));
+
+        // Return JSON response as-is (no conversion)
+        System.out.println("  [DeviceConnectionClient] Returning JSON response directly");
+        return jsonResponse;
+    }
+
+    /**
      * Close the HTTP client (cleanup).
      */
     public void close() {

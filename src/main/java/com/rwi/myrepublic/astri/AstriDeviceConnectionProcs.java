@@ -136,6 +136,77 @@ public class AstriDeviceConnectionProcs {
     }
 
     /**
+     * Add device connection to ASTRI API.
+     *
+     * Creates global Magik procedure:
+     *   astri_add_device_connection(json_request_body)
+     *
+     * @param proc The Magik proc object (always first parameter for @MagikProc)
+     * @param jsonRequestBody JSON string containing all connection fields (Magik string)
+     *                        Magik will build this JSON from property_list
+     * @return String - JSON response from API
+     *         JSON structure:
+     *         {
+     *           "success": true/false,
+     *           "data": [{"id": internalId}]
+     *         }
+     */
+    @MagikProc(@Name("astri_add_device_connection"))
+    public static Object addDeviceConnection(
+        Object proc,
+        Object jsonRequestBody
+    ) {
+        DeviceConnectionClient client = null;
+        try {
+            System.out.println("====== ASTRI ADD DEVICE CONNECTION - START ======");
+
+            // Convert Magik string to Java String
+            String requestBody = MagikInteropUtils.fromMagikString(jsonRequestBody);
+            System.out.println("Request Body: " + requestBody);
+
+            // Create client and make API call
+            client = new DeviceConnectionClient();
+            String jsonResponse = client.addDeviceConnection(requestBody);
+
+            System.out.println("API call successful, response length: " +
+                (jsonResponse != null ? jsonResponse.length() : 0));
+
+            // Convert Java String to Magik string
+            Object magikString = MagikInteropUtils.toMagikString(jsonResponse);
+            System.out.println("====== ASTRI ADD DEVICE CONNECTION - END ======");
+
+            // Return JSON string directly - Magik will parse it
+            return magikString;
+
+        } catch (Exception e) {
+            System.err.println("ERROR in addDeviceConnection: " + e.getMessage());
+            e.printStackTrace();
+
+            // Return error as JSON string
+            String errorJson = "{" +
+                "\"success\":false," +
+                "\"error\":\"" + escapeJson(e.getMessage()) + "\"" +
+                "}";
+
+            try {
+                return MagikInteropUtils.toMagikString(errorJson);
+            } catch (Exception e2) {
+                System.err.println("Failed to convert error JSON to Magik string: " +
+                    e2.getMessage());
+                return errorJson; // Fallback to Java string
+            }
+        } finally {
+            if (client != null) {
+                try {
+                    client.close();
+                } catch (Exception e) {
+                    // Ignore cleanup errors
+                }
+            }
+        }
+    }
+
+    /**
      * Escape special characters for JSON string.
      */
     private static String escapeJson(String str) {
