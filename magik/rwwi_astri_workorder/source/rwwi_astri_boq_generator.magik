@@ -76,138 +76,348 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :service
 		),
 
-		# FAT Types
+		# FAT Types - Material
 		"200001047", property_list.new_with(
 			:code, "200001047",
 			:object, "FAT",
 			:name, "Pole mounted outdoor type (16 ports type)",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002142"
 		),
 		"100000824", property_list.new_with(
 			:code, "100000824",
 			:object, "FAT",
 			:name, "Pedestal mounted type (16 ports type)",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002097"
 		),
 
-		# FDT Types
+		# FAT Types - Service (Installation)
+		"500002142", property_list.new_with(
+			:code, "500002142",
+			:object, "FAT",
+			:name, "Instalasi Pole mounted outdoor type (16 ports type)",
+			:material_slot, :service
+		),
+		"500002097", property_list.new_with(
+			:code, "500002097",
+			:object, "FAT",
+			:name, "Instalasi Pedestal mounted type (16 ports type)",
+			:material_slot, :service
+		),
+
+		# FAT Accessories (auto-generated based on FAT count)
+		"500000510", property_list.new_with(
+			:code, "500000510",
+			:object, "FAT",
+			:name, "Splicing",
+			:material_slot, :service
+		),
+		"200000288", property_list.new_with(
+			:code, "200000288",
+			:object, "FAT",
+			:name, "Label FAT (include QR Code)",
+			:material_slot, :material
+		),
+		"200000802", property_list.new_with(
+			:code, "200000802",
+			:object, "FAT",
+			:name, "Label Pedestal",
+			:material_slot, :material
+		),
+		"500002107", property_list.new_with(
+			:code, "500002107",
+			:object, "FAT",
+			:name, "Testcomm OTDR & OPM FDT - FAT",
+			:material_slot, :service
+		),
+
+		# FDT Types - Material
 		"200001039", property_list.new_with(
 			:code, "200001039",
 			:object, "FDT",
 			:name, "48 cores capacity pole mounted FDT",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002053"
 		),
 		"200001040", property_list.new_with(
 			:code, "200001040",
 			:object, "FDT",
 			:name, "72 cores capacity pole mounted FDT",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002054"
 		),
 		"200001041", property_list.new_with(
 			:code, "200001041",
 			:object, "FDT",
 			:name, "96 cores capacity pole mounted FDT",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002055"
 		),
 		"200001042", property_list.new_with(
 			:code, "200001042",
 			:object, "FDT",
 			:name, "144 cores capacity ground mounted FDT",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002062"
 		),
 		"200001043", property_list.new_with(
 			:code, "200001043",
 			:object, "FDT",
 			:name, "288 cores capacity ground mounted FDT",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002073"
 		),
 		"200001044", property_list.new_with(
 			:code, "200001044",
 			:object, "FDT",
 			:name, "576 cores capacity ground mounted FDT",
+			:material_slot, :material,
+			:service_pair, "500002084"
+		),
+
+		# FDT Types - Service (Installation)
+		"500002053", property_list.new_with(
+			:code, "500002053",
+			:object, "FDT",
+			:name, "Instalasi 48 cores capacity pole mounted FDT",
+			:material_slot, :service
+		),
+		"500002054", property_list.new_with(
+			:code, "500002054",
+			:object, "FDT",
+			:name, "Instalasi 72 cores capacity pole mounted FDT",
+			:material_slot, :service
+		),
+		"500002055", property_list.new_with(
+			:code, "500002055",
+			:object, "FDT",
+			:name, "Instalasi 96 cores capacity pole mounted FDT",
+			:material_slot, :service
+		),
+		"500002062", property_list.new_with(
+			:code, "500002062",
+			:object, "FDT",
+			:name, "Instalasi 144 cores capacity ground mounted FDT",
+			:material_slot, :service
+		),
+		"500002073", property_list.new_with(
+			:code, "500002073",
+			:object, "FDT",
+			:name, "Instalasi 288 cores capacity ground mounted FDT",
+			:material_slot, :service
+		),
+		"500002084", property_list.new_with(
+			:code, "500002084",
+			:object, "FDT",
+			:name, "Instalasi 576 cores capacity ground mounted FDT",
+			:material_slot, :service
+		),
+
+		# FDT Accessories (auto-generated based on total FDT count)
+		"200000273", property_list.new_with(
+			:code, "200000273",
+			:object, "FDT",
+			:name, "Label FDT",
 			:material_slot, :material
 		),
 
-		# Poles
+		# Poles - Material
 		"200002675", property_list.new_with(
 			:code, "200002675",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang 7 meter 2.5", %", %,, " STEL L-003 1996"),
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500004729"
 		),
 		"200001055", property_list.new_with(
 			:code, "200001055",
 			:object, "Pole",
 			:name, "Pengadaan Tiang 7 meter 3 inch",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002159"
 		),
 		"200001183", property_list.new_with(
 			:code, "200001183",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang 7 meter 4", %", %,, " STEL L-003 1996"),
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002480"
 		),
 		"200000187", property_list.new_with(
 			:code, "200000187",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang 7 meter 5", %", %,, " STEL L-003 1996"),
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002157"
 		),
 		"200001181", property_list.new_with(
 			:code, "200001181",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang Tunggal 9 meter 4", %", %,, " STEL L-003 1996"),
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500002337"
 		),
 		"200000169", property_list.new_with(
 			:code, "200000169",
 			:object, "Pole",
 			:name, write_string("Pengadaan Tiang Tunggal 9 meter 5", %", %,, " STEL L-003 1996"),
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500001293"
 		),
 
-		# Cables (identified by spec_id, not stf_item_code)
+		# Poles - Service (Installation)
+		"500004729", property_list.new_with(
+			:code, "500004729",
+			:object, "Pole",
+			:name, write_string("Instalasi Tiang 7 meter 2.5", %", %,, " STEL L-003 1996"),
+			:material_slot, :service
+		),
+		"500002159", property_list.new_with(
+			:code, "500002159",
+			:object, "Pole",
+			:name, "Instalasi Tiang 7 meter 3 inch",
+			:material_slot, :service
+		),
+		"500002480", property_list.new_with(
+			:code, "500002480",
+			:object, "Pole",
+			:name, write_string("Instalasi Tiang 7 meter 4", %", %,, " STEL L-003 1996"),
+			:material_slot, :service
+		),
+		"500002157", property_list.new_with(
+			:code, "500002157",
+			:object, "Pole",
+			:name, write_string("Instalasi Tiang 7 meter 5", %", %,, " STEL L-003 1996"),
+			:material_slot, :service
+		),
+		"500002337", property_list.new_with(
+			:code, "500002337",
+			:object, "Pole",
+			:name, write_string("Instalasi Tiang Tunggal 9 meter 4", %", %,, " STEL L-003 1996"),
+			:material_slot, :service
+		),
+		"500001293", property_list.new_with(
+			:code, "500001293",
+			:object, "Pole",
+			:name, write_string("Instalasi Tiang Tunggal 9 meter 5", %", %,, " STEL L-003 1996"),
+			:material_slot, :service
+		),
+
+		# Pole Accessories (auto-generated based on total pole count)
+		"200000690", property_list.new_with(
+			:code, "200000690",
+			:object, "Pole",
+			:name, "Bahan Pondasi tiang",
+			:material_slot, :material
+		),
+		"500001742", property_list.new_with(
+			:code, "500001742",
+			:object, "Pole",
+			:name, "Label Pole",
+			:material_slot, :service
+		),
+
+		# Cables - Material (identified by spec_id, not stf_item_code)
 		"200000100", property_list.new_with(
 			:code, "200000100",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 24 cores",
 			:material_slot, :material,
-			:spec_id, "SM G652D-ADSS 24C"
+			:spec_id, "SM G652D-ADSS 24C",
+			:service_pair, "500002050"
 		),
 		"200000975", property_list.new_with(
 			:code, "200000975",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 36 cores",
 			:material_slot, :material,
-			:spec_id, "SM G652D-ADSS 36C"
+			:spec_id, "SM G652D-ADSS 36C",
+			:service_pair, "500002051"
 		),
 		"200001038", property_list.new_with(
 			:code, "200001038",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 48 cores",
 			:material_slot, :material,
-			:spec_id, "SM G652D-ADSS 48C"
+			:spec_id, "SM G652D-ADSS 48C",
+			:service_pair, "500002052"
+		),
+		"200001970", property_list.new_with(
+			:code, "200001970",
+			:object, "Cable",
+			:name, "FO core type SM G.652.D-ADSS 72 cores",
+			:material_slot, :material,
+			:spec_id, "SM G652D-ADSS 72C",
+			:service_pair, "500003410"
 		),
 		"200001630", property_list.new_with(
 			:code, "200001630",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 96 cores",
 			:material_slot, :material,
-			:spec_id, "SM G652D-ADSS 96C"
+			:spec_id, "SM G652D-ADSS 96C",
+			:service_pair, "500002890"
 		),
 		"200001030", property_list.new_with(
 			:code, "200001030",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 144 cores",
 			:material_slot, :material,
-			:spec_id, "SM G652D-ADSS 144C"
+			:spec_id, "SM G652D-ADSS 144C",
+			:service_pair, "500002088"
 		),
 		"200001015", property_list.new_with(
 			:code, "200001015",
 			:object, "Cable",
 			:name, "FO core type SM G.652.D-ADSS 288 cores",
 			:material_slot, :material,
-			:spec_id, "SM G652D-ADSS 288C"
+			:spec_id, "SM G652D-ADSS 288C",
+			:service_pair, "500002089"
+		),
+
+		# Cables - Service (Installation)
+		"500002050", property_list.new_with(
+			:code, "500002050",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 24 cores",
+			:material_slot, :service
+		),
+		"500002051", property_list.new_with(
+			:code, "500002051",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 36 cores",
+			:material_slot, :service
+		),
+		"500002052", property_list.new_with(
+			:code, "500002052",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 48 cores",
+			:material_slot, :service
+		),
+		"500003410", property_list.new_with(
+			:code, "500003410",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 72 cores",
+			:material_slot, :service
+		),
+		"500002890", property_list.new_with(
+			:code, "500002890",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 96 cores",
+			:material_slot, :service
+		),
+		"500002088", property_list.new_with(
+			:code, "500002088",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 144 cores",
+			:material_slot, :service
+		),
+		"500002089", property_list.new_with(
+			:code, "500002089",
+			:object, "Cable",
+			:name, "Instalasi FO core type SM G.652.D-ADSS 288 cores",
+			:material_slot, :service
 		),
 
 		# Closures - Inline
@@ -307,6 +517,18 @@ rwwi_astri_boq_generator.define_shared_constant(
 		),
 
 		# Project Management and Support Services
+		"500001887", property_list.new_with(
+			:code, "500001887",
+			:object, "Service",
+			:name, "Project Management",
+			:material_slot, :service
+		),
+		"500001519", property_list.new_with(
+			:code, "500001519",
+			:object, "Service",
+			:name, "Survey & Design (Asplan)",
+			:material_slot, :service
+		),
 		"500003890", property_list.new_with(
 			:code, "500003890",
 			:object, "Service",
@@ -435,6 +657,8 @@ _method rwwi_astri_boq_generator.generate()
 		_loop
 			_local rec << record_change.current_record
 
+			_if rec _is _unset _then _continue _endif
+
 			# Only process specific collection types
 			_local col_name << rec.source_collection.name
 			_if col_name _isnt :sheath_splice _andif
@@ -495,6 +719,18 @@ _method rwwi_astri_boq_generator.generate()
 
 		# Add fixed service items based on infrastructure type
 		_self.add_fixed_service_items(result)
+
+		# Add pole accessories based on total pole count
+		_self.add_pole_accessories(result)
+
+		# Add FDT accessories based on total FDT count
+		_self.add_fdt_accessories(result)
+
+		# Add FAT accessories based on total FAT count
+		_self.add_fat_accessories(result)
+
+		# Add cable-based services (Project Management and Survey & Design)
+		_self.add_cable_based_services(result)
 
 		write("LOG: BoQ generation complete. Total item types:", result.size)
 
@@ -581,10 +817,13 @@ _private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, se
 	## Create a BoQ item property_list from catalog using code
 	## Parameters:
 	##   code - Material code string (stf_item_code, e.g., "200001033")
-	##   material_qty - Quantity for :material slot (or _unset)
-	##   service_qty - Quantity for :service slot (or _unset)
+	##   material_qty - Quantity for :quantity_material field (or _unset)
+	##   service_qty - Quantity for :quantity_service field (or _unset)
 	## Returns:
 	##   property_list with BoQ item data in ASTRI API format
+	##
+	## Note: Codes starting with 200 → quantity_material
+	##       Codes starting with 500 → quantity_service
 
 	_try _with errCond
 		write("Starting BoQ item creation for code:", code)
@@ -596,20 +835,11 @@ _private _method rwwi_astri_boq_generator.create_boq_item(code, material_qty, se
 				write_string("Unknown material code: ", code))
 		_endif
 
-		# Determine which slot gets which quantity
-		_local mat_value << 0
-		_local svc_value << 0
-
-		_local slot_type << catalog_entry[:material_slot]
-		_if slot_type = :material
-		_then
-			mat_value << material_qty
-			svc_value << service_qty
-		_elif slot_type = :service
-		_then
-			mat_value << service_qty
-			svc_value << material_qty
-		_endif
+		# Direct assignment - no swapping
+		# material_qty goes to quantity_material
+		# service_qty goes to quantity_service
+		_local mat_value << material_qty.default(0)
+		_local svc_value << service_qty.default(0)
 
 		# Create property list with ASTRI API format
 		# Get values from boq_params (set during initialization)
@@ -643,6 +873,7 @@ $
 
 _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 	## Add or accumulate BOQ item in result property_list
+	## For pole materials with service_pair, automatically adds the paired service item
 	## Parameters:
 	##   result - property_list to update
 	##   code - material code string
@@ -689,6 +920,14 @@ _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 				existing[:quantity_service] << current + qty
 			_endif
 		_endif
+	_endif
+
+	# Auto-add service pair for poles (material items only)
+	_if slot_type = :material _andif catalog_entry[:service_pair] _isnt _unset
+	_then
+		_local service_code << catalog_entry[:service_pair]
+		write("LOG: Auto-adding service pair:", service_code, "with qty:", qty, "for material:", code)
+		_self.add_to_boq_result(result, service_code, qty)
 	_endif
 _endmethod
 $
@@ -792,6 +1031,238 @@ _private _method rwwi_astri_boq_generator.add_fixed_service_items(result)
 
 	_when error
 		write("LOG: ERROR adding fixed service items:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_pole_accessories(result)
+	## Add pole accessories based on total pole count
+	## Adds 200000690 (Bahan Pondasi tiang) and 500001742 (Label Pole)
+	## with quantity equal to total number of poles
+	##
+	## Parameters:
+	##   result - property_list to update with pole accessories
+
+	_try _with errCond
+		write("LOG: Calculating total pole count for accessories...")
+
+		# List of all pole material codes
+		_local pole_codes << {"200002675", "200001055", "200001183", "200000187", "200001181", "200000169"}
+		_local total_poles << 0
+
+		# Count total poles from all pole material items
+		_for code _over pole_codes.fast_elements()
+		_loop
+			_local item << result[code.as_symbol()]
+			_if item _isnt _unset
+			_then
+				_local qty << item[:quantity_material]
+				_if qty _isnt _unset
+				_then
+					total_poles +<< qty
+					write("LOG: Pole code", code, "has quantity:", qty)
+				_endif
+			_endif
+		_endloop
+
+		# If poles exist, add the accessories
+		_if total_poles > 0
+		_then
+			_self.add_to_boq_result(result, "200000690", total_poles)  # Bahan Pondasi tiang
+			_self.add_to_boq_result(result, "500001742", total_poles)  # Label Pole
+			write("LOG: Added pole accessories with total pole count:", total_poles)
+		_else
+			write("LOG: No poles found, skipping pole accessories")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding pole accessories:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_fdt_accessories(result)
+	## Add FDT accessories based on total FDT count
+	## Adds 200000273 (Label FDT) with quantity equal to total number of FDTs
+	##
+	## Parameters:
+	##   result - property_list to update with FDT accessories
+
+	_try _with errCond
+		write("LOG: Calculating total FDT count for accessories...")
+
+		# List of all FDT material codes
+		_local fdt_codes << {"200001039", "200001040", "200001041", "200001042", "200001043", "200001044"}
+		_local total_fdts << 0
+
+		# Count total FDTs from all FDT material items
+		_for code _over fdt_codes.fast_elements()
+		_loop
+			_local item << result[code.as_symbol()]
+			_if item _isnt _unset
+			_then
+				_local qty << item[:quantity_material]
+				_if qty _isnt _unset
+				_then
+					total_fdts +<< qty
+					write("LOG: FDT code", code, "has quantity:", qty)
+				_endif
+			_endif
+		_endloop
+
+		# If FDTs exist, add the accessories
+		_if total_fdts > 0
+		_then
+			_self.add_to_boq_result(result, "200000273", total_fdts)  # Label FDT
+			write("LOG: Added FDT accessories with total FDT count:", total_fdts)
+		_else
+			write("LOG: No FDTs found, skipping FDT accessories")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding FDT accessories:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_fat_accessories(result)
+	## Add FAT accessories based on FAT count
+	## Adds:
+	##   - 500000510 (Splicing) with quantity = 2 × total FAT (both types)
+	##   - 200000288 (Label FAT include QR Code) with quantity = pole mounted FAT (200001047)
+	##   - 200000802 (Label Pedestal) with quantity = pedestal mounted FAT (100000824)
+	##   - 500002107 (Testcomm OTDR & OPM FDT - FAT) with quantity = total FAT (both types)
+	##
+	## Parameters:
+	##   result - property_list to update with FAT accessories
+
+	_try _with errCond
+		write("LOG: Calculating FAT counts for accessories...")
+
+		# Count pole mounted FAT (200001047)
+		_local pole_fat_count << 0
+		_local pole_item << result[:|200001047|]
+		_if pole_item _isnt _unset
+		_then
+			_local qty << pole_item[:quantity_material]
+			_if qty _isnt _unset
+			_then
+				pole_fat_count << qty
+				write("LOG: Pole mounted FAT (200001047) has quantity:", qty)
+			_endif
+		_endif
+
+		# Count pedestal mounted FAT (100000824)
+		_local pedestal_fat_count << 0
+		_local pedestal_item << result[:|100000824|]
+		_if pedestal_item _isnt _unset
+		_then
+			_local qty << pedestal_item[:quantity_material]
+			_if qty _isnt _unset
+			_then
+				pedestal_fat_count << qty
+				write("LOG: Pedestal mounted FAT (100000824) has quantity:", qty)
+			_endif
+		_endif
+
+		# Calculate total FAT count
+		_local total_fats << pole_fat_count + pedestal_fat_count
+
+		# If FATs exist, add the accessories
+		_if total_fats > 0
+		_then
+			# Splicing - 2x total FAT count
+			_self.add_to_boq_result(result, "500000510", total_fats * 2)
+			write("LOG: Added Splicing (500000510) with quantity:", total_fats * 2)
+
+			# Label FAT (include QR Code) - only for pole mounted FAT
+			_if pole_fat_count > 0
+			_then
+				_self.add_to_boq_result(result, "200000288", pole_fat_count)
+				write("LOG: Added Label FAT (200000288) with quantity:", pole_fat_count)
+			_endif
+
+			# Label Pedestal - only for pedestal mounted FAT
+			_if pedestal_fat_count > 0
+			_then
+				_self.add_to_boq_result(result, "200000802", pedestal_fat_count)
+				write("LOG: Added Label Pedestal (200000802) with quantity:", pedestal_fat_count)
+			_endif
+
+			# Testcomm - total FAT count
+			_self.add_to_boq_result(result, "500002107", total_fats)
+			write("LOG: Added Testcomm (500002107) with quantity:", total_fats)
+
+			write("LOG: Added FAT accessories with total FAT count:", total_fats)
+		_else
+			write("LOG: No FATs found, skipping FAT accessories")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding FAT accessories:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_cable_based_services(result)
+	## Add cable-based services with quantity = total cable + sling wire length
+	## Adds:
+	##   - 500001887 (Project Management) with quantity = cable + sling wire
+	##   - 500001519 (Survey & Design Asplan) with quantity = cable + sling wire
+	##
+	## Parameters:
+	##   result - property_list to update with cable-based services
+
+	_try _with errCond
+		write("LOG: Calculating total cable and sling wire length...")
+
+		# List of all cable material codes
+		_local cable_codes << {"200000100", "200000975", "200001038", "200001970", "200001630", "200001030", "200001015"}
+		_local total_cable_length << 0
+
+		# Count total cable length from all cable material items
+		_for code _over cable_codes.fast_elements()
+		_loop
+			_local item << result[code.as_symbol()]
+			_if item _isnt _unset
+			_then
+				_local qty << item[:quantity_material]
+				_if qty _isnt _unset
+				_then
+					total_cable_length +<< qty
+					write("LOG: Cable code", code, "has length:", qty, "m")
+				_endif
+			_endif
+		_endloop
+
+		# Get sling wire length (code: 200001033, material_slot is :service)
+		_local sling_wire_length << 0
+		_local sling_item << result[:|200001033|]
+		_if sling_item _isnt _unset
+		_then
+			_local qty << sling_item[:quantity_service]
+			_if qty _isnt _unset
+			_then
+				sling_wire_length << qty
+				write("LOG: Sling wire (200001033) has length:", qty, "m")
+			_endif
+		_endif
+
+		# Calculate total length (cable + sling wire)
+		_local total_length << total_cable_length + sling_wire_length
+
+		# If cables or sling wire exist, add the services
+		_if total_length > 0
+		_then
+			_self.add_to_boq_result(result, "500001887", total_length)  # Project Management
+			_self.add_to_boq_result(result, "500001519", total_length)  # Survey & Design (Asplan)
+			write("LOG: Added cable-based services with total length:", total_length, "m (Cable:", total_cable_length, "m + Sling Wire:", sling_wire_length, "m)")
+		_else
+			write("LOG: No cables or sling wire found, skipping cable-based services")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding cable-based services:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $

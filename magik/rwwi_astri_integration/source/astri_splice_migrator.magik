@@ -76,7 +76,13 @@ _private _method astri_design_migrator.create_sheath_splice(pm)
 		_elif closure_type = "FDT"
 		_then
 			# FDT core detection
-			core_count << _self.match_core(pm[:name])
+			core_spec << pm[:name]
+			_if pm[:desc] _isnt _unset _andif pm[:desc] <> ""
+			_then
+				core_spec << pm[:desc]
+			_endif
+				
+			core_count << _self.match_core(core_spec)	
 
 			# Map FDT core to spec and STF
 			_if core_count = "48"
