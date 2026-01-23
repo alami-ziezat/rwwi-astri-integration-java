@@ -152,8 +152,8 @@ _private _method astri_design_migrator.is_splice?(pm)
 	_endif	
 
 	_local network_type << pm[:network_type].default("").lowercase
-	>> network_type = "fdt" _orif network_type = "fat" _orif
-	   network_type = "joint_closure" _orif network_type = "handhole"
+	>> (network_type = "fdt" _orif network_type = "fat" _orif
+	   network_type = "joint_closure" _orif network_type = "handhole") _andif pm[:type] = "point"
 _endmethod
 $
 
