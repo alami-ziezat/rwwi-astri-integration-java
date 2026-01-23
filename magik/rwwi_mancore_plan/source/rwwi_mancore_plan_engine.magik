@@ -245,9 +245,13 @@ _method rwwi_mancore_plan_engine.add_device_connection(connection_data)
 		_local json_builder << internal_text_output_stream.new()
 		json_builder.write("{")
 
-		# Define all 35 fields
+		# Define all fields (37 total)
 		_local fields << {
 			:work_order_number,
+			:source_type,
+			:source_code,
+			:source_tube_number,
+			:source_core_number,
 			:source_device_name,
 			:source_device_hardware_type,
 			:source_device_port_name,
@@ -255,10 +259,19 @@ _method rwwi_mancore_plan_engine.add_device_connection(connection_data)
 			:source_device_remarks,
 			:source_device_capacity,
 			:source_device_capacity_measurement,
+			:transport_tube_number,
+			:transport_core_number,
+			:transport_code,
 			:transport_name,
 			:transport_hardware_type,
 			:transport_capacity,
 			:transport_capacity_measurement,
+			:transport_status,
+			:transport_remarks,
+			:destination_type,
+			:destination_code,
+			:destination_tube_number,
+			:destination_core_number,
 			:destination_device_name,
 			:destination_device_hardware_type,
 			:destination_device_port_name,
@@ -266,40 +279,39 @@ _method rwwi_mancore_plan_engine.add_device_connection(connection_data)
 			:destination_device_remarks,
 			:destination_device_capacity,
 			:destination_device_capacity_measurement,
-			:source_type,
-			:source_code,
-			:source_tube_number,
-			:source_core_number,
-			:transport_code,
-			:transport_tube_number,
-			:transport_core_number,
-			:transport_status,
-			:transport_remarks,
-			:closure_code,
-			:destination_type,
-			:destination_code,
-			:destination_tube_number,
-			:destination_core_number,
+			:destination_status,
+			:destination_remarks,
 			:verified_by_username,
 			:verified_at
 		}
 
 		_local first? << _true
+		
 		_for field _over fields.fast_elements()
 		_loop
 			_local value << connection_data[field]
-			_if value _isnt _unset _andif value <> ""
+
+			# Always include field, even if unset (send as null)
+			_if _not first?
 			_then
-				_if _not first?
-				_then
-					json_builder.write(",")
-				_endif
-				# Write field as JSON: "field_name":"value"
-				json_builder.write(%", field.write_string.convert_to_non_escape_string(), %")
-				json_builder.write(":")
-				json_builder.write(%", _self.escape_json_string(value.write_string), %")
-				first? << _false
+				json_builder.write(",")
 			_endif
+
+			# Write field name
+			json_builder.write(%", field.write_string.convert_to_non_escape_string(), %")
+			json_builder.write(":")
+
+			# Write value
+			_if value _is _unset
+			_then
+				# Explicitly write null for unset values
+				json_builder.write("null")
+			_else
+				# Write as quoted string
+				json_builder.write(%", _self.escape_json_string(value.write_string), %")
+			_endif
+
+			first? << _false
 		_endloop
 
 		json_builder.write("}")
@@ -307,18 +319,43 @@ _method rwwi_mancore_plan_engine.add_device_connection(connection_data)
 
 		write("Calling ASTRI add device connection API...")
 		write("Request JSON: ", json_request)
-
+		write("Source JSON: ", connection_data.write_string)	
 		# Call Java proc
 		_local json_response << astri_add_device_connection(json_request)
 		write("Response JSON: ", json_response)
 
 		# Parse JSON response
-		_local parser << json_parser.new()
-		_local response << parser.parse(json_response)
+		_local response << json_parser.parse(json_response)
 
 		result[:success] << response[:success]
-		result[:data] << response[:data]
-		result[:error_message] << response[:error]
+
+		_if response[:success] = _true
+		_then
+			# Success - get data
+			result[:data] << response[:data]
+			result[:error_message] << _unset
+		_else
+			# Error - get error and concatenate if it's a simple_vector
+			result[:data] << _unset
+			_local error_value << response[:error]
+
+			_if error_value _is _unset
+			_then
+				result[:error_message] << "Unknown error"
+			_elif error_value.is_kind_of?(simple_vector)
+			_then
+				# Concatenate simple_vector elements into a string
+				_local error_parts << rope.new()
+				_for elem _over error_value.fast_elements()
+				_loop
+					error_parts.add(elem.write_string)
+				_endloop
+				result[:error_message] << error_parts.as_simple_vector().join_as_strings(" ")
+			_else
+				# Single value - convert to string
+				result[:error_message] << error_value.write_string
+			_endif
+		_endif
 
 	_when error
 		result[:success] << _false
