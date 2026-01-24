@@ -379,39 +379,113 @@ $
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.update_booking_button_states()
 	##
-	## Update booking button states based on table selections
+	## Update booking button states based on table selections and status
 	##
-	## Booking Feeder enabled when:
-	##   - Both table 1 and table 2 selected
-	##   - Same amount of records in both tables
-	##
-	## Booking Subfeeder enabled when:
-	##   - Both table 2 and table 3 selected
-	##   - Table 2 can have more records than table 3
+	## BOOKED: Requires matching counts AND all records IDLE (not TAKEN)
+	## RELEASE: Enable if ANY records selected (no IDLE check)
+	## ACTIVE: Enable if ALL records are BOOKED (transport_remarks = "BOOKED")
 	##
 
-	# Booking Feeder logic - enable when counts match
+	# Get current status
+	_local status << .items[:status_field].value.default("BOOKED")
+
 	_local enable_feeder? << _false
-	_if .feeder_count > 0 _andif .subfeeder_count > 0 _andif
-	    .feeder_count = .subfeeder_count
-	_then
-		enable_feeder? << _true
-		write("Booking Feeder ENABLED - Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count)
-	_else
-		write("Booking Feeder DISABLED - Counts don't match or zero")
-		write("  Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count)
-	_endif
-
-	# Booking Subfeeder logic - enable when table 2 >= table 3
 	_local enable_subfeeder? << _false
-	_if .subfeeder_count > 0 _andif .fdt_count > 0 _andif
-	    .subfeeder_count >= .fdt_count
+
+	_if status = "BOOKED"
 	_then
-		enable_subfeeder? << _true
-		write("Booking Subfeeder ENABLED - Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count)
-	_else
-		write("Booking Subfeeder DISABLED")
-		write("  Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count)
+		# BOOKED mode: Must match counts AND all records must be IDLE
+		_if .feeder_count > 0 _andif .subfeeder_count > 0 _andif
+		    .feeder_count = .subfeeder_count
+		_then
+			# Check if all records in both tables are IDLE
+			_local feeder_idle? << _self.check_all_records_idle(.feeder_table_selection)
+			_local subfeeder_idle? << _self.check_all_records_idle(.subfeeder_table_selection)
+
+			_if feeder_idle? _andif subfeeder_idle?
+			_then
+				enable_feeder? << _true
+				write("Booking Feeder ENABLED (BOOKED) - Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count, " (all IDLE)")
+			_else
+				write("Booking Feeder DISABLED (BOOKED) - Some records are not IDLE")
+				write("  Table 1 all IDLE: ", feeder_idle?, ", Table 2 all IDLE: ", subfeeder_idle?)
+			_endif
+		_else
+			write("Booking Feeder DISABLED (BOOKED) - Counts don't match or zero")
+			write("  Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count)
+		_endif
+
+		_if .subfeeder_count > 0 _andif .fdt_count > 0 _andif
+		    .subfeeder_count >= .fdt_count
+		_then
+			# Check if all records in both tables are IDLE
+			_local subfeeder_idle? << _self.check_all_records_idle(.subfeeder_table_selection)
+			_local fdt_idle? << _self.check_all_records_idle(.fdt_table_selection)
+
+			_if subfeeder_idle? _andif fdt_idle?
+			_then
+				enable_subfeeder? << _true
+				write("Booking Subfeeder ENABLED (BOOKED) - Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count, " (all IDLE)")
+			_else
+				write("Booking Subfeeder DISABLED (BOOKED) - Some records are not IDLE")
+				write("  Table 2 all IDLE: ", subfeeder_idle?, ", Table 3 all IDLE: ", fdt_idle?)
+			_endif
+		_else
+			write("Booking Subfeeder DISABLED (BOOKED)")
+			write("  Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count)
+		_endif
+
+	_elif status = "RELEASE"
+	_then
+		# RELEASE mode: Enable if ANY records selected
+		_if .feeder_count > 0
+		_then
+			enable_feeder? << _true
+			write("Booking Feeder ENABLED (RELEASE) - Table 1: ", .feeder_count, " records selected")
+		_else
+			write("Booking Feeder DISABLED (RELEASE) - No records selected")
+		_endif
+
+		_if .subfeeder_count > 0
+		_then
+			enable_subfeeder? << _true
+			write("Booking Subfeeder ENABLED (RELEASE) - Table 2: ", .subfeeder_count, " records selected")
+		_else
+			write("Booking Subfeeder DISABLED (RELEASE) - No records selected")
+		_endif
+
+	_elif status = "ACTIVE"
+	_then
+		# ACTIVE mode: Enable only if ALL selected records are already BOOKED
+		_if .feeder_count > 0
+		_then
+			# Check if all feeder records are BOOKED
+			_local all_booked? << _self.check_all_records_booked(.feeder_table_selection)
+			_if all_booked?
+			_then
+				enable_feeder? << _true
+				write("Booking Feeder ENABLED (ACTIVE) - Table 1: ", .feeder_count, " records selected and all BOOKED")
+			_else
+				write("Booking Feeder DISABLED (ACTIVE) - Some records are not BOOKED")
+			_endif
+		_else
+			write("Booking Feeder DISABLED (ACTIVE) - No records selected")
+		_endif
+
+		_if .subfeeder_count > 0
+		_then
+			# Check if all subfeeder records are BOOKED
+			_local all_booked? << _self.check_all_records_booked(.subfeeder_table_selection)
+			_if all_booked?
+			_then
+				enable_subfeeder? << _true
+				write("Booking Subfeeder ENABLED (ACTIVE) - Table 2: ", .subfeeder_count, " records selected and all BOOKED")
+			_else
+				write("Booking Subfeeder DISABLED (ACTIVE) - Some records are not BOOKED")
+			_endif
+		_else
+			write("Booking Subfeeder DISABLED (ACTIVE) - No records selected")
+		_endif
 	_endif
 
 	.items[:booking_feeder].enabled? << enable_feeder?
