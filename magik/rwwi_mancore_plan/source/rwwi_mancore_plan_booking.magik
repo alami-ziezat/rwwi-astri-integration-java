@@ -114,6 +114,31 @@ _method rwwi_mancore_plan_dialog.booking_feeder()
 	write("Table 1 (Feeder): ", feeder_records.size, " records")
 	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
 
+	# Get status
+	_local status << .items[:status_field].value.default("BOOKED")
+	write("Status: ", status)
+
+	# Validate against homepass (only for BOOKED status)
+	_if status = "BOOKED"
+	_then
+		_local (homepass_str, homepass_count, cores_to_book) << _self.get_homepass_and_cores()
+
+		write("Total Homepass: ", homepass_count)
+		write("Total Cores to Book: ", cores_to_book)
+
+		_if feeder_records.size > cores_to_book
+		_then
+			_local msg << write_string("Booking validation failed!", newline_char, newline_char,
+						   "Records to book: ", feeder_records.size, newline_char,
+						   "Maximum allowed (based on homepass): ", cores_to_book, newline_char, newline_char,
+						   "Total Homepass: ", homepass_count, newline_char,
+						   "This exceeds the homepass limit.")
+			_self.show_message(msg)
+			write("ERROR: Booking exceeds homepass limit")
+			_return
+		_endif
+	_endif
+
 	# Execute booking
 	_self.execute_booking_feeder(work_order, feeder_records, subfeeder_records)
 
@@ -164,6 +189,31 @@ _method rwwi_mancore_plan_dialog.booking_subfeeder()
 
 	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
 	write("Table 3 (FDT): ", fdt_records.size, " records")
+
+	# Get status
+	_local status << .items[:status_field].value.default("BOOKED")
+	write("Status: ", status)
+
+	# Validate against homepass (only for BOOKED status)
+	_if status = "BOOKED"
+	_then
+		_local (homepass_str, homepass_count, cores_to_book) << _self.get_homepass_and_cores()
+
+		write("Total Homepass: ", homepass_count)
+		write("Total Cores to Book: ", cores_to_book)
+
+		_if subfeeder_records.size > cores_to_book
+		_then
+			_local msg << write_string("Booking validation failed!", newline_char, newline_char,
+						   "Records to book: ", subfeeder_records.size, newline_char,
+						   "Maximum allowed (based on homepass): ", cores_to_book, newline_char, newline_char,
+						   "Total Homepass: ", homepass_count, newline_char,
+						   "This exceeds the homepass limit.")
+			_self.show_message(msg)
+			write("ERROR: Booking exceeds homepass limit")
+			_return
+		_endif
+	_endif
 
 	# Execute booking
 	_self.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records)
@@ -502,8 +552,47 @@ _private _method rwwi_mancore_plan_dialog.build_booking_feeder_data(work_order, 
 	# Get transport code from table 1
 	_local transport_code << feeder_rec[:transport_feeder_code].default("")
 
-	# Get destination transport code from table 2
-	_local dest_transport_code << subfeeder_rec[:transport_subfeeder_code].default("")
+	# Get status from dropdown
+	_local status << .items[:status_field].value.default("BOOKED")
+
+	# Determine transport_status based on selected status
+	# RELEASE → transport_status = "RELEASE"
+	# BOOKED → transport_status = "TAKEN"
+	# ACTIVE → transport_status = "TAKEN"
+	_local transport_status
+	_if status = "RELEASE"
+	_then
+		transport_status << "RELEASE"
+	_else
+		# For both BOOKED and ACTIVE, set to TAKEN
+		transport_status << "TAKEN"
+	_endif
+
+	write("Setting transport_status to: ", transport_status, " (status=", status, ")")
+
+	# Determine destination fields based on status
+	_local dest_type, dest_code, dest_tube, dest_core
+	_if status = "RELEASE"
+	_then
+		# For RELEASE, set destination fields to null
+		dest_type << _unset
+		dest_code << _unset
+		dest_tube << _unset
+		dest_core << _unset
+	_elif status = "ACTIVE"
+	_then
+		# For ACTIVE, use destination data from same table (table 1 - feeder)
+		dest_type << "SUBFEEDER"
+		dest_code << feeder_rec[:destination_code].default("")
+		dest_tube << feeder_rec[:destination_tube_number].default("")
+		dest_core << feeder_rec[:destination_core_number].default("")
+	_else
+		# For BOOKED, use destination data from table 2 (subfeeder)
+		dest_type << "SUBFEEDER"
+		dest_code << subfeeder_rec[:transport_subfeeder_code].default("")
+		dest_tube << subfeeder_rec[:transport_tube_number].default("")
+		dest_core << subfeeder_rec[:transport_core_number].default("")
+	_endif
 
 	# Build connection data with specific fields
 	_local connection_data << property_list.new_with(
@@ -513,12 +602,12 @@ _private _method rwwi_mancore_plan_dialog.build_booking_feeder_data(work_order, 
 		:transport_tube_number, feeder_rec[:transport_tube_number].default(""),
 		:transport_core_number, feeder_rec[:transport_core_number].default(""),
 		:transport_code, transport_code,
-		:transport_status, "TAKEN",
-		:transport_remarks, "BOOKED",
-		:destination_type, "SUBFEEDER",
-		:destination_code, dest_transport_code,
-		:destination_tube_number, subfeeder_rec[:transport_tube_number].default(""),
-		:destination_core_number, subfeeder_rec[:transport_core_number].default("")
+		:transport_status, transport_status,
+		:transport_remarks, status,
+		:destination_type, dest_type,
+		:destination_code, dest_code,
+		:destination_tube_number, dest_tube,
+		:destination_core_number, dest_core
 	)
 
 	# Add default null/empty fields
@@ -549,21 +638,20 @@ _private _method rwwi_mancore_plan_dialog.build_booking_subfeeder_data(work_orde
 	# Get status from dropdown
 	_local status << .items[:status_field].value.default("BOOKED")
 
-	# Get transport_status and transport_remarks based on status
-	_local transport_status, transport_remarks
+	# Determine transport_status based on selected status
+	# RELEASE → transport_status = "RELEASE"
+	# BOOKED → transport_status = "TAKEN"
+	# ACTIVE → transport_status = "TAKEN"
+	_local transport_status
 	_if status = "RELEASE"
 	_then
-		transport_status << "IDLE"
-		transport_remarks << "RELEASE"
-	_elif status = "ACTIVE"
-	_then
-		transport_status << "TAKEN"
-		transport_remarks << "ACTIVE"
+		transport_status << "RELEASE"
 	_else
-		# BOOKED (default)
+		# For both BOOKED and ACTIVE, set to TAKEN
 		transport_status << "TAKEN"
-		transport_remarks << "BOOKED"
 	_endif
+
+	write("Setting transport_status to: ", transport_status, " (status=", status, ")")
 
 	# Get destination fields based on status
 	_local dest_type, dest_code, dest_tube, dest_core

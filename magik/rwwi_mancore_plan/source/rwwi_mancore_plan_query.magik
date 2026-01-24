@@ -117,7 +117,29 @@ _method rwwi_mancore_plan_dialog.display_rwo_info()
 	_if .selected_rwo _is _unset _then _return _endif
 
 	_local cab << .selected_rwo
-	_local network_type << cab.sheath_network_type.default("").lowercase
+
+	# Determine network type based on populated code fields
+	_local network_type << ""
+	_local subfeeder_code << cab.subfeeder_code.default("")
+	_local feeder_code << cab.feeder_code.default("")
+	_local cluster_code << cab.cluster_code.default("")
+
+	_if subfeeder_code <> "" _andif subfeeder_code _isnt _unset
+	_then
+		network_type << "subfeeder"
+	_elif feeder_code <> "" _andif feeder_code _isnt _unset
+	_then
+		network_type << "feeder"
+	_elif cluster_code <> "" _andif cluster_code _isnt _unset
+	_then
+		network_type << "cluster"
+	_endif
+
+	# Also check sheath_network_type as fallback
+	_if network_type = ""
+	_then
+		network_type << cab.sheath_network_type.default("").lowercase
+	_endif
 
 	.items[:log].append("Selected Cable Information")
 	.items[:log].append(newline_char)

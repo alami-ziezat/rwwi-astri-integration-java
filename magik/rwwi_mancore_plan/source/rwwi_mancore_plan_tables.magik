@@ -101,13 +101,26 @@ _method rwwi_mancore_plan_dialog.populate_feeder_connection_table( a_table )
 		_local sw_core << (tube_num - 1) * 12 + core_num
 		a_table.add_cell(row, 8, {}, {:label, sw_core.write_string, :row_alignment, :centre})
 
-		# Column 9: Status - show TAKEN or IDLE
+		# Column 9: Status - based on transport_status and transport_remarks
 		_local icon_status
-		_if a_rec[:transport_status] = "TAKEN"
+		_local t_status << a_rec[:transport_status].default("")
+		_local t_remarks << a_rec[:transport_remarks].default("")
+
+		_if t_status = "" _orif t_status _is _unset _orif t_status = "RELEASE"
 		_then
+			# NULL/BLANK or RELEASE -> RED
 			icon_status << {:traffic_light_red, :ui_resources}
-		_else
+		_elif t_status = "TAKEN" _andif t_remarks = "BOOKED"
+		_then
+			# TAKEN & BOOKED -> YELLOW
+			icon_status << {:traffic_light_yellow, :ui_resources}
+		_elif t_status = "TAKEN" _andif (t_remarks = "" _orif t_remarks = "ACTIVE" _orif t_remarks _is _unset)
+		_then
+			# TAKEN & (NULL or BLANK or ACTIVE) -> GREEN
 			icon_status << {:traffic_light_green, :ui_resources}
+		_else
+			# Default -> RED for safety
+			icon_status << {:traffic_light_red, :ui_resources}
 		_endif
 		a_table.add_cell(row, 9, {}, {:image, icon_status })
 
@@ -258,13 +271,26 @@ _method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
 		_local sw_core << (tube_num - 1) * 12 + core_num
 		a_table.add_cell(row, 8, {}, {:label, sw_core.write_string, :row_alignment, :centre})
 
-		# Column 9: Status - show TAKEN or IDLE
+		# Column 9: Status - based on transport_status and transport_remarks
 		_local icon_status
-		_if a_rec[:transport_status] = "TAKEN"
+		_local t_status << a_rec[:transport_status].default("")
+		_local t_remarks << a_rec[:transport_remarks].default("")
+
+		_if t_status = "" _orif t_status _is _unset _orif t_status = "RELEASE"
 		_then
+			# NULL/BLANK or RELEASE -> RED
 			icon_status << {:traffic_light_red, :ui_resources}
-		_else
+		_elif t_status = "TAKEN" _andif t_remarks = "BOOKED"
+		_then
+			# TAKEN & BOOKED -> YELLOW
+			icon_status << {:traffic_light_yellow, :ui_resources}
+		_elif t_status = "TAKEN" _andif (t_remarks = "" _orif t_remarks = "ACTIVE" _orif t_remarks _is _unset)
+		_then
+			# TAKEN & (NULL or BLANK or ACTIVE) -> GREEN
 			icon_status << {:traffic_light_green, :ui_resources}
+		_else
+			# Default -> RED for safety
+			icon_status << {:traffic_light_red, :ui_resources}
 		_endif
 		a_table.add_cell(row, 9, {}, {:image, icon_status })
 
@@ -496,11 +522,13 @@ $
 
 _pragma(classify_level=restricted)
 _private _method rwwi_mancore_plan_dialog.check_all_records_booked(selection)
-	## Check if all selected records are booked (status = "TAKEN")
+	##
+	## Check if all records in selection have transport_remarks = "BOOKED"
 	## Parameters:
 	##   selection - Table selection object
 	## Returns:
-	##   True if all records have status = "TAKEN", False otherwise
+	##   true if all records are BOOKED, false otherwise
+	##
 
 	_if selection _is _unset
 	_then
@@ -508,30 +536,39 @@ _private _method rwwi_mancore_plan_dialog.check_all_records_booked(selection)
 	_endif
 
 	_local records << selection.get_row_data_from_selection()
+
 	_if records.empty?
 	_then
 		_return _false
 	_endif
 
+	# Check each record
 	_for rec _over records.fast_elements()
 	_loop
-		_if rec[:transport_status] <> "TAKEN"
+		_local remarks << rec[:transport_remarks].default("")
+		_if remarks <> "BOOKED"
 		_then
+			# Found a record that's not BOOKED
 			_return _false
 		_endif
 	_endloop
 
-	>> _true
+	# All records are BOOKED
+	_return _true
+
 _endmethod
 $
 
 _pragma(classify_level=restricted)
 _private _method rwwi_mancore_plan_dialog.check_all_records_idle(selection)
-	## Check if all selected records are idle (status != "TAKEN")
+	##
+	## Check if all records in selection are IDLE (transport_status != "TAKEN")
+	## This ensures records haven't been booked or activated yet
 	## Parameters:
 	##   selection - Table selection object
 	## Returns:
-	##   True if all records have status != "TAKEN", False otherwise
+	##   true if all records are IDLE, false otherwise
+	##
 
 	_if selection _is _unset
 	_then
@@ -539,20 +576,28 @@ _private _method rwwi_mancore_plan_dialog.check_all_records_idle(selection)
 	_endif
 
 	_local records << selection.get_row_data_from_selection()
+
 	_if records.empty?
 	_then
 		_return _false
 	_endif
 
+	# Check each record
 	_for rec _over records.fast_elements()
 	_loop
-		_if rec[:transport_status] = "TAKEN"
+		_local t_status << rec[:transport_status].default("")
+		_if t_status = "TAKEN"
 		_then
+			# Found a record that's already TAKEN (BOOKED or ACTIVE)
+			write("  Found non-IDLE record - transport_status: ", t_status,
+			     ", remarks: ", rec[:transport_remarks].default(""))
 			_return _false
 		_endif
 	_endloop
 
-	>> _true
+	# All records are IDLE
+	_return _true
+
 _endmethod
 $
 
