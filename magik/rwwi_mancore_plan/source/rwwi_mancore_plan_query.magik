@@ -165,65 +165,43 @@ $
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.get_mancore()
 	## Get mancore plan - query device connections and optical splitters
-	## Network type handling:
-	##   - Feeder: Query feeder (first table) + subfeeder from project.job_title (second table)
-	##   - Subfeeder/Cluster: Query feeder (first table) + subfeeder from cable (second table)
-	## Always populate optical splitters in third table
+	## Validates: RWO selected AND subfeeder field not empty
+	## Subfeeder field is populated in get_rwo() from project.job_title or manually entered
 
 	# Reset log and display RWO info
 	.items[:log].text << ""
 	_self.display_rwo_info()
 
-	# Ensure design is active
-	_local design << _unset
-	_local project_subfeeder_code << ""
-	_try
-		design << swg_dsn_admin_engine.get_current_job()
-		_if design _is _unset
-		_then
-			_self.show_message("No active design. Please activate a design first.")
-			_return
-		_endif
-		project_subfeeder_code << design.project.perform(:job_title).default("")
-		write("Active design: ", project_subfeeder_code)
-	_when error
-		_self.show_message("Cannot get active design. Please activate a design first.")
-		_return
-	_endtry
-
+	# Validate: RWO must be selected
 	_if .selected_rwo _is _unset
 	_then
 		_self.show_message("Please select a cable first using the Get RWO button")
 		_return
 	_endif
 
+	# Validate: Subfeeder field must not be empty
+	_local subfeeder_field_value << .items[:subfeeder_field].value.default("")
+	_if subfeeder_field_value = "" _orif subfeeder_field_value _is _unset
+	_then
+		_self.show_message("Subfeeder field is required. Please enter a subfeeder code or select a cable (Get RWO).")
+		_return
+	_endif
+
 	_local cab << .selected_rwo
 	_local network_type << cab.sheath_network_type.default("").lowercase
 	_local feeder_code << cab.feeder_code.default("")
-	_local subfeeder_code << cab.subfeeder_code.default("")
 
 	write("Getting mancore plan (network type: ", network_type, ")...")
-
-	# Determine subfeeder_code to use based on network type
-	_local target_subfeeder_code << subfeeder_code
-	_if network_type = "feeder"
-	_then
-		# For feeder network, use project.job_title as subfeeder_code
-		target_subfeeder_code << project_subfeeder_code
-		write("  Network type: feeder → Using project.job_title as subfeeder: ", target_subfeeder_code)
-	_else
-		# For subfeeder/cluster, use cable's subfeeder_code
-		write("  Network type: ", network_type, " → Using cable's subfeeder: ", target_subfeeder_code)
-	_endif
+	write("  Using subfeeder field value: ", subfeeder_field_value)
 
 	# Call API for FEEDER and populate first table
 	_self.query_and_populate_feeder_table(feeder_code)
 
-	# Call API for SUBFEEDER and populate second table
-	_self.query_and_populate_subfeeder_table(target_subfeeder_code)
+	# Call API for SUBFEEDER and populate second table - use subfeeder_field value
+	_self.query_and_populate_subfeeder_table(subfeeder_field_value)
 
-	# Query optical splitters for third table
-	_self.query_and_populate_optical_splitters(target_subfeeder_code)
+	# Query optical splitters for third table - use subfeeder_field value
+	_self.query_and_populate_optical_splitters(subfeeder_field_value)
 
 _endmethod
 $
@@ -259,8 +237,10 @@ _method rwwi_mancore_plan_dialog.query_and_populate_feeder_table(feeder_code)
 	# Check for errors from engine
 	_if result[:error_message] _isnt _unset
 	_then
-		.items[:log].append("ERROR: " + result[:error_message])
+		_local error_msg << result[:error_message]
+		.items[:log].append("ERROR: " + error_msg)
 		.items[:log].append(newline_char)
+		_self.show_message("API Error (Feeder): " + error_msg)
 		_return
 	_endif
 
@@ -316,9 +296,15 @@ _method rwwi_mancore_plan_dialog.query_and_populate_feeder_table(feeder_code)
 		.items[:feeder_table].refresh()
 
 	_else
+		_local fail_msg << "API returned success: false for feeder"
 		.items[:log].append(newline_char)
-		.items[:log].append("API returned success: false for feeder")
+		.items[:log].append(fail_msg)
 		.items[:log].append(newline_char)
+		_if result[:message] _isnt _unset
+		_then
+			fail_msg << fail_msg + newline_char + "Message: " + result[:message]
+		_endif
+		_self.show_message(fail_msg)
 	_endif
 
 _endmethod
@@ -355,8 +341,10 @@ _method rwwi_mancore_plan_dialog.query_and_populate_subfeeder_table(subfeeder_co
 	# Check for errors from engine
 	_if result[:error_message] _isnt _unset
 	_then
-		.items[:log].append("ERROR: " + result[:error_message])
+		_local error_msg << result[:error_message]
+		.items[:log].append("ERROR: " + error_msg)
 		.items[:log].append(newline_char)
+		_self.show_message("API Error (Subfeeder): " + error_msg)
 		_return
 	_endif
 
@@ -412,9 +400,15 @@ _method rwwi_mancore_plan_dialog.query_and_populate_subfeeder_table(subfeeder_co
 		.items[:table].refresh()
 
 	_else
+		_local fail_msg << "API returned success: false for subfeeder"
 		.items[:log].append(newline_char)
-		.items[:log].append("API returned success: false for subfeeder")
+		.items[:log].append(fail_msg)
 		.items[:log].append(newline_char)
+		_if result[:message] _isnt _unset
+		_then
+			fail_msg << fail_msg + newline_char + "Message: " + result[:message]
+		_endif
+		_self.show_message(fail_msg)
 	_endif
 
 _endmethod
@@ -423,6 +417,7 @@ $
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.query_and_populate_optical_splitters(subfeeder_code)
 	## Query optical splitters and populate third table
+	## subfeeder_code parameter comes from subfeeder_field (already validated in get_mancore)
 
 	_if subfeeder_code = "" _orif subfeeder_code _is _unset
 	_then
@@ -432,24 +427,8 @@ _method rwwi_mancore_plan_dialog.query_and_populate_optical_splitters(subfeeder_
 
 	_local cab << .selected_rwo
 
-	# Get destination code (subfeeder_code or project title from active design)
+	# Use subfeeder_code as destination code (already populated from cable or design)
 	_local destination_code << subfeeder_code
-	_if destination_code = "" _orif destination_code _is _unset
-	_then
-		# Use project title from active design
-		_local design << swg_dsn_admin_engine.get_current_job()
-		_if design _isnt _unset
-		_then
-			destination_code << design.project.perform(:job_title).default("")
-			write("  Using project title from active design: ", destination_code)
-		_endif
-	_endif
-
-	_if destination_code = "" _orif destination_code _is _unset
-	_then
-		write("  WARNING: Cannot determine destination code for optical splitters")
-		_return
-	_endif
 
 	# Query sheath_splice by subfeeder_code to get optical splitters
 	.items[:log].append("Querying Optical Splitters...")

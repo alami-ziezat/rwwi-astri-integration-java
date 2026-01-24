@@ -186,6 +186,14 @@ _method rwwi_mancore_plan_dialog.build_toolbar( parent )
 						  :value, "100",
 						  :tooltip, "Limit for device connection query (default: fiber count)" )
 
+	sw_label_item.new( file_toolbar, "Subfeeder:" )
+
+	.items[:subfeeder_field] << sw_text_item.new( file_toolbar,
+						  :display_length, 15,
+						  :model, _self,
+						  :value, "",
+						  :tooltip, "Subfeeder code from project job_title (editable)" )
+
 
 	.items[:get_mancore] << sw_button_item.new( file_toolbar,
 					       :image, {:run, :ui_resources},
@@ -501,6 +509,37 @@ _method rwwi_mancore_plan_dialog.get_rwo()
 			.items[:log].append(newline_char)
 			.items[:log].append("===========")
 
+			# Populate subfeeder field with priority: cable subfeeder_code → design job_title
+			_local populated_subfeeder << ""
+
+			# Priority 1: Check cable's subfeeder_code
+			_if subfeeder_code <> "" _andif subfeeder_code _isnt _unset
+			_then
+				populated_subfeeder << subfeeder_code
+				.items[:subfeeder_field].value << populated_subfeeder
+				write("Populated subfeeder field from cable subfeeder_code: ", populated_subfeeder)
+			_else
+				# Priority 2: Try to get from design job_title
+				_local design << _unset
+				_local project_subfeeder_code << ""
+				_try
+					design << swg_dsn_admin_engine.get_current_job()
+					_if design _isnt _unset
+					_then
+						project_subfeeder_code << design.project.perform(:job_title).default("")
+						_if project_subfeeder_code <> "" _andif project_subfeeder_code _isnt _unset
+						_then
+							populated_subfeeder << project_subfeeder_code
+							.items[:subfeeder_field].value << populated_subfeeder
+							write("Populated subfeeder field from project job_title: ", populated_subfeeder)
+						_endif
+					_endif
+				_when error
+					# Design doesn't exist or error - that's OK, user can manually enter subfeeder
+					write("No active design - subfeeder field can be manually entered")
+				_endtry
+			_endif
+
 			# Enable get_mancore button for all network types (feeder, subfeeder, cluster)
 			_if network_type = "feeder" _orif network_type = "subfeeder" _orif network_type = "cluster"
 			_then
@@ -573,6 +612,9 @@ _method rwwi_mancore_plan_dialog.clear()
 
 	# Reset homepass field
 	.items[:homepass_field].value << "0"
+
+	# Reset subfeeder field
+	.items[:subfeeder_field].value << ""
 
 	# Reset counts
 	.feeder_count << 0
