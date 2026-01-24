@@ -1,0 +1,513 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2025 Realworld Systems. All Rights Reserved.
+#
+#
+# ************************************************************
+
+_package sw
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.populate_feeder_connection_table( a_table )
+	##
+	## Populate feeder table with device connection data from API response
+
+	_local row << 1
+
+	# Sort data by Tube Number, then by Core Number
+	_local sorted_data << .feeder_table_list.as_sorted_collection(
+		_proc(a, b)
+			_local tube_a << a[:transport_tube_number].default(0)
+			_local tube_b << b[:transport_tube_number].default(0)
+			_local core_a << a[:transport_core_number].default(0)
+			_local core_b << b[:transport_core_number].default(0)
+
+			_if tube_a <> tube_b
+			_then
+				_return tube_a < tube_b
+			_else
+				_return core_a < core_b
+			_endif
+		_endproc)
+
+	_for a_rec _over sorted_data.fast_elements()
+	_loop
+		a_table.set_row_data( row, a_rec )
+
+		# Column 1: Source Type - depends on infra_type
+		_local source_type
+		_if .current_infra_type _is :feeder
+		_then
+			source_type << "OLT"
+		_else
+			# subfeeder
+			source_type << "FEEDER"
+		_endif
+		a_table.add_cell(row, 1, {}, {:label, source_type})
+
+		# Column 2: Source Code - depends on infra_type
+		_local source_code
+		_if .current_infra_type _is :feeder
+		_then
+			source_code << a_rec[:source_olt_device_code]
+		_else
+			# subfeeder
+			source_code << a_rec[:source_feeder_code]
+		_endif
+		a_table.add_cell(row, 2, {}, {:label, source_code.default("").write_string})
+
+		# Column 3: Transport Code - depends on infra_type
+		_local transport_code
+		_if .current_infra_type _is :feeder
+		_then
+			transport_code << a_rec[:transport_feeder_code]
+		_else
+			# subfeeder
+			transport_code << a_rec[:transport_subfeeder_code]
+		_endif
+		a_table.add_cell(row, 3, {}, {:label, transport_code.default("").write_string})
+
+		# Column 4: Tube Count - depends on infra_type
+		_local tube_count
+		_if .current_infra_type _is :feeder
+		_then
+			tube_count << a_rec[:transport_feeder_tube_count]
+		_else
+			tube_count << a_rec[:transport_subfeeder_tube_count]
+		_endif
+		a_table.add_cell(row, 4, {}, {:label, tube_count.default("").write_string, :row_alignment, :centre})
+
+		# Column 5: Core Count - depends on infra_type
+		_local core_count
+		_if .current_infra_type _is :feeder
+		_then
+			core_count << a_rec[:transport_feeder_core_count]
+		_else
+			core_count << a_rec[:transport_subfeeder_core_count]
+		_endif
+		a_table.add_cell(row, 5, {}, {:label, core_count.default("").write_string, :row_alignment, :centre})
+
+		# Column 6: Tube Number
+		_local tube_num << a_rec[:transport_tube_number].default(0)
+		a_table.add_cell(row, 6, {}, {:label, tube_num.write_string, :row_alignment, :centre})
+
+		# Column 7: Core Number
+		_local core_num << a_rec[:transport_core_number].default(0)
+		a_table.add_cell(row, 7, {}, {:label, core_num.write_string, :row_alignment, :centre})
+
+		# Column 8: SW Core - absolute core number in cable
+		_local sw_core << (tube_num - 1) * 12 + core_num
+		a_table.add_cell(row, 8, {}, {:label, sw_core.write_string, :row_alignment, :centre})
+
+		# Column 9: Status - show TAKEN or IDLE
+		_local icon_status
+		_if a_rec[:transport_status] = "TAKEN"
+		_then
+			icon_status << {:traffic_light_red, :ui_resources}
+		_else
+			icon_status << {:traffic_light_green, :ui_resources}
+		_endif
+		a_table.add_cell(row, 9, {}, {:image, icon_status })
+
+		# Column 10: Destination Code
+		_local dest_code << a_rec[:destination_cluster_code]
+		a_table.add_cell(row, 10, {}, {:label, dest_code.default("").write_string })
+
+		# Column 11: Destination Tube Number
+		_local dest_tube << a_rec[:destination_tube_number]
+		a_table.add_cell(row, 11, {}, {:label, dest_tube.default("").write_string, :row_alignment, :centre })
+
+		# Column 12: Destination Core Number
+		_local dest_core << a_rec[:destination_core_number]
+		a_table.add_cell(row, 12, {}, {:label, dest_core.default("").write_string, :row_alignment, :centre })
+
+		# Column 13: Destination Name
+		_local dest_name << a_rec[:destination_cluster_name]
+		a_table.add_cell(row, 13, {}, {:label, dest_name.default("").write_string })
+
+		row +<< 1
+	_endloop
+
+	a_table.apply_sorting(_true )
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.feeder_connection_table_selected( selection )
+	##
+	## Handle feeder table selection
+	## Store selection and count all records
+	##
+
+	# Store selection for use in booking operations
+	.feeder_table_selection << selection
+
+	_local selected_records << selection.get_row_data_from_selection()
+
+	# Count all records in feeder table (regardless of status)
+	.feeder_count << selected_records.size
+
+	write("Feeder table: ", .feeder_count, " records selected")
+
+	# Update booking button states
+	_self.update_booking_button_states()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.open_editor_feeder()
+	##
+	## Handle feeder table double-click - placeholder for future implementation
+	##
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
+	##
+	## Populate table with device connection data from API response
+
+	_local row << 1
+
+	# Sort data by Tube Number, then by Core Number
+	_local sorted_data << .table_list.as_sorted_collection(
+		_proc(a, b)
+			_local tube_a << a[:transport_tube_number].default(0)
+			_local tube_b << b[:transport_tube_number].default(0)
+			_local core_a << a[:transport_core_number].default(0)
+			_local core_b << b[:transport_core_number].default(0)
+
+			_if tube_a <> tube_b
+			_then
+				_return tube_a < tube_b
+			_else
+				_return core_a < core_b
+			_endif
+		_endproc)
+
+	_for a_rec _over sorted_data.fast_elements()
+	_loop
+		a_table.set_row_data( row, a_rec )
+
+		# Column 1: Source Type - depends on infra_type
+		_local source_type
+		_if .current_infra_type _is :feeder
+		_then
+			source_type << "OLT"
+		_else
+			# subfeeder
+			source_type << "FEEDER"
+		_endif
+		a_table.add_cell(row, 1, {}, {:label, source_type})
+
+		# Column 2: Source Code - depends on infra_type
+		_local source_code
+		_if .current_infra_type _is :feeder
+		_then
+			source_code << a_rec[:source_olt_device_code]
+		_else
+			# subfeeder
+			source_code << a_rec[:source_feeder_code]
+		_endif
+		a_table.add_cell(row, 2, {}, {:label, source_code.default("").write_string})
+
+		# Column 3: Transport Code - depends on infra_type
+		_local transport_code
+		_if .current_infra_type _is :feeder
+		_then
+			transport_code << a_rec[:transport_feeder_code]
+		_else
+			# subfeeder
+			transport_code << a_rec[:transport_subfeeder_code]
+		_endif
+		a_table.add_cell(row, 3, {}, {:label, transport_code.default("").write_string})
+
+		# Column 4: Tube Count - depends on infra_type
+		_local tube_count
+		_if .current_infra_type _is :feeder
+		_then
+			tube_count << a_rec[:transport_feeder_tube_count]
+		_else
+			tube_count << a_rec[:transport_subfeeder_tube_count]
+		_endif
+		a_table.add_cell(row, 4, {}, {:label, tube_count.default("").write_string, :row_alignment, :centre})
+
+		# Column 5: Core Count - depends on infra_type
+		_local core_count
+		_if .current_infra_type _is :feeder
+		_then
+			core_count << a_rec[:transport_feeder_core_count]
+		_else
+			core_count << a_rec[:transport_subfeeder_core_count]
+		_endif
+		a_table.add_cell(row, 5, {}, {:label, core_count.default("").write_string, :row_alignment, :centre})
+
+		# Column 6: Tube Number
+		_local tube_num << a_rec[:transport_tube_number].default(0)
+		a_table.add_cell(row, 6, {}, {:label, tube_num.write_string, :row_alignment, :centre})
+
+		# Column 7: Core Number
+		_local core_num << a_rec[:transport_core_number].default(0)
+		a_table.add_cell(row, 7, {}, {:label, core_num.write_string, :row_alignment, :centre})
+
+		# Column 8: SW Core - absolute core number in cable
+		_local sw_core << (tube_num - 1) * 12 + core_num
+		a_table.add_cell(row, 8, {}, {:label, sw_core.write_string, :row_alignment, :centre})
+
+		# Column 9: Status - show TAKEN or IDLE
+		_local icon_status
+		_if a_rec[:transport_status] = "TAKEN"
+		_then
+			icon_status << {:traffic_light_red, :ui_resources}
+		_else
+			icon_status << {:traffic_light_green, :ui_resources}
+		_endif
+		a_table.add_cell(row, 9, {}, {:image, icon_status })
+
+		# Column 10: Destination Code
+		_local dest_code << a_rec[:destination_cluster_code]
+		a_table.add_cell(row, 10, {}, {:label, dest_code.default("").write_string })
+
+		# Column 11: Destination Tube Number
+		_local dest_tube << a_rec[:destination_tube_number]
+		a_table.add_cell(row, 11, {}, {:label, dest_tube.default("").write_string, :row_alignment, :centre })
+
+		# Column 12: Destination Core Number
+		_local dest_core << a_rec[:destination_core_number]
+		a_table.add_cell(row, 12, {}, {:label, dest_core.default("").write_string, :row_alignment, :centre })
+
+		# Column 13: Destination Name
+		_local dest_name << a_rec[:destination_cluster_name]
+		a_table.add_cell(row, 13, {}, {:label, dest_name.default("").write_string })
+
+		row +<< 1
+	_endloop
+
+	a_table.apply_sorting(_true )
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.populate_ur2( a_table )
+	##
+	## Populate table2 with optical splitter data
+	## Displays: Destination Code, Splitter Name, Dest. Tube Number, Dest. Core Number, Status
+
+	_local row << 1
+
+	# Sort data by splitter name
+	_local sorted_data << .table_list2.as_sorted_collection(
+		_proc(a, b)
+			_local name_a << a[:splitter_name].default("")
+			_local name_b << b[:splitter_name].default("")
+			_return name_a < name_b
+		_endproc)
+
+	_for a_rec _over sorted_data.fast_elements()
+	_loop
+		a_table.set_row_data( row, a_rec )
+
+		# Column 1: Destination Code
+		a_table.add_cell(row, 1, {}, {:label, a_rec[:destination_code].default("").write_string})
+
+		# Column 2: Splitter Name
+		a_table.add_cell(row, 2, {}, {:label, a_rec[:splitter_name].default("").write_string})
+
+		# Column 3: Dest. Tube Number (always 1)
+		a_table.add_cell(row, 3, {}, {:label, a_rec[:dest_tube_number].default("1").write_string, :row_alignment, :centre})
+
+		# Column 4: Dest. Core Number (extracted from splitter name)
+		a_table.add_cell(row, 4, {}, {:label, a_rec[:dest_core_number].default("").write_string, :row_alignment, :centre})
+
+		# Column 5: Status (construction_status)
+		_local status << a_rec[:status].default("")
+		_local icon_status
+		_if status = "In Service" _orif status = "IN SERVICE"
+		_then
+			icon_status << {:traffic_light_green, :ui_resources}
+		_elif status = "Proposed" _orif status = "PROPOSED"
+		_then
+			icon_status << {:traffic_light_yellow, :ui_resources}
+		_else
+			icon_status << {:traffic_light_red, :ui_resources}
+		_endif
+		a_table.add_cell(row, 5, {}, {:image, icon_status})
+
+		row +<< 1
+	_endloop
+
+	a_table.apply_sorting(_true)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.device_connection_table_selected( selection )
+	##
+	## Handle selection in subfeeder table
+	## Store selection and count all records
+	##
+	_global sel
+	sel << selection
+
+	# Store selection for use in booking operations
+	.subfeeder_table_selection << selection
+
+	_if selection.get_row_data_from_selection().size > 0
+	_then
+		.current_selection_ur1 << selection.get_row_data_from_selection().an_element()
+	_endif
+
+	_local selected_records << selection.get_row_data_from_selection()
+
+	# Count all records in subfeeder table (regardless of status)
+	.subfeeder_count << selected_records.size
+
+	write("Subfeeder table: ", .subfeeder_count, " records selected")
+
+	# Update booking button states
+	_self.update_booking_button_states()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.update_booking_button_states()
+	##
+	## Update booking button states based on table selections
+	##
+	## Booking Feeder enabled when:
+	##   - Both table 1 and table 2 selected
+	##   - Same amount of records in both tables
+	##
+	## Booking Subfeeder enabled when:
+	##   - Both table 2 and table 3 selected
+	##   - Table 2 can have more records than table 3
+	##
+
+	# Booking Feeder logic - enable when counts match
+	_local enable_feeder? << _false
+	_if .feeder_count > 0 _andif .subfeeder_count > 0 _andif
+	    .feeder_count = .subfeeder_count
+	_then
+		enable_feeder? << _true
+		write("Booking Feeder ENABLED - Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count)
+	_else
+		write("Booking Feeder DISABLED - Counts don't match or zero")
+		write("  Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count)
+	_endif
+
+	# Booking Subfeeder logic - enable when table 2 >= table 3
+	_local enable_subfeeder? << _false
+	_if .subfeeder_count > 0 _andif .fdt_count > 0 _andif
+	    .subfeeder_count >= .fdt_count
+	_then
+		enable_subfeeder? << _true
+		write("Booking Subfeeder ENABLED - Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count)
+	_else
+		write("Booking Subfeeder DISABLED")
+		write("  Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count)
+	_endif
+
+	.items[:booking_feeder].enabled? << enable_feeder?
+	.items[:booking_subfeeder].enabled? << enable_subfeeder?
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.check_all_records_booked(selection)
+	## Check if all selected records are booked (status = "TAKEN")
+	## Parameters:
+	##   selection - Table selection object
+	## Returns:
+	##   True if all records have status = "TAKEN", False otherwise
+
+	_if selection _is _unset
+	_then
+		_return _false
+	_endif
+
+	_local records << selection.get_row_data_from_selection()
+	_if records.empty?
+	_then
+		_return _false
+	_endif
+
+	_for rec _over records.fast_elements()
+	_loop
+		_if rec[:transport_status] <> "TAKEN"
+		_then
+			_return _false
+		_endif
+	_endloop
+
+	>> _true
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.check_all_records_idle(selection)
+	## Check if all selected records are idle (status != "TAKEN")
+	## Parameters:
+	##   selection - Table selection object
+	## Returns:
+	##   True if all records have status != "TAKEN", False otherwise
+
+	_if selection _is _unset
+	_then
+		_return _false
+	_endif
+
+	_local records << selection.get_row_data_from_selection()
+	_if records.empty?
+	_then
+		_return _false
+	_endif
+
+	_for rec _over records.fast_elements()
+	_loop
+		_if rec[:transport_status] = "TAKEN"
+		_then
+			_return _false
+		_endif
+	_endloop
+
+	>> _true
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.table_selected_ur2( selection )
+	##
+	## Handle selection in FDT table
+	## Store selection and count records
+	##
+	_global sel
+	sel << selection
+
+	# Store selection for use in booking operations
+	.fdt_table_selection << selection
+
+	_local selected_records << selection.get_row_data_from_selection()
+
+	# Count FDT records
+	.fdt_count << selected_records.size
+
+	_if selected_records.size > 0
+	_then
+		.current_selection_ur2 << selected_records.an_element()
+	_endif
+
+	write("FDT table: ", .fdt_count, " records selected")
+
+	# Update booking button states
+	_self.update_booking_button_states()
+
+_endmethod
+$

@@ -1,0 +1,620 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2025 Realworld Systems. All Rights Reserved.
+#
+#
+# ************************************************************
+
+_package sw
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.get_homepass_and_cores()
+	##
+	## Calculate homepass and cores to book from homepass field
+	##
+	## Returns:
+	##   homepass_str    - String value from field
+	##   homepass_count  - Numeric value
+	##   cores_to_book   - Calculated cores (homepass/64 rounded)
+	##
+
+	_local homepass_str << .items[:homepass_field].value.default("0")
+	_local homepass_count << homepass_str.as_number().default(0)
+	_local cores_to_book << (homepass_count.as_float / 64).rounded
+
+	>> homepass_str, homepass_count, cores_to_book
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.homepass_changed()
+	##
+	## Called when homepass field is manually updated
+	## Recalculates and logs the total cores to book
+	##
+
+	_local (homepass_str, homepass_count, cores_to_book) << _self.get_homepass_and_cores()
+
+	write("Homepass field updated: ", homepass_count)
+	write("Total Cores to Book: ", cores_to_book)
+
+	# Append to log
+	.items[:log].append(newline_char)
+	.items[:log].append("** Homepass Updated **")
+	.items[:log].append(newline_char)
+	.items[:log].append("Total Homepass      : " + homepass_count.write_string)
+	.items[:log].append(newline_char)
+	.items[:log].append("Total Cores to Book : " + cores_to_book.write_string)
+	.items[:log].append(newline_char)
+	.items[:log].append(newline_char)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.status_changed()
+	##
+	## Called when status dropdown is changed
+	## Updates button states based on new status
+	##
+
+	_local status << .items[:status_field].value.default("BOOKED")
+	write("Status changed to: ", status)
+
+	# Update button states based on new status and current selections
+	_self.update_booking_button_states()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.booking_feeder()
+	##
+	## Booking Feeder - Book device connections between Table 1 (Feeder) and Table 2 (Subfeeder)
+	##
+
+	write("============================================")
+	write("BOOKING FEEDER")
+	write("============================================")
+
+	# Get current design for work_order_number
+	_local design << _unset
+	_local work_order << ""
+	_try
+		design << swg_dsn_admin_engine.get_current_job()
+		_if design _is _unset
+		_then
+			_self.show_message("No active design. Please activate a design first.")
+			_return
+		_endif
+		work_order << design.project.perform(:name).default("")
+		_if work_order = "" _orif work_order _is _unset
+		_then
+			_self.show_message("Cannot get project name from active design.")
+			_return
+		_endif
+		write("Work Order (project.name): ", work_order)
+	_when error
+		_self.show_message("Cannot get active design. Please activate a design first.")
+		_return
+	_endtry
+
+	# Get selections from slots
+	_local feeder_selection << .feeder_table_selection
+	_local subfeeder_selection << .subfeeder_table_selection
+
+	# Get all records from feeder table (regardless of status)
+	_local feeder_records << _self.get_records_from_selection(feeder_selection)
+
+	# Get all records from subfeeder table (regardless of status)
+	_local subfeeder_records << _self.get_records_from_selection(subfeeder_selection)
+
+	write("Table 1 (Feeder): ", feeder_records.size, " records")
+	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
+
+	# Execute booking
+	_self.execute_booking_feeder(work_order, feeder_records, subfeeder_records)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.booking_subfeeder()
+	##
+	## Booking Subfeeder - Book device connections between Table 2 (Subfeeder) and Table 3 (FDT)
+	##
+
+	write("============================================")
+	write("BOOKING SUBFEEDER")
+	write("============================================")
+
+	# Get current design for work_order_number
+	_local design << _unset
+	_local work_order << ""
+	_try
+		design << swg_dsn_admin_engine.get_current_job()
+		_if design _is _unset
+		_then
+			_self.show_message("No active design. Please activate a design first.")
+			_return
+		_endif
+		work_order << design.project.perform(:name).default("")
+		_if work_order = "" _orif work_order _is _unset
+		_then
+			_self.show_message("Cannot get project name from active design.")
+			_return
+		_endif
+		write("Work Order (project.name): ", work_order)
+	_when error
+		_self.show_message("Cannot get active design. Please activate a design first.")
+		_return
+	_endtry
+
+	# Get selections from slots
+	_local subfeeder_selection << .subfeeder_table_selection
+	_local fdt_selection << .fdt_table_selection
+
+	# Get all records from subfeeder table (regardless of status)
+	_local subfeeder_records << _self.get_records_from_selection(subfeeder_selection)
+
+	# Get all records from FDT table
+	_local fdt_records << _self.get_records_from_selection(fdt_selection)
+
+	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
+	write("Table 3 (FDT): ", fdt_records.size, " records")
+
+	# Execute booking
+	_self.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.get_idle_records_from_selection(selection)
+	## Extract IDLE records from table selection
+	## Parameters:
+	##   selection - Table selection object
+	## Returns:
+	##   rope of IDLE records (status != "TAKEN")
+
+	_local idle_records << rope.new()
+
+	_if selection _is _unset
+	_then
+		_return idle_records
+	_endif
+
+	_local records << selection.get_row_data_from_selection()
+	_for rec _over records.fast_elements()
+	_loop
+		_if rec[:transport_status] <> "TAKEN"
+		_then
+			idle_records.add(rec)
+		_endif
+	_endloop
+
+	>> idle_records
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.get_records_from_selection(selection)
+	## Extract all records from table selection (no filtering)
+	## Parameters:
+	##   selection - Table selection object
+	## Returns:
+	##   rope of records
+
+	_local records << rope.new()
+
+	_if selection _is _unset
+	_then
+		_return records
+	_endif
+
+	_local selected << selection.get_row_data_from_selection()
+	_for rec _over selected.fast_elements()
+	_loop
+		records.add(rec)
+	_endloop
+
+	>> records
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, feeder_records, subfeeder_records)
+	## Execute booking feeder - pair Table 1 (IDLE) with Table 2 (any status)
+	## Parameters:
+	##   work_order - Work order number
+	##   feeder_records - Records from Table 1 (must be IDLE)
+	##   subfeeder_records - Records from Table 2 (can be IDLE or TAKEN)
+
+	write("============================================")
+	write("EXECUTING BOOKING FEEDER")
+	write("============================================")
+
+	# Validate counts match
+	_if feeder_records.size <> subfeeder_records.size
+	_then
+		_local msg << write_string("Selected records count mismatch!", newline_char,
+					   "Table 1 (Feeder): ", feeder_records.size, newline_char,
+					   "Table 2 (Subfeeder): ", subfeeder_records.size, newline_char,
+					   "Please select the same number of records in both tables.")
+		_self.show_message(msg)
+		_return
+	_endif
+
+	write("Pairing ", feeder_records.size, " records for booking feeder...")
+
+	# Process each pair
+	_local success_count << 0
+	_local error_count << 0
+	_local errors << rope.new()
+
+	_for i _over 1.upto(feeder_records.size)
+	_loop
+		_local feeder_rec << feeder_records[i]
+		_local subfeeder_rec << subfeeder_records[i]
+
+		write("Pair ", i, ":")
+		write("  Table 1: Tube ", feeder_rec[:transport_tube_number], " Core ", feeder_rec[:transport_core_number])
+		write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
+
+		# Build connection data
+		_local connection_data << _self.build_booking_feeder_data(
+			work_order, feeder_rec, subfeeder_rec)
+
+		# Call API
+		_local result << .engine.add_device_connection(connection_data)
+
+		_if result[:success] = _true
+		_then
+			success_count +<< 1
+			write("  → SUCCESS: Booking created")
+		_else
+			error_count +<< 1
+			_local err_msg << result[:error_message].default("Unknown error")
+			errors.add(write_string("Pair ", i, ": ", err_msg))
+			write("  → ERROR: ", err_msg)
+		_endif
+	_endloop
+
+	write("============================================")
+	write("BOOKING FEEDER COMPLETED")
+	write("============================================")
+	write("Success: ", success_count)
+	write("Errors: ", error_count)
+
+	# Show result to user
+	_local msg << write_string("Booking Feeder Completed", newline_char,
+				   "Success: ", success_count, newline_char,
+				   "Errors: ", error_count)
+
+	_if error_count > 0
+	_then
+		msg +<< newline_char + newline_char + "Errors:" + newline_char
+		_for err _over errors.fast_elements()
+		_loop
+			msg +<< err + newline_char
+		_endloop
+	_endif
+
+	_self.show_message(msg)
+
+	# Refresh tables after booking
+	_if success_count > 0
+	_then
+		write("Refreshing tables after successful bookings...")
+		_self.refresh_data_after_booking()
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records)
+	## Execute booking subfeeder - pair Table 2 (any status) with Table 3
+	## Parameters:
+	##   work_order - Work order number
+	##   subfeeder_records - Records from Table 2 (can be IDLE or TAKEN)
+	##   fdt_records - Records from Table 3
+
+	write("============================================")
+	write("EXECUTING BOOKING SUBFEEDER")
+	write("============================================")
+
+	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
+	write("Table 3 (FDT): ", fdt_records.size, " records")
+
+	_if fdt_records.size > subfeeder_records.size
+	_then
+		write("WARNING: Table 3 has more records than Table 2. Only first ", subfeeder_records.size, " FDT records will be used.")
+	_elif fdt_records.size < subfeeder_records.size
+	_then
+		write("NOTE: Table 3 has fewer records. Remaining Table 2 records will have empty destination fields.")
+	_endif
+
+	write("Processing ", subfeeder_records.size, " records for booking subfeeder...")
+
+	# Process each pair
+	_local success_count << 0
+	_local error_count << 0
+	_local errors << rope.new()
+
+	_for i _over 1.upto(subfeeder_records.size)
+	_loop
+		_local subfeeder_rec << subfeeder_records[i]
+		_local fdt_rec << _unset
+
+		# Get matching FDT record if available
+		_if i <= fdt_records.size
+		_then
+			fdt_rec << fdt_records[i]
+		_endif
+
+		write("Pair ", i, ":")
+		write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
+		_if fdt_rec _isnt _unset
+		_then
+			write("  Table 3: ", fdt_rec[:splitter_name].default(""), " - Dest Core ", fdt_rec[:dest_core_number].default(""))
+		_else
+			write("  Table 3: (no pair - destination will be empty)")
+		_endif
+
+		# Build connection data
+		_local connection_data << _self.build_booking_subfeeder_data(
+			work_order, subfeeder_rec, fdt_rec)
+
+		# Call API
+		_local result << .engine.add_device_connection(connection_data)
+
+		_if result[:success] = _true
+		_then
+			success_count +<< 1
+			write("  → SUCCESS: Booking created")
+		_else
+			error_count +<< 1
+			_local err_msg << result[:error_message].default("Unknown error")
+			errors.add(write_string("Pair ", i, ": ", err_msg))
+			write("  → ERROR: ", err_msg)
+		_endif
+	_endloop
+
+	write("============================================")
+	write("BOOKING SUBFEEDER COMPLETED")
+	write("============================================")
+	write("Success: ", success_count)
+	write("Errors: ", error_count)
+
+	# Show result to user
+	_local msg << write_string("Booking Subfeeder Completed", newline_char,
+				   "Success: ", success_count, newline_char,
+				   "Errors: ", error_count)
+
+	_if error_count > 0
+	_then
+		msg +<< newline_char + newline_char + "Errors:" + newline_char
+		_for err _over errors.fast_elements()
+		_loop
+			msg +<< err + newline_char
+		_endloop
+	_endif
+
+	_self.show_message(msg)
+
+	# Refresh tables after booking
+	_if success_count > 0
+	_then
+		write("Refreshing tables after successful bookings...")
+		_self.refresh_data_after_booking()
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.refresh_data_after_booking()
+	## Refresh data after successful booking operations
+	## Re-queries the API to get updated data for all tables
+
+	write("============================================")
+	write("REFRESHING DATA AFTER BOOKING")
+	write("============================================")
+
+	_if .current_infra_type _is _unset _orif .current_infra_code _is _unset
+	_then
+		write("Cannot refresh - no current infrastructure selected")
+		_return
+	_endif
+
+	# Re-query based on current infrastructure type
+	_if .current_infra_type _is :feeder
+	_then
+		write("Re-querying feeder data...")
+		_self.query_and_populate_feeder_table(.current_infra_code)
+	_elif .current_infra_type _is :subfeeder
+	_then
+		write("Re-querying subfeeder data...")
+		_self.query_and_populate_subfeeder_table(.current_infra_code)
+	_else
+		write("Unknown infrastructure type: ", .current_infra_type)
+	_endif
+
+	write("Data refresh completed")
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.get_default_device_connection_fields()
+	## Returns property_list with all null/empty device and transport metadata fields
+	## These fields are common to all booking operations
+	## Returns:
+	##   property_list with null/empty default fields
+
+	>> property_list.new_with(
+		:source_tube_number, _unset,
+		:source_core_number, _unset,
+		:source_device_name, _unset,
+		:source_device_hardware_type, _unset,
+		:source_device_port_name, _unset,
+		:source_device_port_type, _unset,
+		:source_device_remarks, _unset,
+		:source_device_capacity, _unset,
+		:source_device_capacity_measurement, _unset,
+		:transport_name, _unset,
+		:transport_hardware_type, _unset,
+		:transport_capacity, _unset,
+		:transport_capacity_measurement, _unset,
+		:destination_device_name, _unset,
+		:destination_device_hardware_type, _unset,
+		:destination_device_port_name, _unset,
+		:destination_device_port_type, _unset,
+		:destination_device_remarks, _unset,
+		:destination_device_capacity, _unset,
+		:destination_device_capacity_measurement, _unset,
+		:destination_status, _unset,
+		:destination_remarks, _unset,
+		:verified_by_username, _unset,
+		:verified_at, _unset
+	)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.build_booking_feeder_data(work_order, feeder_rec, subfeeder_rec)
+	## Build device connection data for booking feeder
+	## Maps data from table 1 (feeder) and table 2 (subfeeder) to API format
+	## Parameters:
+	##   work_order - Work order number from project.name
+	##   feeder_rec - Selected record from table 1 (Feeder Connectivity)
+	##   subfeeder_rec - Selected record from table 2 (Subfeeder Connectivity)
+	## Returns:
+	##   property_list with device connection data
+
+	# Get source data from table 1
+	_local source_type << "OLT"
+	_local source_code << feeder_rec[:source_olt_device_code].default("")
+
+	# Get transport code from table 1
+	_local transport_code << feeder_rec[:transport_feeder_code].default("")
+
+	# Get destination transport code from table 2
+	_local dest_transport_code << subfeeder_rec[:transport_subfeeder_code].default("")
+
+	# Build connection data with specific fields
+	_local connection_data << property_list.new_with(
+		:work_order_number, work_order,
+		:source_type, source_type,
+		:source_code, source_code,
+		:transport_tube_number, feeder_rec[:transport_tube_number].default(""),
+		:transport_core_number, feeder_rec[:transport_core_number].default(""),
+		:transport_code, transport_code,
+		:transport_status, "TAKEN",
+		:transport_remarks, "BOOKED",
+		:destination_type, "SUBFEEDER",
+		:destination_code, dest_transport_code,
+		:destination_tube_number, subfeeder_rec[:transport_tube_number].default(""),
+		:destination_core_number, subfeeder_rec[:transport_core_number].default("")
+	)
+
+	# Add default null/empty fields
+	connection_data.add_all(_self.get_default_device_connection_fields())
+
+	>> connection_data
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.build_booking_subfeeder_data(work_order, subfeeder_rec, fdt_rec)
+	## Build device connection data for booking subfeeder
+	## Maps data from table 2 (subfeeder) and table 3 (FDT) to API format
+	## Parameters:
+	##   work_order - Work order number from project.name
+	##   subfeeder_rec - Selected record from table 2 (Subfeeder Connectivity)
+	##   fdt_rec - Selected record from table 3 (FDT Splice)
+	## Returns:
+	##   property_list with device connection data
+
+	# Get source data from table 2
+	_local source_type << "FEEDER"
+	_local source_code << subfeeder_rec[:source_feeder_code].default("")
+
+	# Get transport code from table 2
+	_local transport_code << subfeeder_rec[:transport_subfeeder_code].default("")
+
+	# Get status from dropdown
+	_local status << .items[:status_field].value.default("BOOKED")
+
+	# Get transport_status and transport_remarks based on status
+	_local transport_status, transport_remarks
+	_if status = "RELEASE"
+	_then
+		transport_status << "IDLE"
+		transport_remarks << "RELEASE"
+	_elif status = "ACTIVE"
+	_then
+		transport_status << "TAKEN"
+		transport_remarks << "ACTIVE"
+	_else
+		# BOOKED (default)
+		transport_status << "TAKEN"
+		transport_remarks << "BOOKED"
+	_endif
+
+	# Get destination fields based on status
+	_local dest_type, dest_code, dest_tube, dest_core
+	_if status = "RELEASE"
+	_then
+		# For RELEASE, set destination fields to null
+		dest_type << _unset
+		dest_code << _unset
+		dest_tube << _unset
+		dest_core << _unset
+	_elif status = "ACTIVE"
+	_then
+		# For ACTIVE, use destination data from same table (table 2 - subfeeder)
+		dest_type << "CLUSTER"
+		dest_code << subfeeder_rec[:destination_cluster_code].default("")
+		dest_tube << subfeeder_rec[:destination_tube_number].default("")
+		dest_core << subfeeder_rec[:destination_core_number].default("")
+	_else
+		# For BOOKED, use destination data from table 3 (FDT)
+		dest_type << "CLUSTER"
+		_if fdt_rec _isnt _unset
+		_then
+			dest_code << fdt_rec[:destination_code].default("")
+			dest_tube << fdt_rec[:dest_tube_number].default("")
+			dest_core << fdt_rec[:dest_core_number].default("")
+		_else
+			dest_code << ""
+			dest_tube << ""
+			dest_core << ""
+		_endif
+	_endif
+
+	# Build connection data with specific fields
+	_local connection_data << property_list.new_with(
+		:work_order_number, work_order,
+		:source_type, source_type,
+		:source_code, source_code,
+		:transport_tube_number, subfeeder_rec[:transport_tube_number].default(""),
+		:transport_core_number, subfeeder_rec[:transport_core_number].default(""),
+		:transport_code, transport_code,
+		:transport_status, transport_status,
+		:transport_remarks, status,
+		:destination_type, dest_type,
+		:destination_code, dest_code,
+		:destination_tube_number, dest_tube,
+		:destination_core_number, dest_core
+	)
+
+	# Add default null/empty fields
+	connection_data.add_all(_self.get_default_device_connection_fields())
+
+	>> connection_data
+_endmethod
+$

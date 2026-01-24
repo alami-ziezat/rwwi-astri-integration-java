@@ -1,4 +1,7 @@
 rwwi_mancore_plan_dialog
+rwwi_mancore_plan_booking
+rwwi_mancore_plan_tables
+rwwi_mancore_plan_query
 rwwi_mancore_plan_engine
 rwwi_mancore_plan_plugin
 test_astri_device_connection_api
