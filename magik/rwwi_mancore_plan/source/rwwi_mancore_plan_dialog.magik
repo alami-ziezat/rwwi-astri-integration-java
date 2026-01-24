@@ -402,7 +402,7 @@ _method rwwi_mancore_plan_dialog.build_table_ur2( parent )
 				 :model, _self,
 				 :label, "Target - FDT Splice Connectifity",
 				 :aspect, :table_ur2,
-				 :data_selector, :populate_ur2|()|,
+				 :data_selector, :populate_splitter_connection|()|,
 				 :selection_notifier, :table_selected_ur2|()|,
 				 :double_click_notifier,:|open_editor_ur2()|,
 				 :row_lines?, _true,
