@@ -1,0 +1,66 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## Example script for running OLT data migration
+## Copy and paste this into Magik prompt or compile with F7 in Emacs
+
+##
+## STEP 1: Get the database
+##
+ds << gis_program_manager.cached_dataset(:gis)
+write("Database: ", ds)
+$
+
+##
+## STEP 2: Create migrator instance
+##
+migrator << astri_data_migrator.new(ds)
+write("Migrator created")
+$
+
+##
+## STEP 3: Run migration (this will connect to PostgreSQL and migrate all OLTs)
+##
+migrator.migrate_olts()
+$
+
+##
+## STEP 4: Show statistics
+##
+migrator.show_statistics()
+$
+
+##
+## Optional: Verify migration results
+##
+ds << gis_program_manager.cached_dataset(:gis)
+mit_hub_col << ds.collections[:mit_hub]
+write("Total mit_hub objects after migration: ", mit_hub_col.size)
+$
+
+##
+## Optional: Check a specific OLT by olt_code
+##
+ds << gis_program_manager.cached_dataset(:gis)
+mit_hub_col << ds.collections[:mit_hub]
+
+# Replace "OLT-001" with actual olt_code from your data
+olt_code_to_check << "OLT-001"
+
+pred << predicate.eq(:olt_code, olt_code_to_check)
+olt << mit_hub_col.select(pred).an_element()
+
+_if olt _isnt _unset
+_then
+	write("Found OLT: ", olt.olt_code)
+	write("  Name: ", olt.name)
+	write("  Location: ", olt.location)
+	write("  IP Address: ", olt.ip_address)
+	write("  Brand: ", olt.olt_brand)
+	write("  Status: ", olt.olt_status)
+_else
+	write("OLT not found: ", olt_code_to_check)
+_endif
+$

@@ -1,0 +1,458 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Data Migrator - PostgreSQL to Smallworld OLT Migration
+## Migrates OLT data from PostgreSQL dim_olt_master_smallworld table to mit_hub collection
+## Simple implementation for Phase 1 (OLT migration only)
+
+remex(:astri_data_migrator)
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+##
+## Migrator for OLT data from PostgreSQL to Smallworld
+##
+def_slotted_exemplar(:astri_data_migrator,
+	{
+		{:database, _unset},           # Smallworld database
+		{:olt_col, _unset},            # mit_hub collection
+		{:transform, _unset},          # WGS84 to local coordinate transform
+		{:stats, _unset},              # Migration statistics
+		{:db_connection, _unset}       # PostgreSQL database connection
+	},
+	{})
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.new(a_database)
+	## Constructor
+	## Parameters:
+	##   a_database - Smallworld database (:gis)
+
+	>> _clone.init(a_database)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.init(a_database)
+	## Initialize migrator
+
+	.database << a_database
+	.olt_col << a_database.collections[:mit_hub]
+
+	# Initialize WGS84 to local coordinate transform
+	_local cs_wgs84 << coordinate_system.new_proj_long_lat(:wgs84, :degree)
+	_local cs_local << a_database.world.coordinate_system
+	.transform << transform.new_converting_cs_to_cs(cs_wgs84, cs_local)
+
+	# Initialize statistics
+	.stats << property_list.new_with(
+		:total, 0,
+		:created, 0,
+		:skipped, 0,
+		:errors, 0
+	)
+
+	>> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_olts()
+	## Main migration method
+	## Connects to PostgreSQL and migrates all OLT records to mit_hub
+
+	write("=== OLT Migration Started ===")
+	write("Connecting to PostgreSQL...")
+
+	_try _with cond
+		# Establish database connection
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) << rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+
+			_if _not is_connect?
+			_then
+				write("ERROR: Failed to connect to PostgreSQL")
+				_return .stats
+			_endif
+			write("Connected successfully")
+		_endif
+
+		# Query all OLT records using sql_select (following workorder engine pattern)
+		_local query << "SELECT * FROM smallworld.dim_olt_master_smallworld ORDER BY olt_code"
+		write("Executing query: ", query)
+
+		_local result_set << .db_connection.sql_select(query)
+
+		# Process each record with batch commit every 1000 records
+		_local batch_count << 0
+		_local commit_interval << 1000
+
+		_loop
+			_local rec << result_set.get()
+			_if rec _is _unset _then _leave _endif
+
+			.stats[:total] +<< 1
+			batch_count +<< 1
+
+			_self.process_olt_record(rec)
+
+			# Commit every 1000 records
+			_if batch_count >= commit_interval
+			_then
+				_try
+					.db_connection.commit()
+					write("  [COMMIT] Committed batch at record ", .stats[:total])
+					batch_count << 0
+				_when error
+					write("  WARNING: Batch commit failed at record ", .stats[:total])
+					.db_connection.rollback()
+				_endtry
+			_endif
+		_endloop
+
+		# Close result set
+		result_set.close()
+
+		# Final commit for remaining records
+		_if batch_count > 0
+		_then
+			_try
+				.db_connection.commit()
+				write("  [COMMIT] Final commit for ", batch_count, " records")
+			_when error
+				write("  WARNING: Final commit failed")
+				.db_connection.rollback()
+			_endtry
+		_endif
+
+		write("=== Migration Completed ===")
+		write("Total records: ", .stats[:total])
+		write("Created: ", .stats[:created])
+		write("Skipped (already exists): ", .stats[:skipped])
+		write("Errors: ", .stats[:errors])
+
+	_when error
+		write("ERROR during migration: ", cond.report_contents_string)
+
+		# Rollback transaction on error
+		_if .db_connection _isnt _unset
+		_then
+			_try
+				.db_connection.rollback()
+				write("Transaction rolled back due to error")
+			_when error
+				# Ignore rollback errors
+			_endtry
+		_endif
+	_endtry
+
+	# Close connection at end
+	_self.close_db_connection()
+
+	>> .stats
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.process_olt_record(rec)
+	## Process a single OLT record from PostgreSQL
+	## Parameters:
+	##   rec - result set record (property_list)
+
+	_try _with cond
+		# Get olt_code (required field)
+		_local olt_code << rec.olt_code.default("")
+		_if olt_code = "" _orif olt_code _is _unset
+		_then
+			write("  WARNING: Skipping record - missing olt_code")
+			.stats[:errors] +<< 1
+			_return
+		_endif
+
+		write("Processing OLT: ", olt_code)
+
+		# Check if OLT already exists by olt_code
+		_if _self.olt_exists?(olt_code)
+		_then
+			write("  SKIPPED: OLT already exists with olt_code: ", olt_code)
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Get coordinates (required fields - skip if NULL/missing)
+		_local lat << rec.latitude
+		_local lon << rec.longitude
+
+		_if lat _is _unset _orif lon _is _unset
+		_then
+			write("  SKIPPED: NULL or missing coordinates for ", olt_code)
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Also skip if coordinates are both zero (likely invalid data)
+		_if lat = 0.0 _andif lon = 0.0
+		_then
+			write("  SKIPPED: Invalid coordinates (0.0, 0.0) for ", olt_code)
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Transform coordinates to local coordinate system
+		_local coord << _self.transform_coordinate(lat, lon)
+		_if coord _is _unset
+		_then
+			write("  ERROR: Failed to transform coordinates for ", olt_code, " (lat: ", lat.write_string, ", lon: ", lon.write_string, ")")
+			.stats[:errors] +<< 1
+			_return
+		_endif
+
+		# Create OLT in mit_hub collection
+		_self.create_olt(rec, coord)
+
+	_when error
+		write("ERROR processing OLT record: ", cond.report_contents_string)
+		write("  OLT code: ", rec.olt_code.default("(unknown)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.olt_exists?(olt_code)
+	## Check if OLT already exists by olt_code
+	## Parameters:
+	##   olt_code - OLT code to check
+	## Returns:
+	##   _true if exists, _false otherwise
+
+	_local pred << predicate.eq(:olt_code, olt_code)
+	_local existing << .olt_col.select(pred)
+
+	>> existing.size > 0
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.transform_coordinate(latitude, longitude)
+	## Transform WGS84 latitude/longitude to local coordinate
+	## Parameters:
+	##   latitude - WGS84 latitude (numeric)
+	##   longitude - WGS84 longitude (numeric)
+	## Returns:
+	##   coordinate - local coordinate or _unset if invalid
+	##
+	## Note: Creates pseudo_point with world set (like parse_point_geometry)
+	##       to ensure coordinate is properly initialized
+
+	_dynamic !print_float_precision! << 16
+	_try
+		# Create WGS84 coordinate (longitude, latitude order)
+		_local wgs84_coord << coordinate.new(longitude, latitude)
+
+		# Convert to local coordinate system
+		_local local_coord << .transform.convert(wgs84_coord)
+
+		# Create pseudo_point and set world (following KMZ migrator pattern)
+		_local point << pseudo_point.new(local_coord)
+		point.world << .database.world
+
+		# Extract coordinate from pseudo_point
+		_local coord << point.as_coord()
+
+		_return coord
+	_when error
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.create_olt(rec, coord)
+	## Create OLT (mit_hub) object in Smallworld
+	## Parameters:
+	##   rec - PostgreSQL record (from dim_olt_master_smallworld)
+	##   coord - local coordinate
+	##
+	## Field Mapping (PostgreSQL → Smallworld):
+	##   olt_name → name
+	##   olt_label → olt
+	##   olt_code → olt_code
+	##   device_id → object_id
+	##   owner → asset_owner ("MYREPUBLIC" = "Owned", else "Third Party")
+	##   olt_area → region
+	##   bng_area → sub_region
+	##   bng_code → segment
+	##   olt_hostname → span
+	##   latitude/longitude → location (coord)
+	##
+	## Fields included in notes (pipe-delimited):
+	##   ip_address, nms_ip_address, olt_brand, type, olt_boss_code,
+	##   category, site_code, system_device_version,
+	##   is_backup_uplink_available, olt_tacacs_configured,
+	##   rfs_date, nms_integration_date, target_rfs_period
+
+	# Determine asset_owner based on owner field
+	_local asset_owner << _if rec.owner.default("").uppercase = "MYREPUBLIC"
+	                      _then >> "Owned"
+	                      _else >> "Third Party"
+	                      _endif
+
+	# Build notes from remaining fields (pipe-delimited)
+	# Only include fields that exist in dim_olt_master_smallworld table
+	_local notes_parts << rope.new()
+
+	# Network and device information
+	_if rec.ip_address _isnt _unset _andif rec.ip_address <> ""
+	_then notes_parts.add("IP: " + rec.ip_address)
+	_endif
+	_if rec.nms_ip_address _isnt _unset _andif rec.nms_ip_address <> ""
+	_then notes_parts.add("NMS IP: " + rec.nms_ip_address)
+	_endif
+	_if rec.olt_brand _isnt _unset _andif rec.olt_brand <> ""
+	_then notes_parts.add("Brand: " + rec.olt_brand)
+	_endif
+	_if rec.type _isnt _unset _andif rec.type <> ""
+	_then notes_parts.add("Type: " + rec.type)
+	_endif
+	_if rec.olt_boss_code _isnt _unset _andif rec.olt_boss_code <> ""
+	_then notes_parts.add("BOSS Code: " + rec.olt_boss_code)
+	_endif
+	_if rec.category _isnt _unset _andif rec.category <> ""
+	_then notes_parts.add("Category: " + rec.category)
+	_endif
+	_if rec.site_code _isnt _unset _andif rec.site_code <> ""
+	_then notes_parts.add("Site: " + rec.site_code)
+	_endif
+	_if rec.system_device_version _isnt _unset _andif rec.system_device_version <> ""
+	_then notes_parts.add("Version: " + rec.system_device_version)
+	_endif
+
+	# Boolean flags
+	_if rec.is_backup_uplink_available _isnt _unset
+	_then
+		_local backup_val << _if rec.is_backup_uplink_available = 1 _then >> "Yes" _else >> "No" _endif
+		notes_parts.add("Backup Uplink: " + backup_val)
+	_endif
+	_if rec.olt_tacacs_configured _isnt _unset
+	_then
+		_local tacacs_val << _if rec.olt_tacacs_configured = 1 _then >> "Yes" _else >> "No" _endif
+		notes_parts.add("TACACS: " + tacacs_val)
+	_endif
+
+	# Date fields
+	_if rec.rfs_date _isnt _unset _andif rec.rfs_date <> ""
+	_then notes_parts.add("RFS: " + rec.rfs_date.write_string)
+	_endif
+	_if rec.nms_integration_date _isnt _unset _andif rec.nms_integration_date <> ""
+	_then notes_parts.add("NMS Integration: " + rec.nms_integration_date.write_string)
+	_endif
+	_if rec.target_rfs_period _isnt _unset _andif rec.target_rfs_period <> ""
+	_then notes_parts.add("Target RFS: " + rec.target_rfs_period.write_string)
+	_endif
+
+	# Join notes with pipe delimiter
+	_local notes_value << ""
+	_if notes_parts.size > 0
+	_then
+		notes_value << notes_parts[1]
+		_for i _over 2.upto(notes_parts.size)
+		_loop
+			notes_value << notes_value + " | " + notes_parts[i]
+		_endloop
+	_endif
+
+	# Build property list for new OLT
+	# Map PostgreSQL fields to Smallworld mit_hub fields
+	_local prop_values << property_list.new_with(
+		# Core identification
+		:name, rec.olt_name.default(rec.olt_label.default("")),
+		:olt_code, rec.olt_code.default(""),
+		:olt, rec.olt_label.default(""),
+
+		# Location and geometry
+		:location, coord,
+
+		# Object metadata
+		:type, "Primary",
+		:object_id, rec.device_id.default(""),
+
+		# Status and ownership
+		:construction_status, "In Service",
+		:asset_owner, asset_owner,
+
+		# Location details
+		:annotation_2, "",
+		:region, rec.olt_area.default(""),
+		:sub_region, rec.bng_area.default(""),
+
+		# Network hierarchy
+		:cluster, _unset,
+		:ring_name, _unset,
+		:span, rec.olt_hostname.default(""),
+		:jalur, _unset, 
+		:segment, rec.bng_code.default(""),
+		:fttx_network_type, "Feeder",
+		:line_type, _unset,
+
+		# Organizational
+		:folders, _unset,
+		:project, _unset,
+
+		# Additional attributes
+		:notes, notes_value,
+		:floor_plan, _unset,
+		:mit_structure_point, _unset,
+		:stf_item_code, _unset,
+		:uuid, _unset
+	)
+
+	# Create record transaction
+	_local rec_trans << record_transaction.new_insert(.olt_col, prop_values)
+	_local result << rec_trans.run()
+
+	.stats[:created] +<< 1
+	write("  [OK] Created OLT: ", rec.olt_code)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.show_statistics()
+	## Display migration statistics
+
+	write("=== Migration Statistics ===")
+	write("Total records: ", .stats[:total])
+	write("Created: ", .stats[:created])
+	write("Skipped: ", .stats[:skipped])
+	write("Errors: ", .stats[:errors])
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.close_db_connection()
+	## Close PostgreSQL database connection
+	##
+	## Should be called when:
+	##   - Migration is complete
+	##   - Error occurs during migration
+	##   - Connection is no longer needed
+
+	_try
+		_if .db_connection _isnt _unset
+		_then
+			.db_connection.rollback()
+			.db_connection.close()
+			.db_connection << _unset
+			write("Database connection closed")
+		_endif
+	_when error
+		# Ignore cleanup errors
+		write("WARNING: Error closing database connection (ignored):", condition.report_contents_string)
+	_endtry
+_endmethod
+$
