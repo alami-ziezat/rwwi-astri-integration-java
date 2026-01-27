@@ -334,12 +334,12 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 		_if result[:success] = _true
 		_then
 			success_count +<< 1
-			write("  → SUCCESS: Booking created")
+			write("  >> SUCCESS: Booking created")
 		_else
 			error_count +<< 1
 			_local err_msg << result[:error_message].default("Unknown error")
 			errors.add(write_string("Pair ", i, ": ", err_msg))
-			write("  → ERROR: ", err_msg)
+			write("  >> ERROR: ", err_msg)
 		_endif
 	_endloop
 
@@ -487,32 +487,37 @@ $
 _pragma(classify_level=restricted)
 _private _method rwwi_mancore_plan_dialog.refresh_data_after_booking()
 	## Refresh data after successful booking operations
-	## Re-queries the API to get updated data for all tables
+	## Re-queries ALL tables (feeder, subfeeder, FDT) to show updated status
 
 	write("============================================")
 	write("REFRESHING DATA AFTER BOOKING")
 	write("============================================")
 
-	_if .current_infra_type _is _unset _orif .current_infra_code _is _unset
+	# Check if we have stored codes from get_mancore()
+	_if .current_feeder_code _is _unset _andif .current_subfeeder_code _is _unset
 	_then
-		write("Cannot refresh - no current infrastructure selected")
+		write("Cannot refresh - no infrastructure codes stored")
+		write("Please run 'Get Mancore' first before booking")
 		_return
 	_endif
 
-	# Re-query based on current infrastructure type
-	_if .current_infra_type _is :feeder
+	# Re-query all three tables with stored codes
+	_if .current_feeder_code _isnt _unset
 	_then
-		write("Re-querying feeder data...")
-		_self.query_and_populate_feeder_table(.current_infra_code)
-	_elif .current_infra_type _is :subfeeder
-	_then
-		write("Re-querying subfeeder data...")
-		_self.query_and_populate_subfeeder_table(.current_infra_code)
-	_else
-		write("Unknown infrastructure type: ", .current_infra_type)
+		write("Re-querying feeder table (code: ", .current_feeder_code, ")...")
+		_self.query_and_populate_feeder_table(.current_feeder_code)
 	_endif
 
-	write("Data refresh completed")
+	_if .current_subfeeder_code _isnt _unset
+	_then
+		write("Re-querying subfeeder table (code: ", .current_subfeeder_code, ")...")
+		_self.query_and_populate_subfeeder_table(.current_subfeeder_code)
+
+		write("Re-querying FDT/optical splitters table (code: ", .current_subfeeder_code, ")...")
+		_self.query_and_populate_optical_splitters(.current_subfeeder_code)
+	_endif
+
+	write("Data refresh completed - all tables updated")
 
 _endmethod
 $

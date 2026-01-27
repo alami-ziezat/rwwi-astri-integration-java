@@ -194,6 +194,10 @@ _method rwwi_mancore_plan_dialog.get_mancore()
 	write("Getting mancore plan (network type: ", network_type, ")...")
 	write("  Using subfeeder field value: ", subfeeder_field_value)
 
+	# Store codes for refresh after booking
+	.current_feeder_code << feeder_code
+	.current_subfeeder_code << subfeeder_field_value
+
 	# Call API for FEEDER and populate first table
 	_self.query_and_populate_feeder_table(feeder_code)
 
