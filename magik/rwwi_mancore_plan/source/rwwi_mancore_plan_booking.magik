@@ -140,7 +140,7 @@ _method rwwi_mancore_plan_dialog.booking_feeder()
 	_endif
 
 	# Execute booking
-	_self.execute_booking_feeder(work_order, feeder_records, subfeeder_records)
+	_self.execute_booking_feeder(work_order, feeder_records, subfeeder_records, status)
 
 _endmethod
 $
@@ -216,7 +216,7 @@ _method rwwi_mancore_plan_dialog.booking_subfeeder()
 	_endif
 
 	# Execute booking
-	_self.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records)
+	_self.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records, status)
 
 _endmethod
 $
@@ -275,19 +275,21 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, feeder_records, subfeeder_records)
+_private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, feeder_records, subfeeder_records, status)
 	## Execute booking feeder - pair Table 1 (IDLE) with Table 2 (any status)
 	## Parameters:
 	##   work_order - Work order number
 	##   feeder_records - Records from Table 1 (must be IDLE)
 	##   subfeeder_records - Records from Table 2 (can be IDLE or TAKEN)
+	##   status - Status from dropdown (BOOKED/RELEASE/ACTIVE)
 
 	write("============================================")
 	write("EXECUTING BOOKING FEEDER")
 	write("============================================")
 
-	# Validate counts match
-	_if feeder_records.size <> subfeeder_records.size
+	# Validate counts match (only for BOOKED status)
+	# For RELEASE and ACTIVE, skip pair validation
+	_if status = "BOOKED" _andif feeder_records.size <> subfeeder_records.size
 	_then
 		_local msg << write_string("Selected records count mismatch!", newline_char,
 					   "Table 1 (Feeder): ", feeder_records.size, newline_char,
@@ -297,14 +299,23 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 		_return
 	_endif
 
-	write("Pairing ", feeder_records.size, " records for booking feeder...")
+	# Determine how many pairs to process
+	# For RELEASE/ACTIVE with mismatched counts, process up to minimum size
+	_local pairs_to_process << feeder_records.size.min(subfeeder_records.size)
+
+	_if status <> "BOOKED" _andif feeder_records.size <> subfeeder_records.size
+	_then
+		write("Processing ", pairs_to_process, " pairs (minimum of ", feeder_records.size, " and ", subfeeder_records.size, ")")
+	_else
+		write("Pairing ", pairs_to_process, " records for booking feeder...")
+	_endif
 
 	# Process each pair
 	_local success_count << 0
 	_local error_count << 0
 	_local errors << rope.new()
 
-	_for i _over 1.upto(feeder_records.size)
+	_for i _over 1.upto(pairs_to_process)
 	_loop
 		_local feeder_rec << feeder_records[i]
 		_local subfeeder_rec << subfeeder_records[i]
@@ -365,12 +376,13 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method rwwi_mancore_plan_dialog.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records)
+_private _method rwwi_mancore_plan_dialog.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records, status)
 	## Execute booking subfeeder - pair Table 2 (any status) with Table 3
 	## Parameters:
 	##   work_order - Work order number
 	##   subfeeder_records - Records from Table 2 (can be IDLE or TAKEN)
 	##   fdt_records - Records from Table 3
+	##   status - Status from dropdown (BOOKED/RELEASE/ACTIVE)
 
 	write("============================================")
 	write("EXECUTING BOOKING SUBFEEDER")
@@ -379,12 +391,19 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_subfeeder(work_order, 
 	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
 	write("Table 3 (FDT): ", fdt_records.size, " records")
 
-	_if fdt_records.size > subfeeder_records.size
+	# Only validate pair counts for BOOKED status
+	# For RELEASE and ACTIVE, skip pair validation
+	_if status = "BOOKED"
 	_then
-		write("WARNING: Table 3 has more records than Table 2. Only first ", subfeeder_records.size, " FDT records will be used.")
-	_elif fdt_records.size < subfeeder_records.size
-	_then
-		write("NOTE: Table 3 has fewer records. Remaining Table 2 records will have empty destination fields.")
+		_if fdt_records.size > subfeeder_records.size
+		_then
+			write("WARNING: Table 3 has more records than Table 2. Only first ", subfeeder_records.size, " FDT records will be used.")
+		_elif fdt_records.size < subfeeder_records.size
+		_then
+			write("NOTE: Table 3 has fewer records. Remaining Table 2 records will have empty destination fields.")
+		_endif
+	_else
+		write("Status is ", status, " - skipping pair count validation")
 	_endif
 
 	write("Processing ", subfeeder_records.size, " records for booking subfeeder...")
