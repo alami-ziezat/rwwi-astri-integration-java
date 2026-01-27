@@ -276,72 +276,99 @@ $
 
 _pragma(classify_level=restricted)
 _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, feeder_records, subfeeder_records, status)
-	## Execute booking feeder - pair Table 1 (IDLE) with Table 2 (any status)
+	## Execute booking feeder
 	## Parameters:
 	##   work_order - Work order number
-	##   feeder_records - Records from Table 1 (must be IDLE)
-	##   subfeeder_records - Records from Table 2 (can be IDLE or TAKEN)
+	##   feeder_records - Records from Table 1 (Feeder)
+	##   subfeeder_records - Records from Table 2 (Subfeeder) - only used for BOOKED
 	##   status - Status from dropdown (BOOKED/RELEASE/ACTIVE)
+	##
+	## Behavior:
+	##   BOOKED: Process pairs (Table 1 paired with Table 2)
+	##   RELEASE/ACTIVE: Process all Table 1 records independently (no pairing)
 
 	write("============================================")
 	write("EXECUTING BOOKING FEEDER")
 	write("============================================")
 
-	# Validate counts match (only for BOOKED status)
-	# For RELEASE and ACTIVE, skip pair validation
-	_if status = "BOOKED" _andif feeder_records.size <> subfeeder_records.size
-	_then
-		_local msg << write_string("Selected records count mismatch!", newline_char,
-					   "Table 1 (Feeder): ", feeder_records.size, newline_char,
-					   "Table 2 (Subfeeder): ", subfeeder_records.size, newline_char,
-					   "Please select the same number of records in both tables.")
-		_self.show_message(msg)
-		_return
-	_endif
-
-	# Determine how many pairs to process
-	# For RELEASE/ACTIVE with mismatched counts, process up to minimum size
-	_local pairs_to_process << feeder_records.size.min(subfeeder_records.size)
-
-	_if status <> "BOOKED" _andif feeder_records.size <> subfeeder_records.size
-	_then
-		write("Processing ", pairs_to_process, " pairs (minimum of ", feeder_records.size, " and ", subfeeder_records.size, ")")
-	_else
-		write("Pairing ", pairs_to_process, " records for booking feeder...")
-	_endif
-
-	# Process each pair
+	# Process each record
 	_local success_count << 0
 	_local error_count << 0
 	_local errors << rope.new()
 
-	_for i _over 1.upto(pairs_to_process)
-	_loop
-		_local feeder_rec << feeder_records[i]
-		_local subfeeder_rec << subfeeder_records[i]
-
-		write("Pair ", i, ":")
-		write("  Table 1: Tube ", feeder_rec[:transport_tube_number], " Core ", feeder_rec[:transport_core_number])
-		write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
-
-		# Build connection data
-		_local connection_data << _self.build_booking_feeder_data(
-			work_order, feeder_rec, subfeeder_rec)
-
-		# Call API
-		_local result << .engine.add_device_connection(connection_data)
-
-		_if result[:success] = _true
+	_if status = "BOOKED"
+	_then
+		# BOOKED: Validate pair counts and process pairs
+		_if feeder_records.size <> subfeeder_records.size
 		_then
-			success_count +<< 1
-			write("  >> SUCCESS: Booking created")
-		_else
-			error_count +<< 1
-			_local err_msg << result[:error_message].default("Unknown error")
-			errors.add(write_string("Pair ", i, ": ", err_msg))
-			write("  >> ERROR: ", err_msg)
+			_local msg << write_string("Selected records count mismatch!", newline_char,
+						   "Table 1 (Feeder): ", feeder_records.size, newline_char,
+						   "Table 2 (Subfeeder): ", subfeeder_records.size, newline_char,
+						   "Please select the same number of records in both tables.")
+			_self.show_message(msg)
+			_return
 		_endif
-	_endloop
+
+		write("Processing ", feeder_records.size, " pairs for BOOKED status...")
+
+		_for i _over 1.upto(feeder_records.size)
+		_loop
+			_local feeder_rec << feeder_records[i]
+			_local subfeeder_rec << subfeeder_records[i]
+
+			write("Pair ", i, ":")
+			write("  Table 1: Tube ", feeder_rec[:transport_tube_number], " Core ", feeder_rec[:transport_core_number])
+			write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
+
+			# Build connection data
+			_local connection_data << _self.build_booking_feeder_data(
+				work_order, feeder_rec, subfeeder_rec)
+
+			# Call API
+			_local result << .engine.add_device_connection(connection_data)
+
+			_if result[:success] = _true
+			_then
+				success_count +<< 1
+				write("  >> SUCCESS: Booking created")
+			_else
+				error_count +<< 1
+				_local err_msg << result[:error_message].default("Unknown error")
+				errors.add(write_string("Pair ", i, ": ", err_msg))
+				write("  >> ERROR: ", err_msg)
+			_endif
+		_endloop
+
+	_else
+		# RELEASE/ACTIVE: Process all feeder records independently (no pairing)
+		write("Processing ", feeder_records.size, " records for ", status, " status (no pairing required)...")
+
+		_for i _over 1.upto(feeder_records.size)
+		_loop
+			_local feeder_rec << feeder_records[i]
+
+			write("Record ", i, ":")
+			write("  Table 1: Tube ", feeder_rec[:transport_tube_number], " Core ", feeder_rec[:transport_core_number])
+
+			# Build connection data (subfeeder_rec = _unset for RELEASE/ACTIVE)
+			_local connection_data << _self.build_booking_feeder_data(
+				work_order, feeder_rec, _unset)
+
+			# Call API
+			_local result << .engine.add_device_connection(connection_data)
+
+			_if result[:success] = _true
+			_then
+				success_count +<< 1
+				write("  >> SUCCESS: Booking created")
+			_else
+				error_count +<< 1
+				_local err_msg << result[:error_message].default("Unknown error")
+				errors.add(write_string("Record ", i, ": ", err_msg))
+				write("  >> ERROR: ", err_msg)
+			_endif
+		_endloop
+	_endif
 
 	write("============================================")
 	write("BOOKING FEEDER COMPLETED")
@@ -377,24 +404,33 @@ $
 
 _pragma(classify_level=restricted)
 _private _method rwwi_mancore_plan_dialog.execute_booking_subfeeder(work_order, subfeeder_records, fdt_records, status)
-	## Execute booking subfeeder - pair Table 2 (any status) with Table 3
+	## Execute booking subfeeder
 	## Parameters:
 	##   work_order - Work order number
-	##   subfeeder_records - Records from Table 2 (can be IDLE or TAKEN)
-	##   fdt_records - Records from Table 3
+	##   subfeeder_records - Records from Table 2 (Subfeeder)
+	##   fdt_records - Records from Table 3 (FDT) - only used for BOOKED
 	##   status - Status from dropdown (BOOKED/RELEASE/ACTIVE)
+	##
+	## Behavior:
+	##   BOOKED: Process pairs (Table 2 paired with Table 3)
+	##   RELEASE/ACTIVE: Process all Table 2 records independently (no pairing)
 
 	write("============================================")
 	write("EXECUTING BOOKING SUBFEEDER")
 	write("============================================")
 
 	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
-	write("Table 3 (FDT): ", fdt_records.size, " records")
 
-	# Only validate pair counts for BOOKED status
-	# For RELEASE and ACTIVE, skip pair validation
+	# Process each record
+	_local success_count << 0
+	_local error_count << 0
+	_local errors << rope.new()
+
 	_if status = "BOOKED"
 	_then
+		# BOOKED: Process pairs with FDT records
+		write("Table 3 (FDT): ", fdt_records.size, " records")
+
 		_if fdt_records.size > subfeeder_records.size
 		_then
 			write("WARNING: Table 3 has more records than Table 2. Only first ", subfeeder_records.size, " FDT records will be used.")
@@ -402,55 +438,78 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_subfeeder(work_order, 
 		_then
 			write("NOTE: Table 3 has fewer records. Remaining Table 2 records will have empty destination fields.")
 		_endif
+
+		write("Processing ", subfeeder_records.size, " records for BOOKED status...")
+
+		_for i _over 1.upto(subfeeder_records.size)
+		_loop
+			_local subfeeder_rec << subfeeder_records[i]
+			_local fdt_rec << _unset
+
+			# Get matching FDT record if available
+			_if i <= fdt_records.size
+			_then
+				fdt_rec << fdt_records[i]
+			_endif
+
+			write("Pair ", i, ":")
+			write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
+			_if fdt_rec _isnt _unset
+			_then
+				write("  Table 3: ", fdt_rec[:splitter_name].default(""), " - Dest Core ", fdt_rec[:dest_core_number].default(""))
+			_else
+				write("  Table 3: (no pair - destination will be empty)")
+			_endif
+
+			# Build connection data
+			_local connection_data << _self.build_booking_subfeeder_data(
+				work_order, subfeeder_rec, fdt_rec)
+
+			# Call API
+			_local result << .engine.add_device_connection(connection_data)
+
+			_if result[:success] = _true
+			_then
+				success_count +<< 1
+				write("  >> SUCCESS: Booking created")
+			_else
+				error_count +<< 1
+				_local err_msg << result[:error_message].default("Unknown error")
+				errors.add(write_string("Pair ", i, ": ", err_msg))
+				write("  >> ERROR: ", err_msg)
+			_endif
+		_endloop
+
 	_else
-		write("Status is ", status, " - skipping pair count validation")
+		# RELEASE/ACTIVE: Process all subfeeder records independently (no pairing)
+		write("Processing ", subfeeder_records.size, " records for ", status, " status (no pairing required)...")
+
+		_for i _over 1.upto(subfeeder_records.size)
+		_loop
+			_local subfeeder_rec << subfeeder_records[i]
+
+			write("Record ", i, ":")
+			write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
+
+			# Build connection data (fdt_rec = _unset for RELEASE/ACTIVE)
+			_local connection_data << _self.build_booking_subfeeder_data(
+				work_order, subfeeder_rec, _unset)
+
+			# Call API
+			_local result << .engine.add_device_connection(connection_data)
+
+			_if result[:success] = _true
+			_then
+				success_count +<< 1
+				write("  >> SUCCESS: Booking created")
+			_else
+				error_count +<< 1
+				_local err_msg << result[:error_message].default("Unknown error")
+				errors.add(write_string("Record ", i, ": ", err_msg))
+				write("  >> ERROR: ", err_msg)
+			_endif
+		_endloop
 	_endif
-
-	write("Processing ", subfeeder_records.size, " records for booking subfeeder...")
-
-	# Process each pair
-	_local success_count << 0
-	_local error_count << 0
-	_local errors << rope.new()
-
-	_for i _over 1.upto(subfeeder_records.size)
-	_loop
-		_local subfeeder_rec << subfeeder_records[i]
-		_local fdt_rec << _unset
-
-		# Get matching FDT record if available
-		_if i <= fdt_records.size
-		_then
-			fdt_rec << fdt_records[i]
-		_endif
-
-		write("Pair ", i, ":")
-		write("  Table 2: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
-		_if fdt_rec _isnt _unset
-		_then
-			write("  Table 3: ", fdt_rec[:splitter_name].default(""), " - Dest Core ", fdt_rec[:dest_core_number].default(""))
-		_else
-			write("  Table 3: (no pair - destination will be empty)")
-		_endif
-
-		# Build connection data
-		_local connection_data << _self.build_booking_subfeeder_data(
-			work_order, subfeeder_rec, fdt_rec)
-
-		# Call API
-		_local result << .engine.add_device_connection(connection_data)
-
-		_if result[:success] = _true
-		_then
-			success_count +<< 1
-			write("  → SUCCESS: Booking created")
-		_else
-			error_count +<< 1
-			_local err_msg << result[:error_message].default("Unknown error")
-			errors.add(write_string("Pair ", i, ": ", err_msg))
-			write("  → ERROR: ", err_msg)
-		_endif
-	_endloop
 
 	write("============================================")
 	write("BOOKING SUBFEEDER COMPLETED")
