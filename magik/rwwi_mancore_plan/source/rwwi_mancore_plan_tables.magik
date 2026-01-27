@@ -125,8 +125,16 @@ _method rwwi_mancore_plan_dialog.populate_feeder_connection_table( a_table )
 		a_table.add_cell(row, 9, {}, {:image, icon_status })
 
 		# Column 10: Destination Code
-		_local dest_code << a_rec[:destination_cluster_code]
-		a_table.add_cell(row, 10, {}, {:label, dest_code.default("").write_string })
+		# Priority: 1) destination_subfeeder_code, 2) destination_cluster_code
+		_local dest_code
+		_local subfeeder_code << a_rec[:destination_subfeeder_code].default("")
+		_if subfeeder_code <> "" _andif subfeeder_code _isnt _unset
+		_then
+			dest_code << subfeeder_code
+		_else
+			dest_code << a_rec[:destination_cluster_code].default("")
+		_endif
+		a_table.add_cell(row, 10, {}, {:label, dest_code.write_string })
 
 		# Column 11: Destination Tube Number
 		_local dest_tube << a_rec[:destination_tube_number]
@@ -137,8 +145,16 @@ _method rwwi_mancore_plan_dialog.populate_feeder_connection_table( a_table )
 		a_table.add_cell(row, 12, {}, {:label, dest_core.default("").write_string, :row_alignment, :centre })
 
 		# Column 13: Destination Name
-		_local dest_name << a_rec[:destination_cluster_name]
-		a_table.add_cell(row, 13, {}, {:label, dest_name.default("").write_string })
+		# Priority: 1) destination_subfeeder_name, 2) destination_cluster_name
+		_local dest_name
+		_local subfeeder_name << a_rec[:destination_subfeeder_name].default("")
+		_if subfeeder_name <> "" _andif subfeeder_name _isnt _unset
+		_then
+			dest_name << subfeeder_name
+		_else
+			dest_name << a_rec[:destination_cluster_name].default("")
+		_endif
+		a_table.add_cell(row, 13, {}, {:label, dest_name.write_string })
 
 		row +<< 1
 	_endloop
@@ -295,8 +311,16 @@ _method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
 		a_table.add_cell(row, 9, {}, {:image, icon_status })
 
 		# Column 10: Destination Code
-		_local dest_code << a_rec[:destination_cluster_code]
-		a_table.add_cell(row, 10, {}, {:label, dest_code.default("").write_string })
+		# Priority: 1) destination_subfeeder_code, 2) destination_cluster_code
+		_local dest_code
+		_local subfeeder_code << a_rec[:destination_subfeeder_code].default("")
+		_if subfeeder_code <> "" _andif subfeeder_code _isnt _unset
+		_then
+			dest_code << subfeeder_code
+		_else
+			dest_code << a_rec[:destination_cluster_code].default("")
+		_endif
+		a_table.add_cell(row, 10, {}, {:label, dest_code.write_string })
 
 		# Column 11: Destination Tube Number
 		_local dest_tube << a_rec[:destination_tube_number]
@@ -307,8 +331,16 @@ _method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
 		a_table.add_cell(row, 12, {}, {:label, dest_core.default("").write_string, :row_alignment, :centre })
 
 		# Column 13: Destination Name
-		_local dest_name << a_rec[:destination_cluster_name]
-		a_table.add_cell(row, 13, {}, {:label, dest_name.default("").write_string })
+		# Priority: 1) destination_subfeeder_name, 2) destination_cluster_name
+		_local dest_name
+		_local subfeeder_name << a_rec[:destination_subfeeder_name].default("")
+		_if subfeeder_name <> "" _andif subfeeder_name _isnt _unset
+		_then
+			dest_name << subfeeder_name
+		_else
+			dest_name << a_rec[:destination_cluster_name].default("")
+		_endif
+		a_table.add_cell(row, 13, {}, {:label, dest_name.write_string })
 
 		row +<< 1
 	_endloop
