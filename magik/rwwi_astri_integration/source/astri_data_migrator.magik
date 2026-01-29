@@ -7,19 +7,21 @@ $
 ## Migrates data from PostgreSQL to Smallworld GIS:
 ##   - OLT data: dim_olt_master_smallworld → mit_hub
 ##   - FEEDER data: dim_feeder_master_smallworld → master_feeder
+##   - SUBFEEDER data: dim_subfeeder_master_smallworld → master_subfeeder
 
 remex(:astri_data_migrator)
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 ##
-## Migrator for OLT and FEEDER data from PostgreSQL to Smallworld
+## Migrator for OLT, FEEDER, and SUBFEEDER data from PostgreSQL to Smallworld
 ##
 def_slotted_exemplar(:astri_data_migrator,
 	{
 		{:database, _unset},           # Smallworld database
 		{:olt_col, _unset},            # mit_hub collection
 		{:feeder_col, _unset},         # master_feeder collection
+		{:subfeeder_col, _unset},      # master_subfeeder collection
 		{:transform, _unset},          # WGS84 to local coordinate transform
 		{:stats, _unset},              # Migration statistics
 		{:db_connection, _unset}       # PostgreSQL database connection
@@ -44,6 +46,7 @@ _private _method astri_data_migrator.init(a_database)
 	.database << a_database
 	.olt_col << a_database.collections[:mit_hub]
 	.feeder_col << a_database.collections[:master_feeder]
+	.subfeeder_col << a_database.collections[:master_subfeeder]
 	ace_view << gis_program_manager.ace_view
 
 	# Initialize WGS84 to local coordinate transform
@@ -268,10 +271,6 @@ _private _method astri_data_migrator.transform_coordinate(latitude, longitude)
 		_local point << pseudo_point.new(local_coord)
 		point.world << .database.world
 		_return point
-		# Extract coordinate from pseudo_point
-		_local coord << point.as_coord()
-
-		_return coord
 	_when error
 		_return _unset
 	_endtry
@@ -678,7 +677,7 @@ _private _method astri_data_migrator.create_feeder(rec)
 
 		# Status and dates
 		:rfs_date, rec.rfs_date.default(_unset),
-		:feeder_status, rec.feeder_status.default(""),
+		:feeder_status, "NEW",
 
 		# KMZ UUIDs and verification
 		:abd_kmz_uuid, rec.abd_kmz_uuid.default(""),
@@ -698,5 +697,242 @@ _private _method astri_data_migrator.create_feeder(rec)
 
 	.stats[:created] +<< 1
 	write("  [OK] Created FEEDER: ", rec.feeder_code)
+_endmethod
+$
+
+##
+## SUBFEEDER MIGRATION METHODS
+##
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_subfeeders()
+	## Main subfeeder migration method
+	## Connects to PostgreSQL and migrates all SUBFEEDER records to master_subfeeder
+
+	write("=== SUBFEEDER Migration Started ===")
+	write("Connecting to PostgreSQL...")
+
+	# Reset statistics
+	.stats[:total] << 0
+	.stats[:created] << 0
+	.stats[:skipped] << 0
+	.stats[:errors] << 0
+
+	_try _with cond
+		# Establish database connection
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) << rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+
+			_if _not is_connect?
+			_then
+				write("ERROR: Failed to connect to PostgreSQL")
+				_return .stats
+			_endif
+			write("Connected successfully")
+		_endif
+
+		# Query all SUBFEEDER records using sql_select
+		_local query << "SELECT * FROM smallworld.dim_subfeeder_master_smallworld ORDER BY subfeeder_code"
+		write("Executing query: ", query)
+
+		_local result_set << .db_connection.sql_select(query)
+
+		# Process each record with batch commit every 1000 records
+		_local batch_count << 0
+		_local commit_interval << 1000
+
+		_loop
+			_local rec << result_set.get()
+			_if rec _is _unset _then _leave _endif
+
+			.stats[:total] +<< 1
+			batch_count +<< 1
+
+			_self.process_subfeeder_record(rec)
+
+			# Commit every 1000 records
+			_if batch_count >= commit_interval
+			_then
+				_try
+					.db_connection.commit()
+					write("  [COMMIT] Committed batch at record ", .stats[:total])
+					batch_count << 0
+				_when error
+					write("  WARNING: Batch commit failed at record ", .stats[:total])
+					.db_connection.rollback()
+				_endtry
+			_endif
+		_endloop
+
+		# Close result set
+		result_set.close()
+
+		# Final commit for remaining records
+		_if batch_count > 0
+		_then
+			_try
+				.db_connection.commit()
+				write("  [COMMIT] Final commit for ", batch_count, " records")
+			_when error
+				write("  WARNING: Final commit failed")
+				.db_connection.rollback()
+			_endtry
+		_endif
+
+		write("=== SUBFEEDER Migration Completed ===")
+		write("Total records: ", .stats[:total])
+		write("Created: ", .stats[:created])
+		write("Skipped (already exists): ", .stats[:skipped])
+		write("Errors: ", .stats[:errors])
+
+	_when error
+		write("ERROR during migration: ", cond.report_contents_string)
+
+		# Rollback transaction on error
+		_if .db_connection _isnt _unset
+		_then
+			_try
+				.db_connection.rollback()
+				write("Transaction rolled back due to error")
+			_when error
+				# Ignore rollback errors
+			_endtry
+		_endif
+	_endtry
+
+	# Close connection at end
+	_self.close_db_connection()
+
+	>> .stats
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.process_subfeeder_record(rec)
+	## Process a single SUBFEEDER record from PostgreSQL
+	## Parameters:
+	##   rec - result set record (property_list)
+
+	_try _with cond
+		# Get subfeeder_code (required field)
+		_local subfeeder_code << rec.subfeeder_code.default("")
+		_if subfeeder_code = "" _orif subfeeder_code _is _unset
+		_then
+			write("  WARNING: Skipping record - missing subfeeder_code")
+			.stats[:errors] +<< 1
+			_return
+		_endif
+
+		write("Processing SUBFEEDER: ", subfeeder_code)
+
+		# Check if SUBFEEDER already exists by subfeeder_code
+		_if _self.subfeeder_exists?(subfeeder_code)
+		_then
+			write("  SKIPPED: SUBFEEDER already exists with subfeeder_code: ", subfeeder_code)
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Create SUBFEEDER in master_subfeeder collection
+		_self.create_subfeeder(rec)
+
+	_when error
+		write("ERROR processing SUBFEEDER record: ", cond.report_contents_string)
+		write("  SUBFEEDER code: ", rec.subfeeder_code.default("(unknown)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.subfeeder_exists?(subfeeder_code)
+	## Check if SUBFEEDER already exists by subfeeder_code
+	## Parameters:
+	##   subfeeder_code - SUBFEEDER code to check
+	## Returns:
+	##   _true if exists, _false otherwise
+
+	_local pred << predicate.eq(:subfeeder_code, subfeeder_code)
+	_local existing << .subfeeder_col.select(pred)
+
+	>> existing.size > 0
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_data_migrator.create_subfeeder(rec)
+	## Create SUBFEEDER (master_subfeeder) object in Smallworld
+	## Parameters:
+	##   rec - PostgreSQL record (from dim_subfeeder_master_smallworld)
+	##
+	## Field Mapping (PostgreSQL → Smallworld):
+	##   subfeeder_id → subfeeder_id and id
+	##   subfeeder_code → subfeeder_code
+	##   subfeeder_name → subfeeder_name
+	##   topology → topology
+	##   region → region
+	##   vendor_name → vendor_name
+	##   vendor_alias → vendor_alias
+	##   subfeeder_length → subfeeder_length
+	##   rfs_date → rfs_date
+	##   subfeeder_status → subfeeder_status
+	##   abd_kmz_uuid → abd_kmz_uuid
+	##   apd_kmz_uuid → apd_kmz_uuid
+	##   abd_kmz_verified_at → abd_kmz_verified_at
+	##   apd_kmz_verified_at → apd_kmz_verified_at
+	##   created_timestamp → created_timestamp
+	##   updated_timestamp → updated_timestamp
+	##   synced_timestamp → synced_timestamp
+	##   subfeeder_cable_type → subfeeder_cable_type
+	##   feeder_code → feeder_code
+	##   olt_code → olt_code
+
+	# Build property list for new SUBFEEDER
+	_local prop_values << property_list.new_with(
+		# Core identification
+		:id, rec.subfeeder_id.default(_unset),
+		:subfeeder_id, rec.subfeeder_id.default(_unset),
+		:subfeeder_code, rec.subfeeder_code.default(""),
+		:subfeeder_name, rec.subfeeder_name.default(""),
+		:olt_code, rec.olt_code.default(""),
+		:feeder_code, rec.feeder_code.default(""),
+
+		# Network details
+		:topology, rec.topology.default(""),
+		:region, rec.region.default(""),
+
+		# Vendor information
+		:vendor_name, rec.vendor_name.default(""),
+		:vendor_alias, rec.vendor_alias.default(""),
+
+		# Technical specifications
+		:subfeeder_length, rec.subfeeder_length.default(_unset),
+		:subfeeder_cable_type, rec.subfeeder_cable_type.default(""),
+		:subfeeder_capacity, _unset,
+
+		# Status and dates
+		:rfs_date, rec.rfs_date.default(_unset),
+		:subfeeder_status, "NEW",
+
+		# KMZ UUIDs and verification
+		:abd_kmz_uuid, rec.abd_kmz_uuid.default(""),
+		:apd_kmz_uuid, rec.apd_kmz_uuid.default(""),
+		:abd_kmz_verified_at, rec.abd_kmz_verified_at.default(_unset),
+		:apd_kmz_verified_at, rec.apd_kmz_verified_at.default(_unset),
+
+		# Timestamps
+		:created_timestamp, rec.created_timestamp.default(_unset),
+		:updated_timestamp, rec.updated_timestamp.default(_unset),
+		:synced_timestamp, rec.synced_timestamp.default(_unset)
+	)
+
+	# Create record transaction
+	_local rec_trans << record_transaction.new_insert(.subfeeder_col, prop_values)
+	_local result << rec_trans.run()
+
+	.stats[:created] +<< 1
+	write("  [OK] Created SUBFEEDER: ", rec.subfeeder_code)
 _endmethod
 $
