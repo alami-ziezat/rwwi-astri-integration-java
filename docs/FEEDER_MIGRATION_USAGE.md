@@ -106,7 +106,7 @@ PostgreSQL (dim_feeder_master_smallworld) → Smallworld (master_feeder)
 | feeder_length | feeder_length | Number | Length in meters |
 | feeder_capacity | feeder_capacity | Number | Capacity count |
 | rfs_date | rfs_date | DateTime | Ready for service date |
-| feeder_status | feeder_status | String | Status (Active/Inactive/etc) |
+| feeder_status | feeder_status | String | **Set to "NEW" for initial data** |
 | abd_kmz_uuid | abd_kmz_uuid | String | As-Built Design KMZ UUID |
 | apd_kmz_uuid | apd_kmz_uuid | String | As-Plan Design KMZ UUID |
 | abd_kmz_verified_at | abd_kmz_verified_at | DateTime | ABD KMZ verification timestamp |
@@ -118,6 +118,9 @@ PostgreSQL (dim_feeder_master_smallworld) → Smallworld (master_feeder)
 **Smallworld-only Fields (not mapped):**
 - `ds!version` - Version control (managed by Smallworld)
 - `int!info_flags` - Internal flags (managed by Smallworld)
+
+**Special Handling:**
+- `feeder_status` is **always set to "NEW"** regardless of PostgreSQL value to identify initial migration data
 
 ---
 
@@ -196,7 +199,18 @@ _then
 _endif
 ```
 
-**3. Visual Verification**
+**3. Verify Status is "NEW"**
+```magik
+ds << gis_program_manager.cached_dataset(:gis)
+feeder_col << ds.collections[:master_feeder]
+
+# Count feeders with status "NEW"
+pred << predicate.eq(:feeder_status, "NEW")
+new_feeders << feeder_col.select(pred)
+write("Feeders with status 'NEW': ", new_feeders.size)
+```
+
+**4. Visual Verification**
 Query and inspect feeder records in your GIS application.
 
 ---

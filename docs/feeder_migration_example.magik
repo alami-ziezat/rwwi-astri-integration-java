@@ -64,3 +64,14 @@ _else
 	write("FEEDER not found: ", feeder_code_to_check)
 _endif
 $
+
+##
+## Optional: Verify all migrated feeders have status "NEW"
+##
+ds << gis_program_manager.cached_dataset(:gis)
+feeder_col << ds.collections[:master_feeder]
+
+pred << predicate.eq(:feeder_status, "NEW")
+new_feeders << feeder_col.select(pred)
+write("Feeders with status 'NEW': ", new_feeders.size)
+$
