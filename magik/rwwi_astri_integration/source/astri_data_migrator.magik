@@ -71,31 +71,31 @@ $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method astri_data_migrator.migrate_all()
-	## Run all migrations in the correct order
-	## Executes: OLT → FEEDER → SUBFEEDER → CLUSTER
+	## Run all master data migrations (excluding OLT)
+	## Executes: FEEDER → SUBFEEDER → CLUSTER
 	##
-	## This is the recommended method for complete data migration.
+	## Note: OLT migration is excluded because it handles geometry objects
+	## and should be run separately using migrate_olts()
+	##
+	## This is the recommended method for master data migration.
 	## Returns: property_list with statistics for all migrations
 
 	write("===========================================================")
-	write("=== COMPLETE DATA MIGRATION - ALL TABLES ===")
+	write("=== MASTER DATA MIGRATION (FEEDER, SUBFEEDER, CLUSTER) ===")
 	write("===========================================================")
 	write("")
 	write("Migration Order:")
-	write("  1. OLT (Parent records)")
-	write("  2. FEEDER (References OLT)")
-	write("  3. SUBFEEDER (References FEEDER and OLT)")
-	write("  4. CLUSTER (References SUBFEEDER, FEEDER, and OLT)")
+	write("  1. FEEDER (master_feeder)")
+	write("  2. SUBFEEDER (master_subfeeder)")
+	write("  3. CLUSTER (master_cluster)")
+	write("")
+	write("Note: OLT migration excluded (geometry objects - run separately)")
 	write("")
 	write("===========================================================")
 	write("")
 
 	# Track overall statistics
 	_local overall_stats << property_list.new_with(
-		:olt_total, 0,
-		:olt_created, 0,
-		:olt_skipped, 0,
-		:olt_errors, 0,
 		:feeder_total, 0,
 		:feeder_created, 0,
 		:feeder_skipped, 0,
@@ -110,27 +110,9 @@ _method astri_data_migrator.migrate_all()
 		:cluster_errors, 0
 	)
 
-	# Phase 1: OLT Migration
+	# Phase 1: FEEDER Migration
 	_try
-		write("PHASE 1/4: Starting OLT migration...")
-		write("")
-		_local olt_stats << _self.migrate_olts()
-		overall_stats[:olt_total] << olt_stats[:total]
-		overall_stats[:olt_created] << olt_stats[:created]
-		overall_stats[:olt_skipped] << olt_stats[:skipped]
-		overall_stats[:olt_errors] << olt_stats[:errors]
-		write("")
-		write("PHASE 1/4: OLT migration completed")
-		write("")
-	_when error
-		write("ERROR in PHASE 1/4 (OLT migration): ", condition.report_contents_string)
-		write("Continuing with next phase...")
-		write("")
-	_endtry
-
-	# Phase 2: FEEDER Migration
-	_try
-		write("PHASE 2/4: Starting FEEDER migration...")
+		write("PHASE 1/3: Starting FEEDER migration...")
 		write("")
 		_local feeder_stats << _self.migrate_feeders()
 		overall_stats[:feeder_total] << feeder_stats[:total]
@@ -138,17 +120,17 @@ _method astri_data_migrator.migrate_all()
 		overall_stats[:feeder_skipped] << feeder_stats[:skipped]
 		overall_stats[:feeder_errors] << feeder_stats[:errors]
 		write("")
-		write("PHASE 2/4: FEEDER migration completed")
+		write("PHASE 1/3: FEEDER migration completed")
 		write("")
 	_when error
-		write("ERROR in PHASE 2/4 (FEEDER migration): ", condition.report_contents_string)
+		write("ERROR in PHASE 1/3 (FEEDER migration): ", condition.report_contents_string)
 		write("Continuing with next phase...")
 		write("")
 	_endtry
 
-	# Phase 3: SUBFEEDER Migration
+	# Phase 2: SUBFEEDER Migration
 	_try
-		write("PHASE 3/4: Starting SUBFEEDER migration...")
+		write("PHASE 2/3: Starting SUBFEEDER migration...")
 		write("")
 		_local subfeeder_stats << _self.migrate_subfeeders()
 		overall_stats[:subfeeder_total] << subfeeder_stats[:total]
@@ -156,17 +138,17 @@ _method astri_data_migrator.migrate_all()
 		overall_stats[:subfeeder_skipped] << subfeeder_stats[:skipped]
 		overall_stats[:subfeeder_errors] << subfeeder_stats[:errors]
 		write("")
-		write("PHASE 3/4: SUBFEEDER migration completed")
+		write("PHASE 2/3: SUBFEEDER migration completed")
 		write("")
 	_when error
-		write("ERROR in PHASE 3/4 (SUBFEEDER migration): ", condition.report_contents_string)
+		write("ERROR in PHASE 2/3 (SUBFEEDER migration): ", condition.report_contents_string)
 		write("Continuing with next phase...")
 		write("")
 	_endtry
 
-	# Phase 4: CLUSTER Migration
+	# Phase 3: CLUSTER Migration
 	_try
-		write("PHASE 4/4: Starting CLUSTER migration...")
+		write("PHASE 3/3: Starting CLUSTER migration...")
 		write("")
 		_local cluster_stats << _self.migrate_clusters()
 		overall_stats[:cluster_total] << cluster_stats[:total]
@@ -174,23 +156,17 @@ _method astri_data_migrator.migrate_all()
 		overall_stats[:cluster_skipped] << cluster_stats[:skipped]
 		overall_stats[:cluster_errors] << cluster_stats[:errors]
 		write("")
-		write("PHASE 4/4: CLUSTER migration completed")
+		write("PHASE 3/3: CLUSTER migration completed")
 		write("")
 	_when error
-		write("ERROR in PHASE 4/4 (CLUSTER migration): ", condition.report_contents_string)
+		write("ERROR in PHASE 3/3 (CLUSTER migration): ", condition.report_contents_string)
 		write("")
 	_endtry
 
 	# Display overall summary
 	write("===========================================================")
-	write("=== MIGRATION SUMMARY - ALL TABLES ===")
+	write("=== MIGRATION SUMMARY - MASTER DATA ===")
 	write("===========================================================")
-	write("")
-	write("OLT:")
-	write("  Total: ", overall_stats[:olt_total])
-	write("  Created: ", overall_stats[:olt_created])
-	write("  Skipped: ", overall_stats[:olt_skipped])
-	write("  Errors: ", overall_stats[:olt_errors])
 	write("")
 	write("FEEDER:")
 	write("  Total: ", overall_stats[:feeder_total])
@@ -211,13 +187,13 @@ _method astri_data_migrator.migrate_all()
 	write("  Errors: ", overall_stats[:cluster_errors])
 	write("")
 	write("GRAND TOTAL:")
-	write("  Total Records: ", overall_stats[:olt_total] + overall_stats[:feeder_total] +
+	write("  Total Records: ", overall_stats[:feeder_total] +
 		overall_stats[:subfeeder_total] + overall_stats[:cluster_total])
-	write("  Created: ", overall_stats[:olt_created] + overall_stats[:feeder_created] +
+	write("  Created: ", overall_stats[:feeder_created] +
 		overall_stats[:subfeeder_created] + overall_stats[:cluster_created])
-	write("  Skipped: ", overall_stats[:olt_skipped] + overall_stats[:feeder_skipped] +
+	write("  Skipped: ", overall_stats[:feeder_skipped] +
 		overall_stats[:subfeeder_skipped] + overall_stats[:cluster_skipped])
-	write("  Errors: ", overall_stats[:olt_errors] + overall_stats[:feeder_errors] +
+	write("  Errors: ", overall_stats[:feeder_errors] +
 		overall_stats[:subfeeder_errors] + overall_stats[:cluster_errors])
 	write("")
 	write("===========================================================")
