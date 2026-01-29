@@ -550,6 +550,17 @@ _method rwwi_mancore_plan_dialog.get_rwo()
 				_endtry
 			_endif
 
+			# Populate feeder field with cable's feeder_code (if available)
+			_if feeder_code <> "" _andif feeder_code _isnt _unset
+			_then
+				.items[:feeder_field].value << feeder_code
+				write("Populated feeder field from cable feeder_code: ", feeder_code)
+			_else
+				# Clear feeder field if no feeder_code
+				.items[:feeder_field].value << ""
+				write("Feeder field cleared (no feeder_code in cable)")
+			_endif
+
 			# Enable get_mancore button for all network types (feeder, subfeeder, cluster)
 			_if network_type = "feeder" _orif network_type = "subfeeder" _orif network_type = "cluster"
 			_then
