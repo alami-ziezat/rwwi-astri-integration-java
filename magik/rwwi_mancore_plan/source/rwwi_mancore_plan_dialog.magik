@@ -188,6 +188,14 @@ _method rwwi_mancore_plan_dialog.build_toolbar( parent )
 						  :value, "100",
 						  :tooltip, "Limit for device connection query (default: fiber count)" )
 
+	sw_label_item.new( file_toolbar, "Feeder:" )
+
+	.items[:feeder_field] << sw_text_item.new( file_toolbar,
+						  :display_length, 15,
+						  :model, _self,
+						  :value, "",
+						  :tooltip, "Feeder code (editable, overrides cable feeder_code if not empty)" )
+
 	sw_label_item.new( file_toolbar, "Subfeeder:" )
 
 	.items[:subfeeder_field] << sw_text_item.new( file_toolbar,

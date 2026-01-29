@@ -189,10 +189,22 @@ _method rwwi_mancore_plan_dialog.get_mancore()
 
 	_local cab << .selected_rwo
 	_local network_type << cab.sheath_network_type.default("").lowercase
-	_local feeder_code << cab.feeder_code.default("")
+
+	# Feeder code: Use feeder_field value if not empty, otherwise use cable's feeder_code
+	_local feeder_field_value << .items[:feeder_field].value.default("")
+	_local feeder_code
+	_if feeder_field_value <> "" _andif feeder_field_value _isnt _unset
+	_then
+		feeder_code << feeder_field_value
+		write("Using feeder code from feeder field: ", feeder_code)
+	_else
+		feeder_code << cab.feeder_code.default("")
+		write("Using feeder code from cable: ", feeder_code)
+	_endif
 
 	write("Getting mancore plan (network type: ", network_type, ")...")
-	write("  Using subfeeder field value: ", subfeeder_field_value)
+	write("  Feeder code: ", feeder_code)
+	write("  Subfeeder code: ", subfeeder_field_value)
 
 	# Store codes for refresh after booking
 	.current_feeder_code << feeder_code

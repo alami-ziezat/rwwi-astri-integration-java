@@ -17,12 +17,14 @@ _private _method rwwi_mancore_plan_dialog.get_homepass_and_cores()
 	## Returns:
 	##   homepass_str    - String value from field
 	##   homepass_count  - Numeric value
-	##   cores_to_book   - Calculated cores (homepass/64 rounded)
+	##   cores_to_book   - Calculated cores (homepass/64 rounded UP)
+	##
+	## Note: Uses ceiling to round up (e.g., 8.1 → 9, not 8)
 	##
 
 	_local homepass_str << .items[:homepass_field].value.default("0")
 	_local homepass_count << homepass_str.as_number().default(0)
-	_local cores_to_book << (homepass_count.as_float / 64).rounded
+	_local cores_to_book << (homepass_count.as_float / 64).ceiling
 
 	>> homepass_str, homepass_count, cores_to_book
 _endmethod
@@ -105,18 +107,29 @@ _method rwwi_mancore_plan_dialog.booking_feeder()
 	_local feeder_selection << .feeder_table_selection
 	_local subfeeder_selection << .subfeeder_table_selection
 
-	# Get all records from feeder table (regardless of status)
-	_local feeder_records << _self.get_records_from_selection(feeder_selection)
-
-	# Get all records from subfeeder table (regardless of status)
-	_local subfeeder_records << _self.get_records_from_selection(subfeeder_selection)
-
-	write("Table 1 (Feeder): ", feeder_records.size, " records")
-	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
-
 	# Get status
 	_local status << .items[:status_field].value.default("BOOKED")
 	write("Status: ", status)
+
+	# Get records based on status
+	_local feeder_records
+	_local subfeeder_records
+
+	_if status = "BOOKED"
+	_then
+		# For BOOKED status: Filter out TAKEN->ACTIVE records, allow TAKEN->BOOKED and RELEASE
+		feeder_records << _self.get_bookable_records_from_selection(feeder_selection)
+		subfeeder_records << _self.get_bookable_records_from_selection(subfeeder_selection)
+		write("Using bookable records filter (excludes TAKEN->ACTIVE)")
+	_else
+		# For RELEASE/ACTIVE status: Get all selected records
+		feeder_records << _self.get_records_from_selection(feeder_selection)
+		subfeeder_records << _self.get_records_from_selection(subfeeder_selection)
+		write("Using all selected records")
+	_endif
+
+	write("Table 1 (Feeder): ", feeder_records.size, " records")
+	write("Table 2 (Subfeeder): ", subfeeder_records.size, " records")
 
 	# Validate against homepass (only for BOOKED status)
 	_if status = "BOOKED"
@@ -246,6 +259,65 @@ _private _method rwwi_mancore_plan_dialog.get_idle_records_from_selection(select
 	_endloop
 
 	>> idle_records
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.get_bookable_records_from_selection(selection)
+	## Extract records that can be booked for BOOKED status
+	## Parameters:
+	##   selection - Table selection object
+	## Returns:
+	##   rope of records that can be booked:
+	##     - IDLE records (transport_status != "TAKEN")
+	##     - TAKEN -> BOOKED records (transport_status = "TAKEN" AND transport_remarks = "BOOKED")
+	##     - RELEASE records (transport_status = "RELEASE")
+	##   Excludes:
+	##     - TAKEN -> ACTIVE records (transport_status = "TAKEN" AND transport_remarks = "ACTIVE")
+
+	_local bookable_records << rope.new()
+
+	_if selection _is _unset
+	_then
+		_return bookable_records
+	_endif
+
+	_local records << selection.get_row_data_from_selection()
+	_for rec _over records.fast_elements()
+	_loop
+		_local t_status << rec[:transport_status].default("")
+		_local t_remarks << rec[:transport_remarks].default("")
+
+		# Allow IDLE records (not TAKEN)
+		_if t_status <> "TAKEN"
+		_then
+			bookable_records.add(rec)
+			_continue
+		_endif
+
+		# Allow TAKEN -> BOOKED (can re-book)
+		_if t_status = "TAKEN" _andif t_remarks = "BOOKED"
+		_then
+			bookable_records.add(rec)
+			_continue
+		_endif
+
+		# Block TAKEN -> ACTIVE (cannot book over active connections)
+		_if t_status = "TAKEN" _andif t_remarks = "ACTIVE"
+		_then
+			# Skip this record - cannot book over ACTIVE
+			write("  Skipping TAKEN->ACTIVE record: Tube ", rec[:transport_tube_number], " Core ", rec[:transport_core_number])
+			_continue
+		_endif
+
+		# For any other TAKEN status (including blank remarks), allow booking
+		_if t_status = "TAKEN"
+		_then
+			bookable_records.add(rec)
+		_endif
+	_endloop
+
+	>> bookable_records
 _endmethod
 $
 
