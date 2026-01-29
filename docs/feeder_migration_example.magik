@@ -1,0 +1,66 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## Example script for running FEEDER data migration
+## Copy and paste this into Magik prompt or compile with F7 in Emacs
+
+##
+## STEP 1: Get the database
+##
+ds << gis_program_manager.cached_dataset(:gis)
+write("Database: ", ds)
+$
+
+##
+## STEP 2: Create migrator instance
+##
+migrator << astri_data_migrator.new(ds)
+write("Migrator created")
+$
+
+##
+## STEP 3: Run FEEDER migration (this will connect to PostgreSQL and migrate all FEEDERs)
+##
+migrator.migrate_feeders()
+$
+
+##
+## STEP 4: Show statistics
+##
+migrator.show_statistics()
+$
+
+##
+## Optional: Verify migration results
+##
+ds << gis_program_manager.cached_dataset(:gis)
+feeder_col << ds.collections[:master_feeder]
+write("Total master_feeder records after migration: ", feeder_col.size)
+$
+
+##
+## Optional: Check a specific FEEDER by feeder_code
+##
+ds << gis_program_manager.cached_dataset(:gis)
+feeder_col << ds.collections[:master_feeder]
+
+# Replace "FEEDER-001" with actual feeder_code from your data
+feeder_code_to_check << "FEEDER-001"
+
+pred << predicate.eq(:feeder_code, feeder_code_to_check)
+feeder << feeder_col.select(pred).an_element()
+
+_if feeder _isnt _unset
+_then
+	write("Found FEEDER: ", feeder.feeder_code)
+	write("  Name: ", feeder.feeder_name)
+	write("  OLT Code: ", feeder.olt_code)
+	write("  Region: ", feeder.region)
+	write("  Status: ", feeder.feeder_status)
+	write("  Capacity: ", feeder.feeder_capacity)
+_else
+	write("FEEDER not found: ", feeder_code_to_check)
+_endif
+$
