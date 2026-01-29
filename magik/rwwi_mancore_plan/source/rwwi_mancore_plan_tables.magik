@@ -476,17 +476,17 @@ _method rwwi_mancore_plan_dialog.update_booking_button_states()
 		_if .subfeeder_count > 0 _andif .fdt_count > 0 _andif
 		    .subfeeder_count >= .fdt_count
 		_then
-			# Check if all records in both tables are IDLE
-			_local subfeeder_idle? << _self.check_all_records_idle(.subfeeder_table_selection)
+			# Check if subfeeder records are bookable (not TAKEN with unset/empty/ACTIVE) and FDT records are IDLE
+			_local subfeeder_bookable? << _self.check_all_records_bookable(.subfeeder_table_selection)
 			_local fdt_idle? << _self.check_all_records_idle(.fdt_table_selection)
 
-			_if subfeeder_idle? _andif fdt_idle?
+			_if subfeeder_bookable? _andif fdt_idle?
 			_then
 				enable_subfeeder? << _true
-				write("Booking Subfeeder ENABLED (BOOKED) - Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count, " (all IDLE)")
+				write("Booking Subfeeder ENABLED (BOOKED) - Table 2: ", .subfeeder_count, ", Table 3: ", .fdt_count, " (all bookable/IDLE)")
 			_else
-				write("Booking Subfeeder DISABLED (BOOKED) - Some records are not IDLE")
-				write("  Table 2 all IDLE: ", subfeeder_idle?, ", Table 3 all IDLE: ", fdt_idle?)
+				write("Booking Subfeeder DISABLED (BOOKED) - Some records not bookable")
+				write("  Table 2 bookable: ", subfeeder_bookable?, ", Table 3 all IDLE: ", fdt_idle?)
 			_endif
 		_else
 			write("Booking Subfeeder DISABLED (BOOKED)")
