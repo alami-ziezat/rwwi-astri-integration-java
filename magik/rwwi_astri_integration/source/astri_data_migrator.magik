@@ -1327,7 +1327,7 @@ _private _method astri_data_migrator.create_cluster(rec)
 		:vendor_alias, rec.vendor_alias.default(""),
 
 		# Technical specifications
-		:cluster_hp, rec.cluster_hp.default(""),
+		:cluster_hp, rec.cluster_hp.default(_unset),
 		:subfeeder_capacity, _unset,
 		:subfeeder_length, _unset,
 

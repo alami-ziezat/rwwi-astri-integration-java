@@ -280,7 +280,7 @@ _method rwwi_mancore_plan_dialog.query_and_populate_feeder_table(feeder_code)
 		# Query and display homepass information
 		_local homepass << .engine.get_homepass("feeder", feeder_code)
 		_local homepass_count << homepass.size
-		_local cores_to_book << (homepass_count.as_float / 64).rounded
+		_local cores_to_book << (homepass_count.as_float / 64).ceiling
 		.items[:log].append("Homepass (Demand Points)")
 		.items[:log].append(newline_char)
 		.items[:log].append("=======================")
