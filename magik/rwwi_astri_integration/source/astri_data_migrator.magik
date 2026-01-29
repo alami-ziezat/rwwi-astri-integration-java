@@ -70,6 +70,165 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_all()
+	## Run all migrations in the correct order
+	## Executes: OLT → FEEDER → SUBFEEDER → CLUSTER
+	##
+	## This is the recommended method for complete data migration.
+	## Returns: property_list with statistics for all migrations
+
+	write("===========================================================")
+	write("=== COMPLETE DATA MIGRATION - ALL TABLES ===")
+	write("===========================================================")
+	write("")
+	write("Migration Order:")
+	write("  1. OLT (Parent records)")
+	write("  2. FEEDER (References OLT)")
+	write("  3. SUBFEEDER (References FEEDER and OLT)")
+	write("  4. CLUSTER (References SUBFEEDER, FEEDER, and OLT)")
+	write("")
+	write("===========================================================")
+	write("")
+
+	# Track overall statistics
+	_local overall_stats << property_list.new_with(
+		:olt_total, 0,
+		:olt_created, 0,
+		:olt_skipped, 0,
+		:olt_errors, 0,
+		:feeder_total, 0,
+		:feeder_created, 0,
+		:feeder_skipped, 0,
+		:feeder_errors, 0,
+		:subfeeder_total, 0,
+		:subfeeder_created, 0,
+		:subfeeder_skipped, 0,
+		:subfeeder_errors, 0,
+		:cluster_total, 0,
+		:cluster_created, 0,
+		:cluster_skipped, 0,
+		:cluster_errors, 0
+	)
+
+	# Phase 1: OLT Migration
+	_try
+		write("PHASE 1/4: Starting OLT migration...")
+		write("")
+		_local olt_stats << _self.migrate_olts()
+		overall_stats[:olt_total] << olt_stats[:total]
+		overall_stats[:olt_created] << olt_stats[:created]
+		overall_stats[:olt_skipped] << olt_stats[:skipped]
+		overall_stats[:olt_errors] << olt_stats[:errors]
+		write("")
+		write("PHASE 1/4: OLT migration completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 1/4 (OLT migration): ", condition.report_contents_string)
+		write("Continuing with next phase...")
+		write("")
+	_endtry
+
+	# Phase 2: FEEDER Migration
+	_try
+		write("PHASE 2/4: Starting FEEDER migration...")
+		write("")
+		_local feeder_stats << _self.migrate_feeders()
+		overall_stats[:feeder_total] << feeder_stats[:total]
+		overall_stats[:feeder_created] << feeder_stats[:created]
+		overall_stats[:feeder_skipped] << feeder_stats[:skipped]
+		overall_stats[:feeder_errors] << feeder_stats[:errors]
+		write("")
+		write("PHASE 2/4: FEEDER migration completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 2/4 (FEEDER migration): ", condition.report_contents_string)
+		write("Continuing with next phase...")
+		write("")
+	_endtry
+
+	# Phase 3: SUBFEEDER Migration
+	_try
+		write("PHASE 3/4: Starting SUBFEEDER migration...")
+		write("")
+		_local subfeeder_stats << _self.migrate_subfeeders()
+		overall_stats[:subfeeder_total] << subfeeder_stats[:total]
+		overall_stats[:subfeeder_created] << subfeeder_stats[:created]
+		overall_stats[:subfeeder_skipped] << subfeeder_stats[:skipped]
+		overall_stats[:subfeeder_errors] << subfeeder_stats[:errors]
+		write("")
+		write("PHASE 3/4: SUBFEEDER migration completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 3/4 (SUBFEEDER migration): ", condition.report_contents_string)
+		write("Continuing with next phase...")
+		write("")
+	_endtry
+
+	# Phase 4: CLUSTER Migration
+	_try
+		write("PHASE 4/4: Starting CLUSTER migration...")
+		write("")
+		_local cluster_stats << _self.migrate_clusters()
+		overall_stats[:cluster_total] << cluster_stats[:total]
+		overall_stats[:cluster_created] << cluster_stats[:created]
+		overall_stats[:cluster_skipped] << cluster_stats[:skipped]
+		overall_stats[:cluster_errors] << cluster_stats[:errors]
+		write("")
+		write("PHASE 4/4: CLUSTER migration completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 4/4 (CLUSTER migration): ", condition.report_contents_string)
+		write("")
+	_endtry
+
+	# Display overall summary
+	write("===========================================================")
+	write("=== MIGRATION SUMMARY - ALL TABLES ===")
+	write("===========================================================")
+	write("")
+	write("OLT:")
+	write("  Total: ", overall_stats[:olt_total])
+	write("  Created: ", overall_stats[:olt_created])
+	write("  Skipped: ", overall_stats[:olt_skipped])
+	write("  Errors: ", overall_stats[:olt_errors])
+	write("")
+	write("FEEDER:")
+	write("  Total: ", overall_stats[:feeder_total])
+	write("  Created: ", overall_stats[:feeder_created])
+	write("  Skipped: ", overall_stats[:feeder_skipped])
+	write("  Errors: ", overall_stats[:feeder_errors])
+	write("")
+	write("SUBFEEDER:")
+	write("  Total: ", overall_stats[:subfeeder_total])
+	write("  Created: ", overall_stats[:subfeeder_created])
+	write("  Skipped: ", overall_stats[:subfeeder_skipped])
+	write("  Errors: ", overall_stats[:subfeeder_errors])
+	write("")
+	write("CLUSTER:")
+	write("  Total: ", overall_stats[:cluster_total])
+	write("  Created: ", overall_stats[:cluster_created])
+	write("  Skipped: ", overall_stats[:cluster_skipped])
+	write("  Errors: ", overall_stats[:cluster_errors])
+	write("")
+	write("GRAND TOTAL:")
+	write("  Total Records: ", overall_stats[:olt_total] + overall_stats[:feeder_total] +
+		overall_stats[:subfeeder_total] + overall_stats[:cluster_total])
+	write("  Created: ", overall_stats[:olt_created] + overall_stats[:feeder_created] +
+		overall_stats[:subfeeder_created] + overall_stats[:cluster_created])
+	write("  Skipped: ", overall_stats[:olt_skipped] + overall_stats[:feeder_skipped] +
+		overall_stats[:subfeeder_skipped] + overall_stats[:cluster_skipped])
+	write("  Errors: ", overall_stats[:olt_errors] + overall_stats[:feeder_errors] +
+		overall_stats[:subfeeder_errors] + overall_stats[:cluster_errors])
+	write("")
+	write("===========================================================")
+	write("=== MIGRATION COMPLETE ===")
+	write("===========================================================")
+
+	>> overall_stats
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
 _method astri_data_migrator.migrate_olts()
 	## Main migration method
 	## Connects to PostgreSQL and migrates all OLT records to mit_hub
@@ -100,7 +259,7 @@ _method astri_data_migrator.migrate_olts()
 
 		# Process each record with batch commit every 1000 records
 		_local batch_count << 0
-		_local commit_interval << 10
+		_local commit_interval << 1000
 
 		_loop
 			_local rec << result_set.get()

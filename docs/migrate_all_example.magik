@@ -1,0 +1,95 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## Example script for running COMPLETE data migration (all tables)
+## This is the recommended method for initial data migration
+## Copy and paste this into Magik prompt or compile with F7 in Emacs
+
+##
+## STEP 1: Get the database
+##
+ds << gis_program_manager.cached_dataset(:gis)
+write("Database: ", ds)
+$
+
+##
+## STEP 2: Create migrator instance
+##
+migrator << astri_data_migrator.new(ds)
+write("Migrator created")
+$
+
+##
+## STEP 3: Run COMPLETE migration (all tables in correct order)
+## This will execute:
+##   Phase 1: OLT migration
+##   Phase 2: FEEDER migration
+##   Phase 3: SUBFEEDER migration
+##   Phase 4: CLUSTER migration
+##
+migrator.migrate_all()
+$
+
+##
+## Optional: Verify migration results for all tables
+##
+
+# OLT records
+ds << gis_program_manager.cached_dataset(:gis)
+olt_col << ds.collections[:mit_hub]
+write("Total OLT records: ", olt_col.size)
+$
+
+# FEEDER records
+ds << gis_program_manager.cached_dataset(:gis)
+feeder_col << ds.collections[:master_feeder]
+write("Total FEEDER records: ", feeder_col.size)
+
+# Count feeders with NEW status
+pred << predicate.eq(:feeder_status, "NEW")
+new_feeders << feeder_col.select(pred)
+write("  Feeders with status 'NEW': ", new_feeders.size)
+$
+
+# SUBFEEDER records
+ds << gis_program_manager.cached_dataset(:gis)
+subfeeder_col << ds.collections[:master_subfeeder]
+write("Total SUBFEEDER records: ", subfeeder_col.size)
+
+# Count subfeeders with NEW status
+pred << predicate.eq(:subfeeder_status, "NEW")
+new_subfeeders << subfeeder_col.select(pred)
+write("  Subfeeders with status 'NEW': ", new_subfeeders.size)
+$
+
+# CLUSTER records
+ds << gis_program_manager.cached_dataset(:gis)
+cluster_col << ds.collections[:master_cluster]
+write("Total CLUSTER records: ", cluster_col.size)
+
+# Count clusters with NEW status
+pred << predicate.eq(:subfeeder_status, "NEW")
+new_clusters << cluster_col.select(pred)
+write("  Clusters with status 'NEW': ", new_clusters.size)
+$
+
+##
+## Grand total across all tables
+##
+ds << gis_program_manager.cached_dataset(:gis)
+olt_count << ds.collections[:mit_hub].size
+feeder_count << ds.collections[:master_feeder].size
+subfeeder_count << ds.collections[:master_subfeeder].size
+cluster_count << ds.collections[:master_cluster].size
+
+write("========================================")
+write("GRAND TOTAL RECORDS AFTER MIGRATION:")
+write("  OLT:       ", olt_count)
+write("  FEEDER:    ", feeder_count)
+write("  SUBFEEDER: ", subfeeder_count)
+write("  CLUSTER:   ", cluster_count)
+write("  TOTAL:     ", olt_count + feeder_count + subfeeder_count + cluster_count)
+write("========================================")
+$
