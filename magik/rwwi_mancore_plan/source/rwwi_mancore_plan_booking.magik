@@ -272,10 +272,10 @@ _private _method rwwi_mancore_plan_dialog.get_bookable_records_from_selection(se
 	## Returns:
 	##   rope of records that can be booked:
 	##     - IDLE records (transport_status != "TAKEN")
-	##     - TAKEN records where remarks is unset, empty, or ACTIVE
-	##     - RELEASE records (transport_status = "RELEASE")
+	##     - TAKEN -> BOOKED records (can re-book)
+	##     - TAKEN -> RELEASE records
 	##   Excludes:
-	##     - TAKEN -> BOOKED records (transport_status = "TAKEN" AND transport_remarks = "BOOKED")
+	##     - TAKEN records with unset/empty/ACTIVE remarks (cannot book over active connections)
 
 	_local bookable_records << rope.new()
 
@@ -297,19 +297,16 @@ _private _method rwwi_mancore_plan_dialog.get_bookable_records_from_selection(se
 			_continue
 		_endif
 
-		# Block TAKEN -> BOOKED (cannot book over booked connections)
-		_if t_status = "TAKEN" _andif t_remarks = "BOOKED"
+		# Block TAKEN with unset/empty/ACTIVE remarks (cannot book over active connections)
+		_if t_status = "TAKEN" _andif (t_remarks = "" _orif t_remarks = "ACTIVE")
 		_then
-			# Skip this record - cannot book over BOOKED
-			write("  Skipping TAKEN->BOOKED record: Tube ", rec[:transport_tube_number], " Core ", rec[:transport_core_number])
+			# Skip this record - cannot book over ACTIVE/unset/empty
+			write("  Skipping TAKEN with unset/empty/ACTIVE: Tube ", rec[:transport_tube_number], " Core ", rec[:transport_core_number])
 			_continue
 		_endif
 
-		# Allow TAKEN with remarks: unset, empty, or ACTIVE
-		_if t_status = "TAKEN"
-		_then
-			bookable_records.add(rec)
-		_endif
+		# Allow TAKEN with other remarks (e.g., BOOKED - can re-book)
+		bookable_records.add(rec)
 	_endloop
 
 	>> bookable_records
