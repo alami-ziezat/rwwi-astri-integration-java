@@ -80,9 +80,12 @@ _method astri_data_migrator.migrate_all()
 	## This is the recommended method for master data migration.
 	## Returns: property_list with statistics for all migrations
 
+	_local overall_start_time << date_time.now()
 	write("===========================================================")
 	write("=== MASTER DATA MIGRATION (FEEDER, SUBFEEDER, CLUSTER) ===")
 	write("===========================================================")
+	write("")
+	write("Overall start time: ", overall_start_time.write_string)
 	write("")
 	write("Migration Order:")
 	write("  1. FEEDER (master_feeder)")
@@ -196,8 +199,16 @@ _method astri_data_migrator.migrate_all()
 	write("  Errors: ", overall_stats[:feeder_errors] +
 		overall_stats[:subfeeder_errors] + overall_stats[:cluster_errors])
 	write("")
+
+	_local overall_end_time << date_time.now()
+	_local overall_duration_seconds << (overall_end_time - overall_start_time).value.rounded
+	_local overall_duration_minutes << (overall_duration_seconds / 60.0).rounded
+
 	write("===========================================================")
 	write("=== MIGRATION COMPLETE ===")
+	write("===========================================================")
+	write("Overall end time: ", overall_end_time.write_string)
+	write("Total duration: ", overall_duration_minutes, " minutes (", overall_duration_seconds, " seconds)")
 	write("===========================================================")
 
 	>> overall_stats
@@ -209,7 +220,9 @@ _method astri_data_migrator.migrate_olts()
 	## Main migration method
 	## Connects to PostgreSQL and migrates all OLT records to mit_hub
 
+	_local start_time << date_time.now()
 	write("=== OLT Migration Started ===")
+	write("Start time: ", start_time.write_string)
 	write("Connecting to PostgreSQL...")
 
 	_try _with cond
@@ -276,7 +289,13 @@ _method astri_data_migrator.migrate_olts()
 			_endtry
 		_endif
 
-		write("=== Migration Completed ===")
+		_local end_time << date_time.now()
+		_local duration_seconds << (end_time - start_time).value.rounded
+		_local duration_minutes << (duration_seconds / 60.0).rounded
+
+		write("=== OLT Migration Completed ===")
+		write("End time: ", end_time.write_string)
+		write("Duration: ", duration_minutes, " minutes (", duration_seconds, " seconds)")
 		write("Total records: ", .stats[:total])
 		write("Created: ", .stats[:created])
 		write("Skipped (already exists): ", .stats[:skipped])
@@ -614,7 +633,9 @@ _method astri_data_migrator.migrate_feeders()
 	## Main feeder migration method
 	## Connects to PostgreSQL and migrates all FEEDER records to master_feeder
 
+	_local start_time << date_time.now()
 	write("=== FEEDER Migration Started ===")
+	write("Start time: ", start_time.write_string)
 	write("Connecting to PostgreSQL...")
 
 	# Reset statistics
@@ -686,7 +707,13 @@ _method astri_data_migrator.migrate_feeders()
 			_endtry
 		_endif
 
+		_local end_time << date_time.now()
+		_local duration_seconds << (end_time - start_time).value.rounded
+		_local duration_minutes << (duration_seconds / 60.0).rounded
+
 		write("=== FEEDER Migration Completed ===")
+		write("End time: ", end_time.write_string)
+		write("Duration: ", duration_minutes, " minutes (", duration_seconds, " seconds)")
 		write("Total records: ", .stats[:total])
 		write("Created: ", .stats[:created])
 		write("Skipped (already exists): ", .stats[:skipped])
@@ -847,7 +874,9 @@ _method astri_data_migrator.migrate_subfeeders()
 	## Main subfeeder migration method
 	## Connects to PostgreSQL and migrates all SUBFEEDER records to master_subfeeder
 
+	_local start_time << date_time.now()
 	write("=== SUBFEEDER Migration Started ===")
+	write("Start time: ", start_time.write_string)
 	write("Connecting to PostgreSQL...")
 
 	# Reset statistics
@@ -919,7 +948,13 @@ _method astri_data_migrator.migrate_subfeeders()
 			_endtry
 		_endif
 
+		_local end_time << date_time.now()
+		_local duration_seconds << (end_time - start_time).value.rounded
+		_local duration_minutes << (duration_seconds / 60.0).rounded
+
 		write("=== SUBFEEDER Migration Completed ===")
+		write("End time: ", end_time.write_string)
+		write("Duration: ", duration_minutes, " minutes (", duration_seconds, " seconds)")
 		write("Total records: ", .stats[:total])
 		write("Created: ", .stats[:created])
 		write("Skipped (already exists): ", .stats[:skipped])
@@ -1084,7 +1119,9 @@ _method astri_data_migrator.migrate_clusters()
 	## Main cluster migration method
 	## Connects to PostgreSQL and migrates all CLUSTER records to master_cluster
 
+	_local start_time << date_time.now()
 	write("=== CLUSTER Migration Started ===")
+	write("Start time: ", start_time.write_string)
 	write("Connecting to PostgreSQL...")
 
 	# Reset statistics
@@ -1156,7 +1193,13 @@ _method astri_data_migrator.migrate_clusters()
 			_endtry
 		_endif
 
+		_local end_time << date_time.now()
+		_local duration_seconds << (end_time - start_time).value.rounded
+		_local duration_minutes << (duration_seconds / 60.0).rounded
+
 		write("=== CLUSTER Migration Completed ===")
+		write("End time: ", end_time.write_string)
+		write("Duration: ", duration_minutes, " minutes (", duration_seconds, " seconds)")
 		write("Total records: ", .stats[:total])
 		write("Created: ", .stats[:created])
 		write("Skipped (already exists): ", .stats[:skipped])
