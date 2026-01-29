@@ -1,0 +1,79 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## Example script for running CLUSTER data migration
+## Copy and paste this into Magik prompt or compile with F7 in Emacs
+
+##
+## STEP 1: Get the database
+##
+ds << gis_program_manager.cached_dataset(:gis)
+write("Database: ", ds)
+$
+
+##
+## STEP 2: Create migrator instance
+##
+migrator << astri_data_migrator.new(ds)
+write("Migrator created")
+$
+
+##
+## STEP 3: Run CLUSTER migration (this will connect to PostgreSQL and migrate all CLUSTERs)
+##
+migrator.migrate_clusters()
+$
+
+##
+## STEP 4: Show statistics
+##
+migrator.show_statistics()
+$
+
+##
+## Optional: Verify migration results
+##
+ds << gis_program_manager.cached_dataset(:gis)
+cluster_col << ds.collections[:master_cluster]
+write("Total master_cluster records after migration: ", cluster_col.size)
+$
+
+##
+## Optional: Check a specific CLUSTER by cluster_code
+##
+ds << gis_program_manager.cached_dataset(:gis)
+cluster_col << ds.collections[:master_cluster]
+
+# Replace "CLUSTER-001" with actual cluster_code from your data
+cluster_code_to_check << "CLUSTER-001"
+
+pred << predicate.eq(:cluster_code, cluster_code_to_check)
+cluster << cluster_col.select(pred).an_element()
+
+_if cluster _isnt _unset
+_then
+	write("Found CLUSTER: ", cluster.cluster_code)
+	write("  Name: ", cluster.cluster_name)
+	write("  Subfeeder Code: ", cluster.subfeeder_code)
+	write("  Feeder Code: ", cluster.feeder_code)
+	write("  OLT Code: ", cluster.olt_code)
+	write("  Region: ", cluster.region)
+	write("  Status: ", cluster.subfeeder_status)
+	write("  Cluster HP: ", cluster.cluster_hp)
+_else
+	write("CLUSTER not found: ", cluster_code_to_check)
+_endif
+$
+
+##
+## Optional: Verify all migrated clusters have status "NEW"
+##
+ds << gis_program_manager.cached_dataset(:gis)
+cluster_col << ds.collections[:master_cluster]
+
+pred << predicate.eq(:subfeeder_status, "NEW")
+new_clusters << cluster_col.select(pred)
+write("Clusters with status 'NEW': ", new_clusters.size)
+$
