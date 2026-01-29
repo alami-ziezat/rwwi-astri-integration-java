@@ -452,21 +452,21 @@ _method rwwi_mancore_plan_dialog.update_booking_button_states()
 
 	_if status = "BOOKED"
 	_then
-		# BOOKED mode: Must match counts AND all records must be IDLE
+		# BOOKED mode: Must match counts AND all records must be bookable (not TAKEN->ACTIVE)
 		_if .feeder_count > 0 _andif .subfeeder_count > 0 _andif
 		    .feeder_count = .subfeeder_count
 		_then
-			# Check if all records in both tables are IDLE
-			_local feeder_idle? << _self.check_all_records_idle(.feeder_table_selection)
-			_local subfeeder_idle? << _self.check_all_records_idle(.subfeeder_table_selection)
+			# Check if all records in both tables are bookable (allows TAKEN->BOOKED, blocks TAKEN->ACTIVE)
+			_local feeder_bookable? << _self.check_all_records_bookable(.feeder_table_selection)
+			_local subfeeder_bookable? << _self.check_all_records_bookable(.subfeeder_table_selection)
 
-			_if feeder_idle? _andif subfeeder_idle?
+			_if feeder_bookable? _andif subfeeder_bookable?
 			_then
 				enable_feeder? << _true
-				write("Booking Feeder ENABLED (BOOKED) - Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count, " (all IDLE)")
+				write("Booking Feeder ENABLED (BOOKED) - Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count, " (all bookable)")
 			_else
-				write("Booking Feeder DISABLED (BOOKED) - Some records are not IDLE")
-				write("  Table 1 all IDLE: ", feeder_idle?, ", Table 2 all IDLE: ", subfeeder_idle?)
+				write("Booking Feeder DISABLED (BOOKED) - Some records are TAKEN->ACTIVE")
+				write("  Table 1 bookable: ", feeder_bookable?, ", Table 2 bookable: ", subfeeder_bookable?)
 			_endif
 		_else
 			write("Booking Feeder DISABLED (BOOKED) - Counts don't match or zero")
@@ -586,6 +586,52 @@ _private _method rwwi_mancore_plan_dialog.check_all_records_booked(selection)
 	_endloop
 
 	# All records are BOOKED
+	_return _true
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.check_all_records_bookable(selection)
+	##
+	## Check if all records in selection can be booked for BOOKED status
+	## Allows: IDLE, TAKEN->BOOKED, RELEASE
+	## Blocks: TAKEN->ACTIVE
+	## Parameters:
+	##   selection - Table selection object
+	## Returns:
+	##   true if all records are bookable, false if any are TAKEN->ACTIVE
+	##
+
+	_if selection _is _unset
+	_then
+		_return _false
+	_endif
+
+	_local records << selection.get_row_data_from_selection()
+
+	_if records.empty?
+	_then
+		_return _false
+	_endif
+
+	# Check each record
+	_for rec _over records.fast_elements()
+	_loop
+		_local t_status << rec[:transport_status].default("")
+		_local t_remarks << rec[:transport_remarks].default("")
+
+		# Block TAKEN->ACTIVE records
+		_if t_status = "TAKEN" _andif t_remarks = "ACTIVE"
+		_then
+			write("  Found non-bookable record (TAKEN->ACTIVE) - Tube: ",
+			      rec[:transport_tube_number].default("?"),
+			      " Core: ", rec[:transport_core_number].default("?"))
+			_return _false
+		_endif
+	_endloop
+
+	# All records are bookable (not TAKEN->ACTIVE)
 	_return _true
 
 _endmethod
