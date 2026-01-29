@@ -26,6 +26,8 @@ _private _method rwwi_mancore_plan_dialog.get_homepass_and_cores()
 	_local homepass_count << homepass_str.as_number().default(0)
 	_local cores_to_book << (homepass_count.as_float / 64).ceiling
 
+	write("Parsed Homepass: ", homepass_count, " cores to book ", cores_to_book)
+
 	>> homepass_str, homepass_count, cores_to_book
 _endmethod
 $
@@ -270,10 +272,10 @@ _private _method rwwi_mancore_plan_dialog.get_bookable_records_from_selection(se
 	## Returns:
 	##   rope of records that can be booked:
 	##     - IDLE records (transport_status != "TAKEN")
-	##     - TAKEN -> BOOKED records (transport_status = "TAKEN" AND transport_remarks = "BOOKED")
+	##     - TAKEN records where remarks is unset, empty, or ACTIVE
 	##     - RELEASE records (transport_status = "RELEASE")
 	##   Excludes:
-	##     - TAKEN -> ACTIVE records (transport_status = "TAKEN" AND transport_remarks = "ACTIVE")
+	##     - TAKEN -> BOOKED records (transport_status = "TAKEN" AND transport_remarks = "BOOKED")
 
 	_local bookable_records << rope.new()
 
@@ -295,22 +297,15 @@ _private _method rwwi_mancore_plan_dialog.get_bookable_records_from_selection(se
 			_continue
 		_endif
 
-		# Allow TAKEN -> BOOKED (can re-book)
+		# Block TAKEN -> BOOKED (cannot book over booked connections)
 		_if t_status = "TAKEN" _andif t_remarks = "BOOKED"
 		_then
-			bookable_records.add(rec)
+			# Skip this record - cannot book over BOOKED
+			write("  Skipping TAKEN->BOOKED record: Tube ", rec[:transport_tube_number], " Core ", rec[:transport_core_number])
 			_continue
 		_endif
 
-		# Block TAKEN -> ACTIVE (cannot book over active connections)
-		_if t_status = "TAKEN" _andif t_remarks = "ACTIVE"
-		_then
-			# Skip this record - cannot book over ACTIVE
-			write("  Skipping TAKEN->ACTIVE record: Tube ", rec[:transport_tube_number], " Core ", rec[:transport_core_number])
-			_continue
-		_endif
-
-		# For any other TAKEN status (including blank remarks), allow booking
+		# Allow TAKEN with remarks: unset, empty, or ACTIVE
 		_if t_status = "TAKEN"
 		_then
 			bookable_records.add(rec)

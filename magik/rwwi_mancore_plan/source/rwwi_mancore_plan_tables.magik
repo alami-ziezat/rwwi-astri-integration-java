@@ -452,11 +452,11 @@ _method rwwi_mancore_plan_dialog.update_booking_button_states()
 
 	_if status = "BOOKED"
 	_then
-		# BOOKED mode: Must match counts AND all records must be bookable (not TAKEN->ACTIVE)
+		# BOOKED mode: Must match counts AND all records must be bookable (not TAKEN->BOOKED)
 		_if .feeder_count > 0 _andif .subfeeder_count > 0 _andif
 		    .feeder_count = .subfeeder_count
 		_then
-			# Check if all records in both tables are bookable (allows TAKEN->BOOKED, blocks TAKEN->ACTIVE)
+			# Check if all records in both tables are bookable (allows TAKEN with unset/empty/ACTIVE, blocks TAKEN->BOOKED)
 			_local feeder_bookable? << _self.check_all_records_bookable(.feeder_table_selection)
 			_local subfeeder_bookable? << _self.check_all_records_bookable(.subfeeder_table_selection)
 
@@ -465,7 +465,7 @@ _method rwwi_mancore_plan_dialog.update_booking_button_states()
 				enable_feeder? << _true
 				write("Booking Feeder ENABLED (BOOKED) - Table 1: ", .feeder_count, ", Table 2: ", .subfeeder_count, " (all bookable)")
 			_else
-				write("Booking Feeder DISABLED (BOOKED) - Some records are TAKEN->ACTIVE")
+				write("Booking Feeder DISABLED (BOOKED) - Some records are TAKEN->BOOKED")
 				write("  Table 1 bookable: ", feeder_bookable?, ", Table 2 bookable: ", subfeeder_bookable?)
 			_endif
 		_else
@@ -595,12 +595,12 @@ _pragma(classify_level=restricted)
 _private _method rwwi_mancore_plan_dialog.check_all_records_bookable(selection)
 	##
 	## Check if all records in selection can be booked for BOOKED status
-	## Allows: IDLE, TAKEN->BOOKED, RELEASE
-	## Blocks: TAKEN->ACTIVE
+	## Allows: IDLE, TAKEN with remarks (unset/empty/ACTIVE), RELEASE
+	## Blocks: TAKEN->BOOKED
 	## Parameters:
 	##   selection - Table selection object
 	## Returns:
-	##   true if all records are bookable, false if any are TAKEN->ACTIVE
+	##   true if all records are bookable, false if any are TAKEN->BOOKED
 	##
 
 	_if selection _is _unset
@@ -621,17 +621,17 @@ _private _method rwwi_mancore_plan_dialog.check_all_records_bookable(selection)
 		_local t_status << rec[:transport_status].default("")
 		_local t_remarks << rec[:transport_remarks].default("")
 
-		# Block TAKEN->ACTIVE records
-		_if t_status = "TAKEN" _andif t_remarks = "ACTIVE"
+		# Block TAKEN->BOOKED records
+		_if t_status = "TAKEN" _andif t_remarks = "BOOKED"
 		_then
-			write("  Found non-bookable record (TAKEN->ACTIVE) - Tube: ",
+			write("  Found non-bookable record (TAKEN->BOOKED) - Tube: ",
 			      rec[:transport_tube_number].default("?"),
 			      " Core: ", rec[:transport_core_number].default("?"))
 			_return _false
 		_endif
 	_endloop
 
-	# All records are bookable (not TAKEN->ACTIVE)
+	# All records are bookable (not TAKEN->BOOKED)
 	_return _true
 
 _endmethod
