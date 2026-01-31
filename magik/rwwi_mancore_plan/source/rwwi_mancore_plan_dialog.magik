@@ -251,14 +251,14 @@ _method rwwi_mancore_plan_dialog.build_toolbar( parent )
 					       :image, {:back, :ui_resources},
 					       :model, _self,
 					       :selector, :booking_feeder|()|,
-					       :tooltip, "Booking Feeder" )
+					       :tooltip, "Run Feeder" )
 	.items[:booking_feeder].enabled? << _false
 
 	.items[:booking_subfeeder] << sw_button_item.new( file_toolbar,
 					       :image, {:forward, :ui_resources},
 					       :model, _self,
 					       :selector, :booking_subfeeder|()|,
-					       :tooltip, "Booking Subfeeder" )
+					       :tooltip, "Run Subfeeder" )
 	.items[:booking_subfeeder].enabled? << _false
 
 _endmethod
