@@ -106,6 +106,7 @@ $
 _pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.activate_in( parent )
 	##
+	## Activate dialog with card stack layout for better handling of low-resolution monitors
 	##
 	parent.title << "FTTx Mancore Plan"
 
@@ -131,18 +132,15 @@ _method rwwi_mancore_plan_dialog.activate_in( parent )
 		:identifier, :top_container,
 		:model, _self)
 
-	# Create outer container with flexible row sizing
-	# 5 rows: Toolbar (fixed), Feeder Table (flexible), Subfeeder Table (flexible), FDT Table (flexible), Log (flexible)
-	.items[:outer] << outer << sw_container.new(top_c, 5, 1,
-		:row_resize_values, {0, 1, 1, 1, 1})  # Toolbar fixed, 3 Tables flexible, Log flexible
+	# Create outer container with 3 rows: Toolbar (fixed), Card Stack (flexible), Log (flexible)
+	.items[:outer] << outer << sw_container.new(top_c, 3, 1,
+		:row_resize_values, {0, 1, 0})  # Toolbar fixed, Card Stack flexible, Log fixed
 
 	# Build toolbar
 	_self.build_toolbar( outer )
 
-	# Build tables (in order: Feeder, Subfeeder, FDT)
-	_self.build_feeder_table( outer )
-	_self.build_device_connection_table( outer )
-	_self.build_table_ur2( outer )
+	# Build card stack with tables
+	_self.build_card_stack_tables( outer )
 
 	# Build log window
 	_self.build_log( outer )
@@ -268,6 +266,47 @@ $
 ## All toolbar items now consolidated in build_toolbar method
 
 _pragma(classify_level=restricted)
+_method rwwi_mancore_plan_dialog.build_card_stack_tables( parent )
+	##
+	## Build card stack containing all three tables
+	## Each table is in its own collapsible card for better handling of low-resolution monitors
+	##
+
+	# Create card stack container
+	.items[:card_stack] << card_stack << sw_card_stack.new( parent,
+								:min_height, 200 )
+
+	# Configure card stack behavior
+	card_stack.single_only? << _false  # Allow multiple expanded cards
+	card_stack.always_one? << _false   # All cards can be collapsed
+	card_stack.show_card_borders? << _false
+	card_stack.allow_float_cards? << _true
+
+	# Default card resize values - first card gets priority
+	card_stack.row_resize_values << {1, 0, 0}
+
+	# Card 1: Feeder Connectivity Table
+	feeder_card << card_stack.new_card( "Feeder Connectivity",
+					    {:chain, :ui_resources} )
+	feeder_card.colour << _unset  # No background colour for the card
+	_self.build_feeder_table( feeder_card )
+
+	# Card 2: Subfeeder Connectivity Table
+	subfeeder_card << card_stack.new_card( "Subfeeder Connectivity",
+					       {:chain_set, :ui_resources} )
+	subfeeder_card.colour << _unset
+	_self.build_device_connection_table( subfeeder_card )
+
+	# Card 3: FDT Splice Connectivity Table
+	fdt_card << card_stack.new_card( "FDT Splice Connectivity",
+					 {:detail_view, :ui_resources} )
+	fdt_card.colour << _unset
+	_self.build_table_ur2( fdt_card )
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
 _method rwwi_mancore_plan_dialog.build_log( parent )
 	##
 	## Build log window for displaying messages and status
@@ -309,7 +348,6 @@ _method rwwi_mancore_plan_dialog.build_feeder_table( parent )
 	##
 	.items[:feeder_table] << a_table << sw_table.new( parent,
 				 :model, _self,
-				 :label, "Feeder Connectivity",
 				 :aspect, :feeder_connection_table,
 				 :data_selector, :populate_feeder_connection_table|()|,
 				 :selection_notifier, :feeder_connection_table_selected|()|,
@@ -319,7 +357,7 @@ _method rwwi_mancore_plan_dialog.build_feeder_table( parent )
 				 :selection_mode, :many, # :many or :one
 				 :col_alignment, :fill,
 				 :row_alignment, :fill,
-				 :min_height, 250,
+				 :min_height, 150,
 				 :enable_horizontal_scrollbar?, _true)
 	a_table.n_cols << 13
 	a_table.set_column_labels({"Source Type",
@@ -363,7 +401,6 @@ _method rwwi_mancore_plan_dialog.build_device_connection_table( parent )
 	##
 	.items[:table] << a_table << sw_table.new( parent,
 				 :model, _self,
-				 :label, "Subfeeder Connectivity",
 				 :aspect, :device_connection_table,
 				 :data_selector, :populate_device_connection_table|()|,
 				 #:text_style , .styles[:true_style],
@@ -375,7 +412,7 @@ _method rwwi_mancore_plan_dialog.build_device_connection_table( parent )
 				 :selection_mode, :many, # :many or :one
 				 :col_alignment, :fill,
 				 :row_alignment, :fill,
-				 :min_height, 250,
+				 :min_height, 150,
 				 :enable_horizontal_scrollbar?, _true)
 	a_table.n_cols << 13
 	a_table.set_column_labels({"Source Type",
@@ -418,7 +455,6 @@ _method rwwi_mancore_plan_dialog.build_table_ur2( parent )
 	##
 	.items[:table2] << a_table2 << sw_table.new( parent,
 				 :model, _self,
-				 :label, "Target - FDT Splice Connectifity",
 				 :aspect, :table_ur2,
 				 :data_selector, :populate_splitter_connection|()|,
 				 :selection_notifier, :table_selected_ur2|()|,
@@ -428,7 +464,7 @@ _method rwwi_mancore_plan_dialog.build_table_ur2( parent )
 				 :selection_mode, :many, # :many or :one
 				 :col_alignment, :fill,
 				 :row_alignment, :fill,
-				 :min_height, 250 )
+				 :min_height, 150 )
 	a_table2.n_cols << 5
 	a_table2.set_column_labels({"Destination Code",
 				    "Splitter Name",
