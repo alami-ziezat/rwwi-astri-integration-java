@@ -43,11 +43,15 @@ _proc()
 	p11 << 0
 	p12 << 0
 	p13 << 0
+	p14 << 0
 
 
 	_for p  _over table_list.fast_elements()
 	_loop
-		
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
 
 		_if p.spec_id="Join Closure In-line 24 Core" 
 		_then
@@ -87,7 +91,10 @@ _proc()
 			p12 << p12 + 1
 		_elif p.spec_id="Join Closure Dome 288 Core" 
 		_then
-			p13 << p13 + 1	
+			p13 << p13 + 1
+		_elif p.spec_id="Join Closure In-line 72 Core" 
+		_then
+			p14 << p14 + 1	
 			
 
 		_endif
@@ -180,7 +187,7 @@ $
 _global get_count_fdt <<
 _proc()
 
-		table_list << rope.new()
+	table_list << rope.new()
 	
 	s << swg_dsn_admin_engine.get_current_job()
 	
@@ -218,6 +225,10 @@ _proc()
 #	print(.table_list5)
 	_for p  _over table_list.fast_elements()
 	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
 
 		_if p.spec_id="48 Core pole mounted FDT" 
 		_then
@@ -290,6 +301,10 @@ _proc()
 #	print(.table_list5)
 	_for p  _over table_list.fast_elements()
 	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
 		#write(p.type)
 		_if p.spec_id="Pole mounted outdoor(16 ports)" 
 		_then
@@ -301,6 +316,59 @@ _proc()
 	_endloop
 	
 >> p1,p2
+	
+_endproc
+$
+
+
+_global get_count_slack <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :figure_eight _then
+			#_if i.current_record.sheath_splice_object_type ="FAT"
+			#_then
+				table_list.add(i.current_record)
+			#_endif
+			
+		_endif
+		
+	_endloop
+
+	p1 << 0
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		p1 << 	p1 + 1
+	
+	_endloop
+	
+>> p1
 	
 _endproc
 $
@@ -342,10 +410,16 @@ _proc()
 	p3 << 0
 	p4 << 0
 	p5 << 0
+	p6 << 0
 
 #	print(.table_list5)
 	_for p  _over table_list.fast_elements()
 	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		
 	#	write(p.type)
 		_if p.type="Pole 7-3" 
 		_then
@@ -362,13 +436,16 @@ _proc()
 		_elif p.type="Pole 7-5" 
 		_then
 			p5 << p5 + 1
+		_elif p.type="Pole 7-2.5" 
+		_then
+			p6 << p6 + 1	
 
 		_endif
 
 	_endloop
 #write("jml :",  p1,p2,p3,p4,p5)
 	
->> p1,p2,p3,p4,p5
+>> p1,p2,p3,p4,p5,p6
 		
 _endproc
 $
@@ -376,8 +453,10 @@ $
 _global get_count_sling_wire <<
 _proc()
 
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:sling_wire]
 	table_list << rope.new()
-	
+	_dynamic !current_world! << v_gis.world
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -393,19 +472,25 @@ _proc()
 	pj << s.inf_project.write_string
 	st << s.status.write_string	
 	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
 	
-	_for i _over change_set.fast_elements()
-	_loop
-		
-		name <<   i.current_record.source_collection.name
-		_if name _is :sling_wire _then
-			table_list.add(i.current_record)
-		_endif
-		
-	_endloop
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
 
-	v_gis << gis_program_manager.databases[:gis]
-	s_col << v_gis.collections[:sokka_logical]
+	pred_m << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m)
+
 
 	a_ff << float_format.new_with_properties(
 			      :float_format,:fixed,
@@ -417,7 +502,11 @@ _proc()
 	t_pjg << 0 #0.0
 
 	_for s _over table_list.fast_elements()
-	_loop 
+	_loop
+		_if s.construction_status="In Service"
+		_then
+			_continue
+		_endif
 		row +<< 1		
 		#write(row)
 	
@@ -462,6 +551,7 @@ _proc()
 	
 	_for i _over change_set.fast_elements()
 	_loop
+	
 		
 		name <<   i.current_record.source_collection.name
 		_if name _is :sheath_with_loc _then
@@ -481,6 +571,10 @@ _proc()
 
 	_for p  _over table_list.fast_elements()
 	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
 		_if p.spec_id="SM G652D-ADSS 24C" 
 		_then
 			p1 << 	p1 + p.calculated_sheath_length.value_in(:m).as_number()
@@ -518,7 +612,7 @@ _global create_boq <<
 _proc(design, infra_type)
 
 
-	#s << swg_dsn_admin_engine.get_current_job()
+	s << swg_dsn_admin_engine.get_current_job()
 
 	_if s _is _unset
 	_then
@@ -559,8 +653,15 @@ _proc(design, infra_type)
 	Excel_Object.Visible << _True
 	
 	Workbooks << Excel_Object.Workbooks ()
-	WorkBook << Workbooks.add(a_filename) 			
-	Sheet << Excel_Object.Sheets ("BoQ Roll Out ODN")
+	WorkBook << Workbooks.add(a_filename)
+
+
+	write(infra_type)
+	_if infra_type ="cluster" _then
+		Sheet << Excel_Object.Sheets ("BoQ NRO Cluster")
+	_else
+		Sheet << Excel_Object.Sheets ("BoQ NRO All Feeder")
+	_endif
 	
 	a_ff << float_format.new_with_properties(
 			:float_format,:fixed,
@@ -573,63 +674,65 @@ _proc(design, infra_type)
 	pole9m_jml << 0			
 	
 
-	q1 << get_count_sling_wire()
-	Cell_q1_name << Sheet.Range("D206")
-	Cell_q1_name.value << q1.write_string
-	
+
+
+	m1 << get_count_slack()
+	Cell_m1_name << Sheet.Range("E225")
+	Cell_m1_name.value << m1.write_string
 	
 	(j1,j2) << get_count_fat()
-	Cell_j1_name << Sheet.Range("D48")
+	Cell_j1_name << Sheet.Range("D63")
 	Cell_j1_name.value << j1.write_string
-	Cell_j2_name << Sheet.Range("D50")
+	Cell_j2_name << Sheet.Range("D65")
 	Cell_j2_name.value << j2.write_string
 	
 	
 	
 	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
 	
-	Cell_f1_name << Sheet.Range("D29")
+	Cell_f1_name << Sheet.Range("D42")
 	Cell_f1_name.value << f1.write_string
-	Cell_f2_name << Sheet.Range("D31")
+	Cell_f2_name << Sheet.Range("D44")
 	Cell_f2_name.value << f2.write_string
-	Cell_f3_name << Sheet.Range("D33")
+	Cell_f3_name << Sheet.Range("D46")
 	Cell_f3_name.value << f3.write_string
-	Cell_f4_name << Sheet.Range("D35")
+	Cell_f4_name << Sheet.Range("D48")
 	Cell_f4_name.value << f4.write_string
-	Cell_f5_name << Sheet.Range("D37")
+	Cell_f5_name << Sheet.Range("D50")
 	Cell_f5_name.value << f5.write_string
-	Cell_f6_name << Sheet.Range("D39")
+	Cell_f6_name << Sheet.Range("D52")
 	Cell_f6_name.value << f6.write_string
 	
 	
-	(p1,p2,p3,p4,p5) << get_count_pole()
+	(p1,p2,p3,p4,p5,p6) << get_count_pole()
 	
-	Cell_p1_name << Sheet.Range("D198")
+	Cell_p1_name << Sheet.Range("D217")
 	Cell_p1_name.value << p1.write_string
-	Cell_p2_name << Sheet.Range("D194")
+	Cell_p2_name << Sheet.Range("D213")
 	Cell_p2_name.value << p2.write_string
-	Cell_p3_name << Sheet.Range("D190")
+	Cell_p3_name << Sheet.Range("D209")
 	Cell_p3_name.value << p3.write_string
-	Cell_p4_name << Sheet.Range("D196")
+	Cell_p4_name << Sheet.Range("D215")
 	Cell_p4_name.value << p4.write_string
-	Cell_p5_name << Sheet.Range("D192")
+	Cell_p5_name << Sheet.Range("D211")
 	Cell_p5_name.value << p5.write_string
-	
+	Cell_p6_name << Sheet.Range("D219")
+	Cell_p6_name.value << p6.write_string
 	
 	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
-	Cell_c1_name << Sheet.Range("D16")
+	Cell_c1_name << Sheet.Range("D15")
 	Cell_c1_name.value << c1.write_string
-	Cell_c2_name << Sheet.Range("D18")
+	Cell_c2_name << Sheet.Range("D17")
 	Cell_c2_name.value << c2.write_string
-	Cell_c3_name << Sheet.Range("D20")
+	Cell_c3_name << Sheet.Range("D19")
 	Cell_c3_name.value << c3.write_string
-	#Cell_c4_name << Sheet.Range("D196")
-	#Cell_c4_name.value << p4.write_string
-	Cell_c5_name << Sheet.Range("D22")
+	Cell_c4_name << Sheet.Range("D21")
+	Cell_c4_name.value << p4.write_string
+	Cell_c5_name << Sheet.Range("D23")
 	Cell_c5_name.value << c5.write_string
-	Cell_c6_name << Sheet.Range("D24")
+	Cell_c6_name << Sheet.Range("D25")
 	Cell_c6_name.value << c6.write_string
-	Cell_c7_name << Sheet.Range("D26")
+	Cell_c7_name << Sheet.Range("D27")
 	Cell_c7_name.value << c7.write_string
 	
 	clr << get_count_closure()
@@ -637,61 +740,69 @@ _proc(design, infra_type)
 	_for b _over clr.fast_elements()
 	_loop
 		_if b[:id]="clr1" _then
-			Cell_d55_name << Sheet.Range("D55")
+			Cell_d55_name << Sheet.Range("D76")
 			Cell_d55_name.value << b[:jml].write_string
 		_elif b[:id]="clr2" 
 		_then
-			Cell_d56_name << Sheet.Range("D56")
+			Cell_d56_name << Sheet.Range("D77")
 			Cell_d56_name.value << b[:jml].write_string
 		_elif b[:id]="clr3"
 		_then
-			Cell_d57_name << Sheet.Range("D57")
+			Cell_d57_name << Sheet.Range("D78")
 			Cell_d57_name.value << b[:jml].write_string
 		_elif b[:id]="clr4" 
 		_then
-			Cell_d58_name << Sheet.Range("D58")
+			Cell_d58_name << Sheet.Range("D80")
 			Cell_d58_name.value << b[:jml].write_string
 		_elif b[:id]="clr5"
 		_then
-			Cell_d59_name << Sheet.Range("D59")
+			Cell_d59_name << Sheet.Range("D81")
 			Cell_d59_name.value << b[:jml].write_string
 		_elif b[:id]="clr6" 
 		_then
-			Cell_d60_name << Sheet.Range("D60")
+			Cell_d60_name << Sheet.Range("D82")
 			Cell_d60_name.value << b[:jml].write_string
 		_elif b[:id]="clr7" 
 		_then
-			Cell_d61_name << Sheet.Range("D61")
+			Cell_d61_name << Sheet.Range("D83")
 			Cell_d61_name.value << b[:jml].write_string
 		_elif b[:id]="clr8" 
 		_then
-			Cell_d62_name << Sheet.Range("D62")
+			Cell_d62_name << Sheet.Range("D84")
 			Cell_d62_name.value << b[:jml].write_string
 		_elif b[:id]="clr9"
 		_then
-			Cell_d63_name << Sheet.Range("D63")
+			Cell_d63_name << Sheet.Range("D85")
 			Cell_d63_name.value << b[:jml].write_string
 		_elif b[:id]="clr10" 
 		_then
-			Cell_d64_name << Sheet.Range("D64")
+			Cell_d64_name << Sheet.Range("D86")
 			Cell_d64_name.value << b[:jml].write_string
 		_elif b[:id]="clr11" 
 		_then
-			Cell_d65_name << Sheet.Range("D65")
+			Cell_d65_name << Sheet.Range("D87")
 			Cell_d65_name.value << b[:jml].write_string
 		_elif b[:id]="clr12"
 		_then
-			Cell_d66_name << Sheet.Range("D66")
+			Cell_d66_name << Sheet.Range("D88")
 			Cell_d66_name.value << b[:jml].write_string
 		_elif b[:id]="clr13"
 		_then
-			Cell_d67_name << Sheet.Range("D67")
-			Cell_d67_name.value << b[:jml].write_string	
+			Cell_d67_name << Sheet.Range("D89")
+			Cell_d67_name.value << b[:jml].write_string
+		_elif b[:id]="clr14"
+		_then
+			Cell_d68_name << Sheet.Range("D79")
+			Cell_d68_name.value << b[:jml].write_string
 		_endif
 	_endloop
+
+	q1 << get_count_sling_wire()
+	Cell_q1_name << Sheet.Range("E226")
+	Cell_q1_name.value << q1.write_string
 	
 	
-		   _endproc
+_endproc
 
 $
 

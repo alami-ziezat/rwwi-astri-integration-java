@@ -637,6 +637,9 @@ _method rwwi_mancore_plan_dialog.clear()
 	# Reset subfeeder field
 	.items[:subfeeder_field].value << ""
 
+	# Reset feeder field
+	.items[:feeder_field].value << ""
+
 	# Reset counts
 	.feeder_count << 0
 	.subfeeder_count << 0

@@ -69,7 +69,7 @@ _method rwwi_mancore_plan_dialog.query_and_populate_tables(infra_type, infra_cod
 		# Query and display homepass information
 		_local homepass << .engine.get_homepass(infra_type, infra_code)
 		_local homepass_count << homepass.size
-		_local cores_to_book << (homepass_count.as_float / 64).rounded
+		_local cores_to_book << (homepass_count.as_float / 64).ceiling
 		.items[:log].append("Homepass (Demand Points)")
 		.items[:log].append(newline_char)
 		.items[:log].append("=======================")
@@ -384,7 +384,7 @@ _method rwwi_mancore_plan_dialog.query_and_populate_subfeeder_table(subfeeder_co
 		# Query and display homepass information
 		_local homepass << .engine.get_homepass("subfeeder", subfeeder_code)
 		_local homepass_count << homepass.size
-		_local cores_to_book << (homepass_count.as_float / 64).rounded
+		_local cores_to_book << (homepass_count.as_float / 64).ceiling
 		.items[:log].append("Homepass (Demand Points)")
 		.items[:log].append(newline_char)
 		.items[:log].append("=======================")

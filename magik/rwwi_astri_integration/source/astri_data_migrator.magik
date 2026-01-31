@@ -537,9 +537,9 @@ _private _method astri_data_migrator.create_olt(rec, coord)
 	# Map PostgreSQL fields to Smallworld mit_hub fields
 	_local prop_values << property_list.new_with(
 		# Core identification
-		:name, rec.olt_name.default(rec.olt_label.default("")),
+		:name, rec.olt_label.default(rec.olt_name.default("")),
 		:olt_code, rec.olt_code.default(""),
-		:olt, rec.olt_label.default(""),
+		:olt, rec.olt_name.default(""),
 
 		# Location and geometry
 		:location, coord,
@@ -1082,7 +1082,7 @@ _private _method astri_data_migrator.create_subfeeder(rec)
 
 		# Technical specifications
 		:subfeeder_length, rec.subfeeder_length.default(_unset),
-		:subfeeder_cable_type, rec.subfeeder_cable_type.default(""),
+		:subfeeder_cable_type, rec.subfeeder_cable_type.default(_unset),
 		:subfeeder_capacity, _unset,
 
 		# Status and dates
@@ -1171,6 +1171,7 @@ _method astri_data_migrator.migrate_clusters()
 					.db_connection.commit()
 					write("  [COMMIT] Committed batch at record ", .stats[:total])
 					batch_count << 0
+					_return 
 				_when error
 					write("  WARNING: Batch commit failed at record ", .stats[:total])
 					.db_connection.rollback()

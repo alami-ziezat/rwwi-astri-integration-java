@@ -782,9 +782,9 @@ _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 	_if col_name _is :sheath_with_loc
 	_then
 		write("Getting length for sheath_with_loc ID:", rec.id)
-		_if rec.responds_to?(:calculated_fiber_length)
+		_if rec.responds_to?(:calculated_sheath_length)
 		_then
-			_return rec.calculated_fiber_length.value_in(:m).as_number()
+			_return rec.calculated_sheath_length.value_in(:m).as_number()
 		_endif
 	_endif
 

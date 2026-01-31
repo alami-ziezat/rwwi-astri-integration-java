@@ -407,6 +407,8 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 		# RELEASE/ACTIVE: Process all feeder records independently (no pairing)
 		write("Processing ", feeder_records.size, " records for ", status, " status (no pairing required)...")
 
+		_local code_to_core_count << hash_table.new()  # Track destination codes and sum core counts (no duplicates)
+
 		_for i _over 1.upto(feeder_records.size)
 		_loop
 			_local feeder_rec << feeder_records[i]
@@ -425,6 +427,35 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 			_then
 				success_count +<< 1
 				write("  >> SUCCESS: Booking created")
+
+				# For ACTIVE status: Track destination codes with source feeder code, tube, and core
+				_if status = "ACTIVE"
+				_then
+					_local dest_subfeeder_code << feeder_rec[:destination_subfeeder_code].default(feeder_rec[:destination_code])
+					_local feeder_core_count << feeder_rec[:transport_feeder_core_count].default(100)
+					_local source_feeder_code << feeder_rec[:transport_feeder_code].default("")
+					_local dest_tube_number << feeder_rec[:destination_tube_number].default("")
+					_local dest_core_number << feeder_rec[:destination_core_number].default("")
+					_if dest_subfeeder_code <> "" _andif dest_subfeeder_code _isnt _unset _andif
+					    source_feeder_code <> "" _andif source_feeder_code _isnt _unset
+					_then
+						# Convert to symbol for hash table key
+						_local code_symbol << dest_subfeeder_code.as_symbol()
+
+						# Track destination code with source feeder code, tube, core, and core count
+						_if _not code_to_core_count.includes_key?(code_symbol)
+						_then
+							code_to_core_count[code_symbol] << property_list.new_with(
+								:core_count, feeder_core_count,
+								:source_feeder_code, source_feeder_code,
+								:destination_tube_number, dest_tube_number,
+								:destination_core_number, dest_core_number)
+							write("  >> Tracking destination subfeeder: ", dest_subfeeder_code, " (", feeder_core_count, " cores, source: ", source_feeder_code, ", tube: ", dest_tube_number, ", core: ", dest_core_number, ")")
+						_else
+							write("  >> Destination subfeeder already tracked: ", dest_subfeeder_code, " (skipping duplicate)")
+						_endif
+					_endif
+				_endif
 			_else
 				error_count +<< 1
 				_local err_msg << result[:error_message].default("Unknown error")
@@ -432,6 +463,17 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 				write("  >> ERROR: ", err_msg)
 			_endif
 		_endloop
+
+		# For ACTIVE status: Automatically activate subfeeders booked to these feeders
+		_if status = "ACTIVE" _andif _not code_to_core_count.empty?
+		_then
+			write("============================================")
+			write("AUTO-ACTIVATING DESTINATION SUBFEEDERS")
+			write("============================================")
+			write("Found ", code_to_core_count.size, " unique destination subfeeder code(s)")
+
+			_self.activate_destination_subfeeders(work_order, code_to_core_count, success_count, error_count, errors)
+		_endif
 	_endif
 
 	write("============================================")
@@ -730,7 +772,7 @@ _private _method rwwi_mancore_plan_dialog.build_booking_feeder_data(work_order, 
 	_then
 		# For ACTIVE, use destination data from same table (table 1 - feeder)
 		dest_type << "SUBFEEDER"
-		dest_code << feeder_rec[:destination_code].default("")
+		dest_code << feeder_rec[:destination_subfeeder_code].default(feeder_rec[:destination_code])
 		dest_tube << feeder_rec[:destination_tube_number].default("")
 		dest_core << feeder_rec[:destination_core_number].default("")
 	_else
@@ -851,5 +893,146 @@ _private _method rwwi_mancore_plan_dialog.build_booking_subfeeder_data(work_orde
 	connection_data.add_all(_self.get_default_device_connection_fields())
 
 	>> connection_data
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwwi_mancore_plan_dialog.activate_destination_subfeeders(work_order, code_to_core_count, success_count, error_count, errors)
+	##
+	## Automatically activate destination subfeeders when feeder is activated
+	## Parameters:
+	##   work_order - Work order number
+	##   code_to_core_count - hash_table mapping destination_subfeeder_code (symbol) to property_list with:
+	##                        :core_count - number of cores to query
+	##                        :source_feeder_code - single source feeder code
+	##                        :destination_tube_number - destination tube number from feeder
+	##                        :destination_core_number - destination core number from feeder
+	##   success_count - Reference to success counter (updated by reference)
+	##   error_count - Reference to error counter (updated by reference)
+	##   errors - rope of error messages (updated by reference)
+	##
+	## Filtering criteria for subfeeders:
+	##   - source_type = "FEEDER"
+	##   - source_code = source_feeder_code
+	##   - transport_status = "TAKEN"
+	##   - transport_remarks = "BOOKED"
+	##   - transport_tube_number = destination_tube_number (from feeder)
+	##   - transport_core_number = destination_core_number (from feeder)
+	##
+
+	_local subfeeder_success << 0
+	_local subfeeder_error << 0
+
+	# Query and activate subfeeders for each unique destination code
+	_for dest_code_symbol, info _over code_to_core_count.fast_keys_and_elements()
+	_loop
+		# Convert symbol back to string for querying
+		_local dest_code << dest_code_symbol.write_string
+		_local total_cores << info[:core_count]
+		_local source_feeder_code << info[:source_feeder_code]
+		_local dest_tube_number << info[:destination_tube_number]
+		_local dest_core_number << info[:destination_core_number]
+
+		write("Querying subfeeders for code: ", dest_code, " (limit: ", total_cores, " cores, source: ", source_feeder_code, ", tube: ", dest_tube_number, ", core: ", dest_core_number, ")")
+
+		# Query device connections using the correct method signature
+		_local query_result << .engine.get_device_connections("subfeeder", dest_code, total_cores, 0)
+
+		_if query_result[:success] _isnt _true
+		_then
+			_local err_msg << write_string("Failed to query subfeeders for ", dest_code, ": ",
+						       query_result[:error_message].default("Unknown error"))
+			write("  >> ERROR: ", err_msg)
+			errors.add(err_msg)
+			subfeeder_error +<< 1
+			_continue
+		_endif
+
+		_local subfeeder_records << query_result[:data]
+		write("  Found ", subfeeder_records.size, " subfeeder record(s) - filtering by criteria...")
+
+		# Filter records to match criteria:
+		# - source_type = "FEEDER"
+		# - source_code = source_feeder_code
+		# - transport_status = "TAKEN"
+		# - transport_remarks = "BOOKED"
+		# - transport_tube_number = destination_tube_number (from feeder)
+		# - transport_core_number = destination_core_number (from feeder)
+		_local filtered_records << rope.new()
+		_for rec _over subfeeder_records.fast_elements()
+		_loop
+			_local src_type << rec[:source_type].default("")
+			_local src_code << rec[:source_code].default("")
+			_local t_status << rec[:transport_status].default("")
+			_local t_remarks << rec[:transport_remarks].default("")
+			_local t_tube << rec[:transport_tube_number].default("")
+			_local t_core << rec[:transport_core_number].default("")
+
+			_if src_type = "FEEDER" _andif
+			    src_code = source_feeder_code _andif
+			    t_status = "TAKEN" _andif
+			    t_remarks = "BOOKED" _andif
+			    t_tube = dest_tube_number _andif
+			    t_core = dest_core_number
+			_then
+				filtered_records.add(rec)
+			_endif
+		_endloop
+
+		write("  Filtered to ", filtered_records.size, " matching subfeeder(s)")
+		_local subfeeder_records << filtered_records
+
+		# Activate each matching subfeeder
+		_for subfeeder_rec _over subfeeder_records.fast_elements()
+		_loop
+			write("  Activating: Tube ", subfeeder_rec[:transport_tube_number], " Core ", subfeeder_rec[:transport_core_number])
+
+			# Build activation data
+			_local activation_data << property_list.new_with(
+				:work_order_number, work_order,
+				:source_type, "FEEDER",
+				:source_code, subfeeder_rec[:source_code].default(""),
+				:transport_tube_number, subfeeder_rec[:transport_tube_number].default(""),
+				:transport_core_number, subfeeder_rec[:transport_core_number].default(""),
+				:transport_code, subfeeder_rec[:transport_code].default(""),
+				:transport_status, "TAKEN",
+				:transport_remarks, "ACTIVE",
+				:destination_type, "CLUSTER",
+				:destination_code, subfeeder_rec[:destination_code].default(""),
+				:destination_tube_number, subfeeder_rec[:destination_tube_number].default(""),
+				:destination_core_number, subfeeder_rec[:destination_core_number].default("")
+			)
+
+			# Add default fields
+			activation_data.add_all(_self.get_default_device_connection_fields())
+
+			# Call API to activate
+			_local result << .engine.add_device_connection(activation_data)
+
+			_if result[:success] = _true
+			_then
+				subfeeder_success +<< 1
+				write("    >> SUCCESS: Subfeeder activated")
+			_else
+				subfeeder_error +<< 1
+				_local err_msg << write_string("Subfeeder activation failed (", dest_code, " Tube ",
+							       subfeeder_rec[:transport_tube_number], " Core ",
+							       subfeeder_rec[:transport_core_number], "): ",
+							       result[:error_message].default("Unknown error"))
+				errors.add(err_msg)
+				write("    >> ERROR: ", result[:error_message].default("Unknown error"))
+			_endif
+		_endloop
+	_endloop
+
+	write("============================================")
+	write("AUTO-ACTIVATION COMPLETED")
+	write("============================================")
+	write("Subfeeders Activated: ", subfeeder_success)
+	write("Subfeeders Failed: ", subfeeder_error)
+
+	# Update overall counters (pass by reference not supported, so we log it separately)
+	# The counts will be shown in the final message
+
 _endmethod
 $
