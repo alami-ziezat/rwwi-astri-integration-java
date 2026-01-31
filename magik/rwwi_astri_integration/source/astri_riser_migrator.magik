@@ -44,11 +44,11 @@ _private _method astri_design_migrator.create_riser(pm)
 		_local prop_values << property_list.new_with(
 			:location, coord,
 			:name, pm[:name],
-			:folders, folders,
-			:fttx_network_type, _self.get_fttx_network_type(),
-			:ring_name, ring_name,
+			#:folders, folders,
+			#:fttx_network_type, _self.get_fttx_network_type(),
+			#:ring_name, ring_name,
 			:construction_status, .construction_status,
-			:cable_type, "Riser",
+			#:cable_type, "Riser",
 			:stf_item_code, "200001034"
 		)
 

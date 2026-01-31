@@ -726,16 +726,12 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 		write("Icon filename _is unset")
 		_return _unset
 	_endif
-	#write("DEBUG map_icon_to_network_type: icon_filename = ", icon_filename)
-	_local filename_lc << icon_filename.lowercase
+	#write("DEBUG map_icon_to_network_type: icon_filename = ", icon_filename, " : ",p_name_lc)
+	_local filename_lc << icon_filename.lowercase 
 
 	# Map icon filenames to network types
-	_if filename_lc.index_of_seq("ranger_station") _isnt _unset _orif 
-		p_name_lc.index_of_seq("olt") _isnt _unset 
-	_then
-		_return "olt"
 
-	_elif filename_lc.index_of_seq("placemark_circle") _isnt _unset _orif 
+	_if filename_lc.index_of_seq("placemark_circle") _isnt _unset _orif 
 		p_name_lc.index_of_seq("pole") _isnt _unset 
 	_then 
 		_if p_name_lc.index_of_seq("mr") _is _unset	
@@ -790,6 +786,14 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 		  p_name_lc.index_of_seq("fdt") _isnt _unset 
 	_then
 		_return "fdt"
+	_elif filename_lc.index_of_seq("arrow") _isnt _unset _orif 
+		p_name_lc.index_of_seq("riser") _isnt _unset 
+	_then
+		_return "riser"
+	_elif filename_lc.index_of_seq("ranger_station") _isnt _unset _orif 
+		p_name_lc.index_of_seq("olt") _isnt _unset 
+	_then
+		_return "olt"
 
 	_else
 		# Unknown icon

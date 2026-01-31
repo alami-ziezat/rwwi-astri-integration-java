@@ -148,8 +148,9 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_local (project, scheme) << migrator.create_project_and_design(
 				placemarks,     # Boundary extracted from placemarks
 				wo_number,      # Project name
-				infra_code,     # Project title
-				infra_name      # Design name
+				infra_code,     # Project title (will be formatted as FEEDER-code or SUBFEEDER-code)
+				infra_name,     # Design name
+				infra_type      # Infrastructure type
 			)
 			_self.log_success("Project and design created")
 			_self.log_info("")

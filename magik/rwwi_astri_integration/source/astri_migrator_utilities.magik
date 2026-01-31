@@ -174,7 +174,6 @@ _private _method astri_design_migrator.is_micro_cell?(pm)
 	## - Areas WITHOUT folders = Macro Cell (boundary areas)
 	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
 	_local network_type << pm[:network_type].default("").lowercase
-	write(pm[:name],"cell  : ",network_type)
 	>> pm[:type] = "area" _andif network_type = "cell" _orif network_type = "fat"
 _endmethod
 $
@@ -220,8 +219,8 @@ _private _method astri_design_migrator.is_riser?(pm)
 		_return _false
 	_endif
 
-	_local name_lc << name.lowercase
-	>> name_lc.matches?("*riser*")
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "riser"
 _endmethod
 $
 

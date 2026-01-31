@@ -200,7 +200,7 @@ _method rwwi_mancore_plan_dialog.build_toolbar( parent )
 						  :display_length, 15,
 						  :model, _self,
 						  :value, "",
-						  :tooltip, "Subfeeder code from project job_title (editable)" )
+						  :tooltip, "Subfeeder code from project job_title (format: INFRATYPE-code, editable)" )
 
 
 	.items[:get_mancore] << sw_button_item.new( file_toolbar,
@@ -575,7 +575,18 @@ _method rwwi_mancore_plan_dialog.get_rwo()
 						project_subfeeder_code << design.project.perform(:job_title).default("")
 						_if project_subfeeder_code <> "" _andif project_subfeeder_code _isnt _unset
 						_then
-							populated_subfeeder << project_subfeeder_code
+							# Extract code part after "-" delimiter (format: INFRATYPE-code)
+							_local dash_pos << project_subfeeder_code.index_of_seq("-")
+							_if dash_pos _isnt _unset
+							_then
+								# Extract part after "-"
+								populated_subfeeder << project_subfeeder_code.subseq(dash_pos + 1, project_subfeeder_code.size - dash_pos)
+								write("Extracted subfeeder code from job_title: ", project_subfeeder_code, " -> ", populated_subfeeder)
+							_else
+								# No delimiter found, use whole value
+								populated_subfeeder << project_subfeeder_code
+								write("Using full job_title as subfeeder code: ", populated_subfeeder)
+							_endif
 							.items[:subfeeder_field].value << populated_subfeeder
 							write("Populated subfeeder field from project job_title: ", populated_subfeeder)
 						_endif

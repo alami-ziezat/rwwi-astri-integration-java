@@ -300,7 +300,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_design_migrator.create_project_and_design(placemarks, wo_number, infra_code, infra_name)
+_method astri_design_migrator.create_project_and_design(placemarks, wo_number, infra_code, infra_name, _optional infra_type)
 	## Create new project and design for migration
 	##
 	## Parameters:
@@ -308,11 +308,22 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, i
 	##   wo_number (string) - Work order number -> project name
 	##   infra_code (string) - Infrastructure code (cluster/subfeeder/feeder) -> project title
 	##   infra_name (string) - Infrastructure name -> design name
+	##   infra_type (string) - Infrastructure type (optional: "feeder", "subfeeder", "cluster")
 	##
 	## Returns:
 	##   (project, scheme) - Created project and scheme objects
 
 	write("Creating project and design...")
+
+	# Format job_title based on infrastructure type
+	# For ALL types: format as "INFRATYPE-code" (e.g., "FEEDER-code", "SUBFEEDER-code", "CLUSTER-code")
+	# If infra_type not specified, use infra_code as-is
+	_local job_title_value << _if infra_type _isnt _unset _andif infra_type <> ""
+	                          _then >> infra_type.uppercase + "-" + infra_code
+	                          _else >> infra_code
+	                          _endif
+
+	write("  Job title formatted as: ", job_title_value, " (infra_type: ", infra_type.default("(not specified)"), ")")
 	_local sch
 
  	_local prj << .design_manager.find_project_or_scheme(wo_number, :project)
@@ -350,18 +361,18 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, i
 
 		# Create project
 		# project_name = WO number
-		# project_title = infra code
+		# project_title = formatted job_title (FEEDER-code, SUBFEEDER-code, or infra_code)
 		_local prj_attrs << property_list.new_with(
-					    :job_title, infra_code,
+					    :job_title, job_title_value,
 					    :job_type, "Physical NI Design Job",
 					    :asset_owner, "Owned")
 		prj << .design_manager.create_project(
-			       wo_number,       # Project name from WO number 
+			       wo_number,       # Project name from WO number
 			       dsnames,
 			       area_sr,
 			       prj_attrs
 				       )
-		write("  Project created: ", wo_number, " (Title: ", infra_code, ", ID: ", prj.id, ")")
+		write("  Project created: ", wo_number, " (Title: ", job_title_value, ", ID: ", prj.id, ")")
 		
 	_endif
 	_if sch _isnt unset
