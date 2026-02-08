@@ -373,6 +373,45 @@ _proc()
 _endproc
 $
 
+_global get_count_hp <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+
+	p1 << 0
+	_for i _over change_set.fast_elements()
+	_loop
+		name <<   i.current_record.source_collection.name
+		_if name _is :ftth!demand_point _then
+			table_list.add(i.current_record)
+			p1 +<< 1
+		_endif
+		
+
+	_endloop
+
+
+	>> p1
+	
+_endproc
+$
+	
 
 
 _global get_count_pole <<
@@ -412,6 +451,8 @@ _proc()
 	p5 << 0
 	p6 << 0
 
+	t_pole << 0
+
 #	print(.table_list5)
 	_for p  _over table_list.fast_elements()
 	_loop
@@ -442,10 +483,12 @@ _proc()
 
 		_endif
 
+		t_pole +<< 1
+
 	_endloop
 #write("jml :",  p1,p2,p3,p4,p5)
 	
->> p1,p2,p3,p4,p5,p6
+>> p1,p2,p3,p4,p5,p6,t_pole
 		
 _endproc
 $
@@ -668,13 +711,34 @@ _proc(design, infra_type)
 			:float_decimal_places,3)
 	
 	start << date_time_now()
+
+
+	hdp << get_count_hp()
+	Cell_hdp << Sheet.Range("O5")
+	Cell_hdp.value << hdp.write_string
+
+	olt_nm << ""
+	#clr_nm << ""
+	_for i _over change_set.fast_elements()
+	_loop
 	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			olt_nm << i.current_record.olt 
+		_endif
+		
+	_endloop
+
+	Cell_olt << Sheet.Range("O2")
+	Cell_olt.value << olt_nm.write_string
+
+	Cell_cluster << Sheet.Range("O3")
+	Cell_cluster.value << nama.write_string
 
 	pole7m_jml << 0
 	pole9m_jml << 0			
 	
-
-
 
 	m1 << get_count_slack()
 	Cell_m1_name << Sheet.Range("E225")
@@ -683,57 +747,155 @@ _proc(design, infra_type)
 	(j1,j2) << get_count_fat()
 	Cell_j1_name << Sheet.Range("D63")
 	Cell_j1_name.value << j1.write_string
+	Cell_j11_name << Sheet.Range("E64")
+	Cell_j11_name.value << j1.write_string
 	Cell_j2_name << Sheet.Range("D65")
 	Cell_j2_name.value << j2.write_string
+	Cell_j22_name << Sheet.Range("D66")
+	Cell_j22_name.value << j2.write_string
+
+	total_fat << j1+j2
+
+	Cell_j220_name << Sheet.Range("E96")
+	Cell_j220_name.value << total_fat.write_string
+	Cell_j221_name << Sheet.Range("D96")
+	Cell_j221_name.value << total_fat.write_string
+	#Testcomm OTDR & OPM FDT - FAT
+	Cell_j229_name << Sheet.Range("E287")
+	Cell_j229_name.value << total_fat.write_string
+	Cell_j228_name << Sheet.Range("D287")
+	Cell_j228_name.value << total_fat.write_string
+
+	#splicing
+	total_fatx << total_fat * 2
+	Cell_j222_name << Sheet.Range("D92")
+	Cell_j222_name.value << total_fatx.write_string
+	Cell_j222_name << Sheet.Range("E92")
+	Cell_j222_name.value << total_fatx.write_string
+
 	
-	
-	
+		
 	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
 	
 	Cell_f1_name << Sheet.Range("D42")
 	Cell_f1_name.value << f1.write_string
+	Cell_f11_name << Sheet.Range("E43")
+	Cell_f11_name.value << f1.write_string
 	Cell_f2_name << Sheet.Range("D44")
 	Cell_f2_name.value << f2.write_string
+	Cell_f22_name << Sheet.Range("E45")
+	Cell_f22_name.value << f2.write_string
 	Cell_f3_name << Sheet.Range("D46")
 	Cell_f3_name.value << f3.write_string
+	Cell_f33_name << Sheet.Range("E47")
+	Cell_f33_name.value << f3.write_string
 	Cell_f4_name << Sheet.Range("D48")
 	Cell_f4_name.value << f4.write_string
+	Cell_f44_name << Sheet.Range("E48")
+	Cell_f44_name.value << f4.write_string
 	Cell_f5_name << Sheet.Range("D50")
 	Cell_f5_name.value << f5.write_string
+	Cell_f55_name << Sheet.Range("E51")
+	Cell_f55_name.value << f5.write_string
 	Cell_f6_name << Sheet.Range("D52")
 	Cell_f6_name.value << f6.write_string
+	Cell_f66_name << Sheet.Range("D53")
+	Cell_f66_name.value << f6.write_string
 	
+	total_fdt << f1+f2+f3+f4+f5+f6
+
 	
-	(p1,p2,p3,p4,p5,p6) << get_count_pole()
+	Cell_f661_name << Sheet.Range("D95")
+	Cell_f661_name.value << total_fdt.write_string
+	Cell_f662_name << Sheet.Range("E95")
+	Cell_f662_name.value << total_fdt.write_string
+	
+	(p1,p2,p3,p4,p5,p6,t_pl) << get_count_pole()
 	
 	Cell_p1_name << Sheet.Range("D217")
 	Cell_p1_name.value << p1.write_string
+	Cell_p11_name << Sheet.Range("E218")
+	Cell_p11_name.value << p1.write_string
 	Cell_p2_name << Sheet.Range("D213")
 	Cell_p2_name.value << p2.write_string
+	Cell_p22_name << Sheet.Range("E214")
+	Cell_p22_name.value << p2.write_string
 	Cell_p3_name << Sheet.Range("D209")
 	Cell_p3_name.value << p3.write_string
+	Cell_p33_name << Sheet.Range("E210")
+	Cell_p33_name.value << p3.write_string
 	Cell_p4_name << Sheet.Range("D215")
 	Cell_p4_name.value << p4.write_string
+	Cell_p44_name << Sheet.Range("E216")
+	Cell_p44_name.value << p4.write_string
 	Cell_p5_name << Sheet.Range("D211")
 	Cell_p5_name.value << p5.write_string
+	Cell_p55_name << Sheet.Range("E212")
+	Cell_p55_name.value << p5.write_string
 	Cell_p6_name << Sheet.Range("D219")
 	Cell_p6_name.value << p6.write_string
+	Cell_p66_name << Sheet.Range("E220")
+	Cell_p66_name.value << p6.write_string
+
+	Cell_c611_name << Sheet.Range("D239")
+	Cell_c611_name.value << t_pl.write_string
+	Cell_c711_name << Sheet.Range("D97")
+	Cell_c711_name.value << t_pl.write_string
+	Cell_c61_name << Sheet.Range("E239")
+	Cell_c61_name.value << t_pl.write_string
+	Cell_c71_name << Sheet.Range("E97")
+	Cell_c71_name.value << t_pl.write_string
+	
+	
 	
 	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
+	write(c1)
+	c1 << c1 + (c1 * (5/100))
 	Cell_c1_name << Sheet.Range("D15")
 	Cell_c1_name.value << c1.write_string
+
+	c2 << c2 + (c2 * (5/100))
 	Cell_c2_name << Sheet.Range("D17")
 	Cell_c2_name.value << c2.write_string
+	
+	c3 << c3 + (c3 * (5/100))
 	Cell_c3_name << Sheet.Range("D19")
 	Cell_c3_name.value << c3.write_string
+
+	c4 << c4 + (c4 * (5/100))
 	Cell_c4_name << Sheet.Range("D21")
 	Cell_c4_name.value << p4.write_string
+
+	c5 << c5 + (c5 * (5/100))
 	Cell_c5_name << Sheet.Range("D23")
 	Cell_c5_name.value << c5.write_string
+
+	c6 << c6 + (c6 * (5/100))
 	Cell_c6_name << Sheet.Range("D25")
 	Cell_c6_name.value << c6.write_string
+
+	c7 << c7 + (c7 * (5/100))
 	Cell_c7_name << Sheet.Range("D27")
 	Cell_c7_name.value << c7.write_string
+
+	Cell_c11_name << Sheet.Range("E16")
+	Cell_c11_name.value << c1.write_string
+	Cell_c22_name << Sheet.Range("E18")
+	Cell_c22_name.value << c2.write_string
+	Cell_c33_name << Sheet.Range("E20")
+	Cell_c33_name.value << c3.write_string
+	Cell_c44_name << Sheet.Range("E22")
+	Cell_c44_name.value << p4.write_string
+	Cell_c55_name << Sheet.Range("E24")
+	Cell_c55_name.value << c5.write_string
+	Cell_c66_name << Sheet.Range("E26")
+	Cell_c66_name.value << c6.write_string
+	Cell_c77_name << Sheet.Range("E28")
+	Cell_c77_name.value << c7.write_string
+
+
+
+	total_cable_length << c1+c2+c3+c4+c5+c6+c7
 	
 	clr << get_count_closure()
 	
@@ -742,30 +904,38 @@ _proc(design, infra_type)
 		_if b[:id]="clr1" _then
 			Cell_d55_name << Sheet.Range("D76")
 			Cell_d55_name.value << b[:jml].write_string
+		
 		_elif b[:id]="clr2" 
 		_then
 			Cell_d56_name << Sheet.Range("D77")
 			Cell_d56_name.value << b[:jml].write_string
+		
 		_elif b[:id]="clr3"
 		_then
 			Cell_d57_name << Sheet.Range("D78")
 			Cell_d57_name.value << b[:jml].write_string
+		
 		_elif b[:id]="clr4" 
 		_then
 			Cell_d58_name << Sheet.Range("D80")
 			Cell_d58_name.value << b[:jml].write_string
+		
 		_elif b[:id]="clr5"
 		_then
 			Cell_d59_name << Sheet.Range("D81")
 			Cell_d59_name.value << b[:jml].write_string
+		
 		_elif b[:id]="clr6" 
 		_then
 			Cell_d60_name << Sheet.Range("D82")
 			Cell_d60_name.value << b[:jml].write_string
+		
+			
 		_elif b[:id]="clr7" 
 		_then
 			Cell_d61_name << Sheet.Range("D83")
 			Cell_d61_name.value << b[:jml].write_string
+		
 		_elif b[:id]="clr8" 
 		_then
 			Cell_d62_name << Sheet.Range("D84")
@@ -797,9 +967,27 @@ _proc(design, infra_type)
 		_endif
 	_endloop
 
+	
+
 	q1 << get_count_sling_wire()
 	Cell_q1_name << Sheet.Range("E226")
 	Cell_q1_name.value << q1.write_string
+
+	_local total_length << total_cable_length + q1
+	
+	Cell_q1_name << Sheet.Range("E296")
+	Cell_q1_name.value << total_length.write_string
+	Cell_q1_name << Sheet.Range("E291")
+	Cell_q1_name.value << total_length.write_string
+
+	_local total_splicing << total_fat * 2
+
+
+	#Cell_q1_name << Sheet.Range("E291")
+	#Cell_q1_name.value << total_length.write_string
+
+	#Cell_q1_name << Sheet.Range("E291")
+	#Cell_q1_name.value << total_length.write_string
 	
 	
 _endproc
