@@ -103,6 +103,7 @@ _method rwwi_mancore_plan_dialog.populate_feeder_connection_table( a_table )
 
 		# Column 9: Status - based on transport_status and transport_remarks
 		_local icon_status
+		_local remark_status
 		_local t_status << a_rec[:transport_status].default("")
 		_local t_remarks << a_rec[:transport_remarks].default("")
 
@@ -110,19 +111,23 @@ _method rwwi_mancore_plan_dialog.populate_feeder_connection_table( a_table )
 		_then
 			# NULL/BLANK or RELEASE -> RED
 			icon_status << {:traffic_light_red, :ui_resources}
+			remark_status << " Idle"
 		_elif t_status = "TAKEN" _andif t_remarks = "BOOKED"
 		_then
 			# TAKEN & BOOKED -> YELLOW
 			icon_status << {:traffic_light_yellow, :ui_resources}
+			remark_status << " Booked"
 		_elif t_status = "TAKEN" _andif (t_remarks = "" _orif t_remarks = "ACTIVE" _orif t_remarks _is _unset)
 		_then
 			# TAKEN & (NULL or BLANK or ACTIVE) -> GREEN
 			icon_status << {:traffic_light_green, :ui_resources}
+			remark_status << " Active"
 		_else
 			# Default -> RED for safety
 			icon_status << {:traffic_light_red, :ui_resources}
+			remark_status << " Idle"
 		_endif
-		a_table.add_cell(row, 9, {}, {:image, icon_status })
+		a_table.add_cell(row, 9, {}, {:image, icon_status }, {:label, remark_status })
 
 		# Column 10: Destination Code
 		# Priority: 1) destination_subfeeder_code, 2) destination_cluster_code
@@ -289,6 +294,7 @@ _method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
 
 		# Column 9: Status - based on transport_status and transport_remarks
 		_local icon_status
+		_local remark_status
 		_local t_status << a_rec[:transport_status].default("")
 		_local t_remarks << a_rec[:transport_remarks].default("")
 
@@ -296,19 +302,23 @@ _method rwwi_mancore_plan_dialog.populate_device_connection_table( a_table )
 		_then
 			# NULL/BLANK or RELEASE -> RED
 			icon_status << {:traffic_light_red, :ui_resources}
+			remark_status << " Idle"
 		_elif t_status = "TAKEN" _andif t_remarks = "BOOKED"
 		_then
 			# TAKEN & BOOKED -> YELLOW
 			icon_status << {:traffic_light_yellow, :ui_resources}
+			remark_status << " Booked"
 		_elif t_status = "TAKEN" _andif (t_remarks = "" _orif t_remarks = "ACTIVE" _orif t_remarks _is _unset)
 		_then
 			# TAKEN & (NULL or BLANK or ACTIVE) -> GREEN
 			icon_status << {:traffic_light_green, :ui_resources}
+			remark_status << " Active"
 		_else
 			# Default -> RED for safety
 			icon_status << {:traffic_light_red, :ui_resources}
+			remark_status << " Idle"
 		_endif
-		a_table.add_cell(row, 9, {}, {:image, icon_status })
+		a_table.add_cell(row, 9, {}, {:image, icon_status }, {:label, remark_status }) 
 
 		# Column 10: Destination Code
 		# Priority: 1) destination_subfeeder_code, 2) destination_cluster_code

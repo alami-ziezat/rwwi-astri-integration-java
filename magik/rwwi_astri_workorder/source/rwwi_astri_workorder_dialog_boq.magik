@@ -38,7 +38,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 
 		# Call the global create_boq procedure
 		write("Calling create_boq procedure...")
-		create_boq()
+		create_boq(scheme, wo[:infrastructure_type].default("cluster").lowercase)
 
 		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
 			scheme.name))

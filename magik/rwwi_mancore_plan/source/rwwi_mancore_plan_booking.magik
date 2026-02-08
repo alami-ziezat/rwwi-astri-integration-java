@@ -431,6 +431,7 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 				# For ACTIVE/RELEASE status: Track destination codes with source feeder code, tube, and core
 				_if status = "ACTIVE" _orif status = "RELEASE"
 				_then
+					feeder_rec.p
 					_local dest_subfeeder_code << feeder_rec[:destination_subfeeder_code].default(feeder_rec[:destination_code])
 					_local feeder_core_count << feeder_rec[:transport_feeder_core_count].default(100)
 					_local source_feeder_code << feeder_rec[:transport_feeder_code].default("")
@@ -438,11 +439,13 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 					_local source_core << feeder_rec[:transport_core_number].default("")
 					_local dest_tube_number << feeder_rec[:destination_tube_number].default("")
 					_local dest_core_number << feeder_rec[:destination_core_number].default("")
+					write("  >> Destination Subfeeder Code to be ",status, " _with code: ", dest_subfeeder_code)
 					_if dest_subfeeder_code <> "" _andif dest_subfeeder_code _isnt _unset _andif
 					    source_feeder_code <> "" _andif source_feeder_code _isnt _unset
 					_then
 						# Convert to symbol for hash table key
-						_local code_symbol << dest_subfeeder_code.as_symbol()
+						_local code << write_string(dest_subfeeder_code,"_", dest_tube_number, "_", dest_core_number)
+						_local code_symbol << code.as_symbol()
 
 						# Track destination code with source feeder code, tube, core, and core count
 						_if _not code_to_core_count.includes_key?(code_symbol)
@@ -452,6 +455,7 @@ _private _method rwwi_mancore_plan_dialog.execute_booking_feeder(work_order, fee
 								:source_feeder_code, source_feeder_code,
 								:source_tube, source_tube,
 								:source_core, source_core,
+								:destination_subfeeder_code, dest_subfeeder_code,
 								:destination_tube_number, dest_tube_number,
 								:destination_core_number, dest_core_number)
 							write("  >> Tracking destination subfeeder: ", dest_subfeeder_code, " (", feeder_core_count, " cores, source: ", source_feeder_code, ", tube: ", dest_tube_number, ", core: ", dest_core_number, ")")
@@ -960,11 +964,11 @@ _private _method rwwi_mancore_plan_dialog.activate_destination_subfeeders(work_o
 	_for dest_code_symbol, info _over code_to_core_count.fast_keys_and_elements()
 	_loop
 		# Convert symbol back to string for querying
-		_local dest_code << dest_code_symbol.write_string
 		_local total_cores << info[:core_count]
 		_local source_feeder_code << info[:source_feeder_code]
 		_local source_tube << info[:source_tube]
 		_local source_core << info[:source_core]
+		_local dest_code << info[:destination_subfeeder_code]
 		_local dest_tube_number << info[:destination_tube_number]
 		_local dest_core_number << info[:destination_core_number]
 
@@ -1104,11 +1108,12 @@ _private _method rwwi_mancore_plan_dialog.release_destination_subfeeders(work_or
 	_for dest_code_symbol, info _over code_to_core_count.fast_keys_and_elements()
 	_loop
 		# Convert symbol back to string for querying
-		_local dest_code << dest_code_symbol.write_string
+
 		_local total_cores << info[:core_count]
 		_local source_feeder_code << info[:source_feeder_code]
 		_local source_tube << info[:source_tube]
 		_local source_core << info[:source_core]
+		_local dest_code << info[:destination_subfeeder_code]
 		_local dest_tube_number << info[:destination_tube_number]
 		_local dest_core_number << info[:destination_core_number]
 
@@ -1146,9 +1151,16 @@ _private _method rwwi_mancore_plan_dialog.release_destination_subfeeders(work_or
 			_local t_tube << rec[:transport_tube_number].default("")
 			_local t_core << rec[:transport_core_number].default("")
 
+			_local t_valid_remarks << _if (t_remarks = "ACTIVE" _orif t_remarks = "BOOKED") 
+											_then 
+												>> _true 
+											_else 
+												>> _false 
+											_endif
+
 			_if src_code = source_feeder_code _andif
 			    t_status = "TAKEN" _andif
-			    t_remarks = "ACTIVE" _andif
+			    t_valid_remarks _andif
 			    t_tube = dest_tube_number _andif
 			    t_core = dest_core_number
 			_then
@@ -1173,12 +1185,12 @@ _private _method rwwi_mancore_plan_dialog.release_destination_subfeeders(work_or
 				:transport_tube_number, subfeeder_rec[:transport_tube_number].default(""),
 				:transport_core_number, subfeeder_rec[:transport_core_number].default(""),
 				:transport_code, subfeeder_rec[:transport_subfeeder_code].default(""),
-				:transport_status, "TAKEN",
-				:transport_remarks, "BOOKED",
-				:destination_type, "CLUSTER",
-				:destination_code, subfeeder_rec[:destination_cluster_code].default(""),
-				:destination_tube_number, subfeeder_rec[:destination_tube_number].default(""),
-				:destination_core_number, subfeeder_rec[:destination_core_number].default("")
+				:transport_status, "RELEASE",
+				:transport_remarks, "RELEASE",
+				:destination_type, _unset,
+				:destination_code, _unset,
+				:destination_tube_number, _unset,
+				:destination_core_number, _unset
 			)
 
 			# Add default fields

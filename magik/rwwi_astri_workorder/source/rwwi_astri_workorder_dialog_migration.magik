@@ -144,7 +144,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 			# Create project and design
 			_self.log_info("Step 5: Creating Design Manager project and design...")
-			write("Initiate: Creating project and design...: ",infra_code," : ",infra_name)
+			write("Initiate: Creating project and design...: ",infra_code," : ",infra_name," : ",infra_type) 
 			_local (project, scheme) << migrator.create_project_and_design(
 				placemarks,     # Boundary extracted from placemarks
 				wo_number,      # Project name

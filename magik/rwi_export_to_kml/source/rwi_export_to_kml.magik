@@ -879,7 +879,7 @@ _method rwi_export_to_kml.write_sheath_loc(strm,l_swl,p_dialog)
 			_endtry
 			_try _with cond
 				l_procesed<<"Fiber Length"
-				l_desc.add("Fiber Length: "+o.calculated_fiber_length.value.rounded.write_string+"m")
+				l_desc.add("Fiber Length: "+o.calculated_sheath_length.value.rounded.write_string+"m")
 			_when error
 				write("error while getting ",l_processed)
 			_endtry

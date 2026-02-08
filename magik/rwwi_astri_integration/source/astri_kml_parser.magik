@@ -734,7 +734,10 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_if filename_lc.index_of_seq("placemark_circle") _isnt _unset _orif 
 		p_name_lc.index_of_seq("pole") _isnt _unset 
 	_then 
-		_if p_name_lc.index_of_seq("mr") _is _unset	
+		_if p_name_lc.index_of_seq("mr.") _is _unset	_andif 
+		   p_name_lc.index_of_seq("ext") _is _unset _andif
+		   p_name_lc.index_of_seq("ln.") _is _unset _andif
+		   p_name_lc.index_of_seq("tel.") _is _unset
 		_then 
 			_return "homepass"
 		_endif 

@@ -587,10 +587,12 @@ _private _method rwi_export_to_aerial_kmz.write_folder(p_stream, p_folder_def, p
 	current_line_id << p_folder_def[:line_id].default(p_parent_line_id)
 
 	# Determine FDT folder name for this level
-	# Check if this folder is FDT_* folder (cluster structure)
+	# Priority: fdt_name from folder definition > parent fdt_folder > check for FDT_* pattern
 	folder_name << p_folder_def[:name]
-	current_fdt_folder << p_parent_fdt_folder
-	_if folder_name.index_of_seq("FDT_") _isnt _unset
+	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
+
+	# Legacy support: Check if this folder is FDT_* folder (old cluster structure)
+	_if current_fdt_folder _is _unset _andif folder_name.index_of_seq("FDT_") _isnt _unset
 	_then
 		# This is an FDT folder, use its name
 		current_fdt_folder << folder_name
@@ -878,9 +880,29 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	##   p_parent_fdt_folder - FDT folder name inherited from parent (second optional)
 
 	folder_name << p_folder_def[:name]
+
+	# Check if this is an FDT container folder (new structure)
+	_if p_folder_def[:is_fdt_container] _is _true
+	_then
+		# This is the top-level FDT folder containing all FDT objects
+		fdt_objects << p_folder_def[:fdt_objects]
+		_if fdt_objects _isnt _unset
+		_then
+			write("  Writing ", fdt_objects.size, " FDT objects to FDT container folder")
+			# Write all FDT equipment objects
+			_self.write_fdt_equipment(p_stream, p_area, p_indent, _unset)
+		_endif
+		_return  # No other content in FDT container folder
+	_endif
+
 	# Use line_id from folder definition if present, otherwise use parent's line_id
 	line_id << p_folder_def[:line_id].default(p_parent_line_id)
 	line_type << "LINE " + line_id.default("A")
+
+	# Determine FDT folder name for filtering
+	# Use fdt_name from folder definition if present (new structure for LINE folders)
+	# Otherwise use parent's fdt_folder (old structure or nested folders)
+	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
 
 	# Check if this is a pole folder (EXISTING POLE or NEW POLE)
 	_if folder_name.index_of_seq("POLE") _isnt _unset
@@ -938,14 +960,16 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_if folder_name.index_of_seq("FAT") _isnt _unset _andif
 	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY FAT
 	_then
-		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "FAT", line_id, p_parent_fdt_folder)
+		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "FAT", line_id, current_fdt_folder)
 	_endif
 
 	# Handle FDT folders - export FDT equipment
-	_if folder_name.index_of_seq("FDT") _isnt _unset
+	# Note: Top-level FDT container is handled above; this handles nested FDT folders (if any)
+	_if folder_name.index_of_seq("FDT") _isnt _unset _andif
+	    p_folder_def[:is_fdt_container] _isnt _true
 	_then
 		# Export FDTs - they can be on poles or standalone (mit_terminal_enclosure)
-		_self.write_fdt_equipment(p_stream, p_area, p_indent, p_parent_fdt_folder)
+		_self.write_fdt_equipment(p_stream, p_area, p_indent, current_fdt_folder)
 	_endif
 
 	# Handle CLOSURE/JOINT CLOSURE folders - export CLOSURE equipment
@@ -958,27 +982,27 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	# Handle SLACK HANGER folders - export figure_eight equipment
 	_if folder_name.index_of_seq("SLACK HANGER") _isnt _unset
 	_then
-		_self.write_figure_eight_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
+		_self.write_figure_eight_for_folder(p_stream, p_area, p_indent, line_id, current_fdt_folder)
 	_endif
 
 	# Handle SLING WIRE folders - export sling_wire chains
 	_if folder_name.index_of_seq("SLING WIRE") _isnt _unset
 	_then
-		_self.write_sling_wire_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
+		_self.write_sling_wire_for_folder(p_stream, p_area, p_indent, line_id, current_fdt_folder)
 	_endif
 
 	# Handle CABLE/DISTRIBUTION CABLE folders - export sheath_with_loc chains from poles
 	_if folder_name.index_of_seq("CABLE") _isnt _unset _andif
 	    folder_name.index_of_seq("BOUNDARY") _is _unset  # Not BOUNDARY folders
 	_then
-		_self.write_cable_for_folder(p_stream, p_area, p_indent, line_id, p_parent_fdt_folder)
+		_self.write_cable_for_folder(p_stream, p_area, p_indent, line_id, current_fdt_folder)
 	_endif
 
 	# Handle HP COVER/HP UNCOVER folders - export demand points
 	_if folder_name.index_of_seq("HP COVER") _isnt _unset _orif
 	    folder_name.index_of_seq("HP UNCOVER") _isnt _unset
 	_then
-		_self.write_demand_points_for_folder(p_stream, p_area, p_indent, folder_name, line_id, p_parent_fdt_folder)
+		_self.write_demand_points_for_folder(p_stream, p_area, p_indent, folder_name, line_id, current_fdt_folder)
 	_endif
 
 	# Handle BOUNDARY CLUSTER folder - export project boundary polygon
@@ -991,7 +1015,7 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 	_if folder_name.index_of_seq("BOUNDARY FAT") _isnt _unset _orif
 	    folder_name.index_of_seq("FAT COVERAGE") _isnt _unset
 	_then
-		_self.write_cells_for_folder(p_stream, p_area, p_indent, folder_name, line_id, p_parent_fdt_folder)
+		_self.write_cells_for_folder(p_stream, p_area, p_indent, folder_name, line_id, current_fdt_folder)
 	_endif
 _endmethod
 $

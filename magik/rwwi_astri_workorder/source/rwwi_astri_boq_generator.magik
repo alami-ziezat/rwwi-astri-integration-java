@@ -771,6 +771,7 @@ $
 
 _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 	## Extract quantity or length from a design record
+	## For cables: Returns length in meters + 5% margin
 	## Parameters:
 	##   rec - Design record
 	## Returns:
@@ -778,13 +779,16 @@ _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 
 	_local col_name << rec.source_collection.name
 
-	# For cables (sheath_with_loc) - return length in meters
+	# For cables (sheath_with_loc) - return length in meters + 5% margin
 	_if col_name _is :sheath_with_loc
 	_then
 		write("Getting length for sheath_with_loc ID:", rec.id)
 		_if rec.responds_to?(:calculated_sheath_length)
 		_then
-			_return rec.calculated_sheath_length.value_in(:m).as_number()
+			_local base_length << rec.calculated_sheath_length.value_in(:m).as_number()
+			_local length_with_margin << base_length * 1.05
+			write("  Cable length: ", base_length.rounded, "m + 5% = ", length_with_margin.rounded, "m")
+			_return length_with_margin
 		_endif
 	_endif
 
@@ -1205,10 +1209,11 @@ _endmethod
 $
 
 _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
-	## Add cable-based services with quantity = total cable + sling wire length
+	## Add cable-based services with quantity = total cable (with 5% margin) + sling wire length
+	## Note: Cable length already includes 5% margin from get_quantity_from_record()
 	## Adds:
-	##   - 500001887 (Project Management) with quantity = cable + sling wire
-	##   - 500001519 (Survey & Design Asplan) with quantity = cable + sling wire
+	##   - 500001887 (Project Management) with quantity = cable (with 5%) + sling wire
+	##   - 500001519 (Survey & Design Asplan) with quantity = cable (with 5%) + sling wire
 	##
 	## Parameters:
 	##   result - property_list to update with cable-based services
@@ -1221,6 +1226,7 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 		_local total_cable_length << 0
 
 		# Count total cable length from all cable material items
+		# Note: Cable length already includes 5% margin from get_quantity_from_record()
 		_for code _over cable_codes.fast_elements()
 		_loop
 			_local item << result[code.as_symbol()]
@@ -1230,12 +1236,13 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 				_if qty _isnt _unset
 				_then
 					total_cable_length +<< qty
-					write("LOG: Cable code", code, "has length:", qty, "m")
+					write("LOG: Cable code", code, "has length:", qty, "m (already includes 5% margin)")
 				_endif
 			_endif
 		_endloop
 
 		# Get sling wire length (code: 200001033, material_slot is :service)
+		# No 5% margin for sling wire
 		_local sling_wire_length << 0
 		_local sling_item << result[:|200001033|]
 		_if sling_item _isnt _unset
@@ -1244,11 +1251,11 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 			_if qty _isnt _unset
 			_then
 				sling_wire_length << qty
-				write("LOG: Sling wire (200001033) has length:", qty, "m")
+				write("LOG: Sling wire (200001033) has length:", qty, "m (no margin)")
 			_endif
 		_endif
 
-		# Calculate total length (cable + sling wire)
+		# Calculate total length (cable with 5% + sling wire without margin)
 		_local total_length << total_cable_length + sling_wire_length
 
 		# If cables or sling wire exist, add the services
@@ -1256,7 +1263,7 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 		_then
 			_self.add_to_boq_result(result, "500001887", total_length)  # Project Management
 			_self.add_to_boq_result(result, "500001519", total_length)  # Survey & Design (Asplan)
-			write("LOG: Added cable-based services with total length:", total_length, "m (Cable:", total_cable_length, "m + Sling Wire:", sling_wire_length, "m)")
+			write("LOG: Added cable-based services with total length:", total_length.rounded, "m (Cable with 5% margin:", total_cable_length.rounded, "m + Sling Wire:", sling_wire_length.rounded, "m)")
 		_else
 			write("LOG: No cables or sling wire found, skipping cable-based services")
 		_endif

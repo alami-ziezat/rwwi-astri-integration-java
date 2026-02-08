@@ -134,6 +134,7 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 	## Build CLUSTER CODE folder structure (dynamic based on FDT count)
+	## NEW STRUCTURE: Single FDT folder at top level, LINE folders as siblings
 	##
 	## Parameters:
 	##   p_fdts - Rope of FDT objects
@@ -159,45 +160,65 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 
 	_elif fdt_count = 1
 	_then
-		# Single FDT - simplified structure (FDT at top level with LINEs inside)
+		# Single FDT - New structure:
+		# - FDT folder (contains FDT object)
+		# - LINE A folder (sibling, no FDT suffix)
+		# - LINE B folder (sibling, no FDT suffix)
+
 		fdt << p_fdts.an_element()
+		fdt_name << fdt.perform(:name).default("FDT")
+
+		# Create FDT folder (no subfolders, will contain FDT object)
 		fdt_folder << property_list.new_with(
 			:name, "FDT",
 			:visibility, _false,
-			:fdt_object, fdt,
-			:subfolders, rope.new())
-
-		# Add 2 LINEs inside FDT folder
-		_for line_id _over {"A", "B"}.fast_elements()
-		_loop
-			line_folder << _self.build_line_folders(line_id, fdt)
-			fdt_folder[:subfolders].add(line_folder)
-		_endloop
+			:is_fdt_container, _true,
+			:fdt_objects, p_fdts)  # Pass all FDTs for writing
 
 		folder_defs.add(fdt_folder)
 
+		# Create LINE folders as siblings (not children of FDT)
+		# No FDT suffix when only 1 FDT
+		_for line_id _over {"A", "B"}.fast_elements()
+		_loop
+			line_folder << _self.build_line_folders(line_id, fdt)
+			# Keep original name "LINE A" or "LINE B" (no FDT suffix)
+			line_folder[:fdt_name] << fdt_name  # Store FDT name for filtering
+			folder_defs.add(line_folder)
+		_endloop
+
 	_else
-		# Multiple FDTs - create separate FDT_[NAME] folder for each	
+		# Multiple FDTs - New structure:
+		# - FDT folder (contains ALL FDT objects)
+		# - LINE A - FDT 1 folder (sibling)
+		# - LINE B - FDT 1 folder (sibling)
+		# - LINE A - FDT 2 folder (sibling)
+		# - LINE B - FDT 2 folder (sibling)
+		# - etc.
+
+		# Create single FDT folder containing all FDTs
+		fdt_folder << property_list.new_with(
+			:name, "FDT",
+			:visibility, _false,
+			:is_fdt_container, _true,
+			:fdt_objects, p_fdts)  # Pass all FDTs for writing
+
+		folder_defs.add(fdt_folder)
+
+		# Create LINE folders for each FDT as siblings
 		_for fdt _over p_fdts.fast_elements()
 		_loop
 			fdt_name << fdt.perform(:name).default("FDT_" + fdt.id.write_string)
 
-			# Create FDT_[FDT_NAME] folder (NO extra FDT folder inside)
-			# LINEs are directly under FDT_[NAME]
-			cluster_folder << property_list.new_with(
-				:name, write_string("FDT_", fdt_name),
-				:visibility, _false,
-				:fdt_object, fdt,
-				:subfolders, rope.new())
-
-			# Add 2 LINEs directly inside FDT_[NAME] folder
+			# Create LINE A and LINE B folders for this FDT
 			_for line_id _over {"A", "B"}.fast_elements()
 			_loop
 				line_folder << _self.build_line_folders(line_id, fdt)
-				cluster_folder[:subfolders].add(line_folder)
+				# Update line folder name to include FDT reference
+				line_folder[:name] << write_string("LINE ", line_id, " - ", fdt_name)
+				line_folder[:fdt_name] << fdt_name  # Store FDT name for filtering
+				folder_defs.add(line_folder)
 			_endloop
-
-			folder_defs.add(cluster_folder)
 		_endloop
 	_endif
 

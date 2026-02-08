@@ -33,10 +33,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 
 		# Step 1: Validate cable folder pattern (substring matching)
 		_local last_folder << fol[fsize]
-		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "SLING WIRE","FO", "ROUTE", "SW"}
+		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL","FO", "ROUTE", "SW"}
 
 		write("	Checking AERIAL ROUTE for in name: ",pm[:name].uppercase)
 		_local is_cable? << _false
+		_local is_sling_wire? << _false
 		_for keyword _over valid_cable_keywords.fast_elements()
 		_loop
 			_local name_upper << pm[:name].uppercase
@@ -47,7 +48,12 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_endif
 		_endloop
 
-		_if _not is_cable?
+		_if	folders.uppercase.index_of_seq("SLING WIRE") _isnt _unset
+		_then
+			is_sling_wire? << _true	
+		_endif
+
+		_if _not is_cable? _andif _not is_sling_wire?
 		_then
 			_return  # Not a cable - skip
 		_endif
@@ -127,7 +133,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 
 		write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
 		# Step 5: Check for SLING WIRE - special handling
-		_if _self.is_sling_wire?(pm) # fol[fsize] = "SLING WIRE"
+		_if is_sling_wire? _orif fol[fsize] = "SLING WIRE"
 		_then
 			_if t_len > 0.6
 			_then
@@ -444,7 +450,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		l_result_swl.place_in_structures(l_structures)
 
 		# Track sheath length in meters using calculated fibre length
-		_local sheath_length << l_result_swl.calculated_fiber_length.value_in(:m).as_number()
+		_local sheath_length << l_result_swl.calculated_sheath_length.value_in(:m).as_number()
 		.stats[:sheath_length] +<< sheath_length
 		write("    [OK] Sheath created and placed in structures (Fibre Length: ", sheath_length.rounded, "m)")
 
