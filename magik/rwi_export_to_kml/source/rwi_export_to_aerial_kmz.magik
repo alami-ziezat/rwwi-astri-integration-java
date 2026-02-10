@@ -941,6 +941,45 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 			# Check if constructed folder name matches current template folder
 			_if pole_template_folder = folder_name
 			_then
+				# Filter by LINE if specified (check pole's line_type)
+				_if line_id _isnt _unset
+				_then
+					# Convert line_id to line_type format (e.g., "A" -> "LINE A")
+					expected_line_type << "LINE " + line_id
+					pole_line_type << pole.perform(:line_type).default("")
+
+					# Skip pole if line_type doesn't match
+					_if pole_line_type.uppercase <> expected_line_type.uppercase
+					_then
+						_continue
+					_endif
+				_endif
+
+				# Filter by FDT if specified (check pole's ring_name)
+				_if current_fdt_folder _isnt _unset
+				_then
+					# Get pole's ring_name
+					pole_ring_name << pole.perform(:ring_name).default("")
+
+					_if pole_ring_name <> ""
+					_then
+						# Extract FDT name from current_fdt_folder
+						# Format can be "FDT_FDT001" (old) or "FDT001" (new)
+						expected_fdt_name << current_fdt_folder
+						_if current_fdt_folder.index_of_seq("FDT_") _isnt _unset
+						_then
+							# Old format: "FDT_FDT001" -> extract "FDT001"
+							expected_fdt_name << current_fdt_folder.slice(5, current_fdt_folder.size)
+						_endif
+
+						# Skip pole if ring_name doesn't match FDT name
+						_if pole_ring_name.uppercase <> expected_fdt_name.uppercase
+						_then
+							_continue
+						_endif
+					_endif
+				_endif
+
 				.object_writer.write_pole(pole, p_stream, p_indent, folder_name)
 				pole_count +<< 1
 				.total_pole_count +<< 1
@@ -1221,29 +1260,30 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 				_endif
 
 				# Also check FAT ring_name matches FDT folder
-				_if p_fdt_folder _isnt _unset
+				_if p_fdt_folder _isnt _unset _andif fat_ring_name <> ""
 				_then
 					# Get FAT ring_name
 					fat_ring_name << splice.perform(:ring_name).default("")
 
-					# FDT folder format is "FDT_<name>", extract the name part
-					# Expected ring_name should match the FDT name
+					# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+					# Extract the FDT name part
+					expected_fdt_name << p_fdt_folder
 					_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
 					_then
-						# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
-						fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+						# Old format: "FDT_FDT001" -> extract "FDT001"
+						expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+					_endif
 
-						# DEBUG
-						#_if equipment_count < 3
-						#_then
-						#	write("      Checking FDT: FAT ring_name='", fat_ring_name, "' expected FDT='", fdt_name, "'")
-						#_endif
+					# DEBUG
+					#_if equipment_count < 3
+					#_then
+					#	write("      Checking FDT: FAT ring_name='", fat_ring_name, "' expected FDT='", expected_fdt_name, "'")
+					#_endif
 
-						# Check if ring_name matches FDT name
-						_if fat_ring_name.uppercase <> fdt_name.uppercase
-						_then
-							_continue  # Skip FAT if it doesn't belong to this FDT
-						_endif
+					# Check if ring_name matches FDT name
+					_if fat_ring_name <> "" _andif fat_ring_name.uppercase <> expected_fdt_name.uppercase
+					_then
+						_continue  # Skip FAT if it doesn't belong to this FDT
 					_endif
 				_endif
 			_endif
@@ -1330,17 +1370,19 @@ _private _method rwi_export_to_aerial_kmz.write_figure_eight_for_folder(p_stream
 					fig8_ring_name << pole.perform(:ring_name).default("")
 				_endif
 
-				# FDT folder format is "FDT_<name>", extract the name part
+				# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+				# Extract the FDT name part
+				expected_fdt_name << p_fdt_folder
 				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
 				_then
-					# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
-					fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+					# Old format: "FDT_FDT001" -> extract "FDT001"
+					expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_endif
 
-					# Check if ring_name matches FDT name
-					_if fig8_ring_name.uppercase <> fdt_name.uppercase
-					_then
-						_continue  # Skip figure_eight if it doesn't belong to this FDT
-					_endif
+				# Check if ring_name matches FDT name
+				_if fig8_ring_name <> "" _andif fig8_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue  # Skip figure_eight if it doesn't belong to this FDT
 				_endif
 			_endif
 
@@ -1401,17 +1443,19 @@ _private _method rwi_export_to_aerial_kmz.write_sling_wire_for_folder(p_stream, 
 			# Get sling_wire ring_name
 			sling_ring_name << sling_wire.perform(:ring_name).default("")
 
-			# FDT folder format is "FDT_<name>", extract the name part
+			# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+			# Extract the FDT name part
+			expected_fdt_name << p_fdt_folder
 			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
 			_then
-				# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
-				fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				# Old format: "FDT_FDT001" -> extract "FDT001"
+				expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+			_endif
 
-				# Check if ring_name matches FDT name
-				_if sling_ring_name.uppercase <> fdt_name.uppercase
-				_then
-					_continue  # Skip sling_wire if it doesn't belong to this FDT
-				_endif
+			# Check if ring_name matches FDT name
+			_if sling_ring_name <> "" _andif sling_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue  # Skip sling_wire if it doesn't belong to this FDT
 			_endif
 		_endif
 
@@ -1485,16 +1529,19 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 			# Get cable ring_name
 			cable_ring_name << cable.perform(:ring_name).default("")
 
-			# Extract FDT name from folder (e.g., "FDT_FDT001" -> "FDT001")
+			# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+			# Extract the FDT name part
+			expected_fdt_name << p_fdt_folder
 			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
 			_then
+				# Old format: "FDT_FDT001" -> extract "FDT001"
 				expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+			_endif
 
-				# Check if ring_name matches FDT name
-				_if cable_ring_name.uppercase <> expected_fdt_name.uppercase
-				_then
-					_continue  # Skip cable if it doesn't belong to this FDT
-				_endif
+			# Check if ring_name matches FDT name
+			_if cable_ring_name <> "" _andif cable_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue  # Skip cable if it doesn't belong to this FDT
 			_endif
 		_endif
 
@@ -1634,7 +1681,15 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 			# Filter by FDT folder if specified
 			_if p_fdt_folder _isnt _unset _andif ring_name <> ""
 			_then
+				# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+				# Extract the FDT name part
 				expected_fdt_name << p_fdt_folder
+				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then
+					# Old format: "FDT_FDT001" -> extract "FDT001"
+					expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_endif
+
 				_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
 				_then
 					_continue
@@ -1718,7 +1773,15 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 			# Filter by FDT folder if specified
 			_if p_fdt_folder _isnt _unset _andif ring_name <> ""
 			_then
+				# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+				# Extract the FDT name part
 				expected_fdt_name << p_fdt_folder
+				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then
+					# Old format: "FDT_FDT001" -> extract "FDT001"
+					expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_endif
+
 				_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
 				_then
 					_continue
@@ -1806,8 +1869,15 @@ _private _method rwi_export_to_aerial_kmz.write_cells_for_folder(p_stream, p_are
 		# Filter by FDT folder if specified (ring_name matching)
 		_if p_fdt_folder _isnt _unset _andif ring_name <> ""
 		_then
-			# Extract FDT name from folder (e.g., "FDT 01" -> "FDT 01")
+			# FDT folder format can be "FDT_FDT001" (old) or "FDT001" (new)
+			# Extract the FDT name part
 			expected_fdt_name << p_fdt_folder
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then
+				# Old format: "FDT_FDT001" -> extract "FDT001"
+				expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+			_endif
+
 			_if ring_name.uppercase.index_of_seq(expected_fdt_name.uppercase) _is _unset
 			_then
 				_continue

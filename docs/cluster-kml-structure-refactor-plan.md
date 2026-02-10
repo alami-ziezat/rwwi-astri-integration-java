@@ -282,3 +282,150 @@ If issues arise, revert changes to:
 2. `pni_custom/rwwi_astri_integration_java/magik/rwi_export_to_kml/source/rwi_export_to_aerial_kmz.magik`
    - Method: `write_folder_contents(...)` - Added FDT container handling and FDT name extraction
    - Method: `write_folder(...)` - Updated FDT name propagation logic
+
+---
+
+## Bug Fixes: Pole Filtering Issues (2025-02-10)
+
+### Issue 1: Duplicate Pole Export Across LINEs
+After the restructuring, poles were being exported twice - appearing in both LINE A and LINE B folders. Poles that belonged to LINE A were incorrectly showing up in LINE B folders and vice versa.
+
+**Root Cause:**
+The pole filtering logic in `write_folder_contents()` was only checking if the pole's template folder name matched the current folder name, but it was **not filtering by the pole's `line_type` attribute**. This caused all poles matching the folder criteria (e.g., "EXISTING POLE EMR 7-2.5") to be exported to every LINE folder that had that pole type, regardless of which LINE the pole actually belonged to.
+
+### Issue 2: Duplicate Pole Export Across FDTs
+When there were multiple FDTs, poles (and initially other objects) from all FDTs were appearing in each FDT's folders.
+
+**Example:**
+- FDT 1, LINE A has 2 poles
+- FDT 2, LINE A has 1 pole
+- **Bug:** Both FDT folders showed 3 poles (total from all FDTs)
+- **Expected:** FDT 1 shows 2 poles, FDT 2 shows 1 pole
+
+**Root Cause:**
+1. **Poles:** Had no FDT filtering at all - didn't check `ring_name` attribute
+2. **ALL Other Objects:** Had FDT filtering code BUT it only worked with old folder structure format "FDT_FDT001"
+
+The critical bug: All existing FDT filtering code checked `_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset` before doing any filtering. In the new structure where `current_fdt_folder` = "FDT001" (without "FDT_" prefix), this condition was always FALSE, so **NO FDT filtering happened for ANY objects**!
+
+This is why ALL objects from ALL FDTs appeared in ALL folders - the FDT filtering was completely bypassed!
+
+### Fixes Applied
+
+**File:** `rwi_export_to_aerial_kmz.magik`
+**Method:** `write_folder_contents()` (around line 934-990)
+
+**Changes:** Added both LINE and FDT filtering checks for poles, matching the pattern used by all other equipment types:
+
+```magik
+# Check if constructed folder name matches current template folder
+_if pole_template_folder = folder_name
+_then
+    # Filter by LINE if specified (check pole's line_type)
+    _if line_id _isnt _unset
+    _then
+        # Convert line_id to line_type format (e.g., "A" -> "LINE A")
+        expected_line_type << "LINE " + line_id
+        pole_line_type << pole.perform(:line_type).default("")
+
+        # Skip pole if line_type doesn't match
+        _if pole_line_type.uppercase <> expected_line_type.uppercase
+        _then
+            _continue
+        _endif
+    _endif
+
+    # Filter by FDT if specified (check pole's ring_name)
+    _if current_fdt_folder _isnt _unset
+    _then
+        # Get pole's ring_name
+        pole_ring_name << pole.perform(:ring_name).default("")
+
+        _if pole_ring_name <> ""
+        _then
+            # Extract FDT name from current_fdt_folder
+            # Format can be "FDT_FDT001" (old) or "FDT001" (new)
+            expected_fdt_name << current_fdt_folder
+            _if current_fdt_folder.index_of_seq("FDT_") _isnt _unset
+            _then
+                # Old format: "FDT_FDT001" -> extract "FDT001"
+                expected_fdt_name << current_fdt_folder.slice(5, current_fdt_folder.size)
+            _endif
+
+            # Skip pole if ring_name doesn't match FDT name
+            _if pole_ring_name.uppercase <> expected_fdt_name.uppercase
+            _then
+                _continue
+            _endif
+        _endif
+    _endif
+
+    .object_writer.write_pole(pole, p_stream, p_indent, folder_name)
+    pole_count +<< 1
+    .total_pole_count +<< 1
+_endif
+```
+
+**How it works:**
+1. After matching the pole to the folder template name, check LINE filtering:
+   - Get the pole's `line_type` attribute
+   - Compare it to the expected LINE for this folder
+   - Skip if it doesn't match
+2. Then check FDT filtering:
+   - Get the pole's `ring_name` attribute
+   - Extract the FDT name from `current_fdt_folder`
+   - Compare pole's ring_name with the FDT name
+   - Skip if it doesn't match
+3. Only write the pole if it passes both filters
+
+This ensures poles are only exported to their assigned LINE and FDT folders, preventing duplicates across both dimensions.
+
+### Comprehensive FDT Filtering Fix
+
+**All object types updated to handle both folder format:**
+1. **Poles** - Added complete FDT filtering (was completely missing)
+2. **FAT** - Fixed to extract FDT name from both "FDT_FDT001" and "FDT001" formats
+3. **Figure Eight (Slack Hanger)** - Fixed format handling
+4. **Sling Wire** - Fixed format handling
+5. **Cables** - Fixed format handling
+6. **Demand Points (HP COVER/UNCOVER)** - Fixed format handling (2 occurrences)
+7. **Cells (BOUNDARY FAT)** - Fixed format handling
+
+**Pattern Applied to All:**
+```magik
+# Extract FDT name from folder
+expected_fdt_name << p_fdt_folder
+_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+_then
+    # Old format: "FDT_FDT001" -> extract "FDT001"
+    expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+_endif
+
+# Then compare with object's ring_name
+_if ring_name <> "" _andif ring_name.uppercase <> expected_fdt_name.uppercase
+_then
+    _continue  # Skip if doesn't match
+_endif
+```
+
+This ensures FDT filtering works in both old and new folder structures.
+
+### Testing Verification
+
+**LINE Filtering Tests:**
+- [ ] Verify poles appear only once in the correct LINE folder
+- [ ] Verify LINE A poles don't appear in LINE B folders
+- [ ] Verify LINE B poles don't appear in LINE A folders
+- [ ] Verify pole counts are accurate per LINE
+
+**FDT Filtering Tests (Multiple FDTs):**
+- [ ] Verify poles from FDT 1 appear only in FDT 1 folders
+- [ ] Verify poles from FDT 2 appear only in FDT 2 folders
+- [ ] Verify pole counts are accurate per FDT (e.g., FDT1 has 2 poles, FDT2 has 1 pole)
+- [ ] Verify no duplication across FDT folders
+
+**Combined Tests:**
+- [ ] Verify total pole count across all FDTs and LINEs matches actual poles in area
+- [ ] Verify each pole appears exactly once in the entire KML export
+- [ ] Test with single FDT scenario (FDT filtering still works)
+- [ ] Test with multiple FDT scenario (2+ FDTs with different pole counts)

@@ -281,7 +281,7 @@ _private _method astri_design_migrator.match_pole_type(fs)
 	_then
 		>> "Pole 9-5"
 	_else
-		>> "Pole 7-4"  # Default
+		>> "Pole 7-3"  # Default
 	_endif
 	_return pole_type
 _endmethod

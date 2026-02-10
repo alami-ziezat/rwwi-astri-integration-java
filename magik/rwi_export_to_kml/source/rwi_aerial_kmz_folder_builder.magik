@@ -179,7 +179,7 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 
 		# Create LINE folders as siblings (not children of FDT)
 		# No FDT suffix when only 1 FDT
-		_for line_id _over {"A", "B"}.fast_elements()
+		_for line_id _over {"A", "B","C"}.fast_elements()
 		_loop
 			line_folder << _self.build_line_folders(line_id, fdt)
 			# Keep original name "LINE A" or "LINE B" (no FDT suffix)
@@ -211,7 +211,7 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 			fdt_name << fdt.perform(:name).default("FDT_" + fdt.id.write_string)
 
 			# Create LINE A and LINE B folders for this FDT
-			_for line_id _over {"A", "B"}.fast_elements()
+			_for line_id _over {"A", "B","C"}.fast_elements()
 			_loop
 				line_folder << _self.build_line_folders(line_id, fdt)
 				# Update line folder name to include FDT reference
