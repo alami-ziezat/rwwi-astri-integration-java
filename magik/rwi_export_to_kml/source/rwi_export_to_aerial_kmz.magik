@@ -539,6 +539,7 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area, p_fdts)
 	## Write CLUSTER CODE section with dynamic FDT structure
+	## Filters out empty LINE folders (folders with no objects)
 
 	# Use infrastructure code if available, otherwise default to "CLUSTER CODE"
 	folder_name << _if .infrastructure_code _isnt _unset
@@ -552,8 +553,46 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 	# Get folder definitions from builder (dynamic based on FDT count)
 	folder_defs << .folder_builder.build_cluster_folders(p_fdts)
 
-	# Write each folder
+	# FIRST PASS: Count objects in each folder and filter out empty LINE folders
+	write("  Counting objects in LINE folders to filter empty ones...")
+	filtered_defs << rope.new()
+
 	_for folder_def _over folder_defs.fast_elements()
+	_loop
+		folder_name << folder_def[:name]
+		line_id << folder_def[:line_id]
+		fdt_name << folder_def[:fdt_name]
+
+		write("  DEBUG: Checking folder '", folder_name, "' | line_id=", line_id, " | fdt_name=", fdt_name)
+
+		# Check if this is a LINE folder (has line_id property)
+		_if folder_def[:line_id] _isnt _unset
+		_then
+			# Count objects in this LINE folder and all its subfolders
+			object_count << _self.count_line_folder_objects(folder_def, p_area)
+
+			write("    DEBUG: count_line_folder_objects returned: ", object_count)
+
+			_if object_count > 0
+			_then
+				# Keep this LINE folder - it has objects
+				filtered_defs.add(folder_def)
+				write("    LINE ", folder_def[:line_id], " (", folder_def[:name], "): ", object_count, " objects - KEPT")
+			_else
+				# Skip this LINE folder - it's empty
+				write("    LINE ", folder_def[:line_id], " (", folder_def[:name], "): 0 objects - REMOVED")
+			_endif
+		_else
+			# Not a LINE folder (e.g., BOUNDARY CLUSTER, FDT folder) - always keep
+			filtered_defs.add(folder_def)
+			write("    Non-LINE folder kept: ", folder_name)
+		_endif
+	_endloop
+
+	write("  Filtered ", folder_defs.size - filtered_defs.size, " empty LINE folders")
+
+	# SECOND PASS: Write non-empty folders
+	_for folder_def _over filtered_defs.fast_elements()
 	_loop
 		_self.write_folder(p_stream, folder_def, p_area, 4)
 	_endloop
@@ -2088,6 +2127,397 @@ _private _method rwi_export_to_aerial_kmz.write_project_boundary(p_stream, p_are
 	.object_writer.write_boundary(boundary_name, boundary_geom, p_stream, p_indent, p_folder_name)
 
 	write("  Wrote project boundary: ", boundary_name)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_line_folder_objects(p_folder_def, p_area, _optional p_parent_line_id, p_parent_fdt_folder)
+	## Count total objects that would be written to this folder and all its subfolders
+	## Simplified approach: just count all poles that match the LINE and FDT filter
+	##
+	## Parameters:
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_parent_line_id - LINE ID from parent folder (first optional)
+	##   p_parent_fdt_folder - FDT folder name from parent (second optional)
+
+	# Determine LINE ID and FDT folder for this folder level
+	current_line_id << p_folder_def[:line_id].default(p_parent_line_id)
+	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
+
+	write("      DEBUG: Counting objects for LINE ", current_line_id, " FDT ", current_fdt_folder)
+
+	# Simplified: Just count poles that match this LINE and FDT
+	# If there are poles, there will likely be other objects too
+	_if current_line_id _is _unset
+	_then
+		write("        DEBUG: No LINE ID, returning 0")
+		>> 0
+	_endif
+
+	# Count all poles matching this LINE and FDT
+	all_poles << .gc[:pole].select(predicate.interacts(:location, p_area))
+	pole_count << 0
+
+	_for pole _over all_poles.fast_elements()
+	_loop
+		# Check LINE filtering
+		expected_line_type << "LINE " + current_line_id
+		pole_line_type << pole.perform(:line_type).default("")
+
+		_if pole_line_type.uppercase <> expected_line_type.uppercase
+		_then
+			_continue
+		_endif
+
+		# Check FDT filtering if specified
+		_if current_fdt_folder _isnt _unset
+		_then
+			pole_ring_name << pole.perform(:ring_name).default("")
+			_if pole_ring_name <> ""
+			_then
+				expected_fdt_name << current_fdt_folder
+				_if current_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then
+					expected_fdt_name << current_fdt_folder.slice(5, current_fdt_folder.size)
+				_endif
+				_if pole_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue
+				_endif
+			_endif
+		_endif
+
+		pole_count +<< 1
+	_endloop
+
+	write("        DEBUG: Found ", pole_count, " poles for LINE ", current_line_id)
+
+	>> pole_count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.determine_folder_type(p_folder_name)
+	## Determine the type of folder based on its name
+	## Returns: Symbol representing folder type
+
+	folder_name_upper << p_folder_name.uppercase
+
+	_if folder_name_upper.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
+	_then
+		>> :boundary_cluster
+	_elif folder_name_upper.index_of_seq("BOUNDARY FAT") _isnt _unset
+	_then
+		>> :boundary_fat
+	_elif folder_name_upper = "FDT"
+	_then
+		>> :fdt_container
+	_elif folder_name_upper = "FAT"
+	_then
+		>> :fat
+	_elif folder_name_upper.index_of_seq("HP COVER") _isnt _unset
+	_then
+		>> :hp_cover
+	_elif folder_name_upper.index_of_seq("HP UNCOVER") _isnt _unset
+	_then
+		>> :hp_uncover
+	_elif folder_name_upper.index_of_seq("EXISTING POLE") _isnt _unset _orif
+	      folder_name_upper.index_of_seq("NEW POLE") _isnt _unset
+	_then
+		>> :pole
+	_elif folder_name_upper.index_of_seq("CABLE") _isnt _unset _orif
+	      folder_name_upper.index_of_seq("DISTRIBUTION CABLE") _isnt _unset
+	_then
+		>> :cable
+	_elif folder_name_upper.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		>> :slack_hanger
+	_elif folder_name_upper.index_of_seq("SLING WIRE") _isnt _unset
+	_then
+		>> :sling_wire
+	_else
+		>> :unknown
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_sheath_splices(p_area, p_equipment_type, p_line_id, p_fdt_folder)
+	## Count sheath splice equipment (FAT/FDT/CLOSURE) that would be written
+
+	all_poles << .gc[:pole].select(predicate.interacts(:location, p_area))
+	count << 0
+
+	_for pole _over all_poles.fast_elements()
+	_loop
+		pole_equipment << pole.get_equipment()
+		_if pole_equipment.empty? _then _continue _endif
+
+		pole_splices << pole_equipment.select(
+			predicate.navigate({:source_collection}, predicate.eq(:name, :sheath_splice)))
+		_if pole_splices.empty? _then _continue _endif
+
+		_for splice _over pole_splices.fast_elements()
+		_loop
+			splice_type << splice.sheath_splice_object_type
+			_if splice_type _is _unset _then _continue _endif
+
+			# Check equipment type match
+			matches_type? << _false
+			_if p_equipment_type = "FAT" _andif splice_type.index_of_seq("FAT") _isnt _unset
+			_then matches_type? << _true
+			_elif p_equipment_type = "FDT" _andif splice_type.index_of_seq("FDT") _isnt _unset
+			_then matches_type? << _true
+			_elif p_equipment_type = "CLOSURE" _andif
+			     (splice_type.index_of_seq("Closure") _isnt _unset _orif splice_type.index_of_seq("Joint") _isnt _unset)
+			_then matches_type? << _true
+			_endif
+			_if _not matches_type? _then _continue _endif
+
+			# Check LINE filtering
+			_if p_line_id _isnt _unset
+			_then
+				expected_line_type << "LINE " + p_line_id
+				pole_line_type << pole.perform(:line_type).default("")
+				_if pole_line_type.uppercase <> expected_line_type.uppercase
+				_then _continue
+				_endif
+			_endif
+
+			# Check FDT filtering
+			_if p_fdt_folder _isnt _unset
+			_then
+				ring_name << splice.perform(:ring_name).default("")
+				expected_fdt_name << p_fdt_folder
+				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_endif
+				_if ring_name <> "" _andif ring_name.uppercase <> expected_fdt_name.uppercase
+				_then _continue
+				_endif
+			_endif
+
+			count +<< 1
+		_endloop
+	_endloop
+
+	>> count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_demand_points_in_zone(p_area, p_folder_name, p_line_id, p_fdt_folder)
+	## Count demand points that would be written to this zone folder
+
+	all_dps << .gc[:demand_point].select(predicate.interacts(:location, p_area))
+	count << 0
+
+	_for dp _over all_dps.fast_elements()
+	_loop
+		_if p_line_id _isnt _unset
+		_then
+			expected_line_type << "LINE " + p_line_id
+			dp_line_type << dp.perform(:line_type).default("")
+			_if dp_line_type.uppercase <> expected_line_type.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		_if p_fdt_folder _isnt _unset
+		_then
+			dp_ring_name << dp.perform(:ring_name).default("")
+			expected_fdt_name << p_fdt_folder
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+			_endif
+			_if dp_ring_name <> "" _andif dp_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		count +<< 1
+	_endloop
+
+	>> count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_poles(p_area, p_folder_name, p_line_id, p_fdt_folder)
+	## Count poles that would be written to this folder
+
+	all_poles << .gc[:pole].select(predicate.interacts(:location, p_area))
+	count << 0
+
+	_for pole _over all_poles.fast_elements()
+	_loop
+		_if p_line_id _isnt _unset
+		_then
+			expected_line_type << "LINE " + p_line_id
+			pole_line_type << pole.perform(:line_type).default("")
+			_if pole_line_type.uppercase <> expected_line_type.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		_if p_fdt_folder _isnt _unset
+		_then
+			pole_ring_name << pole.perform(:ring_name).default("")
+			_if pole_ring_name <> ""
+			_then
+				expected_fdt_name << p_fdt_folder
+				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_endif
+				_if pole_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then _continue
+				_endif
+			_endif
+		_endif
+
+		count +<< 1
+	_endloop
+
+	>> count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_cables(p_area, p_line_id, p_fdt_folder)
+	## Count cables that would be written
+
+	all_aerial_routes << .gc[:aerial_route].select(predicate.interacts(:route, p_area))
+	unique_cables << equality_set.new()
+
+	_for aerial_route _over all_aerial_routes.fast_elements()
+	_loop
+		route_cables << aerial_route.cables()
+		_if route_cables _is _unset _then _continue _endif
+		_for cable _over route_cables.fast_elements()
+		_loop
+			unique_cables.add(cable)
+		_endloop
+	_endloop
+
+	count << 0
+	_for cable _over unique_cables.fast_elements()
+	_loop
+		_if p_line_id _isnt _unset
+		_then
+			expected_line_type << "LINE " + p_line_id
+			cable_line_type << cable.perform(:line_type).default("")
+			_if cable_line_type.uppercase <> expected_line_type.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		_if p_fdt_folder _isnt _unset
+		_then
+			cable_ring_name << cable.perform(:ring_name).default("")
+			expected_fdt_name << p_fdt_folder
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+			_endif
+			_if cable_ring_name <> "" _andif cable_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		count +<< 1
+	_endloop
+
+	>> count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_figure_eights(p_area, p_line_id, p_fdt_folder)
+	## Count figure_eight equipment that would be written
+
+	all_poles << .gc[:pole].select(predicate.interacts(:location, p_area))
+	count << 0
+
+	_for pole _over all_poles.fast_elements()
+	_loop
+		pole_equipment << pole.get_equipment()
+		_if pole_equipment.empty? _then _continue _endif
+
+		pole_figure_eights << pole_equipment.select(
+			predicate.navigate({:source_collection}, predicate.eq(:name, :figure_eight)))
+		_if pole_figure_eights.empty? _then _continue _endif
+
+		_for fig8 _over pole_figure_eights.fast_elements()
+		_loop
+			_if p_line_id _isnt _unset
+			_then
+				expected_line_type << "LINE " + p_line_id
+				pole_line_type << pole.perform(:line_type).default("")
+				_if pole_line_type.uppercase <> expected_line_type.uppercase
+				_then _continue
+				_endif
+			_endif
+
+			_if p_fdt_folder _isnt _unset
+			_then
+				fig8_ring_name << fig8.perform(:ring_name).default("")
+				_if fig8_ring_name = ""
+				_then fig8_ring_name << pole.perform(:ring_name).default("")
+				_endif
+				expected_fdt_name << p_fdt_folder
+				_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+				_then expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_endif
+				_if fig8_ring_name <> "" _andif fig8_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then _continue
+				_endif
+			_endif
+
+			count +<< 1
+		_endloop
+	_endloop
+
+	>> count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_sling_wires(p_area, p_line_id, p_fdt_folder)
+	## Count sling_wire chains that would be written
+
+	all_sling_wires << .gc[:sling_wire].select(predicate.interacts(:route, p_area))
+	count << 0
+
+	_for sling_wire _over all_sling_wires.fast_elements()
+	_loop
+		route_geom << sling_wire.route
+		_if route_geom _is _unset _then _continue _endif
+
+		_if p_line_id _isnt _unset
+		_then
+			expected_line_type << "LINE " + p_line_id
+			sling_line_type << sling_wire.perform(:line_type).default("")
+			_if sling_line_type.uppercase <> expected_line_type.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		_if p_fdt_folder _isnt _unset
+		_then
+			sling_ring_name << sling_wire.perform(:ring_name).default("")
+			expected_fdt_name << p_fdt_folder
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+			_endif
+			_if sling_ring_name <> "" _andif sling_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then _continue
+			_endif
+		_endif
+
+		count +<< 1
+	_endloop
+
+	>> count
 _endmethod
 $
 
