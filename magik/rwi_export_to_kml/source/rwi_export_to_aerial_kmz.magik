@@ -931,8 +931,8 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 		#write("  Processing folder: ", folder_name, " (LINE: ", line_type, ")")
 		#write("    NEW? ", is_new_pole?, " EMR? ", is_emr?, " PARTNER? ", is_partner?, " Spec: ", pole_spec)
 
-		# Filter and write poles based on folder criteria
-		pole_count << 0
+		# Collect poles that match folder criteria
+		matching_poles << rope.new()
 		_for pole _over all_poles.fast_elements()
 		_loop
 			# Construct template folder name from pole attributes
@@ -980,10 +980,26 @@ _private _method rwi_export_to_aerial_kmz.write_folder_contents(p_stream, p_fold
 					_endif
 				_endif
 
-				.object_writer.write_pole(pole, p_stream, p_indent, folder_name)
-				pole_count +<< 1
-				.total_pole_count +<< 1
+				# Add to matching poles collection
+				matching_poles.add(pole)
 			_endif
+		_endloop
+
+		# Sort poles by tag/name ascending
+		sorted_poles << matching_poles.as_sorted_collection(
+			_proc(p1, p2)
+				tag1 << p1.perform(:telco_pole_tag).default("").lowercase
+				tag2 << p2.perform(:telco_pole_tag).default("").lowercase
+				>> tag1 < tag2
+			_endproc)
+
+		# Write sorted poles
+		pole_count << 0
+		_for pole _over sorted_poles.fast_elements()
+		_loop
+			.object_writer.write_pole(pole, p_stream, p_indent, folder_name)
+			pole_count +<< 1
+			.total_pole_count +<< 1
 		_endloop
 
 		# Store statistics for this folder
@@ -1071,7 +1087,10 @@ _private _method rwi_export_to_aerial_kmz.write_fdt_equipment(p_stream, p_area, 
 
 	fdt_count << 0
 
-	# 1. Export FDTs on poles (sheath_splice with type FDT)
+	# Collect all FDTs for sorting
+	fdt_list << rope.new()
+
+	# 1. Collect FDTs on poles (sheath_splice with type FDT)
 	all_poles << .gc[:pole].select(
 		predicate.interacts(:location, p_area))
 
@@ -1113,10 +1132,12 @@ _private _method rwi_export_to_aerial_kmz.write_fdt_equipment(p_stream, p_area, 
 					_endif
 				_endif
 
-				# Write the FDT
-				.object_writer.write_sheath_splice(splice, pole_geom, p_stream, p_indent)
-				fdt_count +<< 1
-				.total_fdt_count +<< 1
+				# Collect FDT for sorting
+				fdt_list.add(property_list.new_with(
+					:type, :splice,
+					:object, splice,
+					:geometry, pole_geom,
+					:name, splice.perform(:name).default("")))
 			_endif
 		_endloop
 	_endloop
@@ -1144,9 +1165,37 @@ _private _method rwi_export_to_aerial_kmz.write_fdt_equipment(p_stream, p_area, 
 			_endif
 		_endif
 
-		# Write terminal enclosure as FDT
-		# Convert terminal to equipment-like format for writer
-		.object_writer.write_terminal_enclosure(terminal, terminal_geom, p_stream, p_indent)
+		# Collect terminal enclosure FDT for sorting
+		fdt_list.add(property_list.new_with(
+			:type, :terminal,
+			:object, terminal,
+			:geometry, terminal_geom,
+			:name, terminal.perform(:name).default("")))
+	_endloop
+
+	# Sort FDTs by name ascending
+	sorted_fdts << fdt_list.as_sorted_collection(
+		_proc(fdt1, fdt2)
+			name1 << fdt1[:name].default("").lowercase
+			name2 << fdt2[:name].default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted FDTs
+	_for fdt_data _over sorted_fdts.fast_elements()
+	_loop
+		fdt_type << fdt_data[:type]
+		fdt_object << fdt_data[:object]
+		fdt_geom << fdt_data[:geometry]
+
+		_if fdt_type = :splice
+		_then
+			.object_writer.write_sheath_splice(fdt_object, fdt_geom, p_stream, p_indent)
+		_elif fdt_type = :terminal
+		_then
+			.object_writer.write_terminal_enclosure(fdt_object, fdt_geom, p_stream, p_indent)
+		_endif
+
 		fdt_count +<< 1
 		.total_fdt_count +<< 1
 	_endloop
@@ -1174,11 +1223,12 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 	all_poles << .gc[:pole].select(
 		predicate.interacts(:location, p_area))
 
-	equipment_count << 0
-
 	# DEBUG: Track processing
 	poles_checked << 0
 	splices_found << 0
+
+	# Collect matching splices with their pole geometry
+	matching_splices << rope.new()
 
 	# Iterate through poles and find sheath splices
 	_for pole _over all_poles.fast_elements()
@@ -1288,22 +1338,45 @@ _private _method rwi_export_to_aerial_kmz.write_sheath_splices_for_folder(p_stre
 				_endif
 			_endif
 
-			# Write the sheath splice (pass equipment object)
-			.object_writer.write_sheath_splice(splice, pole_geom, p_stream, p_indent)
-			equipment_count +<< 1
-
-			# Increment global counters
-			_if p_equipment_type = "FAT"
-			_then
-				.total_fat_count +<< 1
-			_elif p_equipment_type = "FDT"
-			_then
-				.total_fdt_count +<< 1
-			_elif p_equipment_type = "CLOSURE"
-			_then
-				.total_closure_count +<< 1
-			_endif
+			# Add to matching collection with geometry and equipment type
+			matching_splices.add(property_list.new_with(
+				:splice, splice,
+				:pole_geom, pole_geom,
+				:equipment_type, p_equipment_type))
 		_endloop
+	_endloop
+
+	# Sort splices by name ascending
+	sorted_splices << matching_splices.as_sorted_collection(
+		_proc(s1, s2)
+			name1 << s1[:splice].perform(:name).default("").lowercase
+			name2 << s2[:splice].perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted splices
+	equipment_count << 0
+	_for splice_data _over sorted_splices.fast_elements()
+	_loop
+		splice << splice_data[:splice]
+		pole_geom << splice_data[:pole_geom]
+		p_equipment_type << splice_data[:equipment_type]
+
+		# Write the sheath splice (pass equipment object)
+		.object_writer.write_sheath_splice(splice, pole_geom, p_stream, p_indent)
+		equipment_count +<< 1
+
+		# Increment global counters
+		_if p_equipment_type = "FAT"
+		_then
+			.total_fat_count +<< 1
+		_elif p_equipment_type = "FDT"
+		_then
+			.total_fdt_count +<< 1
+		_elif p_equipment_type = "CLOSURE"
+		_then
+			.total_closure_count +<< 1
+		_endif
 	_endloop
 
 	write("  ", p_equipment_type, " summary: Checked ", poles_checked, " poles, found ", splices_found, " total splices, wrote ", equipment_count, " matching ", p_equipment_type)
@@ -1325,7 +1398,8 @@ _private _method rwi_export_to_aerial_kmz.write_figure_eight_for_folder(p_stream
 	all_poles << .gc[:pole].select(
 		predicate.interacts(:location, p_area))
 
-	equipment_count << 0
+	# Collect matching figure_eight equipment with their pole geometry
+	matching_figure_eights << rope.new()
 
 	# Iterate through poles and find figure_eight equipment
 	_for pole _over all_poles.fast_elements()
@@ -1386,11 +1460,30 @@ _private _method rwi_export_to_aerial_kmz.write_figure_eight_for_folder(p_stream
 				_endif
 			_endif
 
-			# Write the figure_eight using pole coordinates
-			.object_writer.write_figure_eight(fig8, pole_geom, p_stream, p_indent)
-			equipment_count +<< 1
-			.total_slack_hanger_count +<< 1
+			# Add to matching collection with geometry
+			matching_figure_eights.add(property_list.new_with(
+				:fig8, fig8,
+				:pole_geom, pole_geom))
 		_endloop
+	_endloop
+
+	# Sort figure_eights by name ascending
+	sorted_figure_eights << matching_figure_eights.as_sorted_collection(
+		_proc(f1, f2)
+			name1 << f1[:fig8].perform(:name).default("").lowercase
+			name2 << f2[:fig8].perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted figure_eights
+	equipment_count << 0
+	_for fig8_data _over sorted_figure_eights.fast_elements()
+	_loop
+		fig8 << fig8_data[:fig8]
+		pole_geom << fig8_data[:pole_geom]
+		.object_writer.write_figure_eight(fig8, pole_geom, p_stream, p_indent)
+		equipment_count +<< 1
+		.total_slack_hanger_count +<< 1
 	_endloop
 
 	_if equipment_count > 0
@@ -1415,7 +1508,8 @@ _private _method rwi_export_to_aerial_kmz.write_sling_wire_for_folder(p_stream, 
 	all_sling_wires << .gc[:sling_wire].select(
 		predicate.interacts(:route, p_area))
 
-	chain_count << 0
+	# Collect matching sling wires first
+	matching_sling_wires << rope.new()
 
 	# Iterate through sling_wire chains
 	_for sling_wire _over all_sling_wires.fast_elements()
@@ -1459,7 +1553,23 @@ _private _method rwi_export_to_aerial_kmz.write_sling_wire_for_folder(p_stream, 
 			_endif
 		_endif
 
-		# Write the sling_wire using its route geometry
+		# Add to matching sling wires
+		matching_sling_wires.add(sling_wire)
+	_endloop
+
+	# Sort sling wires by name ascending
+	sorted_sling_wires << matching_sling_wires.as_sorted_collection(
+		_proc(sw1, sw2)
+			name1 << sw1.perform(:name).default("").lowercase
+			name2 << sw2.perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted sling wires
+	chain_count << 0
+	_for sling_wire _over sorted_sling_wires.fast_elements()
+	_loop
+		route_geom << sling_wire.route
 		.object_writer.write_sling_wire(sling_wire, route_geom, p_stream, p_indent)
 		chain_count +<< 1
 		.total_sling_wire_count +<< 1
@@ -1569,19 +1679,33 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 	cable_count << cables_by_name.size
 	cable_length_sum << 0.0
 
-	_for cable_name, cable_data _over cables_by_name.fast_keys_and_elements()
+	# Collect cable names into a rope first, then sort
+	cable_names_rope << rope.new()
+	_for cable_name _over cables_by_name.fast_keys()
 	_loop
+		cable_names_rope.add(cable_name)
+	_endloop
+
+	# Sort cable names ascending
+	sorted_cable_names << cable_names_rope.as_sorted_collection(
+		_proc(name1, name2)
+			>> name1.write_string.lowercase < name2.write_string.lowercase
+		_endproc)
+
+	_for cable_name _over sorted_cable_names.fast_elements()
+	_loop
+		cable_data << cables_by_name[cable_name]
 		write("  Processing CABLE: ", cable_name)
 		cable << cable_data[:cable]
 		sector_list << cable_data[:sector_list]
 		# Merge sectors that connect (last coord of one = first coord of next)
 		merged_sectors << _self.merge_cable_sectors(sector_list)
-		
+
 
 		# Get cable length from calculated_fiber_length field
 		cable_length << merged_sectors.line_length / 100.0
 		cable_length_sum << cable_length.rounded  # Convert cm to meters
-		write("    >> Merge Cable length: ", cable_length_sum, " meters")	
+		write("    >> Merge Cable length: ", cable_length_sum, " meters")
 
 		# Write the cable using merged sectors
 		.object_writer.write_cable(cable, merged_sectors, p_stream, p_indent)
@@ -1713,9 +1837,16 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 			p_stream.write(p_indent, "  <name>", subfolder_name, "</name>", newline_char)
 			p_stream.write(p_indent, "  <open>0</open>", newline_char)
 
-			# Write all DPs in this subfolder
+			# Sort and write all DPs in this subfolder
+			sorted_dps << dps.as_sorted_collection(
+				_proc(dp1, dp2)
+					name1 << dp1.perform(:name).default("").lowercase
+					name2 << dp2.perform(:name).default("").lowercase
+					>> name1 < name2
+				_endproc)
+
 			subfolder_indent << p_indent + "  "
-			_for dp _over dps.fast_elements()
+			_for dp _over sorted_dps.fast_elements()
 			_loop
 				.object_writer.write_demand_point(dp, p_stream, subfolder_indent, p_folder_name)
 				dp_count +<< 1
@@ -1731,8 +1862,9 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 
 	_elif is_hp_uncover?
 	_then
-		# HP UNCOVER: Write directly without subfolders
+		# HP UNCOVER: Collect matching DPs for sorting
 		dp_count << 0
+		matching_dps << rope.new()
 
 		_for dp _over all_demand_points.fast_elements()
 		_loop
@@ -1788,7 +1920,20 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 				_endif
 			_endif
 
-			# Write demand point directly
+			# Add to matching DPs
+			matching_dps.add(dp)
+		_endloop
+
+		# Sort and write DPs
+		sorted_dps << matching_dps.as_sorted_collection(
+			_proc(dp1, dp2)
+				name1 << dp1.perform(:name).default("").lowercase
+				name2 << dp2.perform(:name).default("").lowercase
+				>> name1 < name2
+			_endproc)
+
+		_for dp _over sorted_dps.fast_elements()
+		_loop
 			.object_writer.write_demand_point(dp, p_stream, p_indent, p_folder_name)
 			dp_count +<< 1
 		_endloop
@@ -1823,7 +1968,8 @@ _private _method rwi_export_to_aerial_kmz.write_cells_for_folder(p_stream, p_are
 
 	write("  Found ", all_cells.size, " cells in area for folder: ", p_folder_name)
 
-	cell_count << 0
+	# Collect matching cells first
+	matching_cells << rope.new()
 
 	_for cell _over all_cells.fast_elements()
 	_loop
@@ -1884,7 +2030,22 @@ _private _method rwi_export_to_aerial_kmz.write_cells_for_folder(p_stream, p_are
 			_endif
 		_endif
 
-		# Write cell
+		# Add to matching cells
+		matching_cells.add(cell)
+	_endloop
+
+	# Sort cells by name ascending
+	sorted_cells << matching_cells.as_sorted_collection(
+		_proc(c1, c2)
+			name1 << c1.perform(:name).default("").lowercase
+			name2 << c2.perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted cells
+	cell_count << 0
+	_for cell _over sorted_cells.fast_elements()
+	_loop
 		.object_writer.write_cell(cell, p_stream, p_indent, p_folder_name)
 		cell_count +<< 1
 	_endloop
