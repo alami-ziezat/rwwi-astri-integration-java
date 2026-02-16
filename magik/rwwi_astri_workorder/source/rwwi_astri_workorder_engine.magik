@@ -25,9 +25,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 ## Logic: If abd_kmz_uuid exists, use it and return 'ABD', otherwise use apd_kmz_uuid and return 'APD'
 rwwi_astri_workorder_engine.define_shared_constant(:sql_for_kmz_uuid,
 	property_list.new_with(
-		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, cluster_code, subfeeder_code, feeder_code, olt_code FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
-		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, subfeeder_code, feeder_code, olt_code FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
-		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, feeder_code, olt_code FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
+		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, topology, cluster_code, subfeeder_code, feeder_code, olt_code FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
+		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, topology, subfeeder_code, feeder_code, olt_code FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
+		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, topology, feeder_code, olt_code FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
 	),
 	_false
 )
@@ -450,7 +450,7 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			                  _else >> ""
 			                  _endif
 
-			# Retrieve KMZ UUID, source, and infrastructure codes from PostgreSQL database
+			# Retrieve KMZ UUID, source, topology, and infrastructure codes from PostgreSQL database
 			_local db_result << _self.get_kmz_uuid_from_db(infrastructure_type, infra_code)
 
 			# Add all database fields to property list (all fields always present with defaults)
@@ -460,6 +460,12 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:subfeeder_code_db] << db_result[:subfeeder_code].default("")
 			pl[:feeder_code_db] << db_result[:feeder_code].default("")
 			pl[:olt_code] << db_result[:olt_code].default("")
+
+			# Override topology with database value if available (DB takes priority, API is fallback)
+			_if db_result[:topology] _isnt _unset _andif db_result[:topology] <> ""
+			_then
+				pl[:topology] << db_result[:topology]
+			_endif
 						  
 			result_rope.add(pl)
 		_endloop
@@ -666,7 +672,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 	##
 	## Returns:
 	##   property_list with keys:
-	##     :kmz_uuid, :kmz_source (always returned)
+	##     :kmz_uuid, :kmz_source, :topology (always returned)
 	##     For cluster: :cluster_code, :subfeeder_code, :feeder_code, :olt_code
 	##     For subfeeder: :subfeeder_code, :feeder_code, :olt_code
 	##     For feeder: :feeder_code, :olt_code
@@ -749,6 +755,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 			# Extract common fields (always returned)
 			result[:kmz_uuid] << rec.kmz_uuid.default("")
 			result[:kmz_source] << rec.kmz_source.default("")
+			result[:topology] << rec.topology.default("")
 
 			# Extract infrastructure-specific fields based on type
 			_if infrastructure_type = "cluster"
@@ -802,6 +809,7 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 		_return property_list.new_with(
 			:kmz_uuid, "",
 			:kmz_source, "",
+			:topology, "",
 			:cluster_code, "",
 			:subfeeder_code, "",
 			:feeder_code, "",
