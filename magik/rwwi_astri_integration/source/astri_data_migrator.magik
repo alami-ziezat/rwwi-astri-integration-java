@@ -1437,7 +1437,7 @@ _private _method astri_data_migrator.process_feeder_kml_migration(rec, obj_stats
 		_then
 			_local kml_file_path << kml_file_path_elem.xml_result
 			_local parser << astri_kml_parser.new(kml_file_path)
-			_local placemarks << parser.parse()
+			_local (placemarks, topology) << parser.parse()
 
 			_local wo << property_list.new_with(:wo_number, feeder_code, :infra_code, feeder_code, :infrastructure_type, "feeder", :kmz_uuid, kmz_uuid)
 
@@ -1538,7 +1538,7 @@ _private _method astri_data_migrator.process_subfeeder_kml_migration(rec, obj_st
 		_then
 			_local kml_file_path << kml_file_path_elem.xml_result
 			_local parser << astri_kml_parser.new(kml_file_path)
-			_local placemarks << parser.parse()
+			_local (placemarks, topology) << parser.parse()
 
 			_local wo << property_list.new_with(:wo_number, subfeeder_code, :infra_code, subfeeder_code, :infrastructure_type, "subfeeder", :kmz_uuid, kmz_uuid)
 
@@ -1638,7 +1638,7 @@ _private _method astri_data_migrator.process_cluster_kml_migration(rec, obj_stat
 		_then
 			_local kml_file_path << kml_file_path_elem.xml_result
 			_local parser << astri_kml_parser.new(kml_file_path)
-			_local placemarks << parser.parse()
+			_local (placemarks, topology) << parser.parse()
 
 			_local wo << property_list.new_with(:wo_number, cluster_code, :infra_code, cluster_code, :infrastructure_type, "cluster", :kmz_uuid, kmz_uuid)
 

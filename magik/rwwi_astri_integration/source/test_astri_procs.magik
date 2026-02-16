@@ -260,9 +260,10 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 		# Parse KML file directly using astri_kml_parser
 		write("Parsing KML file...")
 		parser << astri_kml_parser.new(kml_file_path)
-		placemarks << parser.parse()
+		(placemarks, topology) << parser.parse()
 
 		write("✓ Parsed ", placemarks.size, " placemarks")
+		write("✓ Network topology: ", topology)
 		write("")
 
 		# Display first 3 placemarks as examples

@@ -56,15 +56,23 @@ $
 _pragma(classify_level=basic, topic={astri_integration})
 _method astri_kml_parser.parse()
 	## Parse KML file and extract all Placemark objects
+	## Also detects network topology based on equipment types
 	##
-	## Returns: rope of property_lists, each containing:
-	##   :name       - Placemark name
-	##   :desc       - Description (from <description> tag)
-	##   :coord      - Coordinates string (lon,lat,elevation format)
-	##   :type       - Geometry type ("point", "line", or "area")
-	##   :id         - Placemark id attribute (if present, _unset otherwise)
-	##   :parent     - Parent folder path (e.g. "Folder1|Folder2|Folder3")
-	##   :extended   - Extended data property_list (from ExtendedData)
+	## Returns: (placemarks_rope, topology_symbol)
+	##   placemarks_rope - rope of property_lists, each containing:
+	##     :name       - Placemark name
+	##     :desc       - Description (from <description> tag)
+	##     :coord      - Coordinates string (lon,lat,elevation format)
+	##     :type       - Geometry type ("point", "line", or "area")
+	##     :id         - Placemark id attribute (if present, _unset otherwise)
+	##     :parent     - Parent folder path (e.g. "Folder1|Folder2|Folder3")
+	##     :extended   - Extended data property_list (from ExtendedData)
+	##     :network_type - Network equipment type ("pole", "handhole", "fdt", etc.)
+	##
+	##   topology_symbol - Network topology:
+	##     :aerial      - Only aerial infrastructure (poles, no handholes)
+	##     :underground - Only underground infrastructure (handholes, no poles)
+	##     :both        - Mixed aerial and underground infrastructure
 
 	_if .kml_content _is _unset
 	_then
@@ -81,18 +89,84 @@ _method astri_kml_parser.parse()
 	# Initialize style cache for network type detection
 	.style_cache << property_list.new()
 
-	>> _self.extract_placemarks_from_file(.kml_content)
+	# Extract placemarks
+	placemarks << _self.extract_placemarks_from_file(.kml_content)
+
+	# Detect topology based on equipment types
+	topology << _self.detect_topology(placemarks)
+
+	write("Detected network topology: ", topology)
+
+	>> placemarks, topology
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.detect_topology(placemarks)
+	## Detect network topology based on equipment types in placemarks
+	##
+	## Parameters:
+	##   placemarks - rope of property_lists containing placemark data
+	##
+	## Returns: Symbol
+	##   :aerial      - Only aerial infrastructure (poles, no handholes)
+	##   :underground - Only underground infrastructure (handholes, no poles)
+	##   :both        - Mixed aerial and underground infrastructure
+
+	has_poles? << _false
+	has_handholes? << _false
+
+	# Scan through all placemarks to detect poles and handholes
+	_for placemark _over placemarks.fast_elements()
+	_loop
+		network_type << placemark[:network_type]
+
+		_if network_type _isnt _unset
+		_then
+			_if network_type = "pole"
+			_then
+				has_poles? << _true
+			_elif network_type = "handhole"
+			_then
+				has_handholes? << _true
+			_endif
+		_endif
+
+		# Early exit if we found both
+		_if has_poles? _andif has_handholes?
+		_then
+			_leave
+		_endif
+	_endloop
+
+	# Determine topology based on what was found
+	_if has_poles? _andif has_handholes?
+	_then
+		_return :both
+	_elif has_poles?
+	_then
+		_return :aerial
+	_elif has_handholes?
+	_then
+		_return :underground
+	_else
+		# No poles or handholes found - default to aerial
+		# (may have other equipment like FDT, FAT without poles/handholes shown)
+		_return :aerial
+	_endif
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method astri_kml_parser.parse_from_file(kml_file_path)
-	## Parse KML from file path and return rope of property_lists
+	## Parse KML from file path and return placemarks and topology
 	##
 	## Parameters:
 	##   kml_file_path: Path to KML file
 	##
-	## Returns: rope of property_lists
+	## Returns: (placemarks_rope, topology_symbol)
+	##   placemarks_rope - rope of property_lists
+	##   topology_symbol - :aerial, :underground, or :both
 
 	.kml_content << kml_file_path
 	>> _self.parse()
