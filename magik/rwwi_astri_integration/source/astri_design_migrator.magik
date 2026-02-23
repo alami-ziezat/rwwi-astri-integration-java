@@ -38,6 +38,8 @@ def_slotted_exemplar(:astri_design_migrator,
 	# Collection references
 	{:ar_col,          _unset, :writable},   # aerial_route
 	{:pole_col,        _unset, :writable},   # pole
+	{:ug_route_col,    _unset, :writable},   # underground_route (NEW)
+	{:uub_col,         _unset, :writable},   # uub (underground utility box/handhole) (NEW)
 	{:sheath_col,      _unset, :writable},   # sheath_with_loc
 	{:sc_col,          _unset, :writable},   # sheath_splice
 	{:fe_col,          _unset, :writable},   # figure_eight
@@ -59,6 +61,7 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:cluster,              _unset, :writable},   # Infrastructure name (from target infra_name)
 	{:infra_type,           _unset, :writable},   # Infrastructure type (cluster/subfeeder/feeder)
 	{:construction_status,  _unset, :writable},   # Construction status ("Proposed" or "In Service")
+	{:topology,             _unset, :writable},   # Network topology (:aerial, :underground, :both) (NEW)
 
 	# Database infrastructure codes
 	{:cluster_code_db,      _unset, :writable},   # Cluster code from database
@@ -137,6 +140,8 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 	# Setup collection references
 	.ar_col << .database.collections[:aerial_route]
 	.pole_col << .database.collections[:pole]
+	.ug_route_col << .database.collections[:underground_route]  # NEW
+	.uub_col << .database.collections[:uub]                     # NEW
 	.sheath_col << .database.collections[:sheath_with_loc]
 	.sc_col << .database.collections[:sheath_splice]
 	.fe_col << .database.collections[:figure_eight]
@@ -448,8 +453,8 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_self.create_olt(pm)
 		_endif
 	_endloop
-	# Second pass: Create cables/aerial routes
-	write("  Pass 2: Creating cables and aerial routes...")
+	# Second pass: Create cables/routes (aerial and/or underground based on topology)
+	write("  Pass 2: Creating cables and routes (topology: ", .topology.default(:aerial), ")...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -461,10 +466,23 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_local is_route << _self.is_route?(pm)
 		_if is_route
 		_then
-			_self.create_aerial_route(pm)
+			# TOPOLOGY-BASED ROUTING
+			_local topology << .topology.default(:aerial)
+
+			# Create aerial route if topology supports it
+			_if topology = :aerial #_orif topology = :both
+			_then
+				_self.create_aerial_route(pm)
+			_endif
+
+			# Create underground route if topology supports it
+			_if topology = :underground #_orif topology = :both
+			_then
+				_self.create_underground_route(pm)
+			_endif
 		_endif
 	_endloop
-	write("  Pass 3: Creating poles...")
+	write("  Pass 3: Creating structures (poles and/or UUBs based on topology)...")
 	_for pm _over placemarks.fast_elements()
 	_loop
 		# Skip boundary area
@@ -473,14 +491,21 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_continue
 		_endif
 
-		_local is_pole << _self.is_pole?(pm)
-		#write("    Checking: ", pm[:name], " | is_pole?: ", is_pole, " | Folders: ", pm[:parent].default(""))
-		_if is_pole
+		# TOPOLOGY-BASED STRUCTURE CREATION
+		_local topology << .topology.default(:aerial)
+		pm.p
+		# Create pole if topology supports it
+		_if (topology = :aerial _orif topology = :both) _andif _self.is_pole?(pm)
 		_then
 			_self.create_pole(pm)
 		_endif
-	_endloop
 
+		_if (topology = :underground _orif topology = :both) _andif _self.is_uub?(pm)
+		_then
+			_self.create_uub(pm)
+		_endif
+	_endloop
+ 
 	# Third pass: Create other objects (demand points, splices, zones, etc.)
 	write("  Pass 4: Creating demand points, splices, and area-based objects...")
 	_for pm _over placemarks.fast_elements()

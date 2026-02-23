@@ -143,6 +143,25 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_success("Design migrator initialized")
 			_self.log_info("")
 
+			# Set topology on migrator - prefer UI field, fallback to KML parser
+			_local ui_topology_str << wo[:topology]
+			_local final_topology << topology
+			_if ui_topology_str _isnt _unset _andif ui_topology_str <> ""
+			_then
+				_if ui_topology_str = "AE"
+				_then
+					final_topology << :aerial
+				_elif ui_topology_str = "UG"
+				_then
+					final_topology << :underground
+				_elif ui_topology_str = "AE&UG"
+				_then
+					final_topology << :both
+				_endif
+			_endif
+			migrator.topology << final_topology
+			write("Topology set on migrator: ", final_topology, " (UI field: ", ui_topology_str.default("unset"), ", KML detected: ", topology, ")")
+
 			# Create project and design
 			_self.log_info("Step 5: Creating Design Manager project and design...")
 			write("Initiate: Creating project and design...: ",infra_code," : ",infra_name," : ",infra_type) 
@@ -175,7 +194,10 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_info("Design:          " + infra_name + " - ID: " + scheme.id.write_string)
 			_self.log_info("")
 			_self.log_info("MIGRATION STATISTICS:")
+			_self.log_info("  Network Topology:   " + topology.write_string)
 			_self.log_info("  Aerial Routes:      " + stats[:aerial_routes].write_string)
+			_self.log_info("  Underground Routes: " + stats[:underground_routes].default(0).write_string)
+			_self.log_info("  UUBs/Handholes:     " + stats[:uubs].default(0).write_string)
 			_self.log_info("  New Poles:          " + stats[:new_poles].write_string)
 			_self.log_info("  Existing Poles:     " + stats[:existing_poles].write_string)
 			_self.log_info("  Cable Length (m):  " + stats[:sheath_length].rounded.write_string)
@@ -388,6 +410,25 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 			_local migrator << astri_design_migrator.new(database, wo, "In Service")
 			_self.log_success("Design migrator initialized")
 			_self.log_info("")
+
+			# Set topology on migrator - prefer UI field, fallback to KML parser
+			_local ui_topology_str << wo[:topology]
+			_local final_topology << topology
+			_if ui_topology_str _isnt _unset _andif ui_topology_str <> ""
+			_then
+				_if ui_topology_str = "AE"
+				_then
+					final_topology << :aerial
+				_elif ui_topology_str = "UG"
+				_then
+					final_topology << :underground
+				_elif ui_topology_str = "AE&UG"
+				_then
+					final_topology << :both
+				_endif
+			_endif
+			migrator.topology << final_topology
+			write("Topology set on migrator: ", final_topology, " (UI field: ", ui_topology_str.default("unset"), ", KML detected: ", topology, ")")
 
 			# Migrate placemarks without creating project/design
 			_self.log_info("Step 6: Migrating placemarks to existing alternative...")

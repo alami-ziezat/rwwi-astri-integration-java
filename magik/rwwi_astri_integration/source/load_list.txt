@@ -10,6 +10,8 @@ astri_migrator_utilities
 # ASTRI Design Migrator - Object-specific migrators
 astri_pole_migrator
 astri_aerial_route_migrator
+astri_uub_migrator
+astri_underground_route_migrator
 astri_demand_point_migrator
 astri_splice_migrator
 astri_figure_eight_migrator

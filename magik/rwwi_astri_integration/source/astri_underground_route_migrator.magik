@@ -1,0 +1,368 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Underground Route Migration
+## Contains methods for creating underground routes and cables from KMZ placemarks
+## - Cable folder validation (CABLE, KABEL, CABEL, FO, ROUTE, DUCT)
+## - Cable core detection (12-576 cores) from name
+## - UUB/handhole detection at start/end points (500cm radius, prefers connected UUBs)
+## - Placeholder UUB creation when handholes not found
+## - Sheath creation with structure path via structure_manager
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_underground_route(pm)
+	## Create underground route (cable) from placemark with advanced mode:
+	## - Cable folder validation (CABLE, KABEL, CABEL, FO, ROUTE, DUCT)
+	## - Cable core detection (12-576 cores) from name
+	## - UUB/handhole detection at start/end points (500cm radius)
+	## - Placeholder UUB creation when handholes not found
+	## - Sheath creation with structure placement via structure_manager path
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	write("  Processing Underground Route: ", pm[:name])
+	_try _with errCon
+		# Step 0: Parse folders
+		_local folders << pm[:parent].default("")
+
+		# Validate folders exist
+		_if folders _is _unset _orif folders = ""
+		_then
+			_return  # No folders - skip
+		_endif
+
+		# Split folders
+		_local fol << folders.split_by("|")
+		_local fsize << fol.size
+
+		# Step 1: Validate cable/route keywords
+		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "FO", "ROUTE", "DUCT"}
+		_local name_upper << pm[:name].uppercase
+
+		_local is_cable? << _false
+		_for keyword _over valid_cable_keywords.fast_elements()
+		_loop
+			_if name_upper.index_of_seq(keyword) _isnt _unset
+			_then
+				is_cable? << _true
+				_leave
+			_endif
+		_endloop
+
+		_if _not is_cable?
+		_then
+			_return  # Not a cable - skip
+		_endif
+
+		# Step 2: Parse route geometry
+		_local route << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
+		_local t_len << pc.line_length
+
+		# Check minimum length (in cm, convert to meters for display)
+		_if t_len < 40  # 0.4 meters in cm
+		_then
+			write("    WARNING: Route too short (", (t_len/100.0), "m) - skipping")
+			_return
+		_endif
+
+		# Step 3: Detect cable core count
+		_local m_cbl << _self.match_cable_core(pm[:name])
+		_local fb_c << m_cbl
+		_local s_sp << _unset
+		_local s_cd << _unset
+
+		# Map fiber count to spec_id and STF code (underground/ADSS cable specs)
+		_if m_cbl = "12"
+		_then
+			s_sp << "SM G652D-ADSS 12C"
+			s_cd << ""
+		_elif m_cbl = "24"
+		_then
+			s_sp << "SM G652D-ADSS 24C"
+			s_cd << "200000100"
+		_elif m_cbl = "36"
+		_then
+			s_sp << "SM G652D-ADSS 36C"
+			s_cd << "200000975"
+		_elif m_cbl = "48"
+		_then
+			s_sp << "SM G652D-ADSS 48C"
+			s_cd << "200001038"
+		_elif m_cbl = "72"
+		_then
+			s_sp << "SM G652D-ADSS 72C"
+			s_cd << "FO_INV_FTTX_0796"
+		_elif m_cbl = "96"
+		_then
+			s_sp << "SM G652D-ADSS 96C"
+			s_cd << "200001630"
+		_elif m_cbl = "144"
+		_then
+			s_sp << "SM G652D-ADSS 144C"
+			s_cd << "200001030"
+		_elif m_cbl = "288"
+		_then
+			s_sp << "SM G652D-ADSS 288C"
+			s_cd << "200001015"
+		_elif m_cbl = "576"
+		_then
+			s_sp << "SM G652D-ADSS 576C"
+			s_cd << ""
+		_else
+			s_sp << "SM G652D-ADSS 24C"
+			s_cd << "200000100"
+			fb_c << "24"
+		_endif
+
+		# Step 4: Detect line type and segment
+		_local m_line << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 4.5: Extract ring_name from placemark
+		_local ring_name << pm[:ring_name]
+
+		write("    >> Detected fiber count: ", fb_c, " cores | line: ", m_line)
+
+		# Step 5: Create underground route
+		write("    [OK] Creating underground route...")
+		_local ug_prop_values << property_list.new_with(
+			:construction_status, .construction_status,
+			:name, pm[:name],
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:region, .region,
+			:cluster, .cluster,
+			:fiber_count, fb_c,
+			:fttx_network_type, _self.get_fttx_network_type(),
+			:segment, segment_id,
+			:ring_name, ring_name,
+			:line_type, m_line,
+			:folders, folders,
+			:route, route,
+			:uuid, .uuid,
+			:cluster_code, .cluster_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:feeder_code, .feeder_code_db,
+			:olt_code, .olt_code,
+			:underground_route_type, "Bore",  # Default type
+			:width, 300,
+			:upper_material_depth, 700,
+			:core_material_depth, 300,
+			:diameter, 300,
+			:centre_point_depth, 300,
+			:base_material_depth, 50
+		)
+
+		_local ug_rec_trans << record_transaction.new_insert(.ug_route_col, ug_prop_values)
+		_local ug_result << ug_rec_trans.run()
+
+		# Update statistics (add new stat if it doesn't exist)
+		_if .stats[:underground_routes] _is _unset
+		_then
+			.stats[:underground_routes] << 0
+		_endif
+		.stats[:underground_routes] +<< 1
+
+		write("    [OK] Underground route created: ", pm[:name], " (", fb_c, " cores, ", (t_len/100.0).ceiling, "m)")
+
+		# Step 6: Handle START POINT - scan for existing UUB/handhole
+		# Prefer UUBs that already have connected routes (ref: scan_uub_fttx pattern)
+		_local l_location_start << route.first_coord
+		_local pp_start << pseudo_point.new(l_location_start)
+		pp_start.world << .database.world
+
+		_local l_result_uub_start << _unset
+
+		_local buff_start << pp_start.buffer(500)  # 5m radius in cm
+		buff_start.world << .database.world
+		_local pred_start << predicate.interacts(:location, {buff_start})
+		_local uubs_start << .uub_col.select(pred_start)
+
+		_if uubs_start.size > 0
+		_then
+			# Prefer UUB with existing connected routes
+			_for uu _over uubs_start.fast_elements()
+			_loop
+				_if uu.connected_routes().size > 0
+				_then
+					l_result_uub_start << uu
+					_leave
+				_endif
+			_endloop
+			# Fall back to any nearby UUB if none has connected routes
+			_if l_result_uub_start _is _unset
+			_then
+				l_result_uub_start << uubs_start.an_element()
+			_endif
+			write("    >> Using existing UUB at start: ", l_result_uub_start)
+		_else
+			# No UUB found - create placeholder handhole at start
+			write("    >> Creating placeholder UUB at start")
+			_local uub_start_props << property_list.new_with(
+				:type, "Handhole",
+				:label, "HH-" + pm[:name],
+				:spec_id, "HH Concrete FDT : 80x80x130 cm",
+				:construction_status, .construction_status,
+				:location, l_location_start,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:region, .region,
+				:cluster, .cluster,
+				:line_type, m_line,
+				:ring_name, ring_name,
+				:fttx_network_type, _self.get_fttx_network_type(),
+				:segment, segment_id,
+				:folders, folders,
+				:uuid, .uuid,
+				:cluster_code, .cluster_code_db,
+				:subfeeder_code, .subfeeder_code_db,
+				:feeder_code, .feeder_code_db,
+				:olt_code, .olt_code,
+				:depth, 1.3,
+				:width, 0.8
+			)
+			_local uub_start_trans << record_transaction.new_insert(.uub_col, uub_start_props)
+			l_result_uub_start << uub_start_trans.run()
+		_endif
+
+		# Step 7: Handle END POINT - scan for existing UUB/handhole
+		# Prefer UUBs that already have connected routes (ref: scan_uub_fttx pattern)
+		_local l_location_end << route.last_coord
+		_local pp_end << pseudo_point.new(l_location_end)
+		pp_end.world << .database.world
+
+		_local l_result_uub_end << _unset
+
+		_local buff_end << pp_end.buffer(500)  # 5m radius in cm
+		buff_end.world << .database.world
+		_local pred_end << predicate.interacts(:location, {buff_end})
+		_local uubs_end << .uub_col.select(pred_end)
+
+		_if uubs_end.size > 0
+		_then
+			# Prefer UUB with existing connected routes
+			_for uu _over uubs_end.fast_elements()
+			_loop
+				_if uu.connected_routes().size > 0
+				_then
+					l_result_uub_end << uu
+					_leave
+				_endif
+			_endloop
+			# Fall back to any nearby UUB if none has connected routes
+			_if l_result_uub_end _is _unset
+			_then
+				l_result_uub_end << uubs_end.an_element()
+			_endif
+			write("    >> Using existing UUB at end: ", l_result_uub_end)
+		_else
+			# No UUB found - create placeholder handhole at end
+			write("    >> Creating placeholder UUB at end")
+			_local uub_end_props << property_list.new_with(
+				:type, "Handhole",
+				:label, "HH-" + pm[:name],
+				:spec_id, "HH Concrete FDT : 80x80x130 cm",
+				:construction_status, .construction_status,
+				:location, l_location_end,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:region, .region,
+				:cluster, .cluster,
+				:line_type, m_line,
+				:ring_name, ring_name,
+				:fttx_network_type, _self.get_fttx_network_type(),
+				:segment, segment_id,
+				:folders, folders,
+				:uuid, .uuid,
+				:cluster_code, .cluster_code_db,
+				:subfeeder_code, .subfeeder_code_db,
+				:feeder_code, .feeder_code_db,
+				:olt_code, .olt_code,
+				:depth, 1.3,
+				:width, 0.8
+			)
+			_local uub_end_trans << record_transaction.new_insert(.uub_col, uub_end_props)
+			l_result_uub_end << uub_end_trans.run()
+		_endif
+
+		# Step 8: Find structure path via structure_manager (start coord -> end coord)
+		# Uses get_continuous_structures_via_coords to auto-traverse UUBs and underground routes
+		_local stm << structure_manager.new(.database, .database.world)
+		_local l_sector << sector_rope.new_with(sector.new_with(l_location_start, l_location_end))
+		_local shc << pseudo_chain.new(l_sector)
+		_local path_swl << stm.get_continuous_structures_via_coords(shc.sectors[1])
+
+		# Fallback: manually collect structures if path is empty
+		_if path_swl _is _unset _orif path_swl.size = 0
+		_then
+			write("    >> WARNING: structure_manager path empty, using manual structure list")
+			path_swl << rope.new()
+			_if l_result_uub_start _isnt _unset
+			_then
+				path_swl.add(l_result_uub_start)
+			_endif
+			path_swl.add(ug_result)
+			_if l_result_uub_end _isnt _unset
+			_then
+				path_swl.add(l_result_uub_end)
+			_endif
+		_endif
+
+		# Step 9: Create sheath with structure placement
+		_local ftri << _if fsize >= 3 _then >> fol[3] _else >> fol[fsize] _endif
+		_local rtr << _if ftri.size > 120 _then >> ftri.slice(1, 120) _else >> ftri _endif
+
+		write("    >> Creating sheath with ", path_swl.size, " structures")
+		_local sheath_props << property_list.new_with(
+			:name, pm[:name],
+			:spec_id, s_sp,
+			:construction_status, .construction_status,
+			:sheath_network_type, _self.get_fttx_network_type(),
+			:folders, folders,
+			:pop, .pop_name,
+			:olt, .pop_name,
+			:region, .region,
+			:cluster, rtr,
+			:line_type, m_line,
+			:segment, segment_id,
+			:asset_owner, "Owned",
+			:stf_item_code, s_cd,
+			:ring_name, ring_name,
+			:uuid, .uuid,
+			:cluster_code, .cluster_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:feeder_code, .feeder_code_db,
+			:olt_code, .olt_code
+		)
+
+		_local sheath_trans << record_transaction.new_insert(.sheath_col, sheath_props)
+		_local sheath_result << sheath_trans.run()
+
+		# Place sheath in structure path (UUBs + underground route)
+		sheath_result.place_in_structures(path_swl)
+
+		# Track sheath length in meters using calculated fibre length
+		_local sheath_length << sheath_result.calculated_sheath_length.value_in(:m).as_number()
+		.stats[:sheath_length] +<< sheath_length
+		write("    [OK] Sheath created and placed in structures (Fibre Length: ", sheath_length.rounded, "m)")
+
+		_return ug_result
+
+	_when error
+		write("ERROR in create_underground_route():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		.stats[:errors] +<< 1
+		_return _unset
+	_endtry
+_endmethod
+$

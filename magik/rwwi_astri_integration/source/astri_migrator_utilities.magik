@@ -81,6 +81,29 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_pole_or_uub?(pm)
+	## Check if placemark is a pole based on parent folder
+	## Folder must contain "pole" pattern (case-insensitive)
+
+	_local parent << pm[:parent].default("").lowercase
+	_local network_type << pm[:network_type].default("").lowercase
+	
+	>> _self.is_pole?(pm) _orif _self.is_uub>(pm)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_uub?(pm)
+	## Check if placemark is a pole based on parent folder
+	## Folder must contain "pole" pattern (case-insensitive)
+
+	_local network_type << pm[:network_type].default("").lowercase
+	
+	>> network_type = "handhole"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.is_route?(pm)
 	## Check if placemark is a cable
 	>> _self.is_cable?(pm) _orif _self.is_sling_wire?(pm)
@@ -153,7 +176,7 @@ _private _method astri_design_migrator.is_splice?(pm)
 	write(pm[:name],"   :   ", pm[:type])
 	_local network_type << pm[:network_type].default("").lowercase
 	>>  network_type = "fdt" _orif network_type = "fat" _orif
-	   network_type = "joint_closure" _orif network_type = "handhole" 
+	   network_type = "joint_closure" #_orif network_type = "handhole" 
 _endmethod
 $
 

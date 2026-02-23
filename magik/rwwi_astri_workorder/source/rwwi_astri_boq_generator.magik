@@ -788,7 +788,7 @@ _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 			_local base_length << rec.calculated_sheath_length.value_in(:m).as_number()
 			_local length_with_margin << base_length * 1.05
 			write("  Cable length: ", base_length.rounded, "m + 5% = ", length_with_margin.rounded, "m")
-			_return length_with_margin
+			_return length_with_margin.ceiling
 		_endif
 	_endif
 

@@ -120,13 +120,14 @@ _private _method astri_kml_parser.detect_topology(placemarks)
 	_for placemark _over placemarks.fast_elements()
 	_loop
 		network_type << placemark[:network_type]
-
+		parent << placemark[:parent].lowercase
 		_if network_type _isnt _unset
 		_then
-			_if network_type = "pole"
+			write(network_type, " found in placemark with parent folders: ", parent)
+			_if network_type = "pole" _andif parent.index_of_seq("new") _isnt _unset
 			_then
 				has_poles? << _true
-			_elif network_type = "handhole"
+			_elif network_type = "handhole" _andif parent.index_of_seq("new") _isnt _unset
 			_then
 				has_handholes? << _true
 			_endif
@@ -858,9 +859,11 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_then
 		_return "cell"
 
-	_elif filename_lc.index_of_seq("cross-hairs") _isnt _unset _orif
+	_elif (filename_lc.index_of_seq("cross-hairs") _isnt _unset _orif
 	      filename_lc.index_of_seq("crosshairs") _isnt _unset _orif 
-		  p_name_lc.index_of_seq("fdt") _isnt _unset 
+		  p_name_lc.index_of_seq("fdt") _isnt _unset) _andif 
+		  (p_name_lc.index_of_seq("otb") _isnt _unset _orif 
+		  p_name_lc.index_of_seq("olt") _isnt _unset)
 	_then
 		_return "fdt"
 	_elif filename_lc.index_of_seq("arrow") _isnt _unset _orif 
@@ -868,7 +871,8 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_then
 		_return "riser"
 	_elif filename_lc.index_of_seq("ranger_station") _isnt _unset _orif 
-		p_name_lc.index_of_seq("olt") _isnt _unset 
+		p_name_lc.index_of_seq("olt") _isnt _unset _orif 
+		p_name_lc.index_of_seq("otb") _isnt _unset 
 	_then
 		_return "olt"
 

@@ -1,0 +1,225 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - UUB (Handhole/Manhole) Migration
+## Contains methods for creating underground utility boxes from KMZ placemarks
+## with type detection, cable snapping, and placeholder update support
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_uub(pm)
+	## Create UUB (underground utility box/handhole) object from placemark
+	## with advanced mode:
+	## - Type detection: MH folder/name -> Manhole, HH -> Handhole (ref: fttx_uub_migration)
+	## - Construction status detection from folder patterns
+	## - Cable snapping to nearest underground route (500cm radius)
+	## - Placeholder update: if existing UUB has label "HH-*" -> update with real data
+	## - Duplicate skip: if existing non-placeholder UUB found -> skip
+	## - Create new UUB when nothing found nearby
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	write("  Processing UUB/Handhole: ", pm[:name])
+	_try _with errCon
+		# Step 0: Validate folder
+		_local folders << pm[:parent].default("")
+		_local folders_lc << folders.lowercase
+
+		# Step 1: Parse folder hierarchy
+		_local fol << folders.split_by("|")
+		_local fsize << fol.size
+		_local fparent << _if fsize > 1 _then >> fsize - 1 _else >> fsize _endif
+
+		# Step 2: Detect UUB type from folder hierarchy
+		# Check last folder and parent folder for "MH" (Manhole) or "HH" (Handhole)
+		# Ref: fttx_uub_migration checks fol[fsize]="MH" / fol[fparent]="HH"
+		_local last_folder << fol[fsize].default("").uppercase
+		_local parent_folder << fol[fparent].default("").uppercase
+		_local name_upper << pm[:name].default("").uppercase
+
+		_local uub_type <<
+			_if last_folder = "MH" _orif parent_folder = "MH" _orif
+			   last_folder.matches?("*MANHOLE*") _orif name_upper.matches?("*MANHOLE*")
+			_then
+				>> "Manhole"
+			_else
+				>> "Handhole"  # Default (covers HH and all others)
+			_endif
+
+		# Detect spec_id from folders (like match_pole_type uses folder patterns)
+		# Checks folders_lc for dimension strings: 80x80x130, 40x40x60, 20x20x20
+		_local uub_spec_id <<
+			_if folders_lc.index_of_seq("80x80x130") _isnt _unset
+			_then
+				>> "HH Concrete FDT : 80x80x130 cm"
+			_elif folders_lc.index_of_seq("40x40x60") _isnt _unset
+			_then
+				>> "HH Concrete FDT : 40x40x60 cm"
+			_elif folders_lc.index_of_seq("20x20x20") _isnt _unset
+			_then
+				>> "HH Concrete FDT : 20x20x20 cm"
+			_else
+				>> "HH Concrete FDT : 80x80x130 cm"  # Default
+			_endif
+
+		# Step 2.5: Extract line_type, segment, ring_name
+		_local line_type << _self.match_line(folders)
+		_if line_type _is _unset
+		_then
+			line_type << _self.match_line(pm[:name])
+		_endif
+		_local segment_id << _self.match_segment(folders)
+		_local ring_name << pm[:ring_name]
+
+		# Determine construction status from folder patterns (ref: pole_migrator)
+		_local uub_const_status <<
+			_if .construction_status = "In Service"
+			_then
+				>> "In Service"
+			_elif folders_lc.index_of_seq("exist") _isnt _unset
+			_then
+				>> "In Service"
+			_else
+				>> .construction_status
+			_endif
+
+		write("  >> Detected type: ", uub_type, " | spec: ", uub_spec_id, " | status: ", uub_const_status)
+
+		# Step 3: Parse point geometry
+		_local original_location << _self.parse_point_geometry(pm[:coord])
+		_local coord << original_location.as_coord()
+
+		# Step 4: Snap to nearest underground route (500cm = 5m radius)
+		# Ref: fttx_uub_migration snaps to sokka_line (underground route equivalent)
+		_local pa << pseudo_point.new(coord)
+		pa.world << .database.world
+
+		_local buff << pa.buffer(500)  # 5m radius in cm
+		buff.world << .database.world
+
+		_local pred << predicate.interacts(:route, {buff})
+		_local ug_routes << .ug_route_col.select(pred)
+
+		_local final_location << _unset
+		_if ug_routes.size > 0
+		_then
+			# Underground route found - snap to nearest point on route
+			_local ugr << ug_routes.an_element()
+			_local q_sec << pseudo_chain.new(ugr.route)
+			q_sec.world << .database.world
+			_local cp << q_sec.segpoint_near(pa)
+
+			_local snapped_point << pseudo_point.new(cp)
+			snapped_point.world << .database.world
+			final_location << snapped_point
+
+			write("  >> UUB snapped to underground route")
+		_else
+			# No underground route - use original location
+			final_location << original_location
+			write("  >> UUB placed at original location (no route nearby)")
+		_endif
+
+		# Step 5: Check for existing UUB within 200cm (2m radius)
+		# Similar to pole_migrator duplicate detection
+		_local buff_dup << final_location.buffer(200)  # 2m radius in cm
+		buff_dup.world << .database.world
+
+		_local pred_dup << predicate.interacts(:location, {buff_dup})
+		_local existing_uubs << .uub_col.select(pred_dup)
+
+		_if existing_uubs.size > 0
+		_then
+			_local existing_uub << existing_uubs.an_element()
+
+			# Check if existing UUB is a placeholder created by underground route migrator
+			# Placeholders are created with label "HH-<name>" pattern
+			# Similar to pole_migrator checking for "Existing Pole AR" tag
+			_if existing_uub.label.default("").matches?("HH-*")
+			_then
+				# Update placeholder with real KML data
+				write("  [UPDATE] Updating placeholder UUB: ", existing_uub.id)
+
+				_local update_props << property_list.new_with(
+					:label, pm[:name],
+					:type, uub_type,
+					:spec_id, uub_spec_id,
+					:construction_status, uub_const_status,
+					:asset_owner, "Owned",
+					:pop, .pop_name,
+					:olt, .pop_name,
+					:region, .region,
+					:cluster, .cluster,
+					:line_type, line_type,
+					:ring_name, ring_name,
+					:fttx_network_type, _self.get_fttx_network_type(),
+					:segment, segment_id,
+					:folders, folders,
+					:uuid, .uuid,
+					:cluster_code, .cluster_code_db,
+					:subfeeder_code, .subfeeder_code_db,
+					:feeder_code, .feeder_code_db,
+					:olt_code, .olt_code
+				)
+
+				_local update_trans << record_transaction.new_update(existing_uub, update_props)
+				_local updated_uub << update_trans.run()
+
+				_if .stats[:uubs] _is _unset _then .stats[:uubs] << 0 _endif
+				.stats[:uubs] +<< 1
+				write("  [OK] UUB updated: ", pm[:name], " (Type: ", uub_type, ", Status: ", uub_const_status, ")")
+				_return updated_uub
+			_else
+				# Real existing UUB - skip creation (not a placeholder)
+				write("  [SKIP] UUB already exists nearby (", existing_uub.label, ") - skipping")
+				.stats[:skipped] +<< 1
+				_return existing_uub
+			_endif
+		_else
+			# Step 6: No existing UUB found - create new one
+			write("  [OK] Creating UUB...")
+			_local uub_prop_values << property_list.new_with(
+				:type, uub_type,
+				:label, pm[:name],
+				:spec_id, uub_spec_id,
+				:construction_status, uub_const_status,
+				:asset_owner, "Owned",
+				:location, final_location,
+				:pop, .pop_name,
+				:olt, .pop_name,
+				:region, .region,
+				:cluster, .cluster,
+				:line_type, line_type,
+				:ring_name, ring_name,
+				:fttx_network_type, _self.get_fttx_network_type(),
+				:segment, segment_id,
+				:folders, folders,
+				:uuid, .uuid,
+				:cluster_code, .cluster_code_db,
+				:subfeeder_code, .subfeeder_code_db,
+				:feeder_code, .feeder_code_db,
+				:olt_code, .olt_code,
+				:depth, 1.3,
+				:width, 0.8
+			)
+
+			_local uub_rec_trans << record_transaction.new_insert(.uub_col, uub_prop_values)
+			_local uub_result << uub_rec_trans.run()
+
+			_if .stats[:uubs] _is _unset _then .stats[:uubs] << 0 _endif
+			.stats[:uubs] +<< 1
+			write("  [OK] UUB created: ", pm[:name], " (Type: ", uub_type, ", Status: ", uub_const_status, ")")
+			_return uub_result
+		_endif
+
+	_when error
+		write("ERROR in create_uub():", errCon.report_contents_string)
+		write("  Placemark name:", pm[:name].default("(unnamed)"))
+		write("  Folders:", pm[:parent].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
