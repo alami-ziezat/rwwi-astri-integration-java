@@ -755,17 +755,19 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.user_info(message)
-	## Display informational message to user
+	## Display informational message to user as modal popup dialog
 
 	write("INFO:", message)
+	_self.show_alert(message)
 _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.user_error(message)
-	## Display error message to user
+	## Display error message to user as modal popup dialog
 
 	write("ERROR:", message)
+	_self.show_alert(message)
 _endmethod
 $
 

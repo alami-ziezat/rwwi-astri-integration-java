@@ -386,17 +386,15 @@ _private _method astri_design_migrator.match_segment(fs)
 	## Returns: "SEGMENT 1", "SEGMENT 2", etc. or _unset
 
 	# Match segment patterns
-	_local segment <<
 	_if fs.matches?("*seg*1*") _orif fs.matches?("*segmen*1*")
 	_then
-		>> "SEGMENT 1"
+		_return "SEGMENT 1"
 	_elif fs.matches?("*seg*2*") _orif fs.matches?("*segmen*2*")
 	_then
-		>> "SEGMENT 2"
+		_return "SEGMENT 2"
 	_else
-		>> _unset
+		_return ""
 	_endif
-	_return segment
 _endmethod
 $
 
@@ -591,6 +589,50 @@ _private _method astri_design_migrator.is_sling_wire?(pm)
 
 	_local network_type << pm[:network_type].default("").lowercase
 	>> network_type = "sling_wire"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_t_wey?(pm)
+	## Check if placemark is a t_wey point (Point of Interest)
+	## Detected when network_type = "t_wey"
+	## Returns: boolean
+
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "t_wey"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_boring_manual?(pm)
+	## Check if placemark is a boring_manual line
+	## Detected when network_type = "boring_manual"
+	## Returns: boolean
+
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "boring_manual"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_boring_machine?(pm)
+	## Check if placemark is a boring_machine line
+	## Detected when network_type = "boring_machine"
+	## Returns: boolean
+
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "boring_machine"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_tali_pancing?(pm)
+	## Check if placemark is a tali_pancing line
+	## Detected when network_type = "tali_pancing"
+	## Returns: boolean
+
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "tali_pancing"
 _endmethod
 $
 

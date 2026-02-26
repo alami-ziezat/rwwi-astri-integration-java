@@ -299,7 +299,7 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 		# Query sheath_splice by cluster_code AND sheath_splice_object_type contains "FDT"
 		_local pred_cluster << predicate.eq(:cluster_code, .cluster_code_db)
 		_local pred_type << predicate.contains(:sheath_splice_object_type, "FDT", _true)
-		_local pred << predicate.and(pred_cluster, pred_type)
+		_local pred << pred_cluster.and(pred_type)
 
 		_local fdts << .sc_col.select(pred)
 
@@ -311,16 +311,18 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 			# Update :tp field for all matching FDTs
 			_for fdt _over fdts.fast_elements()
 			_loop
-				_try
+				_try _with cond
 					_local old_tp << fdt.tp.default(0)
-					fdt.tp << total_dp
+					_local update_props << property_list.new_with(:tp, total_dp.write_string)
+					_local update_trans << record_transaction.new_update(fdt, update_props)
+					update_trans.run()
 
 					updated_count +<< 1
 					write("    [OK] Updated FDT ", fdt.name.default("(unnamed)"),
 					      " cluster: ", .cluster_code_db,
 					      " :tp ", old_tp, " -> ", total_dp)
 				_when error
-					write("    ERROR updating FDT: ", condition.report_contents_string)
+					write("    ERROR updating FDT: ", cond.report_contents_string)
 				_endtry
 			_endloop
 		_endif

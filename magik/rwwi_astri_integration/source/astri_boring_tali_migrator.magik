@@ -1,0 +1,210 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Boring Manual, Boring Machine, Tali Pancing Migration
+## Contains methods for creating boring_manual, boring_machine, and tali_pancing
+## records from KMZ placemarks.
+##
+## Detection is based on network_type set by astri_kml_parser:
+##   :boring_manual  - parent folder contains "boring manual" + line geometry
+##   :boring_machine - parent folder contains "boring machine" + line geometry
+##   :tali_pancing   - parent folder contains "tali pancing"  + line geometry
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_boring_manual(pm)
+	## Create boring_manual record from placemark
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	write("  Processing Boring Manual: ", pm[:name])
+	_try _with errCon
+		_local folders  << pm[:parent].default("")
+		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local m_line   << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment   << _self.match_segment(folders)
+		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+		write("	Matched line: ", m_line, " | segment: ", segment)
+		_local prop_values << property_list.new_with(
+			:name,               pm[:name],
+			:folders,            folders,
+			:route,              route,
+			:ring_name,          ring_name,
+			:pop,                .pop_name,
+			:olt,                .pop_name,
+			:region,             .region,
+			:cluster,            .cluster,
+			:line_type,          m_line,
+			:segment,            segment,
+			:fttx_network_type,  _self.get_fttx_network_type(),
+			:construction_status, .construction_status,
+			:uuid,               .uuid,
+			:olt_code,           .olt_code,
+			:feeder_code,        .feeder_code_db,
+			:subfeeder_code,     .subfeeder_code_db,
+			:cluster_code,       .cluster_code_db,
+			:infra_type,         infra_type_cap,
+			:fdt_name,           ring_name
+		)
+
+		prop_values.p
+
+		_local rec_trans << record_transaction.new_insert(.boring_manual_col, prop_values)
+		rec_trans.run()
+
+		_if .stats[:boring_manuals] _is _unset
+		_then
+			.stats[:boring_manuals] << 0
+		_endif
+		.stats[:boring_manuals] +<< 1
+
+		write("    [OK] Boring Manual created: ", pm[:name])
+
+	_when error
+		write("ERROR in create_boring_manual(): ", errCon.report_contents_string)
+		write("  Placemark name: ", pm[:name].default("(unnamed)"))
+		write("  Folders: ", pm[:parent].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_boring_machine(pm)
+	## Create boring_machine record from placemark
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	write("  Processing Boring Machine: ", pm[:name])
+	_try _with errCon
+		_local folders  << pm[:parent].default("")
+		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local m_line   << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment   << _self.match_segment(folders)
+		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+
+		_local prop_values << property_list.new_with(
+			:name,               pm[:name],
+			:folders,            folders,
+			:route,              route,
+			:ring_name,          ring_name,
+			:pop,                .pop_name,
+			:olt,                .pop_name,
+			:region,             .region,
+			:cluster,            .cluster,
+			:line_type,          m_line,
+			:segment,            segment,
+			:fttx_network_type,  _self.get_fttx_network_type(),
+			:construction_status, .construction_status,
+			:uuid,               .uuid,
+			:olt_code,           .olt_code,
+			:feeder_code,        .feeder_code_db,
+			:subfeeder_code,     .subfeeder_code_db,
+			:cluster_code,       .cluster_code_db,
+			:infra_type,         infra_type_cap,
+			:fdt_name,           ring_name
+		)
+
+		_local rec_trans << record_transaction.new_insert(.boring_machine_col, prop_values)
+		rec_trans.run()
+
+		_if .stats[:boring_machines] _is _unset
+		_then
+			.stats[:boring_machines] << 0
+		_endif
+		.stats[:boring_machines] +<< 1
+
+		write("    [OK] Boring Machine created: ", pm[:name])
+
+	_when error
+		write("ERROR in create_boring_machine(): ", errCon.report_contents_string)
+		write("  Placemark name: ", pm[:name].default("(unnamed)"))
+		write("  Folders: ", pm[:parent].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_tali_pancing(pm)
+	## Create tali_pancing record from placemark
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	write("  Processing Tali Pancing: ", pm[:name])
+	_try _with errCon
+		_local folders  << pm[:parent].default("")
+		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local m_line   << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment   << _self.match_segment(folders)
+		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+
+		_local prop_values << property_list.new_with(
+			:name,               pm[:name],
+			:folders,            folders,
+			:route,              route,
+			:ring_name,          ring_name,
+			:pop,                .pop_name,
+			:olt,                .pop_name,
+			:region,             .region,
+			:cluster,            .cluster,
+			:line_type,          m_line,
+			:segment,            segment,
+			:fttx_network_type,  _self.get_fttx_network_type(),
+			:construction_status, .construction_status,
+			:uuid,               .uuid,
+			:olt_code,           .olt_code,
+			:feeder_code,        .feeder_code_db,
+			:subfeeder_code,     .subfeeder_code_db,
+			:cluster_code,       .cluster_code_db,
+			:infra_type,         infra_type_cap,
+			:fdt_name,           ring_name
+		)
+
+		_local rec_trans << record_transaction.new_insert(.tali_pancing_col, prop_values)
+		rec_trans.run()
+
+		_if .stats[:tali_pancings] _is _unset
+		_then
+			.stats[:tali_pancings] << 0
+		_endif
+		.stats[:tali_pancings] +<< 1
+
+		write("    [OK] Tali Pancing created: ", pm[:name])
+
+	_when error
+		write("ERROR in create_tali_pancing(): ", errCon.report_contents_string)
+		write("  Placemark name: ", pm[:name].default("(unnamed)"))
+		write("  Folders: ", pm[:parent].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

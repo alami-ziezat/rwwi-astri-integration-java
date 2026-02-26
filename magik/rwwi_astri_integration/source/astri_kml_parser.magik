@@ -490,6 +490,22 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 		_return "sling_wire"
 	_endif
 
+	# PRIORITY 1.5: Line types based on parent folder
+	_if pl[:type] = "line"
+	_then
+		_local l_parent_line << pl[:parent].lowercase
+		_if l_parent_line.index_of_seq("tali pancing") _isnt _unset
+		_then
+			_return "tali_pancing"
+		_elif l_parent_line.index_of_seq("boring manual") _isnt _unset
+		_then
+			_return "boring_manual"
+		_elif l_parent_line.index_of_seq("boring machine") _isnt _unset
+		_then
+			_return "boring_machine"
+		_endif
+	_endif
+
 	# PRIORITY 2: LineString (any other line)
 	_if pl[:type] = "line"
 	_then
@@ -838,6 +854,11 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_then
 		_return "homepass"
 
+	_elif filename_lc.index_of_seq("placemark_square") _isnt _unset _andif
+		  p_name_lc.index_of_seq("t-wey") _isnt _unset
+	_then
+		_return "t_wey"
+
 	_elif filename_lc.index_of_seq("square") _isnt _unset
 	_then
 		_return "handhole"
@@ -862,7 +883,7 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_elif (filename_lc.index_of_seq("cross-hairs") _isnt _unset _orif
 	      filename_lc.index_of_seq("crosshairs") _isnt _unset _orif 
 		  p_name_lc.index_of_seq("fdt") _isnt _unset) _andif 
-		  (p_name_lc.index_of_seq("otb") _isnt _unset _orif 
+		  _not (p_name_lc.index_of_seq("otb") _isnt _unset _orif 
 		  p_name_lc.index_of_seq("olt") _isnt _unset)
 	_then
 		_return "fdt"

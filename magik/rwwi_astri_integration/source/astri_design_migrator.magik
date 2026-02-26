@@ -53,6 +53,10 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:olt_col,         _unset, :writable},   # mit_hub (OLT)
 	{:riser_col,       _unset, :writable},   # riser
 	{:ap_col,          _unset, :writable},   # access_point
+	{:boring_manual_col,  _unset, :writable},  # boring_manual
+	{:boring_machine_col, _unset, :writable},  # boring_machine
+	{:tali_pancing_col,   _unset, :writable},  # tali_pancing
+	{:poi_col,            _unset, :writable},   # point_of_interest (t_wey)
 
 	# Migration context
 	{:pop_name,             _unset, :writable},   # POP name (from OLT label)
@@ -155,6 +159,10 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 	.olt_col << .database.collections[:mit_hub]
 	.riser_col << .database.collections[:riser]
 	.ap_col << .database.collections[:access_point]
+	.boring_manual_col  << .database.collections[:boring_manual]
+	.boring_machine_col << .database.collections[:boring_machine]
+	.tali_pancing_col   << .database.collections[:tali_pancing]
+	.poi_col            << .database.collections[:point_of_interest]
 
 	# Initialize statistics
 	.stats << property_list.new_with(
@@ -177,6 +185,10 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 		:risers, 0,
 		:access_points, 0,
 		:areas_created, 0,
+		:boring_manuals, 0,
+		:boring_machines, 0,
+		:tali_pancings, 0,
+		:t_weys, 0,
 		:errors, 0,
 		:skipped, 0
 	)
@@ -482,6 +494,28 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 			_endif
 		_endif
 	_endloop
+	 
+	# Pass 2.5: Create boring routes and tali pancing
+	write("  Pass 2.5: Creating boring routes and tali pancing...")
+	_for pm _over placemarks.fast_elements()
+	_loop
+		_if _self.is_boundary_area?(pm)
+		_then
+			_continue
+		_endif
+
+		_if _self.is_boring_manual?(pm)
+		_then
+			_self.create_boring_manual(pm)
+		_elif _self.is_boring_machine?(pm)
+		_then
+			_self.create_boring_machine(pm)
+		_elif _self.is_tali_pancing?(pm)
+		_then
+			_self.create_tali_pancing(pm)
+		_endif
+	_endloop
+
 	write("  Pass 3: Creating structures (poles and/or UUBs based on topology)...")
 	_for pm _over placemarks.fast_elements()
 	_loop
@@ -533,6 +567,11 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_elif is_dp
 		_then
 			_self.create_demand_point(pm)
+
+		# T-Wey points of interest
+		_elif _self.is_t_wey?(pm)
+		_then
+			_self.create_t_wey(pm)
 		_endif
 	_endloop
 
@@ -621,6 +660,10 @@ _method astri_design_migrator.print_statistics()
 	write("Risers:             ", .stats[:risers])
 	write("Access Points:      ", .stats[:access_points])
 	write("Other Areas:        ", .stats[:areas_created])
+	write("Boring Manual:      ", .stats[:boring_manuals])
+	write("Boring Machine:     ", .stats[:boring_machines])
+	write("Tali Pancing:       ", .stats[:tali_pancings])
+	write("T-Wey (POI):        ", .stats[:t_weys])
 	write("Errors:             ", .stats[:errors])
 	write("Skipped:            ", .stats[:skipped])
 	write("")
@@ -629,7 +672,9 @@ _method astri_design_migrator.print_statistics()
 	                         .stats[:figure_eights] + .stats[:sling_wires] +
 	                         .stats[:demand_points] + .stats[:customer_premises] +
 	                         .stats[:buildings] + .stats[:micro_cells] + .stats[:olts] +
-	                         .stats[:risers] + .stats[:access_points] + .stats[:areas_created]
+	                         .stats[:risers] + .stats[:access_points] + .stats[:areas_created] +
+	                         .stats[:boring_manuals] + .stats[:boring_machines] + .stats[:tali_pancings] +
+	                         .stats[:t_weys]
 	write("Total objects:      ", total_created)
 	write("=" * 60)
 _endmethod

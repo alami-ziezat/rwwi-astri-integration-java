@@ -26,37 +26,54 @@ _private _method astri_design_migrator.create_riser(pm)
 
 		write("  Processing riser: ", pm[:name])
 
-		# Step 1: Get folder information
-		_local folders << pm[:parent].default("")
-
-		# Step 2: Extract segment_id from folders
+		# Step 1: Get folder information and matching
+		_local folders   << pm[:parent].default("")
+		_local m_line    << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
 		_local segment_id << _self.match_segment(folders)
+		_local ring_name  << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+		write("    Matched line: ", m_line, " | segment: ", segment_id)
 
-		# Step 3: Parse point geometry
+		# Step 2: Parse point geometry
 		_local location << _self.parse_point_geometry(pm[:coord])
 		_local coord << location.as_coord()
 
-		# Step 3.5: Extract ring_name from folders (FDT/Closure name)
-		_local ring_name << pm[:ring_name]
-
-		# Step 4: Create riser cable as point-based riser object
-		# Using minimal length for point-based representation
+		# Step 3: Create riser cable as point-based riser object
 		_local prop_values << property_list.new_with(
-			:location, coord,
-			:name, pm[:name],
-			#:folders, folders,
-			#:fttx_network_type, _self.get_fttx_network_type(),
-			#:ring_name, ring_name,
+			:location,           coord,
+			:name,               pm[:name],
+			:folders,            folders,
+			:ring_name,          ring_name,
+			:pop,                .pop_name,
+			:olt,                .pop_name,
+			:region,             .region,
+			:cluster,            .cluster,
+			:line_type,          m_line,
+			:segment,            segment_id,
+			:fttx_network_type,  _self.get_fttx_network_type(),
 			:construction_status, .construction_status,
-			#:cable_type, "Riser",
-			:stf_item_code, "200001034"
+			:uuid,               .uuid,
+			:olt_code,           .olt_code,
+			:feeder_code,        .feeder_code_db,
+			:subfeeder_code,     .subfeeder_code_db,
+			:cluster_code,       .cluster_code_db,
+			:infra_type,         infra_type_cap,
+			:fdt_name,           ring_name,
+			:stf_item_code,      "200001034"
 		)
 
 		_local rec_trans << record_transaction.new_insert(.riser_col, prop_values)
 		_local result << rec_trans.run()
 
 		.stats[:risers] +<< 1
-		write("  [OK] Riser created: ", pm[:name], " (Type: Riser)")
+		write("  [OK] Riser created: ", pm[:name])
 
 	_when error
 		write("ERROR in create_riser():", errCon.report_contents_string)

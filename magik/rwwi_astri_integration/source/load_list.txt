@@ -19,6 +19,8 @@ astri_olt_migrator
 astri_riser_migrator
 astri_access_point_migrator
 astri_micro_cell_migrator
+astri_boring_tali_migrator
+astri_t_wey_migrator
 
 # ASTRI Data Migrator - PostgreSQL to Smallworld migration
 astri_data_migrator

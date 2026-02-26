@@ -176,7 +176,16 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_info("")
 
 			# Migrate placemarks to design
-			_self.log_info("Step 6: Migrating placemarks to design objects...")
+			_self.log_info("Step 6: Migrating " + placemarks.size.write_string + " objects to design (poles, routes, cables, splices, demand points)...")
+			_self.user_info(write_string(
+				"Migration to Design is now in progress.", %newline,
+				%newline,
+				"Work Order : ", wo_number, %newline,
+				"Design     : ", infra_name, %newline,
+				"Objects    : ", placemarks.size, " placemarks", %newline,
+				%newline,
+				"This operation may take a while.", %newline,
+				"Click OK to start and do not close the dialog."))
 			write("Migrating objects to design...")
 			_local stats << migrator.migrate_placemarks(placemarks)
 			_self.log_success("Migration complete!")
@@ -431,7 +440,16 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 			write("Topology set on migrator: ", final_topology, " (UI field: ", ui_topology_str.default("unset"), ", KML detected: ", topology, ")")
 
 			# Migrate placemarks without creating project/design
-			_self.log_info("Step 6: Migrating placemarks to existing alternative...")
+			_self.log_info("Step 6: Migrating " + placemarks.size.write_string + " objects to existing alternative (poles, routes, cables, splices, demand points)...")
+			_self.user_info(write_string(
+				"Migration to Existing Alternative is now in progress.", %newline,
+				%newline,
+				"Work Order  : ", wo[:wo_number].default("N/A"), %newline,
+				"Alternative : ", alt_name, %newline,
+				"Objects     : ", placemarks.size, " placemarks", %newline,
+				%newline,
+				"This operation may take a while.", %newline,
+				"Click OK to start and do not close the dialog."))
 			write("Migrating placemarks to existing alternative...")
 			_local stats << migrator.migrate_placemarks(placemarks)
 			_self.log_success("Migration complete!")
