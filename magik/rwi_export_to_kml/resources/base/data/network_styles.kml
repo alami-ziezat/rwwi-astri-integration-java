@@ -863,8 +863,8 @@
 		</Pair>
 	</StyleMap>
 
-	<!-- HANDHOLE 20x20x60 -->
-	<Style id="handhole_20x20x60">
+	<!-- HANDHOLE 20x20x20 -->
+	<Style id="handhole_20x20x20">
 		<IconStyle>
 			<color>ff00ff00</color>
 			<scale>1.0</scale>
@@ -873,7 +873,7 @@
 			</Icon>
 		</IconStyle>
 	</Style>
-	<Style id="handhole_20x20x60_highlight">
+	<Style id="handhole_20x20x20_highlight">
 		<IconStyle>
 			<color>ff00ff00</color>
 			<scale>1.2</scale>
@@ -882,14 +882,14 @@
 			</Icon>
 		</IconStyle>
 	</Style>
-	<StyleMap id="handhole_20x20x60_map">
+	<StyleMap id="handhole_20x20x20_map">
 		<Pair>
 			<key>normal</key>
-			<styleUrl>#handhole_20x20x60</styleUrl>
+			<styleUrl>#handhole_20x20x20</styleUrl>
 		</Pair>
 		<Pair>
 			<key>highlight</key>
-			<styleUrl>#handhole_20x20x60_highlight</styleUrl>
+			<styleUrl>#handhole_20x20x20_highlight</styleUrl>
 		</Pair>
 	</StyleMap>
 

@@ -16,6 +16,8 @@ _private _method astri_design_migrator.create_demand_point(pm)
 	## - Customer premise creation with full attributes
 	## - Optional building creation for GEDUNG type
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Validate demand point folder pattern
 		_local folders << pm[:parent].default("")
@@ -276,6 +278,8 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 	## - Queries sheath_splice by cluster_code_db AND sheath_splice_object_type contains "FDT"
 	## - Updates :tp field with total demand point count from .stats[:demand_points]
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_local total_dp << .stats[:demand_points]
 
 	_if total_dp = 0

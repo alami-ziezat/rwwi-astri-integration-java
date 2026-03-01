@@ -1,0 +1,378 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ - UNDERGROUND FEEDER WRITERS
+## Methods on rwi_export_to_aerial_kmz for underground (UG) feeder topology.
+## Used when .topology = "UG" or "AE&UG".
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_feeder_ug_folder(p_stream, p_folder_def, p_area, p_indent)
+	## Write a single folder for underground feeder
+	## Mirrors write_feeder_folder() but routes to UG content writer
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_indent - Indentation level
+
+	indent << "".fill_up_with(% , p_indent)
+	folder_name << p_folder_def[:name]
+
+	p_stream.write(indent, "<Folder>", newline_char)
+	p_stream.write(indent, "  <name>", folder_name, "</name>", newline_char)
+
+	_if p_folder_def[:visibility] _isnt _unset
+	_then
+		vis_str << _if p_folder_def[:visibility] _then "1" _else "0" _endif
+		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
+	_endif
+
+	_self.write_feeder_ug_folder_contents(p_stream, folder_name, p_area, indent + "  ")
+
+	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_feeder_ug_folder_contents(p_stream, p_folder_name, p_area, p_indent)
+	## Write placemarks for underground feeder folders
+	## Handles: OLT, JOINT CLOSURE, CABLE, EXISTING HH <spec>, NEW HH <spec>,
+	##          SLACK HANGER, BORING MANUAL
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_name - Name of current folder
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	write("Processing UG feeder folder: ", p_folder_name)
+
+	# Handle OLT folder - same collection as aerial (mit_hub)
+	_if p_folder_name.index_of_seq("OLT") _isnt _unset
+	_then
+		write("  Exporting OLTs...")
+		all_olts << .gc[:mit_hub].select(
+			predicate.interacts(:location, p_area))
+
+		olt_count << 0
+		_for olt _over all_olts.fast_elements()
+		_loop
+			olt_folders << olt.perform(:folders).default("")
+			_if olt_folders.index_of_seq(p_folder_name) _isnt _unset
+			_then
+				.object_writer.write_olt(olt, p_stream, p_indent, p_folder_name)
+				olt_count +<< 1
+			_endif
+		_endloop
+
+		_if olt_count > 0
+		_then
+			write("  Wrote ", olt_count, " OLTs to folder: ", p_folder_name)
+		_endif
+	_endif
+
+	# Handle JOINT CLOSURE folder - UG: query sheath_splice directly (no poles)
+	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
+	_then
+		_self.write_ug_closure_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle CABLE folder - UG cable via underground_route
+	_if p_folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    p_folder_name.index_of_seq("BOUNDARY") _is _unset
+	_then
+		_self.write_ug_cable_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle EXISTING HH / NEW HH folders - UUB (handhole) objects
+	_if p_folder_name.uppercase.index_of_seq("EXISTING HH") _isnt _unset _orif
+	    p_folder_name.uppercase.index_of_seq("NEW HH") _isnt _unset
+	_then
+		_self.write_uub_for_folder(p_stream, p_folder_name, p_area, p_indent)
+	_endif
+
+	# Handle SLACK HANGER folder - UG: query figure_eight directly (no poles)
+	_if p_folder_name.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		_self.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle BORING MANUAL folder
+	_if p_folder_name.uppercase.index_of_seq("BORING MANUAL") _isnt _unset
+	_then
+		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folder_name, p_area, p_indent)
+	## Write UUB (handhole/manhole) placemarks to folder
+	## Filters by spec dimension and construction status:
+	##   "EXISTING HH <spec>" -> construction_status = "In Service"
+	##   "NEW HH <spec>"      -> construction_status != "In Service"
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_name - Folder name (e.g., "EXISTING HH 80x80x130")
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	# Determine folder intent: existing vs new
+	is_existing? << p_folder_name.uppercase.index_of_seq("EXISTING") _isnt _unset
+
+	# Extract spec dimension from folder name
+	target_spec << _unset
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		_if p_folder_name.index_of_seq(spec) _isnt _unset
+		_then
+			target_spec << spec
+			_leave
+		_endif
+	_endloop
+
+	# Query all UUB objects in area
+	all_uubs << .gc[:uub].select(
+		predicate.interacts(:location, p_area))
+
+	uub_count << 0
+	_for uub _over all_uubs.fast_elements()
+	_loop
+		# Filter by spec dimension (spec_id field contains the dimension string)
+		_if target_spec _isnt _unset
+		_then
+			uub_spec << uub.perform(:spec_id).default("")
+			_if uub_spec.lowercase.index_of_seq(target_spec) _is _unset
+			_then
+				_continue  # Spec does not match
+			_endif
+		_endif
+
+		# Filter by construction status
+		uub_status << uub.perform(:construction_status).default("").lowercase
+		uub_is_existing? << uub_status.index_of_seq("in service") _isnt _unset _orif
+		                    uub_status.index_of_seq("exist") _isnt _unset
+
+		_if is_existing? <> uub_is_existing?
+		_then
+			_continue  # Status does not match folder intent
+		_endif
+
+		.object_writer.write_uub(uub, p_stream, p_indent)
+		uub_count +<< 1
+	_endloop
+
+	_if uub_count > 0
+	_then
+		write("  Wrote ", uub_count, " UUBs to folder: ", p_folder_name)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	## Write boring_manual route chains to folder
+	## Uses same approach as write_sling_wire_for_folder()
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	# Query boring_manual chains in area (uses :route geometry like sling_wire)
+	all_boring_manuals << .gc[:boring_manual].select(
+		predicate.interacts(:route, p_area))
+
+	# Collect valid entries (must have route geometry)
+	matching << rope.new()
+	_for bm _over all_boring_manuals.fast_elements()
+	_loop
+		route_geom << bm.route
+		_if route_geom _is _unset _then _continue _endif
+		matching.add(bm)
+	_endloop
+
+	# Sort by name ascending
+	sorted_bms << matching.as_sorted_collection(
+		_proc(bm1, bm2)
+			name1 << bm1.perform(:name).default("").lowercase
+			name2 << bm2.perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	bm_count << 0
+	_for bm _over sorted_bms.fast_elements()
+	_loop
+		route_geom << bm.route
+		.object_writer.write_boring_manual(bm, route_geom, p_stream, p_indent)
+		bm_count +<< 1
+	_endloop
+
+	_if bm_count > 0
+	_then
+		write("  Wrote ", bm_count, " BORING MANUAL chains")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_ug_cable_for_folder(p_stream, p_area, p_indent)
+	## Write underground cable chains to folder
+	## Mirrors write_cable_for_folder() but queries underground_route
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	# Step 1: Query underground_route objects in area
+	all_ug_routes << .gc[:underground_route].select(
+		predicate.interacts(:route, p_area))
+
+	# Step 2: Collect unique cables from all underground routes
+	# Use rope + property_list for deduplication (equality_set may not be loaded)
+	unique_cables << rope.new()
+	seen_cable_ids << property_list.new()
+	_for ug_route _over all_ug_routes.fast_elements()
+	_loop
+		route_cables << ug_route.cables()
+		_if route_cables _is _unset _then _continue _endif
+		_for cable _over route_cables.fast_elements()
+		_loop
+			c_id << cable.perform(:id)
+			_if c_id _is _unset _orif seen_cable_ids[c_id] _isnt _unset _then _continue _endif
+			seen_cable_ids[c_id] << _true
+			unique_cables.add_last(cable)
+		_endloop
+	_endloop
+
+	# Step 3: Group cables by name and collect their sectors
+	cables_by_name << property_list.new()
+	_for cable _over unique_cables.fast_elements()
+	_loop
+		cable_name << cable.perform(:name).default("Unknown").as_symbol()
+		cable_sectors << cable.route_sectors()
+		_if cable_sectors _is _unset _orif cable_sectors.empty? _then _continue _endif
+
+		_if cables_by_name[cable_name] _is _unset
+		_then
+			cables_by_name[cable_name] << property_list.new_with(
+				:cable, cable,
+				:sector_list, rope.new())
+		_endif
+		cables_by_name[cable_name][:sector_list].add_last(cable_sectors)
+	_endloop
+
+	# Step 4: Sort cable names and write each cable
+	cable_count << cables_by_name.size
+	cable_names_rope << rope.new()
+	_for cable_name _over cables_by_name.fast_keys()
+	_loop
+		cable_names_rope.add(cable_name)
+	_endloop
+
+	sorted_cable_names << cable_names_rope.as_sorted_collection(
+		_proc(name1, name2)
+			>> name1.write_string.lowercase < name2.write_string.lowercase
+		_endproc)
+
+	_for cable_name _over sorted_cable_names.fast_elements()
+	_loop
+		cable_data << cables_by_name[cable_name]
+		write("  Processing UG CABLE: ", cable_name)
+		cable << cable_data[:cable]
+		sector_list << cable_data[:sector_list]
+
+		# Merge sectors that connect end-to-end
+		merged_sectors << _self.merge_cable_sectors(sector_list)
+
+		.object_writer.write_cable(cable, merged_sectors, p_stream, p_indent)
+	_endloop
+
+	_if cable_count > 0
+	_then
+		write("  Wrote ", cable_count, " UG cable(s)")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_ug_closure_for_folder(p_stream, p_area, p_indent)
+	## Write JOINT CLOSURE placemarks for UG topology.
+	## Directly queries sheath_splice collection by location - bypasses poles
+	## (aerial method goes through poles which don't exist in UG designs).
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	# Query sheath_splice directly in area (UG closures have their own location)
+	all_splices << .gc[:sheath_splice].select(
+		predicate.interacts(:location, p_area))
+
+	closure_count << 0
+	_for splice _over all_splices.fast_elements()
+	_loop
+		splice_type << splice.sheath_splice_object_type
+		_if splice_type _is _unset _then _continue _endif
+
+		# Only export CLOSURE type (not FAT/FDT)
+		_if splice_type.index_of_seq("Closure") _is _unset _andif
+		    splice_type.index_of_seq("Joint") _is _unset
+		_then
+			_continue
+		_endif
+
+		# Use splice's own location geometry
+		splice_geom << splice.location
+		_if splice_geom _is _unset _then _continue _endif
+
+		.object_writer.write_sheath_splice(splice, splice_geom, p_stream, p_indent)
+		closure_count +<< 1
+		.total_closure_count +<< 1
+	_endloop
+
+	_if closure_count > 0
+	_then
+		write("  Wrote ", closure_count, " JOINT CLOSURE(s)")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent)
+	## Write SLACK HANGER (figure_eight) placemarks for UG topology.
+	## Directly queries figure_eight collection by location - bypasses poles
+	## (aerial method goes through poles which don't exist in UG designs).
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	# Query figure_eight directly in area
+	all_fig8s << .gc[:figure_eight].select(
+		predicate.interacts(:location, p_area))
+
+	fig8_count << 0
+	_for fig8 _over all_fig8s.fast_elements()
+	_loop
+		# Use figure_eight's own location geometry
+		fig8_geom << fig8.location
+		_if fig8_geom _is _unset _then _continue _endif
+
+		.object_writer.write_figure_eight(fig8, fig8_geom, p_stream, p_indent)
+		fig8_count +<< 1
+		.total_slack_hanger_count +<< 1
+	_endloop
+
+	_if fig8_count > 0
+	_then
+		write("  Wrote ", fig8_count, " SLACK HANGER (figure_eight) object(s)")
+	_endif
+_endmethod
+$

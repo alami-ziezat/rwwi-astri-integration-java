@@ -1,0 +1,241 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ - UNDERGROUND CLUSTER WRITERS
+## Methods on rwi_export_to_aerial_kmz for underground (UG) cluster topology.
+## Hierarchy mirrors aerial cluster (LINE A/B/C/D with subfolders) but uses
+## UG objects (no poles) plus FAT, HP COVER/UNCOVER from aerial.
+## Additional objects: T-WEY (point_of_interest), TALI PANCING (tali_pancing route).
+## Used when .topology = "UG" or "AE&UG" for cluster infrastructure.
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_cluster_ug_folder(p_stream, p_folder_def, p_area, p_indent, _optional p_parent_line_id, p_parent_fdt_folder)
+	## Write a single folder for underground cluster recursively
+	## Mirrors write_folder() but routes to UG content writer
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_indent - Indentation level
+	##   p_parent_line_id - LINE ID inherited from parent (first optional)
+	##   p_parent_fdt_folder - FDT folder name inherited from parent (second optional)
+
+	indent << "".fill_up_with(% , p_indent)
+
+	p_stream.write(indent, "<Folder>", newline_char)
+	p_stream.write(indent, "  <name>", p_folder_def[:name], "</name>", newline_char)
+
+	_if p_folder_def[:visibility] _isnt _unset
+	_then
+		vis_str << _if p_folder_def[:visibility] _then "1" _else "0" _endif
+		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
+	_endif
+
+	# Determine LINE ID for this folder level
+	current_line_id << p_folder_def[:line_id].default(p_parent_line_id)
+
+	# Determine FDT folder name
+	folder_name << p_folder_def[:name]
+	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
+
+	# Legacy FDT_* folder support
+	_if current_fdt_folder _is _unset _andif folder_name.index_of_seq("FDT_") _isnt _unset
+	_then
+		current_fdt_folder << folder_name
+	_endif
+
+	# Recursively write subfolders
+	_if p_folder_def[:subfolders] _isnt _unset
+	_then
+		_for subfolder _over p_folder_def[:subfolders].fast_elements()
+		_loop
+			_self.write_cluster_ug_folder(p_stream, subfolder, p_area, p_indent + 2, current_line_id, current_fdt_folder)
+		_endloop
+	_endif
+
+	# Write placemarks for this folder
+	_self.write_cluster_ug_folder_contents(p_stream, p_folder_def, p_area, indent + "  ", current_line_id, current_fdt_folder)
+
+	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_cluster_ug_folder_contents(p_stream, p_folder_def, p_area, p_indent, _optional p_parent_line_id, p_parent_fdt_folder)
+	## Write placemarks for underground cluster folders
+	## Aerial objects: FDT container, BOUNDARY CLUSTER, BOUNDARY FAT, FAT, HP COVER/UNCOVER
+	## UG objects: JOINT CLOSURE, CABLE, EXISTING/NEW HH, SLACK HANGER, BORING MANUAL
+	## New objects: T-WEY (point_of_interest), TALI PANCING (tali_pancing route)
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+	##   p_parent_line_id - LINE ID from parent (first optional)
+	##   p_parent_fdt_folder - FDT folder name from parent (second optional)
+
+	folder_name << p_folder_def[:name]
+
+	# Handle FDT container folder
+	_if p_folder_def[:is_fdt_container] _is _true
+	_then
+		fdt_objects << p_folder_def[:fdt_objects]
+		_if fdt_objects _isnt _unset
+		_then
+			write("  Writing ", fdt_objects.size, " FDT objects to FDT container folder")
+			_self.write_fdt_equipment(p_stream, p_area, p_indent, _unset)
+		_endif
+		_return
+	_endif
+
+	# Resolve line_id and fdt_folder for this level
+	line_id << p_folder_def[:line_id].default(p_parent_line_id)
+	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
+
+	# BOUNDARY CLUSTER - project boundary polygon
+	_if folder_name.uppercase = "BOUNDARY CLUSTER"
+	_then
+		_self.write_project_boundary(p_stream, p_area, p_indent, folder_name)
+	_endif
+
+	# BOUNDARY FAT - cells (ftth!zone)
+	_if folder_name.index_of_seq("BOUNDARY FAT") _isnt _unset _orif
+	    folder_name.index_of_seq("FAT COVERAGE") _isnt _unset
+	_then
+		_self.write_cells_for_folder(p_stream, p_area, p_indent, folder_name, line_id, current_fdt_folder)
+	_endif
+
+	# FAT (not BOUNDARY FAT) - sheath_splice equipment
+	_if folder_name.index_of_seq("FAT") _isnt _unset _andif
+	    folder_name.index_of_seq("BOUNDARY") _is _unset
+	_then
+		_self.write_sheath_splices_for_folder(p_stream, p_area, p_indent, "FAT", line_id, current_fdt_folder)
+	_endif
+
+	# HP COVER / HP UNCOVER - demand points
+	_if folder_name.index_of_seq("HP COVER") _isnt _unset _orif
+	    folder_name.index_of_seq("HP UNCOVER") _isnt _unset
+	_then
+		_self.write_demand_points_for_folder(p_stream, p_area, p_indent, folder_name, line_id, current_fdt_folder)
+	_endif
+
+	# JOINT CLOSURE - UG: query sheath_splice directly (no poles)
+	_if folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
+	_then
+		_self.write_ug_closure_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# CABLE (not BOUNDARY) - underground cable via underground_route
+	_if folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    folder_name.index_of_seq("BOUNDARY") _is _unset
+	_then
+		_self.write_ug_cable_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# EXISTING HH / NEW HH - UUB (handhole) objects
+	_if folder_name.uppercase.index_of_seq("EXISTING HH") _isnt _unset _orif
+	    folder_name.uppercase.index_of_seq("NEW HH") _isnt _unset
+	_then
+		_self.write_uub_for_folder(p_stream, folder_name, p_area, p_indent)
+	_endif
+
+	# SLACK HANGER - UG: query figure_eight directly (no poles)
+	_if folder_name.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		_self.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# BORING MANUAL - boring_manual route chains
+	_if folder_name.uppercase.index_of_seq("BORING MANUAL") _isnt _unset
+	_then
+		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# T-WEY - point_of_interest objects
+	_if folder_name.uppercase = "T-WEY"
+	_then
+		_self.write_t_wey_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# TALI PANCING - tali_pancing route chains
+	_if folder_name.uppercase = "TALI PANCING"
+	_then
+		_self.write_tali_pancing_for_folder(p_stream, p_area, p_indent)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_t_wey_for_folder(p_stream, p_area, p_indent)
+	## Write T-WEY (point_of_interest) placemarks to folder
+	## Queries point_of_interest objects within design area
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	all_t_weys << .gc[:point_of_interest].select(
+		predicate.interacts(:location, p_area))
+
+	tw_count << 0
+	_for tw _over all_t_weys.fast_elements()
+	_loop
+		.object_writer.write_t_wey(tw, p_stream, p_indent)
+		tw_count +<< 1
+	_endloop
+
+	_if tw_count > 0
+	_then
+		write("  Wrote ", tw_count, " T-WEY (point_of_interest) objects")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_tali_pancing_for_folder(p_stream, p_area, p_indent)
+	## Write TALI PANCING route chains to folder
+	## Uses same route geometry approach as boring_manual / sling_wire
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	all_tps << .gc[:tali_pancing].select(
+		predicate.interacts(:route, p_area))
+
+	# Collect valid entries (must have route geometry)
+	matching << rope.new()
+	_for tp _over all_tps.fast_elements()
+	_loop
+		route_geom << tp.route
+		_if route_geom _is _unset _then _continue _endif
+		matching.add(tp)
+	_endloop
+
+	# Sort by name ascending
+	sorted_tps << matching.as_sorted_collection(
+		_proc(tp1, tp2)
+			name1 << tp1.perform(:name).default("").lowercase
+			name2 << tp2.perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	tp_count << 0
+	_for tp _over sorted_tps.fast_elements()
+	_loop
+		route_geom << tp.route
+		.object_writer.write_tali_pancing(tp, route_geom, p_stream, p_indent)
+		tp_count +<< 1
+	_endloop
+
+	_if tp_count > 0
+	_then
+		write("  Wrote ", tp_count, " TALI PANCING chains")
+	_endif
+_endmethod
+$

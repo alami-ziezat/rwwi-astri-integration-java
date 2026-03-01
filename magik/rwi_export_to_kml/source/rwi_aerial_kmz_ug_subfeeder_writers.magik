@@ -1,0 +1,86 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ - UNDERGROUND SUBFEEDER WRITERS
+## Methods on rwi_export_to_aerial_kmz for underground (UG) subfeeder topology.
+## Same as feeder UG writers but without OLT handling.
+## Used when .topology = "UG" or "AE&UG" for subfeeder infrastructure.
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder(p_stream, p_folder_def, p_area, p_indent)
+	## Write a single folder for underground subfeeder
+	## Mirrors write_feeder_ug_folder() but routes to subfeeder UG content writer
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area - Design boundary area
+	##   p_indent - Indentation level
+
+	indent << "".fill_up_with(% , p_indent)
+	folder_name << p_folder_def[:name]
+
+	p_stream.write(indent, "<Folder>", newline_char)
+	p_stream.write(indent, "  <name>", folder_name, "</name>", newline_char)
+
+	_if p_folder_def[:visibility] _isnt _unset
+	_then
+		vis_str << _if p_folder_def[:visibility] _then "1" _else "0" _endif
+		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
+	_endif
+
+	_self.write_subfeeder_ug_folder_contents(p_stream, folder_name, p_area, indent + "  ")
+
+	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_stream, p_folder_name, p_area, p_indent)
+	## Write placemarks for underground subfeeder folders
+	## Handles: JOINT CLOSURE, CABLE, EXISTING HH <spec>, NEW HH <spec>,
+	##          SLACK HANGER, BORING MANUAL
+	## (No OLT - subfeeder does not have OLT)
+	##
+	## Parameters:
+	##   p_stream - Output stream
+	##   p_folder_name - Name of current folder
+	##   p_area - Design boundary area
+	##   p_indent - Indentation string
+
+	write("Processing UG subfeeder folder: ", p_folder_name)
+
+	# Handle JOINT CLOSURE folder - UG: query sheath_splice directly (no poles)
+	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
+	_then
+		_self.write_ug_closure_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle CABLE folder - UG cable via underground_route
+	_if p_folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    p_folder_name.index_of_seq("BOUNDARY") _is _unset
+	_then
+		_self.write_ug_cable_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle EXISTING HH / NEW HH folders - UUB (handhole) objects
+	_if p_folder_name.uppercase.index_of_seq("EXISTING HH") _isnt _unset _orif
+	    p_folder_name.uppercase.index_of_seq("NEW HH") _isnt _unset
+	_then
+		_self.write_uub_for_folder(p_stream, p_folder_name, p_area, p_indent)
+	_endif
+
+	# Handle SLACK HANGER folder - UG: query figure_eight directly (no poles)
+	_if p_folder_name.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		_self.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle BORING MANUAL folder
+	_if p_folder_name.uppercase.index_of_seq("BORING MANUAL") _isnt _unset
+	_then
+		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	_endif
+_endmethod
+$

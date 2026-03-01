@@ -1,0 +1,246 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## AERIAL KMZ - UNDERGROUND OBJECT WRITER
+## Methods on rwi_aerial_kmz_object_writer for writing UG-specific
+## objects (UUB handholes, boring manual) as KML placemarks.
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_uub(p_uub, p_stream, p_indent)
+	## Write UUB (handhole/manhole) as KML point placemark
+	## Based on write_olt() pattern
+	##
+	## Parameters:
+	##   p_uub - UUB object (underground utility box)
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	# Get geometry
+	uub_geom << p_uub.location
+	_if uub_geom _is _unset _then _return _endif
+
+	coord << uub_geom.coord
+	_if coord _is _unset _then _return _endif
+
+	coord_string << _self.convert_coord_to_wgs84_string(coord)
+
+	# Get attributes
+	uub_id    << p_uub.perform(:id).default("Unknown")
+	uub_label << p_uub.perform(:label).default("")
+	uub_spec  << p_uub.perform(:spec_id).default("")
+	uub_type  << p_uub.perform(:type).default("Handhole")
+	uub_status << p_uub.perform(:construction_status).default("")
+
+	# Build placemark name
+	_if uub_label <> ""
+	_then
+		placemark_name << uub_label
+	_else
+		placemark_name << write_string("HH ", uub_id)
+	_endif
+
+	# Select style based on spec dimension
+	spec_lc << uub_spec.lowercase
+	style_url <<
+		_if spec_lc.index_of_seq("40x40x60") _isnt _unset
+		_then >> "#handhole_40x40x60_map"
+		_elif spec_lc.index_of_seq("20x20x20") _isnt _unset
+		_then >> "#handhole_20x20x20_map"
+		_else >> "#handhole_80x80x130_map"   # default (80x80x130)
+		_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", placemark_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", uub_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>", uub_type, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Spec'><value>", uub_spec, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Status'><value>", uub_status, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Point geometry
+	p_stream.write(p_indent, "  <Point>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </Point>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_boring_manual(p_boring, p_route_geom, p_stream, p_indent)
+	## Write boring_manual chain as KML LineString placemark
+	## Based on write_sling_wire() pattern
+	##
+	## Parameters:
+	##   p_boring - Boring manual object
+	##   p_route_geom - Route geometry (chain)
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	_if p_route_geom _is _unset _then _return _endif
+	_if .cs_transform _is _unset _then _return _endif
+
+	# Convert route sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	route_sectors << p_route_geom.sectors
+	_for sector _over route_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			t_coord << .cs_transform.convert(coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Get attributes
+	bm_id   << p_boring.perform(:id).default("Unknown")
+	bm_name << p_boring.perform(:name).default("")
+
+	_if bm_name <> ""
+	_then
+		chain_name << bm_name
+	_else
+		chain_name << write_string("BORING MANUAL ", bm_id)
+	_endif
+
+	style_url << "#boring_manual_map"
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", bm_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>BORING MANUAL</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# LineString geometry
+	p_stream.write(p_indent, "  <LineString>", newline_char)
+	p_stream.write(p_indent, "    <tessellate>1</tessellate>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </LineString>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_t_wey(p_poi, p_stream, p_indent)
+	## Write T-WEY (point_of_interest) as KML point placemark
+	##
+	## Parameters:
+	##   p_poi - point_of_interest object
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	# Get geometry
+	poi_geom << p_poi.location
+	_if poi_geom _is _unset _then _return _endif
+
+	coord << poi_geom.coord
+	_if coord _is _unset _then _return _endif
+
+	coord_string << _self.convert_coord_to_wgs84_string(coord)
+
+	# Get attributes
+	poi_id   << p_poi.perform(:id).default("Unknown")
+	poi_name << p_poi.perform(:name).default("")
+	poi_type << p_poi.perform(:type).default("T-WEY")
+
+	# Build placemark name
+	_if poi_name <> ""
+	_then
+		placemark_name << poi_name
+	_else
+		placemark_name << write_string("T-WEY ", poi_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", placemark_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#t_wey_map</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", poi_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>", poi_type, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# Point geometry
+	p_stream.write(p_indent, "  <Point>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </Point>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_tali_pancing(p_tp, p_route_geom, p_stream, p_indent)
+	## Write TALI PANCING route chain as KML LineString placemark
+	## Same approach as write_sling_wire() / write_boring_manual()
+	##
+	## Parameters:
+	##   p_tp - tali_pancing object
+	##   p_route_geom - Route geometry (chain)
+	##   p_stream - Output stream
+	##   p_indent - Indentation string
+
+	_if p_route_geom _is _unset _then _return _endif
+	_if .cs_transform _is _unset _then _return _endif
+
+	# Convert route sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	route_sectors << p_route_geom.sectors
+	_for sector _over route_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			t_coord << .cs_transform.convert(coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Get attributes
+	tp_id   << p_tp.perform(:id).default("Unknown")
+	tp_name << p_tp.perform(:name).default("")
+
+	_if tp_name <> ""
+	_then
+		chain_name << tp_name
+	_else
+		chain_name << write_string("TALI PANCING ", tp_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#tali_pancing_map</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", tp_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>TALI PANCING</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# LineString geometry
+	p_stream.write(p_indent, "  <LineString>", newline_char)
+	p_stream.write(p_indent, "    <tessellate>1</tessellate>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </LineString>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$

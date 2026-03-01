@@ -13,6 +13,8 @@ _pragma(classify_level=basic, topic={astri_integration})
 	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
 	## - Other areas = Skipped
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Parse folder hierarchy
 		_local folders << pm[:parent].default("")
@@ -165,6 +167,8 @@ _private _method astri_design_migrator.create_area_based_object(pm)
 	## Create area-based object from placemark WITH parent folder
 	## This is a catchall for other area types
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		_local parent << pm[:parent].default("")
 

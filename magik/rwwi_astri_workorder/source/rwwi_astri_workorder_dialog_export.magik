@@ -180,6 +180,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		exporter.scheme_name << design.perform(:name).default(wo_number)
 		exporter.infrastructure_type << infra_type.as_symbol()
 		exporter.infrastructure_code << infra_code  # Pass infrastructure code for folder naming
+		exporter.topology << .selected_wo[:topology].default("")  # "AE", "UG", "AE&UG"
 
 		# Show progress
 		_self.log_info("Starting export...")

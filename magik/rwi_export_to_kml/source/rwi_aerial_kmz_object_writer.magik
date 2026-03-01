@@ -55,6 +55,9 @@ _pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_object_writer.convert_coord_to_wgs84_string(p_coord)
 	## Convert coordinate from current coordinate system to WGS84 and format as string
 	## Returns: String in format "lon,lat,0" for KML
+	# Set up dynamics for coordinate system
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 
 	# Use stored coordinate transform
 	_if .cs_transform _is _unset
@@ -69,7 +72,7 @@ _method rwi_aerial_kmz_object_writer.convert_coord_to_wgs84_string(p_coord)
 	# Format as string with precision
 	_dynamic !print_float_precision! << 16
 	l_str << write_string(t_coord.x, ",", t_coord.y, ",0")
-
+	write(p_coord, " converted to WGS84 string: ", l_str)
 	>> l_str
 _endmethod
 $

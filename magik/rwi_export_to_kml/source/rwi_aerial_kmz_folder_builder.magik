@@ -132,6 +132,238 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_subfeeder_ug_folders()
+	## Build SUBFEEDER CODE underground folder structure
+	## Same as feeder UG but without OLT folder
+	##
+	## Folders: JOINT CLOSURE, CABLE,
+	##          EXISTING HH <spec>, NEW HH <spec> (3 spec variants each),
+	##          SLACK HANGER, BORING MANUAL
+	##
+	## Returns:
+	##   rope of property_lists - Folder definitions
+
+	folder_defs << rope.new()
+
+	# 1. JOINT CLOSURE
+	folder_defs.add(property_list.new_with(
+		:name, "JOINT CLOSURE",
+		:visibility, _false))
+
+	# 2. CABLE
+	folder_defs.add(property_list.new_with(
+		:name, "CABLE",
+		:visibility, _false))
+
+	# 3-5. EXISTING HH (3 spec variations)
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		folder_defs.add(property_list.new_with(
+			:name, write_string("EXISTING HH ", spec),
+			:visibility, _false))
+	_endloop
+
+	# 6-8. NEW HH (3 spec variations)
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		folder_defs.add(property_list.new_with(
+			:name, write_string("NEW HH ", spec),
+			:visibility, _false))
+	_endloop
+
+	# 9. SLACK HANGER
+	folder_defs.add(property_list.new_with(
+		:name, "SLACK HANGER",
+		:visibility, _false))
+
+	# 10. BORING MANUAL
+	folder_defs.add(property_list.new_with(
+		:name, "BORING MANUAL",
+		:visibility, _false))
+
+	>> folder_defs
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_cluster_ug_line_folders(p_line_id, p_fdt)
+	## Build UG LINE folder structure for cluster
+	## Keeps aerial objects: BOUNDARY FAT, FAT, HP COVER, HP UNCOVER
+	## Adds UG objects: JOINT CLOSURE, CABLE, EXISTING/NEW HH x3, SLACK HANGER,
+	##                  BORING MANUAL, T-WEY, TALI PANCING
+	## Removes: poles, DISTRIBUTION CABLE, SLING WIRE
+	##
+	## Parameters:
+	##   p_line_id - "A", "B", "C", or "D"
+	##   p_fdt - Parent FDT object
+	##
+	## Returns:
+	##   property_list - LINE folder definition with subfolders
+
+	line_def << property_list.new_with(
+		:name, write_string("LINE ", p_line_id),
+		:visibility, _false,
+		:line_id, p_line_id,
+		:fdt_object, p_fdt,
+		:subfolders, rope.new())
+
+	subfolders << line_def[:subfolders]
+
+	# 1. BOUNDARY FAT
+	subfolders.add(property_list.new_with(
+		:name, "BOUNDARY FAT",
+		:visibility, _false))
+
+	# 2. FAT
+	subfolders.add(property_list.new_with(
+		:name, "FAT",
+		:visibility, _false))
+
+	# 3. HP COVER
+	subfolders.add(property_list.new_with(
+		:name, "HP COVER",
+		:visibility, _false,
+		:subfolders, rope.new()))
+
+	# 4. HP UNCOVER
+	subfolders.add(property_list.new_with(
+		:name, "HP UNCOVER",
+		:visibility, _false))
+
+	# 5. JOINT CLOSURE
+	subfolders.add(property_list.new_with(
+		:name, "JOINT CLOSURE",
+		:visibility, _false))
+
+	# 6. CABLE
+	subfolders.add(property_list.new_with(
+		:name, "CABLE",
+		:visibility, _false))
+
+	# 7-9. EXISTING HH (3 spec variations)
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		subfolders.add(property_list.new_with(
+			:name, write_string("EXISTING HH ", spec),
+			:visibility, _false))
+	_endloop
+
+	# 10-12. NEW HH (3 spec variations)
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		subfolders.add(property_list.new_with(
+			:name, write_string("NEW HH ", spec),
+			:visibility, _false))
+	_endloop
+
+	# 13. SLACK HANGER
+	subfolders.add(property_list.new_with(
+		:name, "SLACK HANGER",
+		:visibility, _false))
+
+	# 14. BORING MANUAL
+	subfolders.add(property_list.new_with(
+		:name, "BORING MANUAL",
+		:visibility, _false))
+
+	# 15. T-WEY
+	subfolders.add(property_list.new_with(
+		:name, "T-WEY",
+		:visibility, _false))
+
+	# 16. TALI PANCING
+	subfolders.add(property_list.new_with(
+		:name, "TALI PANCING",
+		:visibility, _false))
+
+	>> line_def
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_cluster_ug_folders(p_fdts)
+	## Build CLUSTER CODE underground folder structure
+	## Same top-level structure as aerial (BOUNDARY CLUSTER, FDT, LINE A/B/C/D)
+	## but LINE subfolders use UG objects instead of poles
+	##
+	## Parameters:
+	##   p_fdts - Rope of FDT objects
+	##
+	## Returns:
+	##   rope of property_lists - Folder definitions
+
+	folder_defs << rope.new()
+
+	# 1. BOUNDARY CLUSTER (always present)
+	folder_defs.add(property_list.new_with(
+		:name, "BOUNDARY CLUSTER",
+		:visibility, _false))
+
+	fdt_count << p_fdts.size
+
+	_if fdt_count = 0
+	_then
+		write("WARNING: No FDTs detected in cluster export area")
+		>> folder_defs
+
+	_elif fdt_count = 1
+	_then
+		fdt << p_fdts.an_element()
+		fdt_name << fdt.perform(:name).default("FDT")
+
+		# Single FDT folder
+		fdt_folder << property_list.new_with(
+			:name, "FDT",
+			:visibility, _false,
+			:is_fdt_container, _true,
+			:fdt_objects, p_fdts)
+		folder_defs.add(fdt_folder)
+
+		# LINE folders (no FDT suffix for single FDT)
+		_for line_id _over {"A", "B", "C", "D"}.fast_elements()
+		_loop
+			line_folder << _self.build_cluster_ug_line_folders(line_id, fdt)
+			line_folder[:fdt_name] << fdt_name
+			folder_defs.add(line_folder)
+		_endloop
+
+	_else
+		# Multiple FDTs - single FDT folder containing all
+		fdt_folder << property_list.new_with(
+			:name, "FDT",
+			:visibility, _false,
+			:is_fdt_container, _true,
+			:fdt_objects, p_fdts)
+		folder_defs.add(fdt_folder)
+
+		# Sort FDTs by name
+		sorted_fdts << p_fdts.as_sorted_collection(
+			_proc(fdt1, fdt2)
+				name1 << fdt1.perform(:name).default("").lowercase
+				name2 << fdt2.perform(:name).default("").lowercase
+				>> name1 < name2
+			_endproc)
+
+		# LINE folders per FDT as siblings
+		_for fdt _over sorted_fdts.fast_elements()
+		_loop
+			fdt_name << fdt.perform(:name).default("FDT_" + fdt.id.write_string)
+
+			_for line_id _over {"A", "B", "C", "D"}.fast_elements()
+			_loop
+				line_folder << _self.build_cluster_ug_line_folders(line_id, fdt)
+				line_folder[:name] << write_string("LINE ", line_id, " - ", fdt_name)
+				line_folder[:fdt_name] << fdt_name
+				folder_defs.add(line_folder)
+			_endloop
+		_endloop
+	_endif
+
+	>> folder_defs
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
 _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 	## Build CLUSTER CODE folder structure (dynamic based on FDT count)
 	## NEW STRUCTURE: Single FDT folder at top level, LINE folders as siblings
@@ -312,5 +544,64 @@ _method rwi_aerial_kmz_folder_builder.build_line_folders(p_line_id, p_fdt)
 		:visibility, _false))
 
 	>> line_def
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_folder_builder.build_feeder_ug_folders()
+	## Build FEEDER CODE underground folder structure
+	## Used when UG topology detected (UUB objects present in area)
+	##
+	## Folders: OLT, JOINT CLOSURE, CABLE,
+	##          EXISTING HH <spec>, NEW HH <spec> (3 spec variants each),
+	##          SLACK HANGER, BORING MANUAL
+	##
+	## Returns:
+	##   rope of property_lists - Folder definitions
+
+	folder_defs << rope.new()
+
+	# 1. OLT
+	folder_defs.add(property_list.new_with(
+		:name, "OLT",
+		:visibility, _false))
+
+	# 2. JOINT CLOSURE
+	folder_defs.add(property_list.new_with(
+		:name, "JOINT CLOSURE",
+		:visibility, _false))
+
+	# 3. CABLE
+	folder_defs.add(property_list.new_with(
+		:name, "CABLE",
+		:visibility, _false))
+
+	# 4-6. EXISTING HH (3 spec variations)
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		folder_defs.add(property_list.new_with(
+			:name, write_string("EXISTING HH ", spec),
+			:visibility, _false))
+	_endloop
+
+	# 7-9. NEW HH (3 spec variations)
+	_for spec _over {"80x80x130", "40x40x60", "20x20x20"}.fast_elements()
+	_loop
+		folder_defs.add(property_list.new_with(
+			:name, write_string("NEW HH ", spec),
+			:visibility, _false))
+	_endloop
+
+	# 10. SLACK HANGER
+	folder_defs.add(property_list.new_with(
+		:name, "SLACK HANGER",
+		:visibility, _false))
+
+	# 11. BORING MANUAL
+	folder_defs.add(property_list.new_with(
+		:name, "BORING MANUAL",
+		:visibility, _false))
+
+	>> folder_defs
 _endmethod
 $

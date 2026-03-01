@@ -186,6 +186,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				%newline,
 				"This operation may take a while.", %newline,
 				"Click OK to start and do not close the dialog."))
+	
 			write("Migrating objects to design...")
 			_local stats << migrator.migrate_placemarks(placemarks)
 			_self.log_success("Migration complete!")

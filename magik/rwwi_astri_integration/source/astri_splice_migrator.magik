@@ -44,6 +44,8 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 	## - Optical splitter creation for FDT and FAT
 	## - Figure eight creation for FAT, associated to pole
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Validate sheath splice
 		_local folders << pm[:parent].default("")
@@ -408,7 +410,8 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Validate sheath splice
 		_local folders << pm[:parent].default("")
@@ -511,8 +514,8 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 
 		_elif closure_type = "FAT"
 		_then
-			sp << "Pole mounted outdoor(16 ports)"
-			st_cd << "200001047"
+			sp << "Pedestal ground mounted type (16 ports type)"
+			st_cd << "100000824"
 			c_spl << 2
 		_endif
 

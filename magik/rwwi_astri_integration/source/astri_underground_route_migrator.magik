@@ -22,7 +22,8 @@ _private _method astri_design_migrator.create_underground_route(pm)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing Underground Route: ", pm[:name])
 	_try _with errCon
 		# Step 0: Parse folders
@@ -39,7 +40,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		_local fsize << fol.size
 
 		# Step 1: Validate cable/route keywords
-		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "FO", "ROUTE", "DUCT"}
+		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL", "FO", "ROUTE", "DUCT","LINE"}
 		_local name_upper << pm[:name].uppercase
 
 		_local is_cable? << _false
@@ -147,7 +148,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			:ring_name, ring_name,
 			:line_type, m_line,
 			:folders, folders,
-			:route, route,
+			:route, pc,
 			:uuid, .uuid,
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
@@ -212,7 +213,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 				:label, "HH-" + pm[:name],
 				:spec_id, "HH Concrete FDT : 80x80x130 cm",
 				:construction_status, .construction_status,
-				:location, l_location_start,
+				:location, pp_start,
 				:pop, .pop_name,
 				:olt, .pop_name,
 				:region, .region,
@@ -272,7 +273,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 				:label, "HH-" + pm[:name],
 				:spec_id, "HH Concrete FDT : 80x80x130 cm",
 				:construction_status, .construction_status,
-				:location, l_location_end,
+				:location, pp_end,
 				:pop, .pop_name,
 				:olt, .pop_name,
 				:region, .region,

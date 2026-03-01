@@ -19,6 +19,7 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:output_directory, _unset, :writable},      # Output directory
 	{:infrastructure_type, _unset, :writable},   # Infrastructure type filter (cluster/feeder/subfeeder)
 	{:infrastructure_code, _unset, :writable},   # Infrastructure code (e.g., "CLU001")
+	{:topology, _unset, :writable},              # Network topology: "AE", "UG", "AE&UG" or _unset (default aerial)
 	{:style_manager, _unset, :writable},         # Style manager instance
 	{:folder_builder, _unset, :writable},        # Folder builder instance
 	{:object_writer, _unset, :writable},         # Object writer instance
@@ -322,6 +323,31 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 		_endif
 	_endif
 
+	# UG TOPOLOGY FALLBACK:
+	# For underground designs there are no poles or OLTs in the design area,
+	# so the aerial-based detection above will always return all-false.
+	# When topology is UG and nothing was detected, derive the level from
+	# infrastructure_type (already set from the work order dialog).
+	_local topo_str << .topology.default("").uppercase
+	_if (topo_str = "UG" _orif topo_str = "AE&UG") _andif
+	    _not (levels[:feeder] _orif levels[:subfeeder] _orif levels[:cluster])
+	_then
+		write("  UG topology: aerial detection found nothing - using infrastructure_type: ", .infrastructure_type)
+		_if .infrastructure_type _is :feeder
+		_then
+			levels[:feeder] << _true
+			write("  Set FEEDER level from infrastructure_type")
+		_elif .infrastructure_type _is :subfeeder
+		_then
+			levels[:subfeeder] << _true
+			write("  Set SUBFEEDER level from infrastructure_type")
+		_else
+			# :cluster or _unset both default to cluster
+			levels[:cluster] << _true
+			write("  Set CLUSTER level from infrastructure_type")
+		_endif
+	_endif
+
 	>> levels
 _endmethod
 $
@@ -493,12 +519,25 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_section(p_stream, p_area)
 	p_stream.write("  <Folder>", newline_char)
 	p_stream.write("    <name>", folder_name, "</name>", newline_char)
 
-	# Get folder definitions and write each folder
-	# Objects are exported based on their parent folder field
-	folder_defs << .folder_builder.build_feeder_folders()
+	# Determine underground vs aerial from topology field set by caller
+	_local topo_str << .topology.default("").uppercase
+	_local is_ug << topo_str = "UG" _orif topo_str = "AE&UG"
+	write("  Feeder topology: ", .topology.default("(unset)"), " -> ", _if is_ug _then "UNDERGROUND" _else "AERIAL" _endif)
+
+	# Select folder definitions and writer based on topology
+	_local folder_defs << _if is_ug
+	                      _then >> .folder_builder.build_feeder_ug_folders()
+	                      _else >> .folder_builder.build_feeder_folders()
+	                      _endif
+
 	_for folder_def _over folder_defs.fast_elements()
 	_loop
-		_self.write_feeder_folder(p_stream, folder_def, p_area, 4)
+		_if is_ug
+		_then
+			_self.write_feeder_ug_folder(p_stream, folder_def, p_area, 4)
+		_else
+			_self.write_feeder_folder(p_stream, folder_def, p_area, 4)
+		_endif
 	_endloop
 
 	p_stream.write("  </Folder>", newline_char)
@@ -524,12 +563,25 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_section(p_stream, p_ar
 	p_stream.write("  <Folder>", newline_char)
 	p_stream.write("    <name>", folder_name, "</name>", newline_char)
 
-	# Get folder definitions and write each folder
-	# Objects are exported based on their parent folder field
-	folder_defs << .folder_builder.build_subfeeder_folders()
+	# Determine underground vs aerial from topology field set by caller
+	_local topo_str << .topology.default("").uppercase
+	_local is_ug << topo_str = "UG" _orif topo_str = "AE&UG"
+	write("  Subfeeder topology: ", .topology.default("(unset)"), " -> ", _if is_ug _then "UNDERGROUND" _else "AERIAL" _endif)
+
+	# Select folder definitions and writer based on topology
+	_local folder_defs << _if is_ug
+	                      _then >> .folder_builder.build_subfeeder_ug_folders()
+	                      _else >> .folder_builder.build_subfeeder_folders()
+	                      _endif
+
 	_for folder_def _over folder_defs.fast_elements()
 	_loop
-		_self.write_subfeeder_folder(p_stream, folder_def, p_area, 4)
+		_if is_ug
+		_then
+			_self.write_subfeeder_ug_folder(p_stream, folder_def, p_area, 4)
+		_else
+			_self.write_subfeeder_folder(p_stream, folder_def, p_area, 4)
+		_endif
 	_endloop
 
 	p_stream.write("  </Folder>", newline_char)
@@ -550,52 +602,69 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 	p_stream.write("  <Folder>", newline_char)
 	p_stream.write("    <name>", folder_name, "</name>", newline_char)
 
-	# Get folder definitions from builder (dynamic based on FDT count)
-	folder_defs << .folder_builder.build_cluster_folders(p_fdts)
+	# Determine underground vs aerial from topology field set by caller
+	_local topo_str << .topology.default("").uppercase
+	_local is_ug << topo_str = "UG" _orif topo_str = "AE&UG"
+	write("  Cluster topology: ", .topology.default("(unset)"), " -> ", _if is_ug _then "UNDERGROUND" _else "AERIAL" _endif)
 
-	# FIRST PASS: Count objects in each folder and filter out empty LINE folders
-	write("  Counting objects in LINE folders to filter empty ones...")
-	filtered_defs << rope.new()
+	_if is_ug
+	_then
+		# UG cluster: build UG folders and write all (no empty LINE folder filtering)
+		_local ug_folder_defs << .folder_builder.build_cluster_ug_folders(p_fdts)
+		_for folder_def _over ug_folder_defs.fast_elements()
+		_loop
+			_self.write_cluster_ug_folder(p_stream, folder_def, p_area, 4)
+		_endloop
+	_else
+		# Aerial cluster: existing path with empty LINE folder filtering
 
-	_for folder_def _over folder_defs.fast_elements()
-	_loop
-		folder_name << folder_def[:name]
-		line_id << folder_def[:line_id]
-		fdt_name << folder_def[:fdt_name]
+		# Get folder definitions from builder (dynamic based on FDT count)
+		folder_defs << .folder_builder.build_cluster_folders(p_fdts)
 
-		write("  DEBUG: Checking folder '", folder_name, "' | line_id=", line_id, " | fdt_name=", fdt_name)
+		# FIRST PASS: Count objects in each folder and filter out empty LINE folders
+		write("  Counting objects in LINE folders to filter empty ones...")
+		filtered_defs << rope.new()
 
-		# Check if this is a LINE folder (has line_id property)
-		_if folder_def[:line_id] _isnt _unset
-		_then
-			# Count objects in this LINE folder and all its subfolders
-			object_count << _self.count_line_folder_objects(folder_def, p_area)
+		_for folder_def _over folder_defs.fast_elements()
+		_loop
+			folder_name << folder_def[:name]
+			line_id << folder_def[:line_id]
+			fdt_name << folder_def[:fdt_name]
 
-			write("    DEBUG: count_line_folder_objects returned: ", object_count)
+			write("  DEBUG: Checking folder '", folder_name, "' | line_id=", line_id, " | fdt_name=", fdt_name)
 
-			_if object_count > 0
+			# Check if this is a LINE folder (has line_id property)
+			_if folder_def[:line_id] _isnt _unset
 			_then
-				# Keep this LINE folder - it has objects
-				filtered_defs.add(folder_def)
-				write("    LINE ", folder_def[:line_id], " (", folder_def[:name], "): ", object_count, " objects - KEPT")
+				# Count objects in this LINE folder and all its subfolders
+				object_count << _self.count_line_folder_objects(folder_def, p_area)
+
+				write("    DEBUG: count_line_folder_objects returned: ", object_count)
+
+				_if object_count > 0
+				_then
+					# Keep this LINE folder - it has objects
+					filtered_defs.add(folder_def)
+					write("    LINE ", folder_def[:line_id], " (", folder_def[:name], "): ", object_count, " objects - KEPT")
+				_else
+					# Skip this LINE folder - it's empty
+					write("    LINE ", folder_def[:line_id], " (", folder_def[:name], "): 0 objects - REMOVED")
+				_endif
 			_else
-				# Skip this LINE folder - it's empty
-				write("    LINE ", folder_def[:line_id], " (", folder_def[:name], "): 0 objects - REMOVED")
+				# Not a LINE folder (e.g., BOUNDARY CLUSTER, FDT folder) - always keep
+				filtered_defs.add(folder_def)
+				write("    Non-LINE folder kept: ", folder_name)
 			_endif
-		_else
-			# Not a LINE folder (e.g., BOUNDARY CLUSTER, FDT folder) - always keep
-			filtered_defs.add(folder_def)
-			write("    Non-LINE folder kept: ", folder_name)
-		_endif
-	_endloop
+		_endloop
 
-	write("  Filtered ", folder_defs.size - filtered_defs.size, " empty LINE folders")
+		write("  Filtered ", folder_defs.size - filtered_defs.size, " empty LINE folders")
 
-	# SECOND PASS: Write non-empty folders
-	_for folder_def _over filtered_defs.fast_elements()
-	_loop
-		_self.write_folder(p_stream, folder_def, p_area, 4)
-	_endloop
+		# SECOND PASS: Write non-empty folders
+		_for folder_def _over filtered_defs.fast_elements()
+		_loop
+			_self.write_folder(p_stream, folder_def, p_area, 4)
+		_endloop
+	_endif
 
 	p_stream.write("  </Folder>", newline_char)
 _endmethod
@@ -2633,3 +2702,4 @@ _private _method rwi_export_to_aerial_kmz.create_kmz_from_kml(p_kml_file)
 	>> kmz_file
 _endmethod
 $
+

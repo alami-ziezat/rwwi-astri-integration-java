@@ -18,11 +18,14 @@ _private _method astri_design_migrator.create_boring_manual(pm)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing Boring Manual: ", pm[:name])
 	_try _with errCon
 		_local folders  << pm[:parent].default("")
 		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
 		_local m_line   << _self.match_line(folders)
 		_if m_line _is _unset
 		_then
@@ -38,7 +41,7 @@ _private _method astri_design_migrator.create_boring_manual(pm)
 		_local prop_values << property_list.new_with(
 			:name,               pm[:name],
 			:folders,            folders,
-			:route,              route,
+			:route,              pc,
 			:ring_name,          ring_name,
 			:pop,                .pop_name,
 			:olt,                .pop_name,
@@ -48,6 +51,7 @@ _private _method astri_design_migrator.create_boring_manual(pm)
 			:segment,            segment,
 			:fttx_network_type,  _self.get_fttx_network_type(),
 			:construction_status, .construction_status,
+			:stf_item_code,      "500002117",
 			:uuid,               .uuid,
 			:olt_code,           .olt_code,
 			:feeder_code,        .feeder_code_db,
@@ -85,11 +89,14 @@ _private _method astri_design_migrator.create_boring_machine(pm)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing Boring Machine: ", pm[:name])
 	_try _with errCon
 		_local folders  << pm[:parent].default("")
 		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
 		_local m_line   << _self.match_line(folders)
 		_if m_line _is _unset
 		_then
@@ -105,7 +112,7 @@ _private _method astri_design_migrator.create_boring_machine(pm)
 		_local prop_values << property_list.new_with(
 			:name,               pm[:name],
 			:folders,            folders,
-			:route,              route,
+			:route,              pc,
 			:ring_name,          ring_name,
 			:pop,                .pop_name,
 			:olt,                .pop_name,
@@ -115,6 +122,7 @@ _private _method astri_design_migrator.create_boring_machine(pm)
 			:segment,            segment,
 			:fttx_network_type,  _self.get_fttx_network_type(),
 			:construction_status, .construction_status,
+			:stf_item_code,      "500000980",
 			:uuid,               .uuid,
 			:olt_code,           .olt_code,
 			:feeder_code,        .feeder_code_db,
@@ -150,11 +158,14 @@ _private _method astri_design_migrator.create_tali_pancing(pm)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing Tali Pancing: ", pm[:name])
 	_try _with errCon
 		_local folders  << pm[:parent].default("")
 		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
 		_local m_line   << _self.match_line(folders)
 		_if m_line _is _unset
 		_then
@@ -170,7 +181,7 @@ _private _method astri_design_migrator.create_tali_pancing(pm)
 		_local prop_values << property_list.new_with(
 			:name,               pm[:name],
 			:folders,            folders,
-			:route,              route,
+			:route,              pc,
 			:ring_name,          ring_name,
 			:pop,                .pop_name,
 			:olt,                .pop_name,

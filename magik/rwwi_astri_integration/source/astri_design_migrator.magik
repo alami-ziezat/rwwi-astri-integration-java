@@ -308,11 +308,18 @@ _private _method astri_design_migrator.extract_boundary_area(placemarks)
 	_then
 		write("  WARNING: Convex hull creation failed, suspect line geometry, using buffered points instead")
 		l_new_sectors << point_rope.buffer(400).sectors.an_element()
-		_return sector_rope.new_convex_hull(l_new_sectors)
+		#_return sector_rope.new_convex_hull(l_new_sectors)
+		ch << sector_rope.new_convex_hull(l_new_sectors)
+		ch.world << .database.world
+		_return ch
 	_endif
 
 	write("  Created convex hull boundary from ", point_rope.size, " placemark points")
-	_return convex_hull.buffer(400).sectors
+	#_return convex_hull.buffer(400).sectors
+
+	buff_sr << convex_hull.buffer(400)
+	buff_sr.world << .database.world
+	_return buff_sr.sectors
 _endmethod
 $
 
@@ -330,6 +337,8 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, i
 	## Returns:
 	##   (project, scheme) - Created project and scheme objects
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("Creating project and design...")
 
 	# Format job_title based on infrastructure type
@@ -374,8 +383,11 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, i
 			write("  WARNING: Boundary area not closed, using world bounds")
 			area_sr << _unset
 		_endif
-	
+		area_sr.p
+		#_local area_pa << pseudo_area.new_with_sectors(area_sr[1])
+		#area_pa.world << .database.world
 
+		#area_pa.p
 		# Create project
 		# project_name = WO number
 		# project_title = formatted job_title (FEEDER-code, SUBFEEDER-code, or infra_code)
@@ -383,6 +395,7 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, i
 					    :job_title, job_title_value,
 					    :job_type, "Physical NI Design Job",
 					    :asset_owner, "Owned")
+
 		prj << .design_manager.create_project(
 			       wo_number,       # Project name from WO number
 			       dsnames,

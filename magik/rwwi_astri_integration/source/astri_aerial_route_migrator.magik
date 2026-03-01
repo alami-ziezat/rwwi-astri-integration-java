@@ -15,6 +15,8 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 	## - Placeholder pole creation when poles not found
 	## - Additional AR segments to connect to poles
 	## - Sheath creation with structure placement
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing Aerial Route: ", pm[:name])
 	_try _with errCon
 		# Step 0: Parse folders
@@ -158,8 +160,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
 					:olt_code, .olt_code,
-					:stf_item_code, "200001033",
-					:route, route
+					:stf_item_code, "200001033"
 				)
 				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
 				_local result_sw << rec_trans_sw.run()
@@ -189,7 +190,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:ring_name, ring_name,
 			:line_type, m_line,
 			:folders, folders,
-			:route, route,
+			:route, pc,
 			:uuid, .uuid,
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,

@@ -309,7 +309,8 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:code, "200000690",
 			:object, "Pole",
 			:name, "Bahan Pondasi tiang",
-			:material_slot, :material
+			:material_slot, :material,
+			:service_pair, "500001742"
 		),
 		"500001742", property_list.new_with(
 			:code, "500001742",
@@ -558,6 +559,170 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:object, "Service",
 			:name, "Pengamanan Dan Persiapan",
 			:material_slot, :service
+		),
+
+		# =====================================================================
+		# UNDERGROUND (UG) CATALOG ENTRIES
+		# =====================================================================
+
+		# UG FAT handholes - when FAT is housed in underground handhole (UUB)
+		# Each material has a service_pair for auto-installation service
+		"200000165", property_list.new_with(
+			:code, "200000165",
+			:object, "UUB FAT",
+			:name, "Underground Pedestal SPH920 Signature Series Type include acces",
+			:material_slot, :material,
+			:service_pair, "500002113"
+		),
+		"500002113", property_list.new_with(
+			:code, "500002113",
+			:object, "UUB FAT",
+			:name, "Instal Underground Pedestal SPH920 Signature Series Type include",
+			:material_slot, :service
+		),
+		"200001032", property_list.new_with(
+			:code, "200001032",
+			:object, "UUB FAT",
+			:name, "Precast Hand hole for FAT : 40 x 40 x 60 cm",
+			:material_slot, :material,
+			:service_pair, "500002060"
+		),
+		"500002060", property_list.new_with(
+			:code, "500002060",
+			:object, "UUB FAT",
+			:name, "Instal Precast Hand hole for FAT : 40 x 40 x 60 cm",
+			:material_slot, :service
+		),
+		"200000613", property_list.new_with(
+			:code, "200000613",
+			:object, "UUB FAT",
+			:name, "Concrete Hand hole for FAT : 40 x 40 x 60 cm",
+			:material_slot, :material,
+			:service_pair, "500001316"
+		),
+		"500001316", property_list.new_with(
+			:code, "500001316",
+			:object, "UUB FAT",
+			:name, "Instal Concrete Hand hole for FAT : 40 x 40 x 60 cm",
+			:material_slot, :service
+		),
+
+		# UG FDT handholes - when FDT is housed in underground handhole (UUB)
+		# Each material has a service_pair for auto-installation service
+		"200000978", property_list.new_with(
+			:code, "200000978",
+			:object, "UUB FDT",
+			:name, "Precast Hand hole for FDT : 80 x 80 x 130 cm",
+			:material_slot, :material,
+			:service_pair, "500002102"
+		),
+		"500002102", property_list.new_with(
+			:code, "500002102",
+			:object, "UUB FDT",
+			:name, "Instal Precast Hand hole for FDT : 80 x 80 x 130 cm",
+			:material_slot, :service
+		),
+		"200000710", property_list.new_with(
+			:code, "200000710",
+			:object, "UUB FDT",
+			:name, "Concrete Hand hole for FDT: 80 x 80 x 130 cm",
+			:material_slot, :material,
+			:service_pair, "500002101"
+		),
+		"500002101", property_list.new_with(
+			:code, "500002101",
+			:object, "UUB FDT",
+			:name, "Instal Concrete Hand hole for FDT: 80 x 80 x 130 cm",
+			:material_slot, :service
+		),
+
+		# Boring manual (manual trenching/boring by length in meters)
+		"500002117", property_list.new_with(
+			:code, "500002117",
+			:object, "Boring Manual",
+			:name, "Boring manual 150cm depth",
+			:material_slot, :service
+		),
+
+		# Boring machine (mechanical boring by length in meters)
+		"500000980", property_list.new_with(
+			:code, "500000980",
+			:object, "Boring Machine",
+			:name, "Boring Mesin",
+			:material_slot, :service
+		),
+
+		# Open trenching / sewer - service only, no material pair
+		# 500002115 applies to SUBFEEDER topology (150cm depth)
+		# 500002116 applies to CLUSTER topology (30-80cm depth, distribution inside cluster only)
+		"500002115", property_list.new_with(
+			:code, "500002115",
+			:object, "Open Trench",
+			:name, "Pekerjaan Trenching 150cm depth",
+			:material_slot, :service
+		),
+		"500002116", property_list.new_with(
+			:code, "500002116",
+			:object, "Open Trench",
+			:name, "Pekerjaan Trenching 30-80 cm depth (distribution inside cluster only)",
+			:material_slot, :service
+		),
+
+		# Sub Duct / HDPE specs - future objects (not yet implemented in GIS)
+		"200001017", property_list.new_with(
+			:code, "200001017",
+			:object, "Sub Duct",
+			:name, "Sub Duct / HDPE 32/28 warna hitam, 3 strip ungu",
+			:material_slot, :material,
+			:service_pair, "500002144"
+		),
+		"500002144", property_list.new_with(
+			:code, "500002144",
+			:object, "Sub Duct",
+			:name, "Instal Sub Duct / HDPE 32/28 warna hitam, 3 strip ungu",
+			:material_slot, :service
+		),
+		"200000510", property_list.new_with(
+			:code, "200000510",
+			:object, "Sub Duct",
+			:name, "Sub Duct / HDPE 40/34 warna Ungu, 3 Strip Putih",
+			:material_slot, :material,
+			:service_pair, "500002146"
+		),
+		"500002146", property_list.new_with(
+			:code, "500002146",
+			:object, "Sub Duct",
+			:name, "Instal Sub Duct / HDPE 40/34 warna Ungu, 3 Strip Putih",
+			:material_slot, :service
+		),
+
+		# T-WEY / pulling pit handholes (point_of_interest objects)
+		# Each material has a service_pair for auto-installation service
+		"200000992", property_list.new_with(
+			:code, "200000992",
+			:object, "T-WEY",
+			:name, "Precast Hand hole for pulling pit : 20x20x20 cm",
+			:material_slot, :material,
+			:service_pair, "500002061"
+		),
+		"500002061", property_list.new_with(
+			:code, "500002061",
+			:object, "T-WEY",
+			:name, "Instal Precast Hand hole for pulling pit : 20x20x20 cm",
+			:material_slot, :service
+		),
+		"200001013", property_list.new_with(
+			:code, "200001013",
+			:object, "T-WEY",
+			:name, "Concrete Hand hole for pulling pit : 20x20x20 cm",
+			:material_slot, :material,
+			:service_pair, "500002063"
+		),
+		"500002063", property_list.new_with(
+			:code, "500002063",
+			:object, "T-WEY",
+			:name, "Instal Concrete Hand hole for pulling pit : 20x20x20 cm",
+			:material_slot, :service
 		)
 	),
 	:public
@@ -666,7 +831,11 @@ _method rwwi_astri_boq_generator.generate()
 			    col_name _isnt :sheath_with_loc _andif
 			    col_name _isnt :sling_wire _andif
 			    col_name _isnt :riser _andif
-			    col_name _isnt :figure_eight
+			    col_name _isnt :figure_eight _andif
+			    col_name _isnt :uub _andif
+			    col_name _isnt :boring_manual _andif
+			    col_name _isnt :boring_machine _andif
+			    col_name _isnt :point_of_interest
 			_then
 				_continue
 			_endif
@@ -729,6 +898,9 @@ _method rwwi_astri_boq_generator.generate()
 		# Add FAT accessories based on total FAT count
 		_self.add_fat_accessories(result)
 
+		# Add UG-specific items (boring manual/machine, UUB accessories, T-WEY, UG cables)
+		_self.add_ug_items_to_result(result)
+
 		# Add cable-based services (Project Management and Survey & Design)
 		_self.add_cable_based_services(result)
 
@@ -790,6 +962,16 @@ _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 			write("  Cable length: ", base_length.rounded, "m + 5% = ", length_with_margin.rounded, "m")
 			_return length_with_margin.ceiling
 		_endif
+	_endif
+
+	# For boring objects (boring_manual, boring_machine) - return route length in meters (ceiling)
+	_if col_name _is :boring_manual _orif col_name _is :boring_machine
+	_then
+		_local route_geom << rec.route
+		_if route_geom _is _unset _then _return _unset _endif
+		_local length_m << route_geom.line_length / 100  # cm to m
+		write("  Boring route length: ", length_m.rounded, "m -> qty:", length_m.ceiling)
+		_return length_m.ceiling
 	_endif
 
 	# For all other objects - return count of 1
@@ -1072,9 +1254,8 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 		# If poles exist, add the accessories
 		_if total_poles > 0
 		_then
-			_self.add_to_boq_result(result, "200000690", total_poles)  # Bahan Pondasi tiang
-			_self.add_to_boq_result(result, "500001742", total_poles)  # Label Pole
-			write("LOG: Added pole accessories with total pole count:", total_poles)
+			_self.add_to_boq_result(result, "200000690", total_poles)  # Bahan Pondasi tiang -> auto-adds 500001742 (Label Pole)
+			write("LOG: Added pole accessories (1 material + 1 service pair) with total pole count:", total_poles)
 		_else
 			write("LOG: No poles found, skipping pole accessories")
 		_endif
@@ -1270,6 +1451,389 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 
 	_when error
 		write("LOG: ERROR adding cable-based services:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+# ============================================================================
+# Underground (UG) BOQ Methods
+# ============================================================================
+
+_private _method rwwi_astri_boq_generator.add_ug_items_to_result(result)
+	## Add underground (UG) specific BOQ items
+	## Only runs when topology is UG or AE&UG (checked via boq_params or UUB presence)
+	## Calls sub-methods for boring_manual, boring_machine, UUB accessories,
+	## UG cables via underground_route, and T-WEY accessories
+	##
+	## Parameters:
+	##   result - property_list to update with UG items
+
+	# Check topology from boq_params
+	_local topo << .boq_params[:topology].default("").uppercase
+	_local is_ug << topo = "UG" _orif topo = "AE&UG"
+
+	# Fallback: detect UG topology by UUB object presence
+	_if _not is_ug
+	_then
+		is_ug << _self.has_uub_objects?()
+	_endif
+
+	_if _not is_ug
+	_then
+		write("LOG: Not UG topology, skipping UG items (topology:", topo, ")")
+		_return
+	_endif
+
+	write("LOG: Adding UG-specific BOQ items (topology:", topo, ")")
+
+	# UUB FAT accessories (5 items) - based on 200001032 count from change_set
+	_self.add_uub_fat_accessories(result)
+
+	# UUB FDT accessories (3 items) - based on 200000978 count from change_set
+	_self.add_uub_fdt_accessories(result)
+
+	# Boring manual (500002117) and boring_machine (500000980) are now in
+	# the change_set loop with route length from get_quantity_from_record()
+
+	# Underground cables via underground_route objects
+	_self.add_underground_cable_to_result(result)
+
+	# T-WEY pulling pit accessories (3 items) - based on 200000992 count from change_set
+	_self.add_t_wey_accessories_to_result(result)
+
+	write("LOG: UG items generation complete")
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.has_uub_objects?()
+	## Detect UG topology by checking for UUB (handhole) objects in design area
+	## Returns: _true if any UUB objects found, _false otherwise
+
+	_try _with errCond
+		_local uub_col << .dataset.collections[:uub]
+		_if uub_col _is _unset
+		_then
+			_return _false
+		_endif
+
+		_local area << .scheme.project.project_areas.an_element().area
+		_if area _is _unset
+		_then
+			_return _false
+		_endif
+
+		_local uubs << uub_col.select(predicate.interacts(:location, area))
+		_return uubs.size > 0
+	_when error
+		write("LOG: ERROR checking UUB objects:", errCond.report_contents_string)
+		_return _false
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_uub_fat_accessories(result)
+	## Add UUB FAT accessories (5 items) based on 200001032 count in result
+	## 200001032 (Precast Hand hole for FAT) comes from :uub objects in change_set
+	## Remaining 5 accessories are calculated from that count
+	##
+	## Parameters:
+	##   result - property_list to update with UUB FAT accessories
+
+	_try _with errCond
+		write("LOG: Adding UUB FAT accessories based on 200001032 count...")
+
+		# Count from 200001032 (Precast Hand hole for FAT) - populated by :uub objects in change_set
+		_local uub_fat_count << 0
+		_local uub_fat_item << result[:|200001032|]
+		_if uub_fat_item _isnt _unset
+		_then
+			uub_fat_count << uub_fat_item[:quantity_material].default(0)
+		_endif
+
+		_if uub_fat_count = 0
+		_then
+			write("LOG: No UUB FAT handhole objects (200001032) found in result, skipping FAT accessories")
+			_return
+		_endif
+
+		write("LOG: Adding UUB FAT accessories for", uub_fat_count, "UUB FAT handholes...")
+
+		# Add material accessories - service pairs auto-added by add_to_boq_result via :service_pair
+		# 200001032 (Precast HH for FAT) + 500002060 (Instal) already handled by change_set loop
+		_self.add_to_boq_result(result, "200000165", uub_fat_count)  # Underground Pedestal SPH920 -> auto-adds 500002113
+		_self.add_to_boq_result(result, "200000613", uub_fat_count)  # Concrete Hand hole for FAT -> auto-adds 500001316
+
+		write("LOG: Added UUB FAT accessories (2 material + 2 service pairs) with quantity:", uub_fat_count)
+	_when error
+		write("LOG: ERROR adding UUB FAT accessories:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_uub_fdt_accessories(result)
+	## Add UUB FDT accessories (3 items) based on 200000978 count in result
+	## 200000978 (Precast Hand hole for FDT) comes from :uub objects in change_set
+	## Remaining 3 accessories are calculated from that count
+	##
+	## Parameters:
+	##   result - property_list to update with UUB FDT accessories
+
+	_try _with errCond
+		write("LOG: Adding UUB FDT accessories based on 200000978 count...")
+
+		# Count from 200000978 (Precast Hand hole for FDT) - populated by :uub objects in change_set
+		_local uub_fdt_count << 0
+		_local uub_fdt_item << result[:|200000978|]
+		_if uub_fdt_item _isnt _unset
+		_then
+			uub_fdt_count << uub_fdt_item[:quantity_material].default(0)
+		_endif
+
+		_if uub_fdt_count = 0
+		_then
+			write("LOG: No UUB FDT handhole objects (200000978) found in result, skipping FDT accessories")
+			_return
+		_endif
+
+		write("LOG: Adding UUB FDT accessories for", uub_fdt_count, "UUB FDT handholes...")
+
+		# Add material accessories - service pairs auto-added by add_to_boq_result via :service_pair
+		# 200000978 (Precast HH for FDT) + 500002102 (Instal) already handled by change_set loop
+		_self.add_to_boq_result(result, "200000710", uub_fdt_count)  # Concrete Hand hole for FDT -> auto-adds 500002101
+
+		write("LOG: Added UUB FDT accessories (1 material + 1 service pair) with quantity:", uub_fdt_count)
+	_when error
+		write("LOG: ERROR adding UUB FDT accessories:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_boring_manual_to_result(result)
+	## Add boring_manual BOQ item (500002117) by total route length in meters
+	## Queries boring_manual objects in design area, filters Proposed only
+	##
+	## Parameters:
+	##   result - property_list to update with boring_manual service item
+
+	_try _with errCond
+		write("LOG: Querying boring_manual objects...")
+
+		_local bm_col << .dataset.collections[:boring_manual]
+		_if bm_col _is _unset
+		_then
+			write("LOG: WARNING - boring_manual collection not found, skipping")
+			_return
+		_endif
+
+		_local area << .scheme.project.project_areas.an_element().area
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area for boring_manual query")
+			_return
+		_endif
+
+		_local boring_manuals << bm_col.select(predicate.interacts(:route, area))
+
+		_local total_length << 0
+		_for bm _over boring_manuals.fast_elements()
+		_loop
+			_if bm.responds_to?(:construction_status) _andif
+			    bm.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+
+			_local route_geom << bm.route
+			_if route_geom _is _unset _then _continue _endif
+
+			_local length_m << route_geom.line_length / 100  # cm to m
+			total_length +<< length_m
+		_endloop
+
+		_if total_length > 0
+		_then
+			_self.add_to_boq_result(result, "500002117", total_length.ceiling)
+			write("LOG: Boring manual total length:", total_length.rounded, "m -> qty:", total_length.ceiling)
+		_else
+			write("LOG: No Proposed boring_manual objects found or zero total length")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding boring_manual to BOQ:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_boring_machine_to_result(result)
+	## Add boring_machine BOQ item (500000980) by total route length in meters
+	## Queries boring_machine objects in design area, filters Proposed only
+	##
+	## Parameters:
+	##   result - property_list to update with boring_machine service item
+
+	_try _with errCond
+		write("LOG: Querying boring_machine objects...")
+
+		_local bm_col << .dataset.collections[:boring_machine]
+		_if bm_col _is _unset
+		_then
+			write("LOG: WARNING - boring_machine collection not found, skipping")
+			_return
+		_endif
+
+		_local area << .scheme.project.project_areas.an_element().area
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area for boring_machine query")
+			_return
+		_endif
+
+		_local boring_machines << bm_col.select(predicate.interacts(:route, area))
+
+		_local total_length << 0
+		_for bm _over boring_machines.fast_elements()
+		_loop
+			_if bm.responds_to?(:construction_status) _andif
+			    bm.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+
+			_local route_geom << bm.route
+			_if route_geom _is _unset _then _continue _endif
+
+			_local length_m << route_geom.line_length / 100  # cm to m
+			total_length +<< length_m
+		_endloop
+
+		_if total_length > 0
+		_then
+			_self.add_to_boq_result(result, "500000980", total_length.ceiling)
+			write("LOG: Boring machine total length:", total_length.rounded, "m -> qty:", total_length.ceiling)
+		_else
+			write("LOG: No Proposed boring_machine objects found or zero total length")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding boring_machine to BOQ:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_underground_cable_to_result(result)
+	## Add underground cable BOQ items via underground_route objects
+	## Maps each route's spec_id to a material code (same cable codes as aerial)
+	## Length includes 5% margin
+	##
+	## Parameters:
+	##   result - property_list to update with underground cable items
+
+	_try _with errCond
+		write("LOG: Querying underground_route objects for cables...")
+
+		_local ur_col << .dataset.collections[:underground_route]
+		_if ur_col _is _unset
+		_then
+			write("LOG: WARNING - underground_route collection not found, skipping")
+			_return
+		_endif
+
+		_local area << .scheme.project.project_areas.an_element().area
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area for underground_route query")
+			_return
+		_endif
+
+		_local ug_routes << ur_col.select(predicate.interacts(:route, area))
+
+		_local total_count << 0
+		_for ur _over ug_routes.fast_elements()
+		_loop
+			_if ur.responds_to?(:construction_status) _andif
+			    ur.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+
+			# Get cable spec_id for catalog lookup
+			_local spec_id << _unset
+			_if ur.responds_to?(:spec_id)
+			_then
+				spec_id << ur.spec_id
+			_endif
+			_if spec_id _is _unset _then _continue _endif
+
+			# Find catalog entry matching this spec_id
+			_local matched_code << _unset
+			_for cat_code, cat_entry _over _self.MATERIAL_CATALOG.fast_keys_and_elements()
+			_loop
+				_if cat_entry[:spec_id] _isnt _unset _andif
+				    cat_entry[:spec_id] = spec_id
+				_then
+					matched_code << cat_code
+					_leave
+				_endif
+			_endloop
+
+			_if matched_code _is _unset
+			_then
+				write("LOG: WARNING - No catalog match for underground_route spec_id:", spec_id)
+				_continue
+			_endif
+
+			# Get route length with 5% margin
+			_local route_geom << ur.route
+			_if route_geom _is _unset _then _continue _endif
+			_local length_m << route_geom.line_length / 100  # cm to m
+			_local length_with_margin << (length_m * 1.05).ceiling
+
+			_self.add_to_boq_result(result, matched_code, length_with_margin)
+			total_count +<< 1
+			write("LOG: Underground route spec:", spec_id, "->", matched_code, "length:", length_with_margin, "m (+5%)")
+		_endloop
+
+		write("LOG: Processed", total_count, "underground_route cable objects")
+	_when error
+		write("LOG: ERROR adding underground cables to BOQ:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_t_wey_accessories_to_result(result)
+	## Add T-WEY (pulling pit) accessories (3 items) based on 200000992 count in result
+	## 200000992 (Precast Hand hole for pulling pit) comes from :point_of_interest in change_set
+	## Remaining 3 accessories are calculated from that count
+	##
+	## Parameters:
+	##   result - property_list to update with T-WEY accessories
+
+	_try _with errCond
+		write("LOG: Adding T-WEY accessories based on 200000992 count...")
+
+		# Count from 200000992 (Precast Hand hole for pulling pit) - populated by :point_of_interest in change_set
+		_local t_wey_count << 0
+		_local t_wey_item << result[:|200000992|]
+		_if t_wey_item _isnt _unset
+		_then
+			t_wey_count << t_wey_item[:quantity_material].default(0)
+		_endif
+
+		_if t_wey_count = 0
+		_then
+			write("LOG: No T-WEY handhole objects (200000992) found in result, skipping T-WEY accessories")
+			_return
+		_endif
+
+		write("LOG: Adding T-WEY accessories for", t_wey_count, "T-WEY objects...")
+
+		# Add material accessories - service pairs auto-added by add_to_boq_result via :service_pair
+		# 200000992 (Precast HH for pulling pit) + 500002061 (Instal) already handled by change_set loop
+		_self.add_to_boq_result(result, "200001013", t_wey_count)  # Concrete Hand hole for pulling pit -> auto-adds 500002063
+
+		write("LOG: Added T-WEY accessories (1 material + 1 service pair) with quantity:", t_wey_count)
+	_when error
+		write("LOG: ERROR adding T-WEY accessories:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $

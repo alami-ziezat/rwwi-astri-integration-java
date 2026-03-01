@@ -21,6 +21,8 @@ _private _method astri_design_migrator.create_uub(pm)
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing UUB/Handhole: ", pm[:name])
 	_try _with errCon
 		# Step 0: Validate folder
@@ -62,6 +64,21 @@ _private _method astri_design_migrator.create_uub(pm)
 				>> "HH Concrete FDT : 20x20x20 cm"
 			_else
 				>> "HH Concrete FDT : 80x80x130 cm"  # Default
+			_endif
+
+		# Map spec_id to stf_item_code for BOQ integration
+		_local uub_stf_code <<
+			_if folders_lc.index_of_seq("80x80x130") _isnt _unset
+			_then
+				>> "200000978"  # Precast Hand hole for FDT : 80 x 80 x 130 cm
+			_elif folders_lc.index_of_seq("40x40x60") _isnt _unset
+			_then
+				>> "200001032"  # Precast Hand hole for FAT : 40 x 40 x 60 cm
+			_elif folders_lc.index_of_seq("20x20x20") _isnt _unset
+			_then
+				>> "200000992"  # Precast Hand hole for pulling pit : 20x20x20 cm
+			_else
+				>> "200000978"  # Default to FDT size
 			_endif
 
 		# Step 2.5: Extract line_type, segment, ring_name
@@ -146,6 +163,7 @@ _private _method astri_design_migrator.create_uub(pm)
 					:label, pm[:name],
 					:type, uub_type,
 					:spec_id, uub_spec_id,
+					:stf_item_code, uub_stf_code,
 					:construction_status, uub_const_status,
 					:asset_owner, "Owned",
 					:pop, .pop_name,
@@ -184,6 +202,7 @@ _private _method astri_design_migrator.create_uub(pm)
 				:type, uub_type,
 				:label, pm[:name],
 				:spec_id, uub_spec_id,
+				:stf_item_code, uub_stf_code,
 				:construction_status, uub_const_status,
 				:asset_owner, "Owned",
 				:location, final_location,

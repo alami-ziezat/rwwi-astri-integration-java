@@ -44,6 +44,8 @@ _private _method astri_design_migrator.create_t_wey(pm)
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	write("  Processing T-Wey: ", pm[:name])
 	_try _with errCon
 		# Step 1: Extract folder and matching info
@@ -112,13 +114,14 @@ _private _method astri_design_migrator.create_t_wey(pm)
 			:segment,            segment,
 			:fttx_network_type,  _self.get_fttx_network_type(),
 			:construction_status, .construction_status,
+			:stf_item_code,      "200000992",
 			:uuid,               .uuid,
 			:olt_code,           .olt_code,
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:infra_type,         infra_type_cap,
-			:fdt_name,           ring_name
+			:infra_type,         infra_type_cap
+			#:fdt_name,           ring_name
 		)
 
 		_local rec_trans << record_transaction.new_insert(.poi_col, prop_values)

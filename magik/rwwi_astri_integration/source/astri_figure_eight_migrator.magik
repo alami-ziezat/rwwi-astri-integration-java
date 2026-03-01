@@ -41,7 +41,8 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 	## - Pole/OLT association (search within 700cm or create placeholder)
 	## - Aerial route snapping for placeholder poles
 	## - Cable connection if available
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Validate figure_eight
 		_local folders << pm[:parent].default("")
@@ -221,7 +222,8 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
-
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Validate figure_eight
 		_local folders << pm[:parent].default("")

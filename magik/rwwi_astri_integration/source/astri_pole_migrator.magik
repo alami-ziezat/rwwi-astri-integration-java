@@ -11,6 +11,8 @@ _private _method astri_design_migrator.create_pole(pm)
 	## Create pole object from placemark with advanced type detection,
 	## cable snapping, and duplicate detection
 
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
 		# Step 0: Validate folder contains "pole" pattern
 		_local folders << pm[:parent].default("")

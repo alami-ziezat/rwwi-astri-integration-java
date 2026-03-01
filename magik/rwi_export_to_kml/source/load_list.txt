@@ -7,3 +7,7 @@ rwi_aerial_kmz_folder_builder
 rwi_aerial_kmz_line_assigner
 rwi_aerial_kmz_object_writer
 rwi_export_to_aerial_kmz
+rwi_aerial_kmz_ug_object_writer
+rwi_aerial_kmz_ug_writers
+rwi_aerial_kmz_ug_subfeeder_writers
+rwi_aerial_kmz_ug_cluster_writers
