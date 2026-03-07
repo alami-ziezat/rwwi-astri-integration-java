@@ -61,8 +61,6 @@ _private _method astri_design_migrator.create_boring_manual(pm)
 			:fdt_name,           ring_name
 		)
 
-		prop_values.p
-
 		_local rec_trans << record_transaction.new_insert(.boring_manual_col, prop_values)
 		rec_trans.run()
 

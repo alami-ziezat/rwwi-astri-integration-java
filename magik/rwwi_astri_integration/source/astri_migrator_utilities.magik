@@ -173,7 +173,6 @@ _private _method astri_design_migrator.is_splice?(pm)
 	_then
 		_return _false  # Poles are not splices
 	_endif	
-	write(pm[:name],"   :   ", pm[:type])
 	_local network_type << pm[:network_type].default("").lowercase
 	>>  network_type = "fdt" _orif network_type = "fat" _orif
 	   network_type = "joint_closure" #_orif network_type = "handhole" 
@@ -197,7 +196,7 @@ _private _method astri_design_migrator.is_micro_cell?(pm)
 	## - Areas WITHOUT folders = Macro Cell (boundary areas)
 	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
 	_local network_type << pm[:network_type].default("").lowercase
-	>> pm[:type] = "area" _andif network_type = "cell" _orif network_type = "fat"
+	>> pm[:type] = "area" _andif network_type = "cell"
 _endmethod
 $
 

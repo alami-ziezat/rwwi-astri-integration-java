@@ -7,6 +7,10 @@ $
 ## Creates point_of_interest records from KMZ placemarks detected as t_wey:
 ##   - Icon filename contains "placemark_square" AND name/parent contains "t-wey"
 ##
+## Duplicate detection (skips creation if any of these exist within 500cm):
+##   - Existing point_of_interest (T-Wey) at the same location
+##   - Existing UUB (handhole/manhole) at the same location
+##
 ## Location snapping:
 ##   - Searches for nearest underground_route within 500cm (5m) radius
 ##   - If found: snaps to the nearest point on that route (segpoint_near)
@@ -73,6 +77,28 @@ _private _method astri_design_migrator.create_t_wey(pm)
 
 		_local buff << pa.buffer(500)  # 5m radius in cm
 		buff.world << .database.world
+
+		# Step 3.5: Skip if existing T-Wey or UUB already present within 500cm radius
+		_local existing_tweys << .poi_col.select(predicate.interacts(:location, {buff}))
+		_if existing_tweys.size > 0
+		_then
+			_local ex_tw << existing_tweys.an_element()
+			write("    >> SKIP: Existing T-Wey found nearby (", existing_tweys.size, "): ", ex_tw.perform(:label).default("(unnamed)"))
+			_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
+			.stats[:t_weys_skipped] +<< 1
+			_return
+		_endif
+
+		_local existing_uubs << .database.collections[:uub].select(predicate.interacts(:location, {buff}))
+		_if existing_uubs.size > 0
+		_then
+			_local ex_uub << existing_uubs.an_element()
+			_local ex_uub_name << ex_uub.perform(:identification).default(ex_uub.perform(:label).default("(unnamed)"))
+			write("    >> SKIP: Existing UUB/Handhole found nearby (", existing_uubs.size, "): ", ex_uub_name)
+			_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
+			.stats[:t_weys_skipped] +<< 1
+			_return
+		_endif
 
 		# Step 4: Search for nearest underground route within buffer
 		_local pred << predicate.interacts(:route, {buff})

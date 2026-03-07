@@ -1,0 +1,16 @@
+rwwi_nisa_integration	1
+
+description
+	NISA API Integration Module - Mass Problem queries via JWT Bearer auth.
+	Provides global procedures for querying active mass problems by cluster.
+end
+
+requires
+	base
+end
+
+requires_java
+	rwwi.nisa.integration
+end
+
+language en_gb

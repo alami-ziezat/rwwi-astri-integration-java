@@ -531,12 +531,6 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 
 		# Not cached - look up in KML document
 		_local icon_href << _self.lookup_icon_href_from_style(style_url)
-		#write("DEBUG detect_network_type: style_url = ", style_url, ", icon_href = ", icon_href)
-
-		_if icon_href _is _unset
-		_then
-			_return _unset
-		_endif
 	
 		_local l_parent << pl[:parent].lowercase
 		_local l_name << l_parent+"|"+l_name_lc
@@ -814,10 +808,9 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	## Returns: string - network_type or _unset
 	_if icon_filename _is _unset
 	_then
-		write("Icon filename _is unset")
-		_return _unset
+	#	write("Icon filename _is unset")
+		icon_filename << ""
 	_endif
-	#write("DEBUG map_icon_to_network_type: icon_filename = ", icon_filename, " : ",p_name_lc)
 	_local filename_lc << icon_filename.lowercase 
 
 	# Map icon filenames to network types
@@ -876,7 +869,8 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_then
 		_return "fat"
 
-	_elif filename_lc.index_of_seq("ylw-pushpin") _isnt _unset
+	_elif filename_lc.index_of_seq("ylw-pushpin") _isnt _unset _orif 
+		p_name_lc.index_of_seq("boundary fat") _isnt _unset
 	_then
 		_return "cell"
 

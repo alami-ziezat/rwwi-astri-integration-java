@@ -36,9 +36,22 @@ _pragma(classify_level=basic, topic={astri_integration})
 
 		# Extract segment_id from folders
 		_local segment_id << _self.match_segment(folders)
+		# Truncate folders if needed
+		_local ff << _unset
+
+		_if folders.size > 100
+		_then
+			ff << folders.slice(1, 120)  # Truncate to 120 chars
+			write("    >> Folders truncated to 120 chars")
+		_else
+			ff << folders
+		_endif
+
+		# Extract ring_name from folders (FDT/Closure name)
+		_local ring_name << pm[:ring_name]
 
 		# Step 1: Check if this is a MACRO CELL (boundary area without folders)
-		_if folders _is _unset _orif folders = ""
+		_if folders _is _unset _orif folders = "" _orif folders.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
 		_then
 			write("  Processing Macro Cell: ", pm[:name])
 
@@ -52,13 +65,13 @@ _pragma(classify_level=basic, topic={astri_integration})
 				:status, "Active",
 				:location, area,
 				:segment, segment_id,
+				:folders, ff,
 				:fttx_network_type, _self.get_fttx_network_type(),
 				:pop, .pop_name,
 				:olt, .pop_name,
 				:deployment_technology, "System Default",
-				:note, folders,
-				:uuid, .uuid,
-				:construction_status, .construction_status
+				:note, ring_name.default("") + "|" + folders,
+				:uuid, .uuid
 			)
 
 			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
@@ -74,7 +87,8 @@ _pragma(classify_level=basic, topic={astri_integration})
 
 		_if fol[fsize].matches?("LINE A*") _orif fol[fparent].matches?("LINE A*") _orif
 		   fol[fsize].matches?("LINE B*") _orif fol[fparent].matches?("LINE B*") _orif
-		   fol[fsize].matches?("LINE C*") _orif fol[fparent].matches?("LINE C*")
+		   fol[fsize].matches?("LINE C*") _orif fol[fparent].matches?("LINE C*") _orif 
+		   fol[fsize].matches?("LINE D*") _orif fol[fparent].matches?("LINE D*")
 		_then
 			has_line << _true
 		_else
@@ -114,21 +128,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 			write("    >> Found splitter: ", s_id)
 		_endif
 
-		# Step 6: Truncate folders if needed
-		_local ff << _unset
-
-		_if folders.size > 100
-		_then
-			ff << folders.slice(1, 120)  # Truncate to 120 chars
-			write("    >> Folders truncated to 120 chars")
-		_else
-			ff << folders
-		_endif
-
-		# Step 6.5: Extract ring_name from folders (FDT/Closure name)
-		_local ring_name << pm[:ring_name]
-
-		# Step 7: Create Micro Cell
+		# Step 6: Create Micro Cell
 		_local prop_values << property_list.new_with(
 			:identification, pm[:name],
 			:type, "Micro Cell",

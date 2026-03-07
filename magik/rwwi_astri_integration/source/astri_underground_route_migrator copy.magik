@@ -17,7 +17,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 	## - Cable folder validation (CABLE, KABEL, CABEL, FO, ROUTE, DUCT)
 	## - Cable core detection (12-576 cores) from name
 	## - UUB/handhole detection at start/end points (500cm radius)
-	##   If found, route endpoint is SNAPPED to UUB's exact coordinate before UR creation
 	## - Placeholder UUB creation when handholes not found
 	## - Sheath creation with structure placement via structure_manager path
 	##
@@ -138,94 +137,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 
 		write("    >> Detected fiber count: ", fb_c, " cores | line: ", m_line)
 
-		# Step 5: Pre-scan UUBs at start/end BEFORE creating UR
-		# If a UUB is found, snap the route endpoint to the UUB's exact coordinate
-		# so the UR geometry is consistent with the UUB position.
-
-		# --- Pre-scan START point ---
-		_local l_location_start << route.first_coord
-		_local l_result_uub_start << _unset
-
-		_local pp_scan_start << pseudo_point.new(l_location_start)
-		pp_scan_start.world << .database.world
-		_local buff_start << pp_scan_start.buffer(500)  # 5m radius in cm
-		buff_start.world << .database.world
-		_local pred_start << predicate.interacts(:location, {buff_start})
-		_local uubs_start << .uub_col.select(pred_start)
-
-		_if uubs_start.size > 0
-		_then
-			# Prefer UUB with existing connected routes
-			_for uu _over uubs_start.fast_elements()
-			_loop
-				_if uu.connected_routes().size > 0
-				_then
-					l_result_uub_start << uu
-					_leave
-				_endif
-			_endloop
-			# Fall back to any nearby UUB if none has connected routes
-			_if l_result_uub_start _is _unset
-			_then
-				l_result_uub_start << uubs_start.an_element()
-			_endif
-			# Snap: substitute route start coord with UUB's exact position
-			l_location_start << l_result_uub_start.location.coord
-			write("    >> Found UUB at start: ", l_result_uub_start.perform(:label).default("(unnamed)"), " - snapping route start")
-		_endif
-
-		# --- Pre-scan END point ---
-		_local l_location_end << route.last_coord
-		_local l_result_uub_end << _unset
-
-		_local pp_scan_end << pseudo_point.new(l_location_end)
-		pp_scan_end.world << .database.world
-		_local buff_end << pp_scan_end.buffer(500)  # 5m radius in cm
-		buff_end.world << .database.world
-		_local pred_end << predicate.interacts(:location, {buff_end})
-		_local uubs_end << .uub_col.select(pred_end)
-
-		_if uubs_end.size > 0
-		_then
-			# Prefer UUB with existing connected routes
-			_for uu _over uubs_end.fast_elements()
-			_loop
-				_if uu.connected_routes().size > 0
-				_then
-					l_result_uub_end << uu
-					_leave
-				_endif
-			_endloop
-			# Fall back to any nearby UUB if none has connected routes
-			_if l_result_uub_end _is _unset
-			_then
-				l_result_uub_end << uubs_end.an_element()
-			_endif
-			# Snap: substitute route end coord with UUB's exact position
-			l_location_end << l_result_uub_end.location.coord
-			write("    >> Found UUB at end: ", l_result_uub_end.perform(:label).default("(unnamed)"), " - snapping route end")
-		_endif
-
-		# Step 5.5: Snap route endpoint(s) to UUB position(s) if any were found
-		_if l_result_uub_start _isnt _unset _orif l_result_uub_end _isnt _unset
-		_then
-			_local sectors << route.an_element()
-			_if l_result_uub_start _isnt _unset
-			_then
-				sectors[1] << l_location_start
-			_endif
-			_if l_result_uub_end _isnt _unset
-			_then
-				sectors[sectors.size] << l_location_end
-			_endif
-			route << sectors.as_sector_rope()
-			pc << pseudo_chain.new(route)
-			pc.world << .database.world
-			t_len << pc.line_length
-			write("    >> Route geometry adjusted to UUB position(s)")
-		_endif
-
-		# Step 6: Create underground route (with snapped geometry)
+		# Step 5: Create underground route
 		write("    [OK] Creating underground route...")
 		_local ug_prop_values << property_list.new_with(
 			:construction_status, .construction_status,
@@ -263,17 +175,39 @@ _private _method astri_design_migrator.create_underground_route(pm)
 
 		write("    [OK] Underground route created: ", pm[:name], " (", fb_c, " cores, ", (t_len/100.0).ceiling, "m)")
 
-		# Step 7: Handle START UUB
-		# UUB was pre-scanned above. Use existing if found, else create placeholder
-		# at the (possibly snapped) start coordinate.
-		_if l_result_uub_start _isnt _unset
+		# Step 6: Handle START POINT - scan for existing UUB/handhole
+		# Prefer UUBs that already have connected routes (ref: scan_uub_fttx pattern)
+		_local l_location_start << route.first_coord
+		_local pp_start << pseudo_point.new(l_location_start)
+		pp_start.world << .database.world
+
+		_local l_result_uub_start << _unset
+
+		_local buff_start << pp_start.buffer(500)  # 5m radius in cm
+		buff_start.world << .database.world
+		_local pred_start << predicate.interacts(:location, {buff_start})
+		_local uubs_start << .uub_col.select(pred_start)
+
+		_if uubs_start.size > 0
 		_then
+			# Prefer UUB with existing connected routes
+			_for uu _over uubs_start.fast_elements()
+			_loop
+				_if uu.connected_routes().size > 0
+				_then
+					l_result_uub_start << uu
+					_leave
+				_endif
+			_endloop
+			# Fall back to any nearby UUB if none has connected routes
+			_if l_result_uub_start _is _unset
+			_then
+				l_result_uub_start << uubs_start.an_element()
+			_endif
 			write("    >> Using existing UUB at start: ", l_result_uub_start.perform(:label).default("(unnamed)"))
 		_else
-			# No UUB found nearby - create placeholder handhole at start coord
+			# No UUB found - create placeholder handhole at start
 			write("    >> Creating placeholder UUB at start")
-			_local pp_start << pseudo_point.new(l_location_start)
-			pp_start.world << .database.world
 			_local uub_start_props << property_list.new_with(
 				:type, "Handhole",
 				:label, _self.truncate_folders("HH-" + pm[:name], 50),
@@ -303,17 +237,39 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			.stats[:placeholder_uubs] +<< 1
 		_endif
 
-		# Step 8: Handle END UUB
-		# UUB was pre-scanned above. Use existing if found, else create placeholder
-		# at the (possibly snapped) end coordinate.
-		_if l_result_uub_end _isnt _unset
+		# Step 7: Handle END POINT - scan for existing UUB/handhole
+		# Prefer UUBs that already have connected routes (ref: scan_uub_fttx pattern)
+		_local l_location_end << route.last_coord
+		_local pp_end << pseudo_point.new(l_location_end)
+		pp_end.world << .database.world
+
+		_local l_result_uub_end << _unset
+
+		_local buff_end << pp_end.buffer(500)  # 5m radius in cm
+		buff_end.world << .database.world
+		_local pred_end << predicate.interacts(:location, {buff_end})
+		_local uubs_end << .uub_col.select(pred_end)
+
+		_if uubs_end.size > 0
 		_then
+			# Prefer UUB with existing connected routes
+			_for uu _over uubs_end.fast_elements()
+			_loop
+				_if uu.connected_routes().size > 0
+				_then
+					l_result_uub_end << uu
+					_leave
+				_endif
+			_endloop
+			# Fall back to any nearby UUB if none has connected routes
+			_if l_result_uub_end _is _unset
+			_then
+				l_result_uub_end << uubs_end.an_element()
+			_endif
 			write("    >> Using existing UUB at end: ", l_result_uub_end.perform(:label).default("(unnamed)"))
 		_else
-			# No UUB found nearby - create placeholder handhole at end coord
+			# No UUB found - create placeholder handhole at end
 			write("    >> Creating placeholder UUB at end")
-			_local pp_end << pseudo_point.new(l_location_end)
-			pp_end.world << .database.world
 			_local uub_end_props << property_list.new_with(
 				:type, "Handhole",
 				:label, _self.truncate_folders("HH-" + pm[:name], 50),
@@ -343,11 +299,12 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			.stats[:placeholder_uubs] +<< 1
 		_endif
 
-		# Step 9: Find structure path via structure_manager (start coord -> end coord)
+		# Step 8: Find structure path via structure_manager (start coord -> end coord)
 		# Uses get_continuous_structures_via_coords to auto-traverse UUBs and underground routes
 		_local stm << structure_manager.new(.database, .database.world)
-		_local path_sector << sector.new_with(l_location_start, l_location_end)
-		_local path_swl << stm.get_continuous_structures_via_coords(path_sector)
+		_local l_sector << sector_rope.new_with(sector.new_with(l_location_start, l_location_end))
+		_local shc << pseudo_chain.new(l_sector)
+		_local path_swl << stm.get_continuous_structures_via_coords(shc.sectors[1])
 
 		# Fallback: manually collect structures if path is empty
 		_if path_swl _is _unset _orif path_swl.size = 0
@@ -365,7 +322,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			_endif
 		_endif
 
-		# Step 10: Create sheath with structure placement
+		# Step 9: Create sheath with structure placement
 		_local ftri << _if fsize >= 3 _then >> fol[3] _else >> fol[fsize] _endif
 		_local rtr << _if ftri.size > 120 _then >> ftri.slice(1, 120) _else >> ftri _endif
 

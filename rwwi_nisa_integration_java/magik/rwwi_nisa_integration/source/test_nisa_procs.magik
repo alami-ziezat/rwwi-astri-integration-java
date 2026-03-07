@@ -1,0 +1,300 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## NISA API Integration Procedures
+##
+## Global procedures:
+##
+##   nisa_massproblem_by_cluster_code(cluster_code)
+##     Main production procedure. Resolves cluster_code_astri -> cluster_id_stella
+##     via PostgreSQL (dim_cluster_stella_master_smallworld), then calls NISA API.
+##     Returns raw JSON string.
+##
+##   nisa_parse_massproblem_response(json_string)
+##     Parse raw NISA JSON response into Magik property_lists.
+##     Returns property_list with :success, :msg, :data (rope of property_lists).
+##     Each data item has :mp_no, :event, :area, :category, :start_date,
+##     :start_time, :estimation, :sites (rope of property_lists with
+##     :olt_name, :cluster_name, :frame, :slot, :port).
+##
+##   nisa_massproblem_parsed(cluster_code)
+##     Convenience: calls nisa_massproblem_by_cluster_code then parses result.
+##     Returns parsed property_list.
+##
+##   test_nisa_massproblem(cluster_code)
+##     Test helper: calls nisa_get_massproblem_active_cluster() directly with the
+##     given cluster_code (no DB lookup). Prints response to console.
+##
+##   test_nisa_massproblem_default()
+##     Calls test_nisa_massproblem() with a hardcoded default cluster code.
+##
+## Usage:
+##   nisa_massproblem_by_cluster_code("DPK0118.WCK.057")
+##   nisa_massproblem_parsed("DPK0118.WCK.057")
+##   test_nisa_massproblem("CLUSTER-001")
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_global nisa_massproblem_by_cluster_code << _proc(cluster_code)
+	## Query NISA active mass problems by ASTRI cluster code.
+	##
+	## Flow:
+	##   1. Connect to PostgreSQL ([POSTGRESQL_ASTRI_DB])
+	##   2. SELECT cluster_id_stella FROM dim_cluster_stella_master_smallworld
+	##      WHERE cluster_code_astri = cluster_code
+	##   3. Call nisa_get_massproblem_active_cluster(cluster_id_stella)
+	##   4. Return raw JSON response from NISA API
+	##
+	## Parameters:
+	##   cluster_code - ASTRI cluster code (e.g. "DPK0118.WCK.057")
+	##
+	## Returns:
+	##   Raw JSON string from NISA API, or error JSON on failure
+
+	write("=" * 60)
+	write("NISA Mass Problem by Cluster Code")
+	write("=" * 60)
+	write("  Input cluster_code: ", cluster_code)
+
+	_local db_conn << _unset
+	_local result   << _unset
+
+	_protect
+		_try _with errCon
+
+			# Step 1: Connect to PostgreSQL
+			_local is_connect?
+			(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+
+			_if _not is_connect?
+			_then
+				write("  ERROR: Failed to connect to POSTGRESQL_ASTRI_DB")
+				#result << "{\"success\":false,\"error\":\"Failed to connect to PostgreSQL\"}"
+				_return
+			_endif
+			write("  Connected to POSTGRESQL_ASTRI_DB")
+
+			# Step 2: Look up cluster_id_stella for the given cluster_code_astri
+			_local sql_query << "SELECT cluster_id_stella FROM smallworld.dim_cluster_stella_master_smallworld WHERE cluster_code_astri = ? LIMIT 1"
+			write("  Querying dim_cluster_stella_master_smallworld...")
+
+			_local recs << db_conn.sql_select(sql_query, cluster_code)
+			_local rec  << recs.get()
+			recs.close()
+
+			# Clean transaction state after SELECT
+			_try
+				db_conn.commit()
+			_when error
+				db_conn.rollback()
+			_endtry
+
+			_if rec _is _unset
+			_then
+				write("  ERROR: No record found for cluster_code_astri = ", cluster_code)
+				#result << "{\"success\":false,\"error\":\"Cluster not found: " + cluster_code + "\"}"
+				_return
+			_endif
+
+			_local cluster_id_stella << rec.cluster_id_stella.write_string
+			write("  Resolved cluster_id_stella: ", cluster_id_stella)
+
+			# Step 3: Call NISA API with cluster_id_stella
+			write("  Calling NISA API...")
+			_local json_result << nisa_get_massproblem_active_cluster(cluster_id_stella)
+			write("  Response received (", json_result.size, " chars)")
+			write("")
+			result << nisa_parse_massproblem_response(json_result)
+
+		_when error
+			write("  ERROR: ", errCon.report_contents_string)
+			#result << "{\"success\":false,\"error\":\"" + errCon.report_contents_string + "\"}"
+		_endtry
+
+	_protection
+		# Always close the DB connection on exit
+		_if db_conn _isnt _unset
+		_then
+			_try
+				db_conn.rollback()
+				db_conn.close()
+				write("  DB connection closed")
+			_when error
+				# Ignore cleanup errors
+			_endtry
+		_endif
+	_endprotect
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=debug, topic={nisa_integration})
+_global nisa_massproblem_by_id_stella << _proc(cluster_id_stella)
+	## Test: call NISA API directly with cluster_code (no DB lookup).
+	##
+	## Parameters:
+	##   cluster_code - Cluster code to send directly to NISA API
+
+	write("=" * 60)
+	write("Testing NISA Mass Problem API (direct)")
+	write("=" * 60)
+	write("  Cluster ID Stella: ", cluster_id_stella)
+	write("")
+
+	_try
+		_local json_result << nisa_get_massproblem_active_cluster(cluster_id_stella)
+		write("Response:")
+		write(json_result)
+		write("")
+		result << nisa_parse_massproblem_response(json_result)
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=debug, topic={nisa_integration})
+_global test_nisa_massproblem_default << _proc()
+	## Test NISA Mass Problem API with a default cluster code (direct, no DB lookup).
+
+	>> nisa_massproblem_by_id_stella("TNG.0322.PSP1-02.001")
+_endproc
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_global nisa_parse_massproblem_response << _proc(json_string)
+	## Parse raw NISA mass problem API response JSON into Magik property_lists.
+	##
+	## Parameters:
+	##   json_string - Raw JSON string from NISA API
+	##
+	## Returns:
+	##   property_list with:
+	##     :success  - Boolean (_true/_false)
+	##     :msg      - String message from API
+	##     :data     - Rope of property_lists, each with:
+	##                   :mp_no, :event, :area, :category,
+	##                   :start_date, :start_time, :estimation,
+	##                   :sites - Rope of property_lists with:
+	##                            :olt_name, :cluster_name, :frame, :slot, :port
+
+	_local result << property_list.new()
+	result[:success] << _false
+	result[:msg]     << ""
+	result[:data]    << rope.new()
+
+	_if json_string _is _unset _orif json_string.empty?
+	_then
+		result[:msg] << "No response"
+		_return result
+	_endif
+
+	_try
+		_local json_obj << json_parser.parse(json_string)
+
+		# Top-level fields
+		result[:success] << json_obj[:success].default(_false)
+		result[:msg]     << json_obj[:msg].default("").write_string
+
+		_local json_data << json_obj[:data]
+		_if json_data _is _unset
+		_then
+			_return result
+		_endif
+
+		_local data_rope << rope.new()
+
+		# Iterate mass problem items
+		_for mp_item _over json_data.fast_elements()
+		_loop
+			_local mp_pl << property_list.new()
+			mp_pl[:mp_no]      << mp_item[:mp_no].default("").write_string
+			mp_pl[:event]      << mp_item[:event].default("").write_string
+			mp_pl[:area]       << mp_item[:area].default("").write_string
+			mp_pl[:category]   << mp_item[:category].default("").write_string
+			mp_pl[:start_date] << mp_item[:start_date].default("").write_string
+			mp_pl[:start_time] << mp_item[:start_time].default("").write_string
+			mp_pl[:estimation] << mp_item[:estimation].default("").write_string
+
+			# Parse nested sites array
+			_local json_sites << mp_item[:sites]
+			_local sites_rope << rope.new()
+
+			_if json_sites _isnt _unset
+			_then
+				_for site_item _over json_sites.fast_elements()
+				_loop
+					_local site_pl << property_list.new()
+					site_pl[:olt_name]     << site_item[:olt_name].default("").write_string
+					site_pl[:cluster_name] << site_item[:cluster_name].default("").write_string
+					site_pl[:frame]        << site_item[:frame].default("").write_string
+					site_pl[:slot]         << site_item[:slot].default("").write_string
+					site_pl[:port]         << site_item[:port].default("").write_string
+					sites_rope.add_last(site_pl)
+				_endloop
+			_endif
+
+			mp_pl[:sites] << sites_rope
+			data_rope.add_last(mp_pl)
+		_endloop
+
+		result[:data] << data_rope
+
+	_when error
+		write("  [nisa_parse_massproblem_response] Parse error: ", condition.report_contents_string)
+		result[:msg] << "Parse error: " + condition.report_contents_string
+	_endtry
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_global nisa_massproblem_parsed << _proc(cluster_code)
+	## Query NISA active mass problems by ASTRI cluster code and return parsed result.
+	##
+	## Convenience wrapper: calls nisa_massproblem_by_cluster_code() then parses the
+	## JSON response into Magik property_lists.
+	##
+	## Parameters:
+	##   cluster_code - ASTRI cluster code (e.g. "DPK0118.WCK.057")
+	##
+	## Returns:
+	##   Parsed property_list (see nisa_parse_massproblem_response)
+
+	_local json_str << nisa_massproblem_by_cluster_code(cluster_code)
+
+	_if json_str _is _unset
+	_then
+		_local err_result << property_list.new()
+		err_result[:success] << _false
+		err_result[:msg]     << "No response from NISA API"
+		err_result[:data]    << rope.new()
+		>> err_result
+	_endif
+
+	>> nisa_parse_massproblem_response(json_str)
+_endproc
+$
+
+## Usage Examples:
+##
+## Production - resolve cluster_code -> cluster_id_stella via DB, then call NISA:
+##   nisa_massproblem_by_cluster_code("DPK0118.WCK.057")
+##
+## Production with parsed result:
+##   result << nisa_massproblem_parsed("DPK0118.WCK.057")
+##   result[:success]              # _true/_false
+##   result[:data].size            # number of mass problems
+##   result[:data][1][:mp_no]     # first MP number
+##   result[:data][1][:sites][1][:olt_name]  # first site OLT
+##
+## Direct test - call NISA with cluster_code directly (no DB lookup):
+##   test_nisa_massproblem("CLUSTER-001")
+##
+## Default test:
+##   test_nisa_massproblem_default()

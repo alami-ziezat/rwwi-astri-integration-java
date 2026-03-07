@@ -514,7 +514,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 
 		_elif closure_type = "FAT"
 		_then
-			sp << "Pedestal ground mounted type (16 ports type)"
+			sp << "Pedestal mounted (16 ports)"
 			st_cd << "100000824"
 			c_spl << 2
 		_endif
@@ -531,7 +531,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 		_local l_result_uub << _unset
 		_local found << _false
 
-		_local buff << pp.buffer(1500)  # 15m radius in cm
+		_local buff << pp.buffer(300)  # 15m radius in cm
 		buff.world << .database.world
 		_local pred << predicate.interacts(:location, {buff})
 		_local uubs << .uub_col.select(pred)
