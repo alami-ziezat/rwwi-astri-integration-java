@@ -636,6 +636,14 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :service
 		),
 
+		# Tali pancing / Roding rope (by total route length in meters)
+		"200000267", property_list.new_with(
+			:code, "200000267",
+			:object, "Tali Pancing",
+			:name, "Tambang pancing/Roding rope",
+			:material_slot, :material
+		),
+
 		# Boring manual (manual trenching/boring by length in meters)
 		"500002117", property_list.new_with(
 			:code, "500002117",
@@ -828,12 +836,9 @@ _method rwwi_astri_boq_generator.generate()
 			_local col_name << rec.source_collection.name
 			_if col_name _isnt :sheath_splice _andif
 			    col_name _isnt :pole _andif
-			    col_name _isnt :sling_wire _andif
 			    col_name _isnt :riser _andif
 			    col_name _isnt :figure_eight _andif
 			    col_name _isnt :uub _andif
-			    col_name _isnt :boring_manual _andif
-			    col_name _isnt :boring_machine _andif
 			    col_name _isnt :point_of_interest
 			_then
 				_continue
@@ -845,18 +850,6 @@ _method rwwi_astri_boq_generator.generate()
 			_then
 				_continue
 			_endif
-
-			# Filter by infrastructure type (fttx_network_type)
-			#_if rec.responds_to?(:fttx_network_type)
-			#_then
-			#	_local rec_type << rec.fttx_network_type.default("").lowercase
-			#	_local filter_type << _self.normalize_infra_type(.infra_type)
-
-			#	_if rec_type <> filter_type
-			#	_then
-			#		_continue
-			#	_endif
-			#_endif
 
 			# Get stf_item_code from object
 			_local code << _unset
@@ -952,16 +945,6 @@ _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 	##   Numeric quantity/length or _unset
 
 	_local col_name << rec.source_collection.name
-
-	# For boring objects (boring_manual, boring_machine) - return route length in meters (ceiling)
-	_if col_name _is :boring_manual _orif col_name _is :boring_machine
-	_then
-		_local route_geom << rec.route
-		_if route_geom _is _unset _then _return _unset _endif
-		_local length_m << route_geom.line_length / 100  # cm to m
-		write("  Boring route length: ", length_m.rounded, "m -> qty:", length_m.ceiling)
-		_return length_m.ceiling
-	_endif
 
 	# For all other objects - return count of 1
 	_return 1
@@ -1555,14 +1538,17 @@ _private _method rwwi_astri_boq_generator.add_ug_items_to_result(result)
 	# UUB FDT accessories (3 items) - based on 200000978 count from change_set
 	_self.add_uub_fdt_accessories(result)
 
-	# Boring manual (500002117) and boring_machine (500000980) are now in
-	# the change_set loop with route length from get_quantity_from_record()
+	# Boring manual (500002117) - query from area, sum all lengths, ceiling once
+	_self.add_boring_manual(result)
 
-	# Underground cables via underground_route objects
-	_self.add_underground_cable_to_result(result)
+	# Boring machine (500000980) - query from area, sum all lengths, ceiling once
+	_self.add_boring_machine(result)
+
+	# Tali pancing / Roding rope (200000267) - query from area, sum all lengths, ceiling once
+	_self.add_tali_pancing(result)
 
 	# T-WEY pulling pit accessories (3 items) - based on 200000992 count from change_set
-	_self.add_t_wey_accessories_to_result(result)
+	_self.add_t_wey_accessories(result)
 
 	write("LOG: UG items generation complete")
 _endmethod
@@ -1671,7 +1657,7 @@ _private _method rwwi_astri_boq_generator.add_uub_fdt_accessories(result)
 _endmethod
 $
 
-_private _method rwwi_astri_boq_generator.add_boring_manual_to_result(result)
+_private _method rwwi_astri_boq_generator.add_boring_manual(result)
 	## Add boring_manual BOQ item (500002117) by total route length in meters
 	## Queries boring_manual objects in design area, filters Proposed only
 	##
@@ -1727,7 +1713,7 @@ _private _method rwwi_astri_boq_generator.add_boring_manual_to_result(result)
 _endmethod
 $
 
-_private _method rwwi_astri_boq_generator.add_boring_machine_to_result(result)
+_private _method rwwi_astri_boq_generator.add_boring_machine(result)
 	## Add boring_machine BOQ item (500000980) by total route length in meters
 	## Queries boring_machine objects in design area, filters Proposed only
 	##
@@ -1779,6 +1765,64 @@ _private _method rwwi_astri_boq_generator.add_boring_machine_to_result(result)
 
 	_when error
 		write("LOG: ERROR adding boring_machine to BOQ:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_tali_pancing(result)
+	## Add tali_pancing (Tambang pancing/Roding rope) BOQ item (200000267)
+	## by total route length in meters.
+	## Queries tali_pancing objects in design area, filters Proposed only,
+	## sums all route lengths, then applies ceiling once on the total.
+	##
+	## Parameters:
+	##   result - property_list to update with tali_pancing material item
+
+	_try _with errCond
+		write("LOG: Querying tali_pancing objects...")
+
+		_local tp_col << .dataset.collections[:tali_pancing]
+		_if tp_col _is _unset
+		_then
+			write("LOG: WARNING - tali_pancing collection not found, skipping")
+			_return
+		_endif
+
+		_local area << .scheme.project.project_areas.an_element().area
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area for tali_pancing query")
+			_return
+		_endif
+
+		_local tali_pancangs << tp_col.select(predicate.interacts(:route, area))
+
+		_local total_length << 0
+		_for tp _over tali_pancangs.fast_elements()
+		_loop
+			_if tp.responds_to?(:construction_status) _andif
+			    tp.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+
+			_local route_geom << tp.route
+			_if route_geom _is _unset _then _continue _endif
+
+			_local length_m << route_geom.line_length / 100  # cm to m
+			total_length +<< length_m
+		_endloop
+
+		_if total_length > 0
+		_then
+			_self.add_to_boq_result(result, "200000267", total_length.ceiling)
+			write("LOG: Tali pancing total length:", total_length.rounded, "m -> qty:", total_length.ceiling)
+		_else
+			write("LOG: No Proposed tali_pancing objects found or zero total length")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding tali_pancing to BOQ:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $
@@ -1863,7 +1907,7 @@ _private _method rwwi_astri_boq_generator.add_underground_cable_to_result(result
 _endmethod
 $
 
-_private _method rwwi_astri_boq_generator.add_t_wey_accessories_to_result(result)
+_private _method rwwi_astri_boq_generator.add_t_wey_accessories(result)
 	## Add T-WEY (pulling pit) accessories (3 items) based on 200000992 count in result
 	## 200000992 (Precast Hand hole for pulling pit) comes from :point_of_interest in change_set
 	## Remaining 3 accessories are calculated from that count

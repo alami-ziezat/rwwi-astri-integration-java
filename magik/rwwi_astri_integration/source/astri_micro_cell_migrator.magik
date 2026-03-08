@@ -50,6 +50,19 @@ _pragma(classify_level=basic, topic={astri_integration})
 		# Extract ring_name from folders (FDT/Closure name)
 		_local ring_name << pm[:ring_name]
 
+		# Extract line_type from folders (used by both macro and micro cell)
+		_local line_type << _self.match_line(folders)
+		_if line_type _is _unset
+		_then
+			line_type << _self.match_line(pm[:name])
+		_endif
+
+		# Capitalize infra_type for field value (e.g. "cluster" -> "Cluster")
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+
 		# Step 1: Check if this is a MACRO CELL (boundary area without folders)
 		_if folders _is _unset _orif folders = "" _orif folders.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
 		_then
@@ -69,9 +82,17 @@ _pragma(classify_level=basic, topic={astri_integration})
 				:fttx_network_type, _self.get_fttx_network_type(),
 				:pop, .pop_name,
 				:olt, .pop_name,
+				:region, .region,
+				:cluster, .cluster,
+				:line_type, line_type,
 				:deployment_technology, "System Default",
 				:note, ring_name.default("") + "|" + folders,
-				:uuid, .uuid
+				:uuid, .uuid,
+				:olt_code, .olt_code,
+				:feeder_code, .feeder_code_db,
+				:subfeeder_code, .subfeeder_code_db,
+				:cluster_code, .cluster_code_db,
+				:infra_type, infra_type_cap
 			)
 
 			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
@@ -139,10 +160,18 @@ _pragma(classify_level=basic, topic={astri_integration})
 			:fttx_network_type, _self.get_fttx_network_type(),
 			:pop, .pop_name,
 			:olt, .pop_name,
+			:region, .region,
+			:cluster, .cluster,
+			:line_type, line_type,
 			:splitter_id, s_id,
 			:deployment_technology, "System Default",
 			:note, ring_name.default("") + "|" + folders,
-			:uuid, .uuid
+			:uuid, .uuid,
+			:olt_code, .olt_code,
+			:feeder_code, .feeder_code_db,
+			:subfeeder_code, .subfeeder_code_db,
+			:cluster_code, .cluster_code_db,
+			:infra_type, infra_type_cap
 		)
 
 		_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)

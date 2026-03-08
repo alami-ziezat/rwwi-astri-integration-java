@@ -2060,11 +2060,11 @@ _private _method rwi_export_to_aerial_kmz.write_demand_points_for_folder(p_strea
 
 			# Close subfolder
 			p_stream.write(p_indent, "</Folder>", newline_char)
-			write("    Wrote ", dps.size, " demand points to subfolder: ", subfolder_name)
 		_endloop
 
 		# Update total counter - Only HP COVER is counted in summary
 		.total_hp_count +<< dp_count
+		write("    Wrote ", dp_count, " demand points to fdt: ", p_fdt_folder, " line: ", p_line_id)
 
 	_elif is_hp_uncover?
 	_then
