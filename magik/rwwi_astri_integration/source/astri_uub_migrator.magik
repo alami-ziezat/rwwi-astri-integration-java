@@ -63,7 +63,7 @@ _private _method astri_design_migrator.create_uub(pm)
 			_then
 				>> "HH Concrete FDT : 20x20x20 cm"
 			_else
-				>> "HH Concrete FDT : 80x80x130 cm"  # Default
+				>> "HH Concrete FDT : 40x40x60 cm"  # Default
 			_endif
 
 		# Map spec_id to stf_item_code for BOQ integration
@@ -78,7 +78,7 @@ _private _method astri_design_migrator.create_uub(pm)
 			_then
 				>> "200000992"  # Precast Hand hole for pulling pit : 20x20x20 cm
 			_else
-				>> "200000978"  # Default to FDT size
+				>> "200001032"  # Default to FAT size
 			_endif
 
 		# Step 2.5: Extract line_type, segment, ring_name

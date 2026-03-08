@@ -828,7 +828,6 @@ _method rwwi_astri_boq_generator.generate()
 			_local col_name << rec.source_collection.name
 			_if col_name _isnt :sheath_splice _andif
 			    col_name _isnt :pole _andif
-			    col_name _isnt :sheath_with_loc _andif
 			    col_name _isnt :sling_wire _andif
 			    col_name _isnt :riser _andif
 			    col_name _isnt :figure_eight _andif
@@ -885,6 +884,9 @@ _method rwwi_astri_boq_generator.generate()
 
 		# Special handling for sling_wire (not in change_set)
 		_self.add_sling_wire_to_result(result)
+
+		# Sum all sheath_with_loc lengths per code first, then apply 5% margin + ceiling once
+		_self.add_sheath_with_loc_to_result(result)
 
 		# Add fixed service items based on infrastructure type
 		_self.add_fixed_service_items(result)
@@ -950,19 +952,6 @@ _private _method rwwi_astri_boq_generator.get_quantity_from_record(rec)
 	##   Numeric quantity/length or _unset
 
 	_local col_name << rec.source_collection.name
-
-	# For cables (sheath_with_loc) - return length in meters + 5% margin
-	_if col_name _is :sheath_with_loc
-	_then
-		write("Getting length for sheath_with_loc ID:", rec.id)
-		_if rec.responds_to?(:calculated_sheath_length)
-		_then
-			_local base_length << rec.calculated_sheath_length.value_in(:m).as_number()
-			_local length_with_margin << base_length * 1.05
-			write("  Cable length: ", base_length.rounded, "m + 5% = ", length_with_margin.rounded, "m")
-			_return length_with_margin.ceiling
-		_endif
-	_endif
 
 	# For boring objects (boring_manual, boring_machine) - return route length in meters (ceiling)
 	_if col_name _is :boring_manual _orif col_name _is :boring_machine
@@ -1112,7 +1101,6 @@ _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 	_if slot_type = :material _andif catalog_entry[:service_pair] _isnt _unset
 	_then
 		_local service_code << catalog_entry[:service_pair]
-		write("LOG: Auto-adding service pair:", service_code, "with qty:", qty, "for material:", code)
 		_self.add_to_boq_result(result, service_code, qty)
 	_endif
 _endmethod
@@ -1177,6 +1165,81 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
 
 	_when error
 		write("LOG: ERROR querying sling_wire:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
+	## Add sheath_with_loc (cable) lengths to BOQ result.
+	## Groups all SWL records by stf_item_code, sums raw lengths per code,
+	## then applies the 5% margin and ceiling ONCE on the total per code.
+	## This avoids over-counting that occurs when ceiling is applied per record.
+	##
+	## Parameters:
+	##   result - property_list to update
+
+	_try _with errCond
+		write("LOG: Processing sheath_with_loc cables (sum-then-margin approach)...")
+
+		# Accumulate raw base lengths per stf_item_code
+		# key: code string, value: total raw length in meters
+		raw_lengths_by_code << equality_hash_table.new()
+		swl_count << 0
+
+		_for record_change _over .change_set.fast_elements()
+		_loop
+			_local rec << record_change.current_record
+			_if rec _is _unset _then _continue _endif
+
+			_if rec.source_collection.name _isnt :sheath_with_loc _then _continue _endif
+
+			# Only Proposed objects
+			_if rec.responds_to?(:construction_status) _andif
+			    rec.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+
+			# Must have a valid stf_item_code in catalog
+			_local code << _unset
+			_if rec.responds_to?(:stf_item_code)
+			_then
+				code << rec.stf_item_code
+			_endif
+			_if code _is _unset _orif _self.MATERIAL_CATALOG[code] _is _unset
+			_then
+				_continue
+			_endif
+
+			# Get raw base length (no margin, no ceiling yet)
+			_if _not rec.responds_to?(:calculated_sheath_length) _then _continue _endif
+			_local base_length << rec.calculated_sheath_length.value_in(:m).as_number()
+			_if base_length _is _unset _orif base_length <= 0 _then _continue _endif
+
+			write("  SWL ID:", rec.id, "code:", code, "base_length:", base_length, "m")
+
+			# Accumulate raw length per code
+			_local existing_len << raw_lengths_by_code[code]
+			_if existing_len _is _unset
+			_then
+				raw_lengths_by_code[code] << base_length
+			_else
+				raw_lengths_by_code[code] << existing_len + base_length
+			_endif
+			swl_count +<< 1
+		_endloop
+
+		# Now apply 5% margin + ceiling ONCE per code on the total
+		_for code, total_raw _over raw_lengths_by_code.fast_keys_and_elements()
+		_loop
+			_local total_with_margin << (total_raw * 1.05).ceiling
+			write("LOG: SWL code:", code, "total raw:", total_raw, "m -> +5% ceiling:", total_with_margin, "m")
+			_self.add_to_boq_result(result, code, total_with_margin)
+		_endloop
+
+		write("LOG: Processed", swl_count, "sheath_with_loc records,", raw_lengths_by_code.size, "unique codes")
+	_when error
+		write("LOG: ERROR processing sheath_with_loc:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $

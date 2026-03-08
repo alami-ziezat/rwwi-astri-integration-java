@@ -526,12 +526,12 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 		_local pp << pseudo_point.new(coord)
 		pp.world << .database.world
 
-		# Step 5: Scan for UUB within 1500cm (prefer connected UUBs)
+		# Step 5: Scan for UUB within 200cm (prefer connected UUBs)
 		# Ref: fttx_ur_closure_migration uses scan_uub_fttx(c, 1500)
 		_local l_result_uub << _unset
 		_local found << _false
 
-		_local buff << pp.buffer(300)  # 15m radius in cm
+		_local buff << pp.buffer(200)  # 2m radius in cm
 		buff.world << .database.world
 		_local pred << predicate.interacts(:location, {buff})
 		_local uubs << .uub_col.select(pred)
@@ -553,7 +553,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 			_then
 				l_result_uub << uubs.an_element()
 			_endif
-			write("    >> Found existing UUB within 1500cm: ", l_result_uub.label)
+			write("    >> Found existing UUB within 200cm: ", l_result_uub.label)
 		_else
 			# No UUB found - create placeholder handhole
 			write("    >> Creating placeholder UUB for closure")
@@ -721,7 +721,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 				_local l_prop_values_fe << property_list.new_with(
 					:construction_status, .construction_status,
 					:type, "Circle",
-					:length, 20,
+					:length, 20000,
 					:name, pm[:name] + " Slack",
 					:description, noted,
 					:folders, folders,

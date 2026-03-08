@@ -206,31 +206,6 @@ _private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folde
 			_endif
 		_endif
 
-		# Skip UUBs that contain FDT equipment (FDT handholes are not handhole placemarks)
-		has_fdt_equipment? << _false
-		_try
-			uub_equip << uub.get_equipment()
-			_if uub_equip _isnt _unset _andif _not uub_equip.empty?
-			_then
-				uub_splices << uub_equip.select(
-					predicate.navigate({:source_collection},
-						predicate.eq(:name, :sheath_splice)))
-				_for eq_splice _over uub_splices.fast_elements()
-				_loop
-					eq_type << eq_splice.sheath_splice_object_type
-					_if eq_type _isnt _unset _andif eq_type.uppercase = "FDT"
-					_then
-						has_fdt_equipment? << _true
-						_leave
-					_endif
-				_endloop
-			_endif
-		_when error
-			# Ignore equipment navigation errors
-		_endtry
-
-		_if has_fdt_equipment? _then _continue _endif
-
 		matching_uubs.add(uub)
 	_endloop
 
@@ -729,8 +704,9 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
 	## Write SLACK HANGER (figure_eight) placemarks for UG topology.
-	## Directly queries figure_eight collection by location - bypasses poles.
-	## Filters by LINE type and FDT ring name (mirrors pole filtering logic).
+	## Navigates through UUBs (like aerial navigates through poles) to find
+	## figure_eight equipment, using the UUB location as placemark geometry.
+	## Filters by LINE type and FDT ring name.
 	##
 	## Parameters:
 	##   p_stream     - Output stream
@@ -756,39 +732,86 @@ _private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_str
 		_endif
 	_endif
 
-	# Query figure_eight directly in area
-	all_fig8s << .gc[:figure_eight].select(
+	# Query UUBs in area - figure_eight is equipment on a UUB, not standalone
+	all_uubs << .gc[:uub].select(
 		predicate.interacts(:location, p_area))
 
-	fig8_count << 0
-	_for fig8 _over all_fig8s.fast_elements()
+	# Collect matching figure_eight equipment with their UUB geometry
+	matching_figure_eights << rope.new()
+
+	_for uub _over all_uubs.fast_elements()
 	_loop
-		# Use figure_eight's own location geometry
-		fig8_geom << fig8.location
-		_if fig8_geom _is _unset _then _continue _endif
+		uub_geom << uub.location
+		_if uub_geom _is _unset _then _continue _endif
 
-		# Filter by LINE type
-		_if expected_line_type _isnt _unset
-		_then
-			fig8_line_type << fig8.perform(:line_type).default("")
-			_if fig8_line_type.uppercase <> expected_line_type.uppercase
+		# Get all equipment on this UUB
+		uub_equipment << _unset
+		_try
+			uub_equipment << uub.get_equipment()
+		_when error
+			_continue
+		_endtry
+		_if uub_equipment _is _unset _orif uub_equipment.empty? _then _continue _endif
+
+		# Find figure_eight items in UUB equipment
+		uub_fig8s << uub_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :figure_eight)))
+
+		_if uub_fig8s.empty? _then _continue _endif
+
+		_for fig8 _over uub_fig8s.fast_elements()
+		_loop
+			# Filter by LINE type (check figure_eight first, fall back to UUB)
+			_if expected_line_type _isnt _unset
 			_then
-				_continue
+				fig8_line_type << fig8.perform(:line_type).default("")
+				_if fig8_line_type = ""
+				_then
+					fig8_line_type << uub.perform(:line_type).default("")
+				_endif
+				_if fig8_line_type.uppercase <> expected_line_type.uppercase
+				_then
+					_continue
+				_endif
 			_endif
-		_endif
 
-		# Filter by FDT ring name
-		_if expected_fdt_name _isnt _unset
-		_then
-			fig8_ring_name << fig8.perform(:ring_name).default("")
-			_if fig8_ring_name <> "" _andif
-			    fig8_ring_name.uppercase <> expected_fdt_name.uppercase
+			# Filter by FDT ring name (check figure_eight first, fall back to UUB)
+			_if expected_fdt_name _isnt _unset
 			_then
-				_continue
+				fig8_ring_name << fig8.perform(:ring_name).default("")
+				_if fig8_ring_name = ""
+				_then
+					fig8_ring_name << uub.perform(:ring_name).default("")
+				_endif
+				_if fig8_ring_name <> "" _andif
+				    fig8_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue
+				_endif
 			_endif
-		_endif
 
-		.object_writer.write_figure_eight(fig8, fig8_geom, p_stream, p_indent)
+			# Add to matching collection with UUB geometry
+			matching_figure_eights.add(property_list.new_with(
+				:fig8, fig8,
+				:uub_geom, uub_geom))
+		_endloop
+	_endloop
+
+	# Sort by name ascending
+	sorted_figure_eights << matching_figure_eights.as_sorted_collection(
+		_proc(f1, f2)
+			name1 << f1[:fig8].perform(:name).default("").lowercase
+			name2 << f2[:fig8].perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	fig8_count << 0
+	_for fig8_data _over sorted_figure_eights.fast_elements()
+	_loop
+		fig8     << fig8_data[:fig8]
+		uub_geom << fig8_data[:uub_geom]
+		.object_writer.write_figure_eight(fig8, uub_geom, p_stream, p_indent)
 		fig8_count +<< 1
 		.total_slack_hanger_count +<< 1
 	_endloop
