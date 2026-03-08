@@ -111,12 +111,10 @@ _method rwi_aerial_kmz_object_writer.write_boring_manual(p_boring, p_route_geom,
 		chain_name << write_string("BORING MANUAL ", bm_id)
 	_endif
 
-	style_url << "#boring_manual_map"
-
 	# Write KML Placemark
 	p_stream.write(p_indent, "<Placemark>", newline_char)
 	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
-	p_stream.write(p_indent, "  <styleUrl>", style_url, "</styleUrl>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#boring_manual_map</styleUrl>", newline_char)
 
 	# Extended data
 	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
@@ -154,8 +152,8 @@ _method rwi_aerial_kmz_object_writer.write_t_wey(p_poi, p_stream, p_indent)
 
 	# Get attributes
 	poi_id   << p_poi.perform(:id).default("Unknown")
-	poi_name << p_poi.perform(:name).default("")
-	poi_type << p_poi.perform(:type).default("T-WEY")
+	poi_name << p_poi.perform(:label).default("")
+	poi_type << p_poi.perform(:ring_name).default("")
 
 	# Build placemark name
 	_if poi_name <> ""

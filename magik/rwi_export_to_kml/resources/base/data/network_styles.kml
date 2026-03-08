@@ -1633,6 +1633,90 @@
 		</Pair>
 	</StyleMap>
 
+	<!-- BORING MANUAL -->
+	<Style id="boring_manual">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="boring_manual_highlight">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="boring_manual_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#boring_manual</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#boring_manual_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- TALI PANCING -->
+	<Style id="tali_pancing">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+	</Style>
+	<Style id="tali_pancing_highlight">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<StyleMap id="tali_pancing_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#tali_pancing</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#tali_pancing_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
+	<!-- T-WEY -->
+	<Style id="t_wey">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.7</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_square.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<color>00ffffff</color>
+		</LabelStyle>
+	</Style>
+	<Style id="t_wey_highlight">
+		<IconStyle>
+			<color>ff0000ff</color>
+			<scale>0.9</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_square.png</href>
+			</Icon>
+		</IconStyle>
+		<LabelStyle>
+			<color>00ffffff</color>
+		</LabelStyle>
+	</Style>
+	<StyleMap id="t_wey_map">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#t_wey</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#t_wey_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+
 	<!-- CONTENT_PLACEHOLDER -->
 
 </Document>

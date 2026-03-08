@@ -33,7 +33,14 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:total_sling_wire_count, _unset, :writable},    # Total SLING WIREs exported
 	{:total_cable_length, _unset, :writable},        # Total cable length exported (meters)
 	{:total_hp_count, _unset, :writable},            # Total HOME PASS (demand points) exported
-	{:total_cell_count, _unset, :writable}           # Total CELLs (ftth!zone) exported
+	{:total_cell_count, _unset, :writable},          # Total CELLs (ftth!zone) exported
+	# UG-specific counters
+	{:total_uub_existing_count, _unset, :writable},  # Total EXISTING HH (UUB) exported
+	{:total_uub_new_count, _unset, :writable},       # Total NEW HH (UUB) exported
+	{:total_ug_cable_count, _unset, :writable},      # Total UG cable chains exported
+	{:total_boring_manual_count, _unset, :writable}, # Total BORING MANUAL chains exported
+	{:total_t_wey_count, _unset, :writable},         # Total T-WEY objects exported
+	{:total_tali_pancing_count, _unset, :writable}   # Total TALI PANCING chains exported
 }, :object)
 $
 
@@ -191,6 +198,12 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 		:total_cable_length, .total_cable_length,
 		:total_home_pass, .total_hp_count,
 		:total_cells, .total_cell_count,
+		:total_uub_existing, .total_uub_existing_count,
+		:total_uub_new, .total_uub_new_count,
+		:total_ug_cables, .total_ug_cable_count,
+		:total_boring_manuals, .total_boring_manual_count,
+		:total_t_weys, .total_t_wey_count,
+		:total_tali_pancings, .total_tali_pancing_count,
 		:project_name, .project_name,
 		:infrastructure_type, .infrastructure_type)
 _endmethod
@@ -201,8 +214,13 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 	## Detect which network levels are present in the export area
 	## Logic:
 	##   1. FEEDER: Find if mit_hub is inside project area
-	##   2. SUBFEEDER: Find poles in area, check if poles have sheath_splice with type Joint Closure/Closure AND FDT
-	##   3. CLUSTER: Find poles in area, check if poles have sheath_splice with type FDT AND FAT
+	##   2. AERIAL: Find poles in area, check equipment sheath_splice type
+	##      - Joint Closure/Closure → SUBFEEDER indicator
+	##      - FDT                   → SUBFEEDER and CLUSTER indicator
+	##      - FAT                   → CLUSTER indicator
+	##   3. UNDERGROUND: Find UUBs in area, same equipment check as poles
+	##      - Same sheath_splice type logic via uub.get_equipment()
+	##   4. mit_terminal_enclosure → additional FDT source (both AE and UG)
 	##
 	## Returns:
 	##   property_list - {:feeder, boolean, :subfeeder, boolean, :cluster, boolean, :fdts, rope}
@@ -224,18 +242,17 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 		write("  Detected FEEDER network (", olts.size, " OLTs/hubs)")
 	_endif
 
-	# Get all poles in area first
-	all_poles << .gc[:pole].select(
-		predicate.interacts(:location, p_area))
-
-	write("  Found ", all_poles.size, " poles in area")
-
-	# Now check equipment on these poles
 	has_joint_closure << _false
 	has_fdt << _false
 	has_fat << _false
 	all_fdts << rope.new()
 	all_closures << rope.new()
+
+	# 2. AERIAL: Get all poles in area, check equipment sheath_splice types
+	all_poles << .gc[:pole].select(
+		predicate.interacts(:location, p_area))
+
+	write("  Found ", all_poles.size, " poles in area")
 
 	_for pole _over all_poles.fast_elements()
 	_loop
@@ -248,17 +265,13 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 			predicate.navigate({:source_collection},
 				predicate.eq(:name, :sheath_splice)))
 
-		# Check if sheath_splice exists on this pole
 		_if _not pole_splices.empty?
 		_then
-			# Check each sheath_splice
 			_for splice _over pole_splices.fast_elements()
 			_loop
 				splice_type << splice.sheath_splice_object_type
-				write("	>> Found sheath_splice on pole ", pole.telco_pole_tag, " of type: ", splice_type)
 				_if splice_type _is _unset _then _continue _endif
 
-				# Check for Joint Closure (SUBFEEDER indicator)
 				_if splice_type.lowercase = "join closure" _or
 				    splice_type.lowercase = "closure"
 				_then
@@ -266,14 +279,12 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 					all_closures.add_last(splice)
 				_endif
 
-				# Check for FDT (SUBFEEDER and CLUSTER indicator)
 				_if splice_type.uppercase = "FDT"
 				_then
 					has_fdt << _true
 					all_fdts.add_last(splice)
 				_endif
 
-				# Check for FAT (CLUSTER indicator)
 				_if splice_type.uppercase = "FAT"
 				_then
 					has_fat << _true
@@ -282,9 +293,60 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 		_endif
 	_endloop
 
-	write(" Has Joint Closure: ", has_joint_closure, " | Has FDT: ", has_fdt, " | Has FAT: ", has_fat	)
+	# 3. UNDERGROUND: Get all UUBs in area, same equipment check as poles
+	#    uub mirrors pole structure:
+	#    uub.get_equipment() → filter sheath_splice → check type
+	all_uubs << .gc[:uub].select(
+		predicate.interacts(:location, p_area))
+	
+	write("  Found ", all_uubs.size, " UUBs in area")
 
-	# Check for mit_terminal_enclosure directly in area (world geometry)
+	_for uub _over all_uubs.fast_elements()
+	_loop
+		# Get all equipment on this UUB (same API as pole)
+		uub_equipment << uub.get_equipment()
+		_if uub_equipment _is _unset _then _continue _endif
+
+		# Get sheath_splice from equipment (same navigation as pole)
+		uub_splices << uub_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :sheath_splice)))
+
+		_if _not uub_splices.empty?
+		_then
+			_for splice _over uub_splices.fast_elements()
+			_loop
+				splice_type << splice.sheath_splice_object_type
+				_if splice_type _is _unset _then _continue _endif
+
+				_if splice_type.lowercase = "join closure" _or
+				    splice_type.lowercase = "closure"
+				_then
+					has_joint_closure << _true
+					_if _not all_closures.includes?(splice)
+					_then
+						all_closures.add_last(splice)
+					_endif
+				_endif
+
+				_if splice_type.uppercase = "FDT"
+				_then
+					has_fdt << _true
+					_if _not all_fdts.includes?(splice)
+					_then
+						all_fdts.add_last(splice)
+					_endif
+				_endif
+
+				_if splice_type.uppercase = "FAT"
+				_then
+					has_fat << _true
+				_endif
+			_endloop
+		_endif
+	_endloop
+
+	# 4. mit_terminal_enclosure: additional FDT source (both AE and UG)
 	terminal_enclosures << .gc[:mit_terminal_enclosure].select(
 		predicate.within(:location, p_area))
 
@@ -302,51 +364,27 @@ _private _method rwi_export_to_aerial_kmz.detect_network_levels_in_area(p_area)
 	levels[:fdts] << all_fdts
 	levels[:closures] << all_closures
 
-	# 3. CLUSTER: Poles have FDT AND FAT (check first - highest priority)
+	# CLUSTER: FDT AND FAT found (on poles or UUBs) - highest priority
 	_if has_fdt _and has_fat
 	_then
 		levels[:cluster] << _true
-		write("  Detected CLUSTER network (", all_fdts.size, " FDTs and FATs on poles)")
+		write("  Detected CLUSTER network (", all_fdts.size, " FDTs and FATs on poles/UUBs)")
 	_endif
 
-	# 2. SUBFEEDER: Poles have Joint Closure (with or without FDT)
+	# SUBFEEDER: Joint Closure found (on poles or UUBs), no CLUSTER detected
 	# Special case: Some subfeeder designs only have Closures, no FDTs
-	# Note: If CLUSTER is already detected, don't set SUBFEEDER (cluster takes precedence)
 	_if _not has_olt _andif has_joint_closure _andif levels[:cluster] _is _false
 	_then
 		levels[:subfeeder] << _true
 		_if has_fdt
 		_then
-			write("  Detected SUBFEEDER network (has Joint Closures and FDTs on poles)")
+			write("  Detected SUBFEEDER network (has Joint Closures and FDTs on poles/UUBs)")
 		_else
 			write("  Detected SUBFEEDER network (has Joint Closures only, no FDTs)")
 		_endif
 	_endif
 
-	# UG TOPOLOGY FALLBACK:
-	# For underground designs there are no poles or OLTs in the design area,
-	# so the aerial-based detection above will always return all-false.
-	# When topology is UG and nothing was detected, derive the level from
-	# infrastructure_type (already set from the work order dialog).
-	_local topo_str << .topology.default("").uppercase
-	_if (topo_str = "UG" _orif topo_str = "AE&UG") _andif
-	    _not (levels[:feeder] _orif levels[:subfeeder] _orif levels[:cluster])
-	_then
-		write("  UG topology: aerial detection found nothing - using infrastructure_type: ", .infrastructure_type)
-		_if .infrastructure_type _is :feeder
-		_then
-			levels[:feeder] << _true
-			write("  Set FEEDER level from infrastructure_type")
-		_elif .infrastructure_type _is :subfeeder
-		_then
-			levels[:subfeeder] << _true
-			write("  Set SUBFEEDER level from infrastructure_type")
-		_else
-			# :cluster or _unset both default to cluster
-			levels[:cluster] << _true
-			write("  Set CLUSTER level from infrastructure_type")
-		_endif
-	_endif
+	write("Topology: ", .topology, " | Has Joint Closure: ", has_joint_closure, " | Has FDT: ", has_fdt, " | Has FAT: ", has_fat	)
 
 	>> levels
 _endmethod
@@ -367,6 +405,12 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 	.total_cable_length << 0.0
 	.total_hp_count << 0
 	.total_cell_count << 0
+	.total_uub_existing_count << 0
+	.total_uub_new_count << 0
+	.total_ug_cable_count << 0
+	.total_boring_manual_count << 0
+	.total_t_wey_count << 0
+	.total_tali_pancing_count << 0
 
 	# Replace .kmz with .kml for temp file
 	kml_file << p_output_file.substitute_string(".kmz", ".kml")
@@ -501,6 +545,22 @@ _private _method rwi_export_to_aerial_kmz.print_export_statistics()
 	write("CABLE EXPORT SUMMARY:")
 	write("-"*60)
 	write("  TOTAL CABLE LENGTH: ", .total_cable_length.rounded, " meters")
+	write("-"*60)
+	write("UNDERGROUND OBJECTS EXPORT SUMMARY:")
+	write("-"*60)
+	_local total_uub << .total_uub_existing_count + .total_uub_new_count
+	_if total_uub > 0
+	_then
+		write("  EXISTING HH: ", .total_uub_existing_count)
+		write("  NEW HH: ", .total_uub_new_count)
+	_else
+		write("  EXISTING HH: 0")
+		write("  NEW HH: 0")
+	_endif
+	write("  UG CABLE: ", .total_ug_cable_count)
+	write("  BORING MANUAL: ", .total_boring_manual_count)
+	write("  T-WEY: ", .total_t_wey_count)
+	write("  TALI PANCING: ", .total_tali_pancing_count)
 	write("="*60)
 _endmethod
 $
@@ -609,9 +669,40 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 
 	_if is_ug
 	_then
-		# UG cluster: build UG folders and write all (no empty LINE folder filtering)
+		# UG cluster: build UG folders, filter empty LINE folders, then write
 		_local ug_folder_defs << .folder_builder.build_cluster_ug_folders(p_fdts)
+
+		# FIRST PASS: Count UG objects in each LINE folder and filter empty ones
+		write("  Counting UG objects in LINE folders to filter empty ones...")
+		filtered_ug_defs << rope.new()
+
 		_for folder_def _over ug_folder_defs.fast_elements()
+		_loop
+			_local ug_folder_name << folder_def[:name]
+
+			# Only filter LINE folders (they have line_id); always keep others
+			_if folder_def[:line_id] _isnt _unset
+			_then
+				object_count << _self.count_ug_line_folder_objects(folder_def, p_area)
+
+				_if object_count > 0
+				_then
+					filtered_ug_defs.add(folder_def)
+					write("    LINE ", folder_def[:line_id], " (", ug_folder_name, "): ", object_count, " UG objects - KEPT")
+				_else
+					write("    LINE ", folder_def[:line_id], " (", ug_folder_name, "): 0 UG objects - REMOVED")
+				_endif
+			_else
+				# Non-LINE folder (BOUNDARY CLUSTER, FDT container) - always keep
+				filtered_ug_defs.add(folder_def)
+				write("    Non-LINE folder kept: ", ug_folder_name)
+			_endif
+		_endloop
+
+		write("  Filtered ", ug_folder_defs.size - filtered_ug_defs.size, " empty UG LINE folders")
+
+		# SECOND PASS: Write non-empty folders
+		_for folder_def _over filtered_ug_defs.fast_elements()
 		_loop
 			_self.write_cluster_ug_folder(p_stream, folder_def, p_area, 4)
 		_endloop
@@ -1691,10 +1782,10 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
-	## Write cable/sheath_with_loc chains to folder
-	## Queries aerial_route in area, collects cables from each route
-	## Merges sectors for cables with same name
+_private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder, p_route_collection)
+	## Write cable chains to folder
+	## Queries route objects in area (aerial_route by default, underground_route for UG)
+	## Merges sectors for cables with same name, accumulates cable length
 	##
 	## Parameters:
 	##   p_stream - Output stream
@@ -1702,9 +1793,14 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 	##   p_indent - Indentation string
 	##   p_line_id - LINE ID (A/B/C/D) for filtering, _unset if not in LINE folder (first optional)
 	##   p_fdt_folder - FDT folder name (e.g., "FDT_FDT001") for filtering (second optional)
+	##   p_route_collection - Collection name to query (:aerial_route or :underground_route, third optional)
+	##
+	## Returns:
+	##   Integer - number of cable chains written
 
-	# Step 1: Query aerial_route objects in area
-	all_aerial_routes << .gc[:aerial_route].select(
+	# Step 1: Query route objects in area (aerial or underground)
+	_local route_coll << p_route_collection.default(:aerial_route)
+	all_aerial_routes << .gc[route_coll].select(
 		predicate.interacts(:route, p_area))
 
 	# Step 2: Collect unique cables from all aerial routes using equality_set
@@ -1826,6 +1922,8 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 	_then
 		write("  Wrote ", cable_count, " CABLE chains (total length: ", cable_length_sum, " meters)")
 	_endif
+
+	>> cable_count
 _endmethod
 $
 
@@ -2263,6 +2361,95 @@ _private _method rwi_export_to_aerial_kmz.count_line_folder_objects(p_folder_def
 	write("        DEBUG: Found ", pole_count, " poles for LINE ", current_line_id)
 
 	>> pole_count
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.count_ug_line_folder_objects(p_folder_def, p_area, _optional p_parent_line_id, p_parent_fdt_folder)
+	## Count total UG objects for a LINE folder to detect empty folders.
+	## Mirrors count_line_folder_objects() but uses UUBs and underground_routes
+	## instead of poles (UG designs have no poles).
+	##
+	## Parameters:
+	##   p_folder_def       - Folder definition property_list
+	##   p_area             - Design boundary area
+	##   p_parent_line_id   - LINE ID from parent folder (first optional)
+	##   p_parent_fdt_folder - FDT folder name from parent (second optional)
+
+	# Determine LINE ID and FDT folder for this folder level
+	current_line_id << p_folder_def[:line_id].default(p_parent_line_id)
+	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
+
+	write("      Counting UG objects for LINE ", current_line_id, " FDT ", current_fdt_folder)
+
+	_if current_line_id _is _unset
+	_then
+		>> 0
+	_endif
+
+	# Resolve LINE type and FDT name strings
+	expected_line_type << "LINE " + current_line_id
+	expected_fdt_name << _unset
+	_if current_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << current_fdt_folder
+		_if current_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			expected_fdt_name << current_fdt_folder.slice(5, current_fdt_folder.size)
+		_endif
+	_endif
+
+	total_count << 0
+
+	# 1. Count UUBs matching this LINE + FDT (proxy for handhole content)
+	all_uubs << .gc[:uub].select(predicate.interacts(:location, p_area))
+	_for uub _over all_uubs.fast_elements()
+	_loop
+		uub_line_type << uub.perform(:line_type).default("")
+		_if uub_line_type.uppercase <> expected_line_type.uppercase
+		_then
+			_continue
+		_endif
+
+		_if expected_fdt_name _isnt _unset
+		_then
+			uub_ring_name << uub.perform(:ring_name).default("")
+			_if uub_ring_name <> "" _andif
+			    uub_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		total_count +<< 1
+	_endloop
+
+	# 2. Count underground_routes matching this LINE + FDT (proxy for cable content)
+	all_routes << .gc[:underground_route].select(predicate.interacts(:route, p_area))
+	_for route _over all_routes.fast_elements()
+	_loop
+		route_line_type << route.perform(:line_type).default("")
+		_if route_line_type.uppercase <> expected_line_type.uppercase
+		_then
+			_continue
+		_endif
+
+		_if expected_fdt_name _isnt _unset
+		_then
+			route_ring_name << route.perform(:ring_name).default("")
+			_if route_ring_name <> "" _andif
+			    route_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		total_count +<< 1
+	_endloop
+
+	write("        Found ", total_count, " UG objects (UUBs + routes) for LINE ", current_line_id)
+
+	>> total_count
 _endmethod
 $
 

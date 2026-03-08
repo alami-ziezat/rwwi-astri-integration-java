@@ -108,17 +108,21 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folder_name, p_area, p_indent)
-	## Write UUB (handhole/manhole) placemarks to folder
-	## Filters by spec dimension and construction status:
+_private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folder_name, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write UUB (handhole/manhole) placemarks to folder.
+	## Mirrors pole filtering logic: spec, construction status, LINE type, and FDT ring.
 	##   "EXISTING HH <spec>" -> construction_status = "In Service"
 	##   "NEW HH <spec>"      -> construction_status != "In Service"
+	## LINE filtering: uub.line_type must match "LINE <p_line_id>" (if p_line_id given)
+	## FDT filtering:  uub.ring_name must match FDT name from p_fdt_folder (if given)
 	##
 	## Parameters:
-	##   p_stream - Output stream
+	##   p_stream      - Output stream
 	##   p_folder_name - Folder name (e.g., "EXISTING HH 80x80x130")
-	##   p_area - Design boundary area
-	##   p_indent - Indentation string
+	##   p_area        - Design boundary area
+	##   p_indent      - Indentation string
+	##   p_line_id     - LINE ID letter (e.g., "A") for filtering (first optional)
+	##   p_fdt_folder  - FDT folder name for filtering (e.g., "FDT001") (second optional)
 
 	# Determine folder intent: existing vs new
 	is_existing? << p_folder_name.uppercase.index_of_seq("EXISTING") _isnt _unset
@@ -134,11 +138,31 @@ _private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folde
 		_endif
 	_endloop
 
+	# Resolve expected LINE type string (e.g., "LINE A")
+	expected_line_type << _unset
+	_if p_line_id _isnt _unset
+	_then
+		expected_line_type << "LINE " + p_line_id
+	_endif
+
+	# Resolve expected FDT name (strip "FDT_" prefix if present)
+	expected_fdt_name << _unset
+	_if p_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << p_fdt_folder
+		_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			# Old format: "FDT_FDT001" -> "FDT001"
+			expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+		_endif
+	_endif
+
 	# Query all UUB objects in area
 	all_uubs << .gc[:uub].select(
 		predicate.interacts(:location, p_area))
 
-	uub_count << 0
+	# Collect matching UUBs for sorting
+	matching_uubs << rope.new()
 	_for uub _over all_uubs.fast_elements()
 	_loop
 		# Filter by spec dimension (spec_id field contains the dimension string)
@@ -161,8 +185,74 @@ _private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folde
 			_continue  # Status does not match folder intent
 		_endif
 
+		# Filter by LINE type (mirrors pole line_type check)
+		_if expected_line_type _isnt _unset
+		_then
+			uub_line_type << uub.perform(:line_type).default("")
+			_if uub_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue  # LINE does not match
+			_endif
+		_endif
+
+		# Filter by FDT ring name (mirrors pole ring_name check)
+		_if expected_fdt_name _isnt _unset
+		_then
+			uub_ring_name << uub.perform(:ring_name).default("")
+			_if uub_ring_name <> "" _andif
+			    uub_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue  # FDT does not match
+			_endif
+		_endif
+
+		# Skip UUBs that contain FDT equipment (FDT handholes are not handhole placemarks)
+		has_fdt_equipment? << _false
+		_try
+			uub_equip << uub.get_equipment()
+			_if uub_equip _isnt _unset _andif _not uub_equip.empty?
+			_then
+				uub_splices << uub_equip.select(
+					predicate.navigate({:source_collection},
+						predicate.eq(:name, :sheath_splice)))
+				_for eq_splice _over uub_splices.fast_elements()
+				_loop
+					eq_type << eq_splice.sheath_splice_object_type
+					_if eq_type _isnt _unset _andif eq_type.uppercase = "FDT"
+					_then
+						has_fdt_equipment? << _true
+						_leave
+					_endif
+				_endloop
+			_endif
+		_when error
+			# Ignore equipment navigation errors
+		_endtry
+
+		_if has_fdt_equipment? _then _continue _endif
+
+		matching_uubs.add(uub)
+	_endloop
+
+	# Sort by label ascending (mirrors pole tag sort)
+	sorted_uubs << matching_uubs.as_sorted_collection(
+		_proc(u1, u2)
+			label1 << u1.perform(:label).default("").lowercase
+			label2 << u2.perform(:label).default("").lowercase
+			>> label1 < label2
+		_endproc)
+
+	uub_count << 0
+	_for uub _over sorted_uubs.fast_elements()
+	_loop
 		.object_writer.write_uub(uub, p_stream, p_indent)
 		uub_count +<< 1
+		_if is_existing?
+		_then
+			.total_uub_existing_count +<< 1
+		_else
+			.total_uub_new_count +<< 1
+		_endif
 	_endloop
 
 	_if uub_count > 0
@@ -173,25 +263,66 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_boring_manual_for_folder(p_stream, p_area, p_indent)
-	## Write boring_manual route chains to folder
-	## Uses same approach as write_sling_wire_for_folder()
+_private _method rwi_export_to_aerial_kmz.write_boring_manual_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write boring_manual route chains to folder.
+	## Filters by LINE type and FDT ring name (mirrors pole filtering logic).
 	##
 	## Parameters:
-	##   p_stream - Output stream
-	##   p_area - Design boundary area
-	##   p_indent - Indentation string
+	##   p_stream     - Output stream
+	##   p_area       - Design boundary area
+	##   p_indent     - Indentation string
+	##   p_line_id    - LINE ID letter (e.g., "A") for filtering (first optional)
+	##   p_fdt_folder - FDT folder name for filtering (second optional)
+
+	# Resolve expected LINE type and FDT name
+	expected_line_type << _unset
+	_if p_line_id _isnt _unset
+	_then
+		expected_line_type << "LINE " + p_line_id
+	_endif
+
+	expected_fdt_name << _unset
+	_if p_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << p_fdt_folder
+		_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+		_endif
+	_endif
 
 	# Query boring_manual chains in area (uses :route geometry like sling_wire)
 	all_boring_manuals << .gc[:boring_manual].select(
 		predicate.interacts(:route, p_area))
 
-	# Collect valid entries (must have route geometry)
+	# Collect valid entries (must have route geometry, LINE and FDT match)
 	matching << rope.new()
 	_for bm _over all_boring_manuals.fast_elements()
 	_loop
 		route_geom << bm.route
 		_if route_geom _is _unset _then _continue _endif
+
+		# Filter by LINE type
+		_if expected_line_type _isnt _unset
+		_then
+			bm_line_type << bm.perform(:line_type).default("")
+			_if bm_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Filter by FDT ring name
+		_if expected_fdt_name _isnt _unset
+		_then
+			bm_ring_name << bm.perform(:ring_name).default("")
+			_if bm_ring_name <> "" _andif
+			    bm_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
 		matching.add(bm)
 	_endloop
 
@@ -209,6 +340,7 @@ _private _method rwi_export_to_aerial_kmz.write_boring_manual_for_folder(p_strea
 		route_geom << bm.route
 		.object_writer.write_boring_manual(bm, route_geom, p_stream, p_indent)
 		bm_count +<< 1
+		.total_boring_manual_count +<< 1
 	_endloop
 
 	_if bm_count > 0
@@ -219,96 +351,57 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_ug_cable_for_folder(p_stream, p_area, p_indent)
-	## Write underground cable chains to folder
-	## Mirrors write_cable_for_folder() but queries underground_route
+_private _method rwi_export_to_aerial_kmz.write_ug_cable_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write underground cable chains to folder.
+	## Delegates to write_cable_for_folder() with :underground_route collection.
+	## Same logic as aerial: dedup, LINE/FDT filtering, sector merge, cable length.
 	##
 	## Parameters:
-	##   p_stream - Output stream
-	##   p_area - Design boundary area
-	##   p_indent - Indentation string
+	##   p_stream   - Output stream
+	##   p_area     - Design boundary area
+	##   p_indent   - Indentation string
+	##   p_line_id  - LINE ID (A/B/C/D) for filtering (first optional)
+	##   p_fdt_folder - FDT folder name for filtering (second optional)
 
-	# Step 1: Query underground_route objects in area
-	all_ug_routes << .gc[:underground_route].select(
-		predicate.interacts(:route, p_area))
-
-	# Step 2: Collect unique cables from all underground routes
-	# Use rope + property_list for deduplication (equality_set may not be loaded)
-	unique_cables << rope.new()
-	seen_cable_ids << property_list.new()
-	_for ug_route _over all_ug_routes.fast_elements()
-	_loop
-		route_cables << ug_route.cables()
-		_if route_cables _is _unset _then _continue _endif
-		_for cable _over route_cables.fast_elements()
-		_loop
-			c_id << cable.perform(:id)
-			_if c_id _is _unset _orif seen_cable_ids[c_id] _isnt _unset _then _continue _endif
-			seen_cable_ids[c_id] << _true
-			unique_cables.add_last(cable)
-		_endloop
-	_endloop
-
-	# Step 3: Group cables by name and collect their sectors
-	cables_by_name << property_list.new()
-	_for cable _over unique_cables.fast_elements()
-	_loop
-		cable_name << cable.perform(:name).default("Unknown").as_symbol()
-		cable_sectors << cable.route_sectors()
-		_if cable_sectors _is _unset _orif cable_sectors.empty? _then _continue _endif
-
-		_if cables_by_name[cable_name] _is _unset
-		_then
-			cables_by_name[cable_name] << property_list.new_with(
-				:cable, cable,
-				:sector_list, rope.new())
-		_endif
-		cables_by_name[cable_name][:sector_list].add_last(cable_sectors)
-	_endloop
-
-	# Step 4: Sort cable names and write each cable
-	cable_count << cables_by_name.size
-	cable_names_rope << rope.new()
-	_for cable_name _over cables_by_name.fast_keys()
-	_loop
-		cable_names_rope.add(cable_name)
-	_endloop
-
-	sorted_cable_names << cable_names_rope.as_sorted_collection(
-		_proc(name1, name2)
-			>> name1.write_string.lowercase < name2.write_string.lowercase
-		_endproc)
-
-	_for cable_name _over sorted_cable_names.fast_elements()
-	_loop
-		cable_data << cables_by_name[cable_name]
-		write("  Processing UG CABLE: ", cable_name)
-		cable << cable_data[:cable]
-		sector_list << cable_data[:sector_list]
-
-		# Merge sectors that connect end-to-end
-		merged_sectors << _self.merge_cable_sectors(sector_list)
-
-		.object_writer.write_cable(cable, merged_sectors, p_stream, p_indent)
-	_endloop
+	_local cable_count << _self.write_cable_for_folder(
+		p_stream, p_area, p_indent, p_line_id, p_fdt_folder, :underground_route)
 
 	_if cable_count > 0
 	_then
-		write("  Wrote ", cable_count, " UG cable(s)")
+		.total_ug_cable_count +<< cable_count
 	_endif
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_ug_closure_for_folder(p_stream, p_area, p_indent)
+_private _method rwi_export_to_aerial_kmz.write_ug_closure_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
 	## Write JOINT CLOSURE placemarks for UG topology.
-	## Directly queries sheath_splice collection by location - bypasses poles
-	## (aerial method goes through poles which don't exist in UG designs).
+	## Directly queries sheath_splice collection by location - bypasses poles.
+	## Filters by LINE type and FDT ring name (mirrors pole filtering logic).
 	##
 	## Parameters:
-	##   p_stream - Output stream
-	##   p_area - Design boundary area
-	##   p_indent - Indentation string
+	##   p_stream     - Output stream
+	##   p_area       - Design boundary area
+	##   p_indent     - Indentation string
+	##   p_line_id    - LINE ID letter (e.g., "A") for filtering (first optional)
+	##   p_fdt_folder - FDT folder name for filtering (second optional)
+
+	# Resolve expected LINE type and FDT name
+	expected_line_type << _unset
+	_if p_line_id _isnt _unset
+	_then
+		expected_line_type << "LINE " + p_line_id
+	_endif
+
+	expected_fdt_name << _unset
+	_if p_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << p_fdt_folder
+		_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+		_endif
+	_endif
 
 	# Query sheath_splice directly in area (UG closures have their own location)
 	all_splices << .gc[:sheath_splice].select(
@@ -331,6 +424,27 @@ _private _method rwi_export_to_aerial_kmz.write_ug_closure_for_folder(p_stream, 
 		splice_geom << splice.location
 		_if splice_geom _is _unset _then _continue _endif
 
+		# Filter by LINE type
+		_if expected_line_type _isnt _unset
+		_then
+			splice_line_type << splice.perform(:line_type).default("")
+			_if splice_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Filter by FDT ring name
+		_if expected_fdt_name _isnt _unset
+		_then
+			splice_ring_name << splice.perform(:ring_name).default("")
+			_if splice_ring_name <> "" _andif
+			    splice_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
 		.object_writer.write_sheath_splice(splice, splice_geom, p_stream, p_indent)
 		closure_count +<< 1
 		.total_closure_count +<< 1
@@ -344,15 +458,303 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={rwi_export})
-_private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent)
-	## Write SLACK HANGER (figure_eight) placemarks for UG topology.
-	## Directly queries figure_eight collection by location - bypasses poles
-	## (aerial method goes through poles which don't exist in UG designs).
+_private _method rwi_export_to_aerial_kmz.write_ug_sheath_splices_for_folder(p_stream, p_area, p_indent, p_equipment_type, _optional p_line_id, p_fdt_folder)
+	## Write sheath splice equipment (FAT/FDT/CLOSURE) for UG topology.
+	## Mirrors write_sheath_splices_for_folder() but navigates through UUBs
+	## instead of poles (UG designs have no poles).
 	##
 	## Parameters:
-	##   p_stream - Output stream
-	##   p_area - Design boundary area
-	##   p_indent - Indentation string
+	##   p_stream        - Output stream
+	##   p_area          - Design boundary area
+	##   p_indent        - Indentation string
+	##   p_equipment_type - "FAT", "FDT", or "CLOSURE"
+	##   p_line_id       - LINE ID (A/B/C/D) for filtering (first optional)
+	##   p_fdt_folder    - FDT folder name for filtering (second optional)
+
+	# Resolve expected LINE type and FDT name
+	expected_line_type << _unset
+	_if p_line_id _isnt _unset
+	_then
+		expected_line_type << "LINE " + p_line_id
+	_endif
+
+	expected_fdt_name << _unset
+	_if p_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << p_fdt_folder
+		_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+		_endif
+	_endif
+
+	# Query UUBs in area (replaces poles)
+	all_uubs << .gc[:uub].select(
+		predicate.interacts(:location, p_area))
+
+	uubs_checked << 0
+	splices_found << 0
+	matching_splices << rope.new()
+
+	_for uub _over all_uubs.fast_elements()
+	_loop
+		uubs_checked +<< 1
+		uub_geom << uub.location
+		_if uub_geom _is _unset _then _continue _endif
+
+		# Get all equipment on this UUB (same API as pole)
+		uub_equipment << uub.get_equipment()
+		_if uub_equipment _is _unset _orif uub_equipment.empty? _then _continue _endif
+
+		# Get sheath_splice from equipment
+		uub_splices << uub_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :sheath_splice)))
+
+		_if uub_splices.empty? _then _continue _endif
+
+		splices_found +<< uub_splices.size
+
+		_for splice _over uub_splices.fast_elements()
+		_loop
+			splice_type << splice.sheath_splice_object_type
+			_if splice_type _is _unset _then _continue _endif
+
+			# Filter by equipment type
+			matches_type? << _false
+			_if p_equipment_type = "FAT" _andif
+			    splice_type.index_of_seq("FAT") _isnt _unset
+			_then
+				matches_type? << _true
+			_elif p_equipment_type = "FDT" _andif
+			      splice_type.index_of_seq("FDT") _isnt _unset
+			_then
+				matches_type? << _true
+			_elif p_equipment_type = "CLOSURE" _andif
+			      (splice_type.index_of_seq("Closure") _isnt _unset _orif
+			       splice_type.index_of_seq("Joint") _isnt _unset)
+			_then
+				matches_type? << _true
+			_endif
+
+			_if _not matches_type? _then _continue _endif
+
+			# Filter by LINE type (check UUB's line_type, mirrors pole check)
+			_if expected_line_type _isnt _unset
+			_then
+				uub_line_type << uub.perform(:line_type).default("")
+				_if uub_line_type.uppercase <> expected_line_type.uppercase
+				_then
+					_continue
+				_endif
+			_endif
+
+			# Filter by FDT ring name (check splice's ring_name)
+			_if expected_fdt_name _isnt _unset
+			_then
+				splice_ring_name << splice.perform(:ring_name).default("")
+				_if splice_ring_name <> "" _andif
+				    splice_ring_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue
+				_endif
+			_endif
+
+			matching_splices.add(property_list.new_with(
+				:splice, splice,
+				:uub_geom, uub_geom,
+				:equipment_type, p_equipment_type))
+		_endloop
+	_endloop
+
+	# Sort splices by name ascending
+	sorted_splices << matching_splices.as_sorted_collection(
+		_proc(s1, s2)
+			name1 << s1[:splice].perform(:name).default("").lowercase
+			name2 << s2[:splice].perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted splices
+	equipment_count << 0
+	_for splice_data _over sorted_splices.fast_elements()
+	_loop
+		splice << splice_data[:splice]
+		uub_geom << splice_data[:uub_geom]
+		eq_type << splice_data[:equipment_type]
+
+		.object_writer.write_sheath_splice(splice, uub_geom, p_stream, p_indent)
+		equipment_count +<< 1
+
+		_if eq_type = "FAT"
+		_then
+			.total_fat_count +<< 1
+		_elif eq_type = "FDT"
+		_then
+			.total_fdt_count +<< 1
+		_elif eq_type = "CLOSURE"
+		_then
+			.total_closure_count +<< 1
+		_endif
+	_endloop
+
+	write("  ", p_equipment_type, " summary: Checked ", uubs_checked, " UUBs, found ", splices_found, " total splices, wrote ", equipment_count, " matching ", p_equipment_type)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_ug_fdt_equipment(p_stream, p_area, p_indent, _optional p_fdt_folder)
+	## Write FDT equipment for UG topology.
+	## Mirrors write_fdt_equipment() but navigates through UUBs instead of poles.
+	## Also includes standalone FDTs (mit_terminal_enclosure) same as aerial.
+	##
+	## Parameters:
+	##   p_stream     - Output stream
+	##   p_area       - Design boundary area
+	##   p_indent     - Indentation string
+	##   p_fdt_folder - FDT folder name for filtering (optional)
+
+	fdt_count << 0
+	fdt_list << rope.new()
+
+	# 1. Collect FDTs on UUBs (sheath_splice with type FDT)
+	all_uubs << .gc[:uub].select(
+		predicate.interacts(:location, p_area))
+
+	_for uub _over all_uubs.fast_elements()
+	_loop
+		uub_geom << uub.location
+		_if uub_geom _is _unset _then _continue _endif
+
+		uub_equipment << uub.get_equipment()
+		_if uub_equipment _is _unset _orif uub_equipment.empty? _then _continue _endif
+
+		uub_splices << uub_equipment.select(
+			predicate.navigate({:source_collection},
+				predicate.eq(:name, :sheath_splice)))
+
+		_for splice _over uub_splices.fast_elements()
+		_loop
+			splice_type << splice.sheath_splice_object_type
+			_if splice_type _is _unset _then _continue _endif
+
+			_if splice_type.uppercase = "FDT"
+			_then
+				# Filter by FDT folder if specified
+				_if p_fdt_folder _isnt _unset
+				_then
+					fdt_name << splice.perform(:name).default("")
+					_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+					_then
+						expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+						_if fdt_name.uppercase <> expected_fdt_name.uppercase
+						_then
+							_continue
+						_endif
+					_endif
+				_endif
+
+				fdt_list.add(property_list.new_with(
+					:type, :splice,
+					:object, splice,
+					:geometry, uub_geom,
+					:name, splice.perform(:name).default("")))
+			_endif
+		_endloop
+	_endloop
+
+	# 2. Standalone FDTs (mit_terminal_enclosure) - same as aerial
+	terminal_enclosures << .gc[:mit_terminal_enclosure].select(
+		predicate.within(:location, p_area))
+
+	_for terminal _over terminal_enclosures.fast_elements()
+	_loop
+		terminal_geom << terminal.location
+		_if terminal_geom _is _unset _then _continue _endif
+
+		_if p_fdt_folder _isnt _unset
+		_then
+			terminal_name << terminal.perform(:name).default("")
+			_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+			_then
+				expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+				_if terminal_name.uppercase <> expected_fdt_name.uppercase
+				_then
+					_continue
+				_endif
+			_endif
+		_endif
+
+		fdt_list.add(property_list.new_with(
+			:type, :terminal,
+			:object, terminal,
+			:geometry, terminal_geom,
+			:name, terminal.perform(:name).default("")))
+	_endloop
+
+	# Sort FDTs by name ascending
+	sorted_fdts << fdt_list.as_sorted_collection(
+		_proc(fdt1, fdt2)
+			name1 << fdt1[:name].default("").lowercase
+			name2 << fdt2[:name].default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	# Write sorted FDTs
+	_for fdt_data _over sorted_fdts.fast_elements()
+	_loop
+		fdt_type << fdt_data[:type]
+		fdt_object << fdt_data[:object]
+		fdt_geom << fdt_data[:geometry]
+
+		_if fdt_type = :splice
+		_then
+			.object_writer.write_sheath_splice(fdt_object, fdt_geom, p_stream, p_indent)
+		_elif fdt_type = :terminal
+		_then
+			.object_writer.write_terminal_enclosure(fdt_object, fdt_geom, p_stream, p_indent)
+		_endif
+
+		fdt_count +<< 1
+		.total_fdt_count +<< 1
+	_endloop
+
+	_if fdt_count > 0
+	_then
+		write("  Wrote ", fdt_count, " FDT equipment (UG)")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write SLACK HANGER (figure_eight) placemarks for UG topology.
+	## Directly queries figure_eight collection by location - bypasses poles.
+	## Filters by LINE type and FDT ring name (mirrors pole filtering logic).
+	##
+	## Parameters:
+	##   p_stream     - Output stream
+	##   p_area       - Design boundary area
+	##   p_indent     - Indentation string
+	##   p_line_id    - LINE ID letter (e.g., "A") for filtering (first optional)
+	##   p_fdt_folder - FDT folder name for filtering (second optional)
+
+	# Resolve expected LINE type and FDT name
+	expected_line_type << _unset
+	_if p_line_id _isnt _unset
+	_then
+		expected_line_type << "LINE " + p_line_id
+	_endif
+
+	expected_fdt_name << _unset
+	_if p_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << p_fdt_folder
+		_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+		_endif
+	_endif
 
 	# Query figure_eight directly in area
 	all_fig8s << .gc[:figure_eight].select(
@@ -365,6 +767,27 @@ _private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_str
 		fig8_geom << fig8.location
 		_if fig8_geom _is _unset _then _continue _endif
 
+		# Filter by LINE type
+		_if expected_line_type _isnt _unset
+		_then
+			fig8_line_type << fig8.perform(:line_type).default("")
+			_if fig8_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Filter by FDT ring name
+		_if expected_fdt_name _isnt _unset
+		_then
+			fig8_ring_name << fig8.perform(:ring_name).default("")
+			_if fig8_ring_name <> "" _andif
+			    fig8_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
 		.object_writer.write_figure_eight(fig8, fig8_geom, p_stream, p_indent)
 		fig8_count +<< 1
 		.total_slack_hanger_count +<< 1
@@ -373,6 +796,98 @@ _private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_str
 	_if fig8_count > 0
 	_then
 		write("  Wrote ", fig8_count, " SLACK HANGER (figure_eight) object(s)")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder(p_stream, p_folder_def, p_area, p_indent)
+	## Write a single folder for underground subfeeder.
+	## Mirrors write_subfeeder_folder() but routes to UG content writer.
+	##
+	## Parameters:
+	##   p_stream     - Output stream
+	##   p_folder_def - Folder definition property_list
+	##   p_area       - Design boundary area
+	##   p_indent     - Indentation level
+
+	indent << "".fill_up_with(% , p_indent)
+	folder_name << p_folder_def[:name]
+
+	p_stream.write(indent, "<Folder>", newline_char)
+	p_stream.write(indent, "  <name>", folder_name, "</name>", newline_char)
+
+	_if p_folder_def[:visibility] _isnt _unset
+	_then
+		vis_str << _if p_folder_def[:visibility] _then "1" _else "0" _endif
+		p_stream.write(indent, "  <visibility>", vis_str, "</visibility>", newline_char)
+	_endif
+
+	_self.write_subfeeder_ug_folder_contents(p_stream, folder_name, p_area, indent + "  ")
+
+	p_stream.write(indent, "</Folder>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_stream, p_folder_name, p_area, p_indent)
+	## Write placemarks for underground subfeeder folders.
+	## Mirrors write_subfeeder_folder_contents() with pole -> UUB substitution
+	## and all UG route objects (cable, boring manual, slack hanger).
+	##
+	## Handles:
+	##   JOINT CLOSURE  -> write_ug_closure_for_folder (sheath_splice direct, no poles)
+	##   CABLE          -> write_ug_cable_for_folder   (underground_route)
+	##   EXISTING HH    -> write_uub_for_folder        (replaces EXISTING POLE)
+	##   NEW HH         -> write_uub_for_folder        (replaces NEW POLE)
+	##   SLACK HANGER   -> write_ug_figure_eight_for_folder (figure_eight direct, no poles)
+	##   BORING MANUAL  -> write_boring_manual_for_folder
+	##   FDT            -> write_sheath_splices_for_folder  (if present)
+	##
+	## Parameters:
+	##   p_stream      - Output stream
+	##   p_folder_name - Name of current folder
+	##   p_area        - Design boundary area
+	##   p_indent      - Indentation string
+
+	write("Processing UG subfeeder folder: ", p_folder_name)
+
+	# JOINT CLOSURE - sheath_splice direct (no poles in UG)
+	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset
+	_then
+		_self.write_ug_closure_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# CABLE (not BOUNDARY) - underground_route
+	_if p_folder_name.index_of_seq("CABLE") _isnt _unset _andif
+	    p_folder_name.index_of_seq("BOUNDARY") _is _unset
+	_then
+		_self.write_ug_cable_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# EXISTING HH / NEW HH - UUB (replaces EXISTING POLE / NEW POLE)
+	_if p_folder_name.uppercase.index_of_seq("EXISTING HH") _isnt _unset _orif
+	    p_folder_name.uppercase.index_of_seq("NEW HH") _isnt _unset
+	_then
+		_self.write_uub_for_folder(p_stream, p_folder_name, p_area, p_indent)
+	_endif
+
+	# SLACK HANGER - figure_eight direct (no poles in UG)
+	_if p_folder_name.index_of_seq("SLACK HANGER") _isnt _unset
+	_then
+		_self.write_ug_figure_eight_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# BORING MANUAL - boring_manual route chains
+	_if p_folder_name.uppercase.index_of_seq("BORING MANUAL") _isnt _unset
+	_then
+		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# FDT - sheath_splice equipment via UUBs (not poles)
+	_if p_folder_name.index_of_seq("FDT") _isnt _unset
+	_then
+		_self.write_ug_sheath_splices_for_folder(p_stream, p_area, p_indent, "FDT", _unset)
 	_endif
 _endmethod
 $

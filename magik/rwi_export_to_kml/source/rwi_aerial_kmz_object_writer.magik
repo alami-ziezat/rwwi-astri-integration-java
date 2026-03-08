@@ -72,7 +72,6 @@ _method rwi_aerial_kmz_object_writer.convert_coord_to_wgs84_string(p_coord)
 	# Format as string with precision
 	_dynamic !print_float_precision! << 16
 	l_str << write_string(t_coord.x, ",", t_coord.y, ",0")
-	write(p_coord, " converted to WGS84 string: ", l_str)
 	>> l_str
 _endmethod
 $
@@ -256,15 +255,6 @@ _method rwi_aerial_kmz_object_writer.write_terminal_enclosure(p_terminal, p_term
 	p_stream.write(p_indent, "  </Point>", newline_char)
 
 	p_stream.write(p_indent, "</Placemark>", newline_char)
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={rwi_export})
-_method rwi_aerial_kmz_object_writer.write_cable(p_cable, p_stream, p_indent)
-	## Write cable placemark
-	## TODO: Implement in Phase 3
-
-	# Placeholder
 _endmethod
 $
 

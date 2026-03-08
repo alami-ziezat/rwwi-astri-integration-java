@@ -171,7 +171,7 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_then
 			_return  # User cancelled
 		_endif
-
+		topology << .selected_wo[:topology].default("AE")   # "AE", "UG", "AE&UG"
 		# Create exporter
 		exporter << rwi_export_to_aerial_kmz.new()
 		exporter.gc << gis_program_manager.cached_dataset(:gis).collections
@@ -180,7 +180,8 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		exporter.scheme_name << design.perform(:name).default(wo_number)
 		exporter.infrastructure_type << infra_type.as_symbol()
 		exporter.infrastructure_code << infra_code  # Pass infrastructure code for folder naming
-		exporter.topology << .selected_wo[:topology].default("")  # "AE", "UG", "AE&UG"
+		exporter.topology << topology
+		write("topology: ", exporter.topology)
 
 		# Show progress
 		_self.log_info("Starting export...")
