@@ -242,3 +242,131 @@ _method rwi_aerial_kmz_object_writer.write_tali_pancing(p_tp, p_route_geom, p_st
 	p_stream.write(p_indent, "</Placemark>", newline_char)
 _endmethod
 $
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_sub_duct(p_conduit, p_route_geom, p_stream, p_indent)
+	## Write SUB DUCT (mit_conduit) route chain as KML LineString placemark
+	## Same approach as write_boring_manual() / write_tali_pancing()
+	##
+	## Parameters:
+	##   p_conduit    - mit_conduit object
+	##   p_route_geom - Route geometry (chain)
+	##   p_stream     - Output stream
+	##   p_indent     - Indentation string
+
+	_if p_route_geom _is _unset _then _return _endif
+	_if .cs_transform _is _unset _then _return _endif
+
+	# Convert route sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	route_sectors << p_route_geom.sectors
+	_for sector _over route_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			t_coord << .cs_transform.convert(coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Get attributes
+	sd_id   << p_conduit.perform(:id).default("Unknown")
+	sd_name << p_conduit.perform(:name).default("")
+	sd_spec << p_conduit.perform(:spec_id).default("SUB DUCT")
+
+	# Determine type label from spec
+	_local type_label << _if sd_spec.index_of_seq("40/34") _isnt _unset
+	                     _then >> "SUBDUCT 40/34"
+	                     _else >> "SUBDUCT 32/28"
+	                     _endif
+
+	_if sd_name <> ""
+	_then
+		chain_name << sd_name
+	_else
+		chain_name << write_string(type_label, " ", sd_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#sub_duct_map</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", sd_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>", type_label, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Spec'><value>", sd_spec, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# LineString geometry
+	p_stream.write(p_indent, "  <LineString>", newline_char)
+	p_stream.write(p_indent, "    <tessellate>1</tessellate>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </LineString>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_method rwi_aerial_kmz_object_writer.write_open_trenching(p_ot, p_route_geom, p_stream, p_indent)
+	## Write OPEN TRENCHING (open_trenching) route chain as KML LineString placemark
+	## Same approach as write_boring_manual() / write_tali_pancing()
+	##
+	## Parameters:
+	##   p_ot         - open_trenching object
+	##   p_route_geom - Route geometry (chain)
+	##   p_stream     - Output stream
+	##   p_indent     - Indentation string
+
+	_if p_route_geom _is _unset _then _return _endif
+	_if .cs_transform _is _unset _then _return _endif
+
+	# Convert route sectors to coordinate string
+	_dynamic !print_float_precision! << 16
+	coord_string << ""
+
+	route_sectors << p_route_geom.sectors
+	_for sector _over route_sectors.fast_elements()
+	_loop
+		_for coord _over sector.coords.fast_elements()
+		_loop
+			t_coord << .cs_transform.convert(coord)
+			coord_string +<< write_string(t_coord.x, ",", t_coord.y, ",0 ")
+		_endloop
+	_endloop
+
+	# Get attributes
+	ot_id   << p_ot.perform(:id).default("Unknown")
+	ot_name << p_ot.perform(:name).default("")
+
+	_if ot_name <> ""
+	_then
+		chain_name << ot_name
+	_else
+		chain_name << write_string("OPEN TRENCHING ", ot_id)
+	_endif
+
+	# Write KML Placemark
+	p_stream.write(p_indent, "<Placemark>", newline_char)
+	p_stream.write(p_indent, "  <name>", chain_name, "</name>", newline_char)
+	p_stream.write(p_indent, "  <styleUrl>#open_trenching_map</styleUrl>", newline_char)
+
+	# Extended data
+	p_stream.write(p_indent, "  <ExtendedData>", newline_char)
+	p_stream.write(p_indent, "    <Data name='ID'><value>", ot_id, "</value></Data>", newline_char)
+	p_stream.write(p_indent, "    <Data name='Type'><value>OPEN TRENCHING</value></Data>", newline_char)
+	p_stream.write(p_indent, "  </ExtendedData>", newline_char)
+
+	# LineString geometry
+	p_stream.write(p_indent, "  <LineString>", newline_char)
+	p_stream.write(p_indent, "    <tessellate>1</tessellate>", newline_char)
+	p_stream.write(p_indent, "    <coordinates>", coord_string, "</coordinates>", newline_char)
+	p_stream.write(p_indent, "  </LineString>", newline_char)
+
+	p_stream.write(p_indent, "</Placemark>", newline_char)
+_endmethod
+$

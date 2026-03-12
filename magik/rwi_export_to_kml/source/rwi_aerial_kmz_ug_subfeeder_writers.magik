@@ -40,7 +40,8 @@ _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_stream, p_folder_name, p_area, p_indent)
 	## Write placemarks for underground subfeeder folders
 	## Handles: JOINT CLOSURE, CABLE, EXISTING HH <spec>, NEW HH <spec>,
-	##          SLACK HANGER, BORING MANUAL
+	##          SLACK HANGER, BORING MANUAL, SUBDUCT 40/34, SUBDUCT 32/28,
+	##          OPEN TRENCHING
 	## (No OLT - subfeeder does not have OLT)
 	##
 	## Parameters:
@@ -81,6 +82,24 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_s
 	_if p_folder_name.uppercase.index_of_seq("BORING MANUAL") _isnt _unset
 	_then
 		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# Handle SUBDUCT 40/34 folder
+	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 40") _isnt _unset
+	_then
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "40")
+	_endif
+
+	# Handle SUBDUCT 32/28 folder
+	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 32") _isnt _unset
+	_then
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "32")
+	_endif
+
+	# Handle OPEN TRENCHING folder
+	_if p_folder_name.uppercase.index_of_seq("OPEN TRENCHING") _isnt _unset
+	_then
+		_self.write_open_trenching_for_folder(p_stream, p_area, p_indent)
 	_endif
 _endmethod
 $

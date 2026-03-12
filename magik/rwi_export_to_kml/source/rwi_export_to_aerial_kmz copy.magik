@@ -40,7 +40,9 @@ def_slotted_exemplar(:rwi_export_to_aerial_kmz,
 	{:total_ug_cable_count, _unset, :writable},      # Total UG cable chains exported
 	{:total_boring_manual_count, _unset, :writable}, # Total BORING MANUAL chains exported
 	{:total_t_wey_count, _unset, :writable},         # Total T-WEY objects exported
-	{:total_tali_pancing_count, _unset, :writable}   # Total TALI PANCING chains exported
+	{:total_tali_pancing_count, _unset, :writable},  # Total TALI PANCING chains exported
+	{:progress_dialog, _unset, :writable},           # sw_progress_dialog instance (UI only)
+	{:progress_owner,  _unset, :writable}            # Application owner handle for dialog
 }, :object)
 $
 
@@ -62,6 +64,29 @@ _private _method rwi_export_to_aerial_kmz.init()
 	.line_assigner << rwi_aerial_kmz_line_assigner.new()
 
 	>> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.update_progress(p_percent, p_message)
+	## Safely advance sw_progress_dialog and log to console.
+	## If no dialog is active (headless/batch), only writes to console.
+	##
+	## Parameters:
+	##   p_percent - Progress percentage (0..100)
+	##   p_message - Status message for dialog :info label and console
+
+	write("[", p_percent, "%] ", p_message)
+
+	_if .progress_dialog _isnt _unset
+	_then
+		_try
+			.progress_dialog.set_label(:info, p_message)
+			.progress_dialog.set_progress(p_percent)
+		_when error
+			# Dialog errors must never abort the export
+		_endtry
+	_endif
 _endmethod
 $
 
@@ -135,7 +160,31 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 	write("  Project:", .project_name)
 	write("  Infrastructure Type:", .infrastructure_type)
 
+	# Create and activate sw_progress_dialog (UI-only; skipped in headless/batch)
+	_try
+		.progress_owner << smallworld_product.pni_application()
+		_if .progress_owner _isnt _unset
+		_then
+			.progress_dialog << sw_progress_dialog.new_dialog(
+				.progress_owner,
+				:title,                  "KML Export",
+				:modality,               :primary_modal,
+				:show_progress_percent?, _true
+			)
+			.progress_dialog.activate()
+			.progress_dialog.set_label(:task,
+				"Please wait while exporting KML data." + newline_char +
+				"This may take some time.")
+			.progress_dialog.start_progress()
+		_endif
+	_when error
+		.progress_dialog << _unset
+	_endtry
+
+	_self.update_progress(5, "Starting export...")
+
 	# Detect network levels in area
+	_self.update_progress(10, "Detecting network levels in area...")
 	levels << _self.detect_network_levels_in_area(p_area)
 	levels.p
 	# Filter based on infrastructure type
@@ -178,12 +227,25 @@ _method rwi_export_to_aerial_kmz.export_mixed_network(p_area, p_output_file)
 	write("    CLUSTER:", levels[:cluster])
 
 	# Create KML file
+	_self.update_progress(15, "Creating KML file...")
 	kml_file << _self.create_kml_file(p_output_file, p_area, levels)
 
 	# Create KMZ (zip the KML) - COMMENTED OUT FOR NOW
 	# kmz_file << _self.create_kmz_from_kml(kml_file)
 
 	write("Export complete:", kml_file)
+
+	# Close progress dialog
+	_if .progress_dialog _isnt _unset
+	_then
+		_try
+			.progress_dialog.complete_progress()
+			.progress_dialog.close()
+		_when error
+			# ignore
+		_endtry
+		.progress_dialog << _unset
+	_endif
 
 	# Return output file and statistics
 	>> property_list.new_with(
@@ -453,40 +515,52 @@ _private _method rwi_export_to_aerial_kmz.create_kml_file(p_output_file, p_area,
 		kml_stream.write(output_line, newline_char)
 	_endloop
 
+	_self.update_progress(20, "KML header and styles written.")
+
 	# Write network level folders
 	# Special case: If both feeder and subfeeder flags are true,
 	# it means feeder work order has subfeeder network - export only subfeeder structure
 	_if p_levels[:feeder] _and p_levels[:subfeeder]
 	_then
 		write("Exporting SUBFEEDER network structure with FEEDER CODE...")
+		_self.update_progress(30, "Exporting FEEDER/SUBFEEDER network...")
 		_self.write_subfeeder_section(kml_stream, p_area, p_levels[:closures])
+		_self.update_progress(50, "FEEDER/SUBFEEDER complete.")
 	_else
 		# Normal cases - export each level independently
 		_if p_levels[:feeder]
 		_then
 			write("Exporting FEEDER network...")
+			_self.update_progress(30, "Exporting FEEDER network...")
 			_self.write_feeder_section(kml_stream, p_area)
+			_self.update_progress(40, "FEEDER complete.")
 		_endif
 
 		_if p_levels[:subfeeder]
 		_then
 			write("Exporting SUBFEEDER network...")
+			_self.update_progress(40, "Exporting SUBFEEDER network...")
 			_self.write_subfeeder_section(kml_stream, p_area, p_levels[:closures])
+			_self.update_progress(50, "SUBFEEDER complete.")
 		_endif
 
 		_if p_levels[:cluster]
 		_then
 			write("Exporting CLUSTER network...")
+			_self.update_progress(50, "Exporting CLUSTER network...")
 			_self.write_cluster_section(kml_stream, p_area, p_levels[:fdts])
+			_self.update_progress(85, "CLUSTER complete.")
 		_endif
 	_endif
 
 	# Write KML footer
+	_self.update_progress(90, "Writing KML footer...")
 	_self.write_kml_footer(kml_stream)
 
 	kml_stream.close()
 
 	# Display detailed statistics report
+	_self.update_progress(95, "Generating export statistics...")
 	_self.print_export_statistics()
 
 	>> kml_file
@@ -702,8 +776,14 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 		write("  Filtered ", ug_folder_defs.size - filtered_ug_defs.size, " empty UG LINE folders")
 
 		# SECOND PASS: Write non-empty folders
+		_local ug_line_pct_map << property_list.new_with("A", 60, "B", 65, "C", 70, "D", 75)
 		_for folder_def _over filtered_ug_defs.fast_elements()
 		_loop
+			_if folder_def[:line_id] _isnt _unset
+			_then
+				_local ug_pct << ug_line_pct_map[folder_def[:line_id]].default(60)
+				_self.update_progress(ug_pct, write_string("Writing UG LINE ", folder_def[:line_id], " folder..."))
+			_endif
 			_self.write_cluster_ug_folder(p_stream, folder_def, p_area, 4)
 		_endloop
 	_else
@@ -751,8 +831,14 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 		write("  Filtered ", folder_defs.size - filtered_defs.size, " empty LINE folders")
 
 		# SECOND PASS: Write non-empty folders
+		_local ae_line_pct_map << property_list.new_with("A", 60, "B", 65, "C", 70, "D", 75)
 		_for folder_def _over filtered_defs.fast_elements()
 		_loop
+			_if folder_def[:line_id] _isnt _unset
+			_then
+				_local ae_pct << ae_line_pct_map[folder_def[:line_id]].default(60)
+				_self.update_progress(ae_pct, write_string("Writing LINE ", folder_def[:line_id], " folder..."))
+			_endif
 			_self.write_folder(p_stream, folder_def, p_area, 4)
 		_endloop
 	_endif
@@ -1800,16 +1886,16 @@ _private _method rwi_export_to_aerial_kmz.write_cable_for_folder(p_stream, p_are
 
 	# Step 1: Query route objects in area (aerial or underground)
 	_local route_coll << p_route_collection.default(:aerial_route)
-	all_routes << .gc[route_coll].select(
+	all_aerial_routes << .gc[route_coll].select(
 		predicate.interacts(:route, p_area))
 
 	# Step 2: Collect unique cables from all aerial routes using equality_set
 	unique_cables << equality_set.new()
 
-	_for route _over all_routes.fast_elements()
+	_for aerial_route _over all_aerial_routes.fast_elements()
 	_loop
-		# Get cables from this route
-		route_cables << route.cables()
+		# Get cables from this aerial_route
+		route_cables << aerial_route.cables()
 		_if route_cables _is _unset _then _continue _endif
 
 		# Add cables to set (automatically handles duplicates)

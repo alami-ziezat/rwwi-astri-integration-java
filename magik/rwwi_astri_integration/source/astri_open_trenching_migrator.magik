@@ -1,0 +1,109 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Open Trenching Migration
+## Contains methods for creating open_trenching records from KMZ placemarks.
+##
+## Folder detection (via astri_kml_parser):
+##   Parent folder contains "open trenching" or "open trench" -> network_type = "open_trenching"
+##
+## STF item code selection by infra_type:
+##   FEEDER or SUBFEEDER -> "500002115" (Pekerjaan Trenching 150cm depth)
+##   CLUSTER             -> "500002116" (Pekerjaan Trenching 30-80 cm depth)
+##
+## Geometry: world coordinate pseudo_chain in :route (same as boring_manual / sling_wire).
+## Valid for all infrastructure types.
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_open_trenching(pm)
+	## Create open_trenching record from a placemark.
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	write("  Processing Open Trenching: ", pm[:name])
+
+	_try _with errCon
+
+		# Step 1: Parse attributes
+		_local folders    << pm[:parent].default("")
+		_local ring_name  << pm[:ring_name]
+
+		# Step 2: Determine STF item code from infra_type
+		_local infra_lc << .infra_type.default("").lowercase
+		_local stf_code << _if infra_lc = "cluster"
+		                   _then >> "500002116"
+		                   _else >> "500002115"  # feeder or subfeeder (150cm depth)
+		                   _endif
+
+		write("    >> infra_type: ", .infra_type, " -> stf_code: ", stf_code)
+
+		# Step 3: Parse line geometry (world coordinate route, same as boring_manual)
+		_local route << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
+
+		# Step 4: Match line type, segment
+		_local m_line   << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment_id << _self.match_segment(folders)
+
+		# Step 5: Infra type capitalised
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+
+		write("    >> line: ", m_line, " | segment: ", segment_id)
+
+		# Step 6: Build property_list with all requested fields
+		_local prop_values << property_list.new_with(
+			:name,                pm[:name],
+			:region,              .region,
+			:status,              .construction_status,
+			:pop,                 .pop_name,
+			:cluster,             .cluster,
+			:stf_item_code,       stf_code,
+			:ring_name,           ring_name,
+			:route,               pc,
+			:folders,             folders,
+			:segment,             segment_id,
+			:line_type,           m_line,
+			:fttx_network_type,   _self.get_fttx_network_type(),
+			:uuid,                .uuid,
+			:olt,                 .pop_name,
+			:construction_status, .construction_status,
+			:olt_code,            .olt_code,
+			:feeder_code,         .feeder_code_db,
+			:subfeeder_code,      .subfeeder_code_db,
+			:cluster_code,        .cluster_code_db,
+			:infra_code,          .cluster_code_db,
+			:infra_type,          infra_type_cap,
+			:fdt_name,            ring_name
+		)
+
+		# Step 7: Insert record
+		_local rec_trans << record_transaction.new_insert(.ot_col, prop_values)
+		rec_trans.run()
+
+		_if .stats[:open_trenchings] _is _unset _then .stats[:open_trenchings] << 0 _endif
+		.stats[:open_trenchings] +<< 1
+
+		write("    [OK] Open Trenching created: ", pm[:name], " (stf:", stf_code, ")")
+
+	_when error
+		write("ERROR in create_open_trenching(): ", errCon.report_contents_string)
+		write("  Placemark name: ", pm[:name].default("(unnamed)"))
+		write("  Folders: ", pm[:parent].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

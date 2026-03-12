@@ -636,6 +636,30 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_open_trenching?(pm)
+	## Check if placemark is an open_trenching line (OPEN TRENCHING folder)
+	## Detected when network_type = "open_trenching"
+	## Valid for all infrastructure types (feeder, subfeeder, cluster)
+	## Returns: boolean
+
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "open_trenching"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.is_sub_duct?(pm)
+	## Check if placemark is a sub_duct line (SUBDUCT 40/34 or SUBDUCT 32/28 folder)
+	## Detected when network_type = "sub_duct"
+	## Only relevant for feeder and subfeeder infrastructure types
+	## Returns: boolean
+
+	_local network_type << pm[:network_type].default("").lowercase
+	>> network_type = "sub_duct"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.get_latlong(coord)
 	## Convert local coordinate to WGS84 latitude/longitude strings
 	## Parameters:

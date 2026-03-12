@@ -503,6 +503,14 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 		_elif l_parent_line.index_of_seq("boring machine") _isnt _unset
 		_then
 			_return "boring_machine"
+		_elif l_parent_line.index_of_seq("subduct 40") _isnt _unset _orif
+		     l_parent_line.index_of_seq("subduct 32") _isnt _unset
+		_then
+			_return "sub_duct"
+		_elif l_parent_line.index_of_seq("open trenching") _isnt _unset _orif
+		     l_parent_line.index_of_seq("open trench") _isnt _unset
+		_then
+			_return "open_trenching"
 		_endif
 	_endif
 

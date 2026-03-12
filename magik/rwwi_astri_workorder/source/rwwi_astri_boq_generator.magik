@@ -706,6 +706,12 @@ rwwi_astri_boq_generator.define_shared_constant(
 
 		# T-WEY / pulling pit handholes (point_of_interest objects)
 		# Each material has a service_pair for auto-installation service
+		"200001006", property_list.new_with(
+			:code, "200001006",
+			:object, "T-WEY",
+			:name, "Large Radius Tee (D-LT) 2 x 1 inch	pcs",
+			:material_slot, :material
+		),
 		"200000992", property_list.new_with(
 			:code, "200000992",
 			:object, "T-WEY",
@@ -895,6 +901,9 @@ _method rwwi_astri_boq_generator.generate()
 
 		# Add UG-specific items (boring manual/machine, UUB accessories, T-WEY, UG cables)
 		_self.add_ug_items_to_result(result)
+
+		# Add open trenching (all infra types: feeder->500002115, subfeeder->500002115, cluster->500002116)
+		_self.add_open_trenching(result)
 
 		# Add cable-based services (Project Management and Survey & Design)
 		_self.add_cable_based_services(result)
@@ -1533,10 +1542,10 @@ _private _method rwwi_astri_boq_generator.add_ug_items_to_result(result)
 	write("LOG: Adding UG-specific BOQ items (topology:", topo, ")")
 
 	# UUB FAT accessories (5 items) - based on 200001032 count from change_set
-	_self.add_uub_fat_accessories(result)
+	#_self.add_uub_fat_accessories(result)
 
 	# UUB FDT accessories (3 items) - based on 200000978 count from change_set
-	_self.add_uub_fdt_accessories(result)
+	#_self.add_uub_fdt_accessories(result)
 
 	# Boring manual (500002117) - query from area, sum all lengths, ceiling once
 	_self.add_boring_manual(result)
@@ -1547,8 +1556,8 @@ _private _method rwwi_astri_boq_generator.add_ug_items_to_result(result)
 	# Tali pancing / Roding rope (200000267) - query from area, sum all lengths, ceiling once
 	_self.add_tali_pancing(result)
 
-	# T-WEY pulling pit accessories (3 items) - based on 200000992 count from change_set
-	_self.add_t_wey_accessories(result)
+	# Sub Duct HDPE (material + service pair) - query from area by spec_id, ceiling once
+	_self.add_sub_duct(result)
 
 	write("LOG: UG items generation complete")
 _endmethod
@@ -1827,6 +1836,179 @@ _private _method rwwi_astri_boq_generator.add_tali_pancing(result)
 _endmethod
 $
 
+_private _method rwwi_astri_boq_generator.add_sub_duct(result)
+	## Add Sub Duct / HDPE BOQ items (material + service pairs).
+	##
+	## Queries mit_conduit objects in the design area, groups by spec_id:
+	##   "Sub Duct / HDPE 40/34"  -> material 200000510 + service 500002146
+	##   "Sub Duct / HDPE 32/28"  -> material 200001017 + service 500002144
+	##
+	## Sums total route lengths per spec, applies ceiling once.
+	##
+	## Parameters:
+	##   result - property_list to update with sub duct items
+
+	_try _with errCond
+		write("LOG: Querying mit_conduit objects for sub duct BOQ...")
+
+		_local sd_col << .dataset.collections[:mit_conduit]
+		_if sd_col _is _unset
+		_then
+			write("LOG: WARNING - mit_conduit collection not found, skipping sub duct BOQ")
+			_return
+		_endif
+
+		_local area << _unset
+		_try
+			area << .scheme.project.project_areas.an_element().area
+		_when error
+		_endtry
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area for sub duct query")
+			_return
+		_endif
+
+		_local sd_list << sd_col.select(predicate.interacts(:route, area))
+
+		# Accumulate raw lengths per spec
+		_local len_40 << 0
+		_local len_32 << 0
+
+		_for sd _over sd_list.fast_elements()
+		_loop
+			# Only Proposed objects
+			_local cstatus << sd.perform(:construction_status).default("").lowercase
+			_if cstatus <> "proposed" _then _continue _endif
+
+			_local spec << sd.perform(:spec_id).default("")
+			_local route_geom << sd.perform(:route)
+			_if route_geom _is _unset _then _continue _endif
+
+			_local length_cm << route_geom.line_length
+			_local length_m  << length_cm / 100.0
+
+			_if spec.index_of_seq("40/34") _isnt _unset
+			_then
+				len_40 +<< length_m
+			_elif spec.index_of_seq("32/28") _isnt _unset
+			_then
+				len_32 +<< length_m
+			_endif
+		_endloop
+
+		# Apply ceiling once per spec and add to result
+		_if len_40 > 0
+		_then
+			_local qty_40 << len_40.ceiling
+			_self.add_to_boq_result(result, "200000510", qty_40)
+			_self.add_to_boq_result(result, "500002146", qty_40)
+			write("LOG: Sub Duct 40/34 total:", len_40.rounded, "m -> qty:", qty_40)
+		_endif
+		_if len_32 > 0
+		_then
+			_local qty_32 << len_32.ceiling
+			_self.add_to_boq_result(result, "200001017", qty_32)
+			_self.add_to_boq_result(result, "500002144", qty_32)
+			write("LOG: Sub Duct 32/28 total:", len_32.rounded, "m -> qty:", qty_32)
+		_endif
+
+		_if len_40 = 0 _andif len_32 = 0
+		_then
+			write("LOG: No Proposed mit_conduit objects found or zero total length")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding sub_duct to BOQ:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_open_trenching(result)
+	## Add open trenching BOQ items (service only, no material pair).
+	##
+	## Queries open_trenching objects in the design area, groups by stf_item_code:
+	##   500002115 -> Pekerjaan Trenching 150cm depth  (feeder / subfeeder)
+	##   500002116 -> Pekerjaan Trenching 30-80cm depth (cluster)
+	##
+	## Sums total route lengths per code, applies ceiling once.
+	##
+	## Parameters:
+	##   result - property_list to update with open trenching items
+
+	_try _with errCond
+		write("LOG: Querying open_trenching objects for BOQ...")
+
+		_local ot_col << .dataset.collections[:open_trenching]
+		_if ot_col _is _unset
+		_then
+			write("LOG: WARNING - open_trenching collection not found, skipping")
+			_return
+		_endif
+
+		_local area << _unset
+		_try
+			area << .scheme.project.project_areas.an_element().area
+		_when error
+		_endtry
+		_if area _is _unset
+		_then
+			write("LOG: WARNING - No project area for open_trenching query")
+			_return
+		_endif
+
+		_local ot_list << ot_col.select(predicate.interacts(:route, area))
+
+		# Accumulate raw lengths per STF code
+		_local len_115 << 0   # feeder/subfeeder (150cm)
+		_local len_116 << 0   # cluster (30-80cm)
+
+		_for ot _over ot_list.fast_elements()
+		_loop
+			# Only Proposed objects
+			_local cstatus << ot.perform(:construction_status).default("").lowercase
+			_if cstatus <> "proposed" _then _continue _endif
+
+			_local stf << ot.perform(:stf_item_code).default("")
+			_local route_geom << ot.perform(:route)
+			_if route_geom _is _unset _then _continue _endif
+
+			_local length_m << route_geom.line_length / 100.0
+
+			_if stf = "500002115"
+			_then
+				len_115 +<< length_m
+			_elif stf = "500002116"
+			_then
+				len_116 +<< length_m
+			_endif
+		_endloop
+
+		# Apply ceiling once per code and add to result
+		_if len_115 > 0
+		_then
+			_local qty_115 << len_115.ceiling
+			_self.add_to_boq_result(result, "500002115", qty_115)
+			write("LOG: Open Trenching 150cm total:", len_115.rounded, "m -> qty:", qty_115)
+		_endif
+		_if len_116 > 0
+		_then
+			_local qty_116 << len_116.ceiling
+			_self.add_to_boq_result(result, "500002116", qty_116)
+			write("LOG: Open Trenching 30-80cm total:", len_116.rounded, "m -> qty:", qty_116)
+		_endif
+
+		_if len_115 = 0 _andif len_116 = 0
+		_then
+			write("LOG: No Proposed open_trenching objects found or zero total length")
+		_endif
+
+	_when error
+		write("LOG: ERROR adding open_trenching to BOQ:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
 _private _method rwwi_astri_boq_generator.add_underground_cable_to_result(result)
 	## Add underground cable BOQ items via underground_route objects
 	## Maps each route's spec_id to a material code (same cable codes as aerial)
@@ -1903,44 +2085,6 @@ _private _method rwwi_astri_boq_generator.add_underground_cable_to_result(result
 		write("LOG: Processed", total_count, "underground_route cable objects")
 	_when error
 		write("LOG: ERROR adding underground cables to BOQ:", errCond.report_contents_string)
-	_endtry
-_endmethod
-$
-
-_private _method rwwi_astri_boq_generator.add_t_wey_accessories(result)
-	## Add T-WEY (pulling pit) accessories (3 items) based on 200000992 count in result
-	## 200000992 (Precast Hand hole for pulling pit) comes from :point_of_interest in change_set
-	## Remaining 3 accessories are calculated from that count
-	##
-	## Parameters:
-	##   result - property_list to update with T-WEY accessories
-
-	_try _with errCond
-		write("LOG: Adding T-WEY accessories based on 200000992 count...")
-
-		# Count from 200000992 (Precast Hand hole for pulling pit) - populated by :point_of_interest in change_set
-		_local t_wey_count << 0
-		_local t_wey_item << result[:|200000992|]
-		_if t_wey_item _isnt _unset
-		_then
-			t_wey_count << t_wey_item[:quantity_material].default(0)
-		_endif
-
-		_if t_wey_count = 0
-		_then
-			write("LOG: No T-WEY handhole objects (200000992) found in result, skipping T-WEY accessories")
-			_return
-		_endif
-
-		write("LOG: Adding T-WEY accessories for", t_wey_count, "T-WEY objects...")
-
-		# Add material accessories - service pairs auto-added by add_to_boq_result via :service_pair
-		# 200000992 (Precast HH for pulling pit) + 500002061 (Instal) already handled by change_set loop
-		_self.add_to_boq_result(result, "200001013", t_wey_count)  # Concrete Hand hole for pulling pit -> auto-adds 500002063
-
-		write("LOG: Added T-WEY accessories (1 material + 1 service pair) with quantity:", t_wey_count)
-	_when error
-		write("LOG: ERROR adding T-WEY accessories:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $

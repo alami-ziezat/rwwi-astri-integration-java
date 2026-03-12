@@ -395,20 +395,20 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				"  Errors: ", api_error_count, %newline,
 				%newline)
 	
-			msg << msg + write_string("BoQ Report Summary:", %newline)
+			#msg << msg + write_string("BoQ Report Summary:", %newline)
 
 			# Show first 5 items as preview
-			_for key _over boq_result.keys()
-			_loop
-				_local item << boq_result[key]
-				msg << msg + write_string(
-					"  - Equipment: ", item[:equipment_name].default(""), %newline,
-					"    Description: ", item[:description].default(""), %newline,
-					"    Quantity Material: ", item[:quantity_material].default("N/A"),
-					", Quantity Service: ", item[:quantity_service].default("N/A"), %newline)
-			_endloop
-			msg << msg + write_string(
-				"="*100)
+			#_for key _over boq_result.keys()
+			#_loop
+			#	_local item << boq_result[key]
+			#	msg << msg + write_string(
+			#		"  - Equipment: ", item[:equipment_name].default(""), %newline,
+			#		"    Description: ", item[:description].default(""), %newline,
+			#		"    Quantity Material: ", item[:quantity_material].default("N/A"),
+			#		", Quantity Service: ", item[:quantity_service].default("N/A"), %newline)
+			#_endloop
+			#msg << msg + write_string(
+			#	"="*100)
 
 			_self.user_info(msg)
 		_else

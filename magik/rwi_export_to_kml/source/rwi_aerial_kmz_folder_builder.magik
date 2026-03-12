@@ -181,6 +181,21 @@ _method rwi_aerial_kmz_folder_builder.build_subfeeder_ug_folders()
 		:name, "BORING MANUAL",
 		:visibility, _false))
 
+	# 11. SUBDUCT 40/34
+	folder_defs.add(property_list.new_with(
+		:name, "SUBDUCT 40/34",
+		:visibility, _false))
+
+	# 12. SUBDUCT 32/28
+	folder_defs.add(property_list.new_with(
+		:name, "SUBDUCT 32/28",
+		:visibility, _false))
+
+	# 13. OPEN TRENCHING
+	folder_defs.add(property_list.new_with(
+		:name, "OPEN TRENCHING",
+		:visibility, _false))
+
 	>> folder_defs
 _endmethod
 $
@@ -190,7 +205,7 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_ug_line_folders(p_line_id, p
 	## Build UG LINE folder structure for cluster
 	## Keeps aerial objects: BOUNDARY FAT, FAT, HP COVER, HP UNCOVER
 	## Adds UG objects: JOINT CLOSURE, CABLE, EXISTING/NEW HH x3, SLACK HANGER,
-	##                  BORING MANUAL, T-WEY, TALI PANCING
+	##                  BORING MANUAL, T-WEY, TALI PANCING, OPEN TRENCHING
 	## Removes: poles, DISTRIBUTION CABLE, SLING WIRE
 	##
 	## Parameters:
@@ -274,6 +289,11 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_ug_line_folders(p_line_id, p
 	# 16. TALI PANCING
 	subfolders.add(property_list.new_with(
 		:name, "TALI PANCING",
+		:visibility, _false))
+
+	# 17. OPEN TRENCHING
+	subfolders.add(property_list.new_with(
+		:name, "OPEN TRENCHING",
 		:visibility, _false))
 
 	>> line_def
@@ -607,6 +627,21 @@ _method rwi_aerial_kmz_folder_builder.build_feeder_ug_folders()
 	# 11. BORING MANUAL
 	folder_defs.add(property_list.new_with(
 		:name, "BORING MANUAL",
+		:visibility, _false))
+
+	# 12. SUBDUCT 40/34
+	folder_defs.add(property_list.new_with(
+		:name, "SUBDUCT 40/34",
+		:visibility, _false))
+
+	# 13. SUBDUCT 32/28
+	folder_defs.add(property_list.new_with(
+		:name, "SUBDUCT 32/28",
+		:visibility, _false))
+
+	# 14. OPEN TRENCHING
+	folder_defs.add(property_list.new_with(
+		:name, "OPEN TRENCHING",
 		:visibility, _false))
 
 	>> folder_defs

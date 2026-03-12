@@ -56,6 +56,8 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:boring_manual_col,  _unset, :writable},  # boring_manual
 	{:boring_machine_col, _unset, :writable},  # boring_machine
 	{:tali_pancing_col,   _unset, :writable},  # tali_pancing
+	{:sub_duct_col,       _unset, :writable},  # mit_conduit (sub duct HDPE 40/34 or 32/28)
+	{:ot_col,             _unset, :writable},  # open_trenching (all infra types)
 	{:poi_col,            _unset, :writable},   # point_of_interest (t_wey)
 
 	# Migration context
@@ -162,6 +164,8 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 	.boring_manual_col  << .database.collections[:boring_manual]
 	.boring_machine_col << .database.collections[:boring_machine]
 	.tali_pancing_col   << .database.collections[:tali_pancing]
+	.sub_duct_col       << .database.collections[:mit_conduit]
+	.ot_col             << .database.collections[:open_trenching]
 	.poi_col            << .database.collections[:point_of_interest]
 
 	# Initialize statistics
@@ -188,6 +192,8 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 		:boring_manuals, 0,
 		:boring_machines, 0,
 		:tali_pancings, 0,
+		:sub_ducts, 0,
+		:open_trenchings, 0,
 		:t_weys, 0,
 		:t_weys_skipped, 0,
 		:underground_routes, 0,
@@ -541,6 +547,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_elif _self.is_tali_pancing?(pm)
 		_then
 			_self.create_tali_pancing(pm)
+		_elif _self.is_open_trenching?(pm)
+		_then
+			_self.create_open_trenching(pm)
 		_endif
 	_endloop
 
@@ -601,6 +610,15 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_then
 			_self.create_t_wey(pm)
 		_endif
+	_endloop
+
+	# Create sub-ducts in a separate pass to ensure all routes are created (sub-ducts need to snap to routes)
+	_for pm _over placemarks.fast_elements()
+	_loop	
+		_if _self.is_sub_duct?(pm)
+		_then
+			_self.create_sub_duct(pm)
+		_endif 
 	_endloop
 
 	# Update FDT :tp field with total demand points (only for cluster infrastructure)
@@ -691,6 +709,8 @@ _method astri_design_migrator.print_statistics()
 	write("Boring Manual:      ", .stats[:boring_manuals])
 	write("Boring Machine:     ", .stats[:boring_machines])
 	write("Tali Pancing:       ", .stats[:tali_pancings])
+	write("Sub Duct:           ", .stats[:sub_ducts])
+	write("Open Trenching:     ", .stats[:open_trenchings])
 	write("T-Wey (POI):        ", .stats[:t_weys])
 	write("  - Skipped (dup):  ", .stats[:t_weys_skipped])
 	write("Errors:             ", .stats[:errors])
@@ -703,7 +723,7 @@ _method astri_design_migrator.print_statistics()
 	                         .stats[:buildings] + .stats[:micro_cells] + .stats[:olts] +
 	                         .stats[:risers] + .stats[:access_points] + .stats[:areas_created] +
 	                         .stats[:boring_manuals] + .stats[:boring_machines] + .stats[:tali_pancings] +
-	                         .stats[:t_weys] + .stats[:underground_routes]
+	                         .stats[:sub_ducts] + .stats[:open_trenchings] + .stats[:t_weys] + .stats[:underground_routes]
 	write("Total objects:      ", total_created)
 	write("=" * 60)
 _endmethod

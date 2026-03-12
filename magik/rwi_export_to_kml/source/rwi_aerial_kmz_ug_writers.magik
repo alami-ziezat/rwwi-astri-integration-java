@@ -104,6 +104,111 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_ug_folder_contents(p_stre
 	_then
 		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
 	_endif
+
+	# Handle SUBDUCT 40/34 folder
+	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 40") _isnt _unset
+	_then
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "40/34")
+	_endif
+
+	# Handle SUBDUCT 32/28 folder
+	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 32") _isnt _unset
+	_then
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "32/28")
+	_endif
+
+	# Handle OPEN TRENCHING folder
+	_if p_folder_name.uppercase.index_of_seq("OPEN TRENCHING") _isnt _unset
+	_then
+		_self.write_open_trenching_for_folder(p_stream, p_area, p_indent)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_open_trenching_for_folder(p_stream, p_area, p_indent, _optional p_line_id, p_fdt_folder)
+	## Write open_trenching route chains to folder.
+	## Queries open_trenching objects in area, mirrors write_boring_manual_for_folder() pattern.
+	##
+	## Parameters:
+	##   p_stream     - Output stream
+	##   p_area       - Design boundary area
+	##   p_indent     - Indentation string
+	##   p_line_id    - LINE ID letter for filtering (first optional)
+	##   p_fdt_folder - FDT folder name for filtering (second optional)
+
+	# Resolve expected LINE type and FDT name
+	expected_line_type << _unset
+	_if p_line_id _isnt _unset
+	_then
+		expected_line_type << "LINE " + p_line_id
+	_endif
+
+	expected_fdt_name << _unset
+	_if p_fdt_folder _isnt _unset
+	_then
+		expected_fdt_name << p_fdt_folder
+		_if p_fdt_folder.index_of_seq("FDT_") _isnt _unset
+		_then
+			expected_fdt_name << p_fdt_folder.slice(5, p_fdt_folder.size)
+		_endif
+	_endif
+
+	# Query open_trenching chains in area
+	all_ots << .gc[:open_trenching].select(
+		predicate.interacts(:route, p_area))
+
+	# Collect valid entries (must have route geometry, LINE and FDT match)
+	matching << rope.new()
+	_for ot _over all_ots.fast_elements()
+	_loop
+		route_geom << ot.route
+		_if route_geom _is _unset _then _continue _endif
+
+		# Filter by LINE type
+		_if expected_line_type _isnt _unset
+		_then
+			ot_line_type << ot.perform(:line_type).default("")
+			_if ot_line_type.uppercase <> expected_line_type.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		# Filter by FDT ring name
+		_if expected_fdt_name _isnt _unset
+		_then
+			ot_ring_name << ot.perform(:ring_name).default("")
+			_if ot_ring_name <> "" _andif
+			    ot_ring_name.uppercase <> expected_fdt_name.uppercase
+			_then
+				_continue
+			_endif
+		_endif
+
+		matching.add(ot)
+	_endloop
+
+	# Sort by name ascending
+	sorted_ots << matching.as_sorted_collection(
+		_proc(ot1, ot2)
+			name1 << ot1.perform(:name).default("").lowercase
+			name2 << ot2.perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	ot_count << 0
+	_for ot _over sorted_ots.fast_elements()
+	_loop
+		route_geom << ot.route
+		.object_writer.write_open_trenching(ot, route_geom, p_stream, p_indent)
+		ot_count +<< 1
+	_endloop
+
+	_if ot_count > 0
+	_then
+		write("  Wrote ", ot_count, " OPEN TRENCHING chains")
+	_endif
 _endmethod
 $
 
@@ -321,6 +426,69 @@ _private _method rwi_export_to_aerial_kmz.write_boring_manual_for_folder(p_strea
 	_if bm_count > 0
 	_then
 		write("  Wrote ", bm_count, " BORING MANUAL chains")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={rwi_export})
+_private _method rwi_export_to_aerial_kmz.write_sub_duct_for_folder(p_stream, p_area, p_indent, _optional p_spec_filter)
+	## Write mit_conduit (sub duct) route chains to folder.
+	## Queries mit_conduit objects in area, optionally filtering by spec_id.
+	## Mirrors write_boring_manual_for_folder() pattern.
+	##
+	## Parameters:
+	##   p_stream      - Output stream
+	##   p_area        - Design boundary area
+	##   p_indent      - Indentation string
+	##   p_spec_filter - Optional spec filter: "40/34" or "32/28" (first optional)
+
+	# Query mit_conduit chains in area (uses :route geometry)
+	all_conduits << .gc[:mit_conduit].select(
+		predicate.interacts(:route, p_area))
+
+	# Collect valid entries
+	matching << rope.new()
+	_for sd _over all_conduits.fast_elements()
+	_loop
+		route_geom << sd.route
+		_if route_geom _is _unset _then _continue _endif
+
+		# Filter by spec if requested
+		_if p_spec_filter _isnt _unset
+		_then
+			sd_spec << sd.perform(:spec_id).default("")
+			_if sd_spec.index_of_seq(p_spec_filter) _is _unset
+			_then
+				_continue
+			_endif
+		_endif
+
+		matching.add(sd)
+	_endloop
+
+	# Sort by name ascending
+	sorted_sds << matching.as_sorted_collection(
+		_proc(sd1, sd2)
+			name1 << sd1.perform(:name).default("").lowercase
+			name2 << sd2.perform(:name).default("").lowercase
+			>> name1 < name2
+		_endproc)
+
+	sd_count << 0
+	_for sd _over sorted_sds.fast_elements()
+	_loop
+		route_geom << sd.route
+		.object_writer.write_sub_duct(sd, route_geom, p_stream, p_indent)
+		sd_count +<< 1
+	_endloop
+
+	_if sd_count > 0
+	_then
+		_local spec_msg << _if p_spec_filter _isnt _unset
+		                   _then >> write_string(" (", p_spec_filter, ")")
+		                   _else >> ""
+		                   _endif
+		write("  Wrote ", sd_count, " SUB DUCT chains", spec_msg)
 	_endif
 _endmethod
 $
@@ -905,6 +1073,18 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_s
 	_if p_folder_name.uppercase.index_of_seq("BORING MANUAL") _isnt _unset
 	_then
 		_self.write_boring_manual_for_folder(p_stream, p_area, p_indent)
+	_endif
+
+	# SUBDUCT 40/34 - mit_conduit HDPE 40/34
+	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 40") _isnt _unset
+	_then
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "40/34")
+	_endif
+
+	# SUBDUCT 32/28 - mit_conduit HDPE 32/28
+	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 32") _isnt _unset
+	_then
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "32/28")
 	_endif
 
 	# FDT - sheath_splice equipment via UUBs (not poles)

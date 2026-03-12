@@ -1,0 +1,215 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Design Migrator - Sub Duct (mit_conduit) Migration
+## Contains methods for creating mit_conduit records from KMZ placemarks.
+##
+## Folder detection (via astri_kml_parser):
+##   "SUBDUCT 40/34" folder -> spec_id = "Sub Duct / HDPE 40/34"
+##                             stf_item_code = "200000510" (material)
+##   "SUBDUCT 32/28" folder -> spec_id = "Sub Duct / HDPE 32/28"
+##                             stf_item_code = "200001017" (material)
+##
+## Geometry: KML line coordinates are parsed into a pseudo_chain stored in :route
+## (for area query / BOQ / KML re-export).  The start/end points are also used to
+## locate the nearest UUBs (500 cm radius) to fill :span, and the nearest
+## underground_route to fill :jalur -- mirroring the cable migrator pattern.
+##
+## Only valid for feeder and subfeeder infrastructure types.
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.create_sub_duct(pm)
+	## Create mit_conduit record from a SUBDUCT placemark.
+	##
+	## Parameters:
+	##   pm - Placemark property_list from KML parser
+
+	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	write("  Processing Sub Duct: ", pm[:name])
+
+	_try _with errCon
+
+		# Guard: only feeder and subfeeder infra types
+		_local infra_lc << .infra_type.default("").lowercase
+		_if infra_lc = "cluster"
+		_then
+			write("    >> SKIP: Sub Duct only valid for feeder/subfeeder (infra_type=", .infra_type, ")")
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Step 1: Parse attributes
+		_local folders  << pm[:parent].default("")
+		_local l_parent << folders.lowercase
+
+		# Determine spec from folder name
+		_local spec_id     << _unset
+		_local stf_code    << _unset
+		_if l_parent.index_of_seq("subduct 40") _isnt _unset
+		_then
+			spec_id  << "Sub Duct / HDPE 40/34"
+			stf_code << "200000510"
+		_elif l_parent.index_of_seq("subduct 32") _isnt _unset
+		_then
+			spec_id  << "Sub Duct / HDPE 32/28"
+			stf_code << "200001017"
+		_else
+			# Fallback: use 40/34 as default
+			spec_id  << "Sub Duct / HDPE 40/34"
+			stf_code << "200000510"
+			write("    >> WARNING: Cannot determine subduct spec from folder: ", folders, " - defaulting to 40/34")
+		_endif
+
+		# Step 2: Parse line geometry
+		_local route    << _self.parse_line_geometry(pm[:coord])
+		_local pc << pseudo_chain.new(route)
+		pc.world << .database.world
+		_local buff_pc << pc.buffer(500)
+		buff_pc.world << .database.world
+
+		# Step 3: Match line type and segment
+		_local m_line   << _self.match_line(folders)
+		_if m_line _is _unset
+		_then
+			m_line << _self.match_line(pm[:name])
+		_endif
+		_local segment_id << _self.match_segment(folders)
+		_local ring_name  << pm[:ring_name]
+
+		# Step 4: Infra type capitalised
+		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
+		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		                         _else >> ""
+		                         _endif
+
+		write("    >> spec: ", spec_id, " | stf: ", stf_code, " | line: ", m_line, " | segment: ", segment_id)
+
+		# Step 5: Locate nearest UUBs at start/end for :span field (500 cm radius)
+		_local start_coord << route.first_coord
+		_local end_coord   << route.last_coord
+		_local start_uub_label << _unset
+		_local end_uub_label   << _unset
+
+		_try
+			_local pp_start << pseudo_point.new(start_coord)
+			pp_start.world << .database.world
+			_local buff_start << pp_start.buffer(500)
+			buff_start.world << .database.world
+			_local uubs_start << .uub_col.select(predicate.interacts(:location, {buff_start}))
+			_if uubs_start.size > 0
+			_then
+				_local uu_s << uubs_start.an_element()
+				start_coord << uub_s.location.coord
+				start_uub_label << uu_s.perform(:label).default(uu_s.perform(:name).default("HH"))
+				write("    >> Found UUB at start: ", start_uub_label)
+			_endif
+		_when error
+			# UUB search is optional - ignore errors
+		_endtry
+
+		_try
+			_local pp_end << pseudo_point.new(end_coord)
+			pp_end.world << .database.world
+			_local buff_end << pp_end.buffer(500)
+			buff_end.world << .database.world
+			_local uubs_end << .uub_col.select(predicate.interacts(:location, {buff_end}))
+			_if uubs_end.size > 0
+			_then
+				_local uu_e << uubs_end.an_element()
+				end_coord << uu_e.location.coord
+				end_uub_label << uu_e.perform(:label).default(uu_e.perform(:name).default("HH"))
+				write("    >> Found UUB at end: ", end_uub_label)
+			_endif
+		_when error
+			# UUB search is optional - ignore errors
+		_endtry
+
+		# Build :span from UUB labels
+		_local span_str << _unset
+		_if start_uub_label _isnt _unset _orif end_uub_label _isnt _unset
+		_then
+			span_str << write_string(
+				start_uub_label.default("?"), " - ", end_uub_label.default("?"))
+		_endif
+
+		# Step 6: Find nearest underground_route for :jalur
+		_local jalur_str << _unset
+		_try
+			_local urs_in_area << .ug_route_col.select(predicate.interacts(:route, {buff_pc}))
+			_if urs_in_area.size > 0
+			_then
+				_local ur << urs_in_area.an_element()
+				jalur_str << ur.perform(:name).default(_unset)
+				_if jalur_str _isnt _unset
+				_then
+					write("    >> Found UR for jalur: ", jalur_str)
+				_endif
+			_endif
+		_when error
+			# UR search is optional - ignore errors
+		_endtry
+
+		# Step 7: Build property_list with all requested fields
+		_local prop_values << property_list.new_with(
+			:name,                pm[:name],
+			:spec_id,             spec_id,
+			:construction_status, .construction_status,
+			:asset_owner,         "Owned",
+			:owner,               .pop_name,
+			:usage,               "Fibre Only",
+			:stf_item_code,       stf_code,
+			:pop,                 .pop_name,
+			:cluster,             .cluster,
+			:region,              .region,
+			:ring_name,           ring_name,
+			:span,                span_str,
+			:folder,              folders,
+			:jalur,               jalur_str,
+			:segment,             segment_id,
+			:line_type,           m_line,
+			:fttx_network_type,   _self.get_fttx_network_type(),
+			:uuid,                .uuid,
+			:olt,                 .pop_name,
+			:olt_code,            .olt_code,
+			:feeder_code,         .feeder_code_db,
+			:subfeeder_code,      .subfeeder_code_db,
+			:cluster_code,        .cluster_code_db,
+			:infra_code,          .cluster_code_db,
+			:infra_type,          infra_type_cap
+		)
+
+		# Step 8: Insert record
+		_local rec_trans << record_transaction.new_insert(.sub_duct_col, prop_values)
+		_local sub_duct_result << rec_trans.run()
+
+		# Step 9: Attempt place_in_structures (like cable migrator - optional, graceful)
+		_try
+			_local stm << structure_manager.new(.database, .database.world)
+			_local path_sector << sector.new_with(start_coord, end_coord)
+			_local path_subduct << stm.get_continuous_structures_via_coords(path_sector)
+			_if path_subduct _isnt _unset _andif path_subduct.size > 0
+			_then
+				sub_duct_result.place_in_structures(path_subduct)
+				write("    >> Sub Duct placed in structures (", path_subduct.size, " structures)")
+			_endif
+		_when error
+			# place_in_structures is optional for conduits - ignore errors
+		_endtry
+
+		_if .stats[:sub_ducts] _is _unset _then .stats[:sub_ducts] << 0 _endif
+		.stats[:sub_ducts] +<< 1
+
+		write("    [OK] Sub Duct created: ", pm[:name], " (", spec_id, ")")
+
+	_when error
+		write("ERROR in create_sub_duct(): ", errCon.report_contents_string)
+		write("  Placemark name: ", pm[:name].default("(unnamed)"))
+		write("  Folders: ", pm[:parent].default("(none)"))
+		.stats[:errors] +<< 1
+	_endtry
+_endmethod
+$

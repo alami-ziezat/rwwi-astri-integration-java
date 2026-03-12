@@ -67,7 +67,8 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_ug_folder_contents(p_str
 	## Write placemarks for underground cluster folders
 	## Aerial objects: FDT container, BOUNDARY CLUSTER, BOUNDARY FAT, FAT, HP COVER/UNCOVER
 	## UG objects: JOINT CLOSURE, CABLE, EXISTING/NEW HH, SLACK HANGER, BORING MANUAL
-	## New objects: T-WEY (point_of_interest), TALI PANCING (tali_pancing route)
+	## New objects: T-WEY (point_of_interest), TALI PANCING (tali_pancing route),
+	##              OPEN TRENCHING (open_trenching route)
 	##
 	## Parameters:
 	##   p_stream - Output stream
@@ -164,6 +165,12 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_ug_folder_contents(p_str
 	_if folder_name.uppercase = "TALI PANCING"
 	_then
 		_self.write_tali_pancing_for_folder(p_stream, p_area, p_indent, line_id, current_fdt_folder)
+	_endif
+
+	# OPEN TRENCHING - open_trenching route chains
+	_if folder_name.uppercase.index_of_seq("OPEN TRENCHING") _isnt _unset
+	_then
+		_self.write_open_trenching_for_folder(p_stream, p_area, p_indent, line_id, current_fdt_folder)
 	_endif
 _endmethod
 $
