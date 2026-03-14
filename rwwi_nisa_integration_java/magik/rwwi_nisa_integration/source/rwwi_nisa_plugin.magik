@@ -1,0 +1,445 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## NISA Mass Problem Monitoring Plugin
+## Plugin entry point for the NISA dialog.
+## Handles map rendering of cluster outage status as colour-coded points
+## with tooltips showing NISA API mass problem details.
+##
+## Databus:
+##   Consumes: :current_document  (unpacked as {doc, doc_gui} via _scatter)
+##   Produces: :goto_request
+
+remex(:rwwi_nisa_plugin)
+$
+
+def_slotted_exemplar(:rwwi_nisa_plugin,
+{
+	{:dialog,          _unset},   # rwwi_nisa_dialog instance
+	{:current_doc_gui, _unset},   # Current map document GUI
+	{:current_doc,     _unset},   # Current map document (map view)
+	{:geoms,           _unset},   # Rope of property_lists {local_coord, cluster_pl}
+	{:render_status,   _unset}    # :enable or :disable
+}, :plugin)
+$
+
+##
+## Shared constants — styles (mirrored from rwwi_bulk_search_plugin pattern)
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:render_priority, 150, :public)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:text_style,
+	property_list.new_with(
+		:outage,  text_style.new_with_properties(:colour, colour.called(:white)),
+		:ok,      text_style.new_with_properties(:colour, colour.called(:white)),
+		:unknown, text_style.new_with_properties(:colour, colour.called(:black))),
+	:private)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:fill_style,
+	property_list.new_with(
+		:outage,  fill_style.new_with_properties(:foreground_colour, colour.called(:red)),
+		:ok,      fill_style.new_with_properties(:foreground_colour, colour.called(:green)),
+		:unknown, fill_style.new_with_properties(:foreground_colour,
+			colour.new_with_properties(:red, 0.6, :green, 0.6, :blue, 0.6))),
+	:private)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:line_style,
+	line_style.new_with_properties(:foreground_colour, colour.called(:black)),
+	:private)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:max_text_width, 400, :private)
+$
+
+##
+## Databus declarations
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:databus_consumer_data_types,
+	{:current_document},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:databus_producer_data_types,
+	{:goto_request},
+	:public)
+$
+
+##
+## Init / Actions
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.init_actions()
+	## Register action to open the NISA monitoring dialog
+
+	_super.init_actions()
+
+	_self.add_action(sw_action.new(:activate_nisa_monitor,
+		:engine,         _self,
+		:enabled?,       _true,
+		:caption,        "NISA Mass Problem Monitor...",
+		:tooltip,        "Open Mass Problem Monitoring (NISA)",
+		:action_message, :|activate_nisa_monitor()|))
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.activate_nisa_monitor()
+	## Show the Mass Problem Monitoring dialog
+
+	write("Activating Mass Problem Monitoring (NISA)...")
+
+	_local name << :nisa_mass_problem_monitor
+	.dialog << _self.get_dialog(name)
+
+	_if .dialog _is _unset
+	_then
+		.dialog << rwwi_nisa_dialog.new(_self)
+		_self.cache_dialog(name, .dialog)
+		.dialog.activate_relative_to("activate_dialog",
+			_self.top_frame, 50, 50)
+	_else
+		.dialog.activate()
+	_endif
+
+	>> .dialog
+_endmethod
+$
+
+##
+## Databus — mirrors rwwi_bulk_search_plugin pattern exactly
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.sw_databus_data_available(data_type_name, data)
+	## Handle databus events.
+	## :current_document -> data is {doc, doc_gui}, unpacked via _scatter.
+
+	_if data_type_name _is :current_document
+	_then
+		(doc, doc_gui) << (_scatter data)
+
+		_if doc_gui _isnt .current_doc_gui
+		_then
+			_if .current_doc_gui _isnt _unset
+			_then
+				.current_doc_gui.remove_dependent(_self)
+			_endif
+
+			_if doc_gui _isnt _unset
+			_then
+				doc_gui.add_dependent(_self, :interaction_mode)
+			_endif
+
+			.current_doc_gui << doc_gui
+		_endif
+
+		.current_doc << doc
+	_endif
+_endmethod
+$
+
+##
+## note_change — receives :show_map from dialog
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.note_change(who, what, data)
+	## Handle change notifications from the dialog.
+	## :show_map    -> build geoms and enable rendering.
+	## :goto_request -> navigate map to the given cluster property_list.
+
+	write("NISA plugin note_change: ", what, " from ", who, " with data: ", data, " (current_doc=", .current_doc, ")")
+ 	_global cd, dt
+	cd << .current_doc
+	dt << data
+	_if what _is :show_map
+	_then
+		_self.show_mode(data)
+	_elif what _is :goto_request
+	_then
+		# data is a pseudo_point already in local CS — mirrors bulk_search pattern
+		_if .current_doc _isnt _unset _andif data _isnt _unset
+		_then
+			.current_doc.goto(data.bounds)
+			#.current_doc.goto_bounds(data.bounds, :|detail|)
+			#.current_doc.view_scale << 2000
+		_endif
+	_endif
+_endmethod
+$
+
+##
+## Map rendering — mirrors rwwi_bulk_search_plugin pattern
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.show_mode(enable?)
+	## Enable or disable map rendering of outage clusters.
+	## Mirrors rwwi_bulk_search_plugin.show_mode pattern.
+	## enable? - _true to show clusters on map, _false to hide.
+
+	_if enable?
+	_then
+		.render_status << :enable
+		a_map_manager << _self.get_service_provider(:map_manager)
+		_if a_map_manager _isnt _unset
+		_then
+			a_map_manager.add_post_renderer(_self, _self.render_priority, :transient_drawer)
+			_self.show_records()
+		_endif
+	_else
+		.render_status << :disable
+		a_map_manager << _self.get_service_provider(:map_manager)
+		_if a_map_manager _isnt _unset
+		_then
+			_self.refresh_maps()
+			a_map_manager.remove_post_renderer(_self, :transient_drawer)
+		_endif
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.show_records()
+	## Build geom cache from dialog records and trigger map redraw.
+	## Mirrors rwwi_bulk_search_plugin.show_records pattern.
+
+	_if .render_status _is :enable
+	_then
+		_self.build_rwo_cache()
+		_self.refresh_maps()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.build_rwo_cache()
+	## Populate .geoms from dialog.records.
+	## dialog.records returns only outage-active clusters (red icon),
+	## each with :pseudo_point, :cluster_pl, :outage_data.
+
+	_if .dialog _is _unset
+	_then
+		_return
+	_endif
+
+	.geoms << rope.new()
+
+	_try _with errCon
+		_for rec _over .dialog.records.fast_elements()
+		_loop
+			.geoms.add_last(rec)
+		_endloop
+		write("NISA plugin: ", .geoms.size, " outage clusters for rendering")
+	_when error
+		write("NISA plugin: build_rwo_cache error - ", errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.refresh_maps()
+	## Trigger a map redraw.
+
+	_if .current_doc _isnt _unset _andif
+	    (a_window << .current_doc.window) _isnt _unset _andif
+	    (gc << a_window.create_graphics_context()) _isnt _unset
+	_then
+		gc.refresh_from_backing_store()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.map_damage_notify(gc, a_map_view)
+	## Post-renderer callback — called each time the map redraws.
+
+	_if a_map_view _is .current_doc _andif
+	    .render_status _is :enable
+	_then
+		_self.draw_all_clusters(gc)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.draw_all_clusters(gc)
+	## Draw all outage-active cluster points with tooltips onto the map gc.
+	## All records in .geoms come from dialog.records, so status is always :outage.
+
+	_if .geoms _is _unset _orif .geoms.empty? _then _return _endif
+
+	_for rec _over .geoms.fast_elements()
+	_loop
+		_local cluster_pl   << rec[:cluster_pl]
+		_local cluster_code << cluster_pl[:cluster_code]
+		_local local_coord  << rec[:pseudo_point].coordinate
+
+		_self.draw_cluster(gc, local_coord, cluster_code, :outage)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.draw_cluster(gc, local_coord, cluster_code, status)
+	## Draw a single cluster: dot + tooltip.
+
+	_local text << _if .dialog _isnt _unset
+	               _then >> .dialog.outage_tooltip_for(cluster_code)
+	               _else >> cluster_code
+	               _endif
+	_if text _is _unset _orif text.empty? _then _return _endif
+
+	_local line_gc << _unset
+	_local text_gc << _unset
+	_protect
+		line_gc << gc.create_graphics_context(:classic_text_drawing)
+		text_gc << gc.create_graphics_context(:classic_drawing)
+
+		_self.int!draw_cluster(line_gc, text_gc, local_coord, text, status)
+
+	_protection
+		_if text_gc _isnt _unset _then text_gc.destroy() _endif
+		_if line_gc _isnt _unset _then line_gc.destroy() _endif
+	_endprotect
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.int!draw_cluster(line_gc, text_gc, local_coord, text, status)
+	## Internal: draw tooltip box at local_coord.
+	## Mirrors rwwi_bulk_search_plugin.int!draw_time_series — no circle drawing.
+	_local map_window  << .current_doc.window
+	_local map_coord   << pixel_coordinate.new_from(line_gc.transform.convert(local_coord))
+
+	_local inner_bounds << map_window.inner_bounds
+	_local x << map_coord.x.max(0).min(inner_bounds.width)
+	_local y << map_coord.y.max(0).min(inner_bounds.height)
+
+	# Build text lines (split on newline_char)
+	_local window_min   << 5
+	_local window_max   << inner_bounds.width - 5
+	_local max_width    << _self.max_text_width
+
+	_local xmin << x - max_width _div 2
+	_local xmax << x + max_width _div 2
+	_if xmin < 5
+	_then
+		xmin << window_min
+		xmax << (window_min + max_width).min(window_max)
+	_elif xmax > window_max
+	_then
+		xmin << (window_max - max_width).max(window_min)
+		xmax << window_max
+	_endif
+	_local max_text_width << xmax - xmin
+
+	_local t_style  << _self.text_style[status].default(_self.text_style[:unknown])
+	_local text_lines << rope.new()
+	_local text_width  << 0
+	_local text_height << 0
+
+	_for str _over text.split_by(newline_char).fast_elements()
+	_loop
+		_local txt << str
+		_loop
+			_local txt_bounds << text_gc.draw_text(t_style, 0, -50, txt, _unset, _unset, :top_left).bounds
+			_local txt_width  << txt_bounds.width
+			_if txt_width > max_text_width
+			_then
+				txt << write_string(txt.slice(1, txt.size - 3), "..")
+			_else
+				text_width  << text_width.max(txt_width)
+				text_height +<< txt_bounds.height
+				text_lines.add_last(txt)
+				_leave
+			_endif
+		_endloop
+	_endloop
+
+	_local text_x << (xmin + (max_text_width - text_width)).min(x + 10).max(window_min)
+
+	_local above? << _false
+	_local text_y
+	_if y < text_height + 18
+	_then
+		above? << _false
+		text_y << y + 16
+	_else
+		above? << _true
+		text_y << y - text_height - 14
+	_endif
+
+	# Draw tooltip border
+	_local vec << _self.tooltip_border_points(x, y, text_x, text_y, text_width, text_height, above?)
+	line_gc.fill_line(_self.fill_style[status].default(_self.fill_style[:unknown]), vec)
+	line_gc.draw_line(_self.line_style, vec)
+
+	# Draw text
+	_local cur_y << text_y
+	_for str _over text_lines.fast_elements()
+	_loop
+		_local str_bounds << text_gc.draw_text(t_style, text_x, cur_y, str, _unset, _unset, :top_left).bounds
+		cur_y +<< str_bounds.height
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.tooltip_border_points(x, y, text_x, text_y, width, height, above?)
+	## Returns a signed_integer_vector outlining the tooltip bubble.
+	## Mirrors rwwi_bulk_search_plugin.tooltip_border_points exactly.
+
+	_local xmin << text_x - 4
+	_local ymin << text_y - 3
+	_local xmax << text_x + width + 3
+	_local ymax << text_y + height + 3
+
+	_local left_x  << x - 5
+	_local right_x << x + 5
+	_if left_x < text_x + 1
+	_then
+		left_x  << text_x + 1
+		right_x << left_x + 10
+	_elif right_x > text_x + width - 2
+	_then
+		right_x << text_x + width - 2
+		left_x  << right_x - 10
+	_endif
+
+	>> _if above?
+	   _then
+		   >> signed_integer_vector.new_with(
+			xmin, ymax - 4, xmin, ymin + 4,
+			xmin + 1, ymin + 2, xmin + 2, ymin + 1, xmin + 4, ymin,
+			xmax - 4, ymin, xmax - 2, ymin + 1, xmax - 1, ymin + 2,
+			xmax, ymin + 4, xmax, ymax - 4,
+			xmax - 1, ymax - 2, xmax - 2, ymax - 1, xmax - 4, ymax,
+			right_x, ymax, x, y, left_x, ymax,
+			xmin + 4, ymax, xmin + 2, ymax - 1, xmin + 1, ymax - 2, xmin, ymax - 4)
+	   _else
+		   >> signed_integer_vector.new_with(
+			xmin, ymax - 4, xmin, ymin + 4,
+			xmin + 1, ymin + 2, xmin + 2, ymin + 1, xmin + 4, ymin,
+			left_x, ymin, x, y, right_x, ymin,
+			xmax - 4, ymin, xmax - 2, ymin + 1, xmax - 1, ymin + 2,
+			xmax, ymin + 4, xmax, ymax - 4,
+			xmax - 1, ymax - 2, xmax - 2, ymax - 1, xmax - 4, ymax,
+			xmin + 4, ymax, xmin + 2, ymax - 1, xmin + 1, ymax - 2, xmin, ymax - 4)
+	   _endif
+_endmethod
+$

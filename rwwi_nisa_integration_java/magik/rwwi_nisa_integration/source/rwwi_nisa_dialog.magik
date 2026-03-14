@@ -1,0 +1,924 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## NISA Mass Problem Monitoring Dialog
+## UI layer for querying NISA mass problem (outage) status per cluster.
+## Searches clusters from PostgreSQL dim_cluster_stella_master_smallworld,
+## calls NISA API to check outage status, and shows results in a table.
+## Fires show_map() to let the plugin render impacted clusters on the map.
+
+remex(:rwwi_nisa_dialog)
+$
+
+def_slotted_exemplar(:rwwi_nisa_dialog,
+{
+	{:owner,            _unset, :writable},   # Parent plugin
+	{:items,            _unset, :writable},   # UI widget cache (property_list)
+	{:cluster_cache,    _unset, :writable},   # Row number -> cluster property_list
+	{:result_rows,      _unset, :writable},   # Current search results (rope of pl)
+	{:outage_cache,     _unset, :writable},   # cluster_code -> outage result pl
+	{:selected_cluster, _unset, :writable},   # Currently selected cluster pl
+	{:database,         _unset},              # GIS database (gis_program_manager.databases[:gis])
+	{:view,             _unset},              # ACE view (gis_program_manager.ace_view)
+	{:cs_transform,     _unset}               # WGS84 -> local CS transform (built once, reused)
+}, :model)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.new(_optional owner)
+	## Create new dialog
+	## Parameters:
+	##   owner - Parent plugin instance
+	>> _clone.init(owner)
+_endmethod
+$
+
+_private _method rwwi_nisa_dialog.init(owner)
+	## Initialise slots
+	.owner         << owner
+	.items         << property_list.new()
+	.cluster_cache << equality_hash_table.new()
+	.result_rows   << rope.new()
+	.outage_cache  << equality_hash_table.new()
+
+	_self.add_dependent(.owner)
+	>> _super.init()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.activate_in(frame)
+	## Build and activate Mass Problem Monitoring UI in frame
+
+	frame.title << "Mass Problem Monitoring (NISA)"
+
+	# Top-level canvas container (SWIFT requirement)
+	.items[:top] << top_c << sw_canvas_container.new(
+		frame, 4, 1,
+		:width,          950,
+		:height,         650,
+		:outer_spacing,  5,
+		:row_spacing,    5,
+		:identifier,     :nisa_top_container,
+		:model,          _self)
+
+	# Outer container: 4 rows - toolbar, table, actions, log
+	.items[:outer] << outer << sw_container.new(top_c, 4, 1,
+		:row_resize_values, {0, 1, 0, 1})
+
+	_self.build_toolbar(outer)
+	_self.build_table(outer)
+	_self.build_log(outer)
+
+	_self.log_info("Mass Problem Monitoring (NISA) - Ready")
+	_self.log_info("Enter a cluster code and click Search to begin.")
+
+	_return top_c
+_endmethod
+$
+
+_private _method rwwi_nisa_dialog.build_toolbar(parent)
+	## Build search toolbar: cluster code field + Search + Reset + count label
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type,     :button_group,
+		:show_separators?,   _true,
+		:enable_action_menu?, _false)
+
+	tb << toolbar_con.create_toolbar()
+
+	sw_label_item.new(tb, "  Cluster Code: ")
+
+	.items[:search_field] << sw_text_item.new(tb,
+		:model,          _self,
+		:display_length, 25,
+		:editable?,      _true)
+
+	.items[:search_btn] << sw_button_item.new(tb,
+		:image,    {:find, :ui_resources},
+		#:label,    "Search",
+		:model,    _self,
+		:selector, :search_clusters|()|,
+		:tooltip,  "Search clusters in database")
+
+	.items[:reset_btn] << sw_button_item.new(tb,
+		:image,    {:clear, :ui_resources},
+		#:label,    "Reset",
+		:model,    _self,
+		:selector, :reset|()|,
+		:tooltip,  "Clear results and cache")
+
+	.items[:run_btn] << sw_button_item.new(tb,
+		:image,    {:run, :ui_resources},
+		#:label,    "Check All Outages",
+		:model,    _self,
+		:selector, :check_outage_all|()|,
+		:tooltip,  "Check NISA outage status for all clusters in list")
+	.items[:run_btn].enabled? << _false
+
+	.items[:goto_btn] << sw_button_item.new(tb,
+		:image,    {:goto_object, :ui_resources},
+		#:label,    "Go To Selected",
+		:model,    _self,
+		:selector, :goto_selected|()|,
+		:tooltip,  "Navigate map to selected cluster")
+	.items[:goto_btn].enabled? << _false
+
+	.items[:highlight_btn] << sw_image_toggle_item.new(tb,
+		:image,    {:highlight, :ui_resources},
+		#:label,    "Show on Map",
+		:model,    _self,
+		:enabled?, _false,
+		:change_selector, :show_map|()|,
+		:value, _false,
+		:tooltip,  "Show/highlight cluster outage status on map")
+
+	.items[:count_label] << sw_label_item.new(tb, "  0 clusters found  ")
+_endmethod
+$
+
+_private _method rwwi_nisa_dialog.build_table(parent)
+	## Build 8-column result table (lat/lon cached in result_rows but not displayed)
+
+	.items[:table] << sw_table.new(parent,
+		:row_height,                   22,
+		:selection_type,               :row,
+		:selection_mode,               :one,
+		:model,                        _self,
+		:aspect,                       :cluster_list,
+		:row_lines?,                   _true,
+		:column_lines?,                _true,
+		:row_stripes?,                 _true,
+		:enable_horizontal_scrollbar?, _true,
+		:data_selector,                :|cluster_list_data()|,
+		:selection_notifier,           :cluster_selected|()|,
+		:enable_manage_columns?,       _true,
+		:min_height,                   250)
+
+	.items[:table].set_column_labels({
+		"#", "Cluster Code", "Stella ID", "OLT Code", "FDT Code",
+		"OLT Hostname", "Homepass", "Outage Status"})
+
+	.items[:table].col_resize_values << {0, 2, 1.5, 1.5, 1.5, 2, 1, 1}
+
+	.items[:table].enable_column_filter(2, _true)   # Cluster Code
+	.items[:table].enable_column_filter(3, _true)   # Stella ID
+	.items[:table].enable_column_filter(4, _true)   # OLT Code
+	.items[:table].enable_sort? << _true
+_endmethod
+$
+
+_private _method rwwi_nisa_dialog.build_log(parent)
+	## Build read-only log text window
+
+	.items[:log] << sw_text_window.new(parent)
+	.items[:log].show_border?                  << _true
+	.items[:log].enable_horizontal_scrollbar?  << _false
+	.items[:log].enable_vertical_scrollbar?    << _true
+	.items[:log].min_height                    << 120
+	.items[:log].editable?                     << _false
+	.items[:log].colour                        << colour.called(:white)
+_endmethod
+$
+
+##
+## Data / search
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.search_clusters()
+	## Query PostgreSQL dim_cluster_stella_master_smallworld
+	## by the value in the search field (ILIKE match on cluster_code).
+
+	_local search_term << .items[:search_field].value.default("").trim_spaces()
+
+	_if search_term.size < 3
+	_then
+		_self.log_separator()
+		_self.show_alert("Please enter at least 3 characters to search.")
+		_return
+	_endif
+
+	_self.log_separator()
+	_self.log_info("Searching clusters: '" + search_term + "'")
+
+	_local db_conn << _unset
+
+	_protect
+		_try _with errCon
+
+			_local is_connect?
+			(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+
+			_if _not is_connect?
+			_then
+				_self.log_error("Failed to connect to POSTGRESQL_ASTRI_DB")
+				_return
+			_endif
+
+			_local sql << write_string(
+				"SELECT cluster_id_stella, cluster_code_astri, olt_code, fdt_code, ",
+				"cluster_latitude, cluster_longitude, olt_hostname, homepass_total ",
+				"FROM smallworld.dim_cluster_stella_master_smallworld ",
+				"WHERE cluster_code_astri ILIKE ? ",
+				"ORDER BY cluster_code_astri ",
+				"LIMIT 25")
+
+			_local pattern << search_term + "%"
+			_local recs << db_conn.sql_select(sql, pattern)
+
+			.result_rows.empty()
+			_loop
+				_local rec << recs.get()
+				_if rec _is _unset _then _leave _endif
+				_local pl << property_list.new_with(
+					:cluster_id_stella, rec.cluster_id_stella.default("").write_string,
+					:cluster_code,      rec.cluster_code_astri.default("").write_string,
+					:olt_code,          rec.olt_code.default("").write_string,
+					:fdt_code,          rec.fdt_code.default("").write_string,
+					:lat,               rec.cluster_latitude.default("").write_string,
+					:lon,               rec.cluster_longitude.default("").write_string,
+					:olt_hostname,      rec.olt_hostname.default("").write_string,
+					:homepass_total,    rec.homepass_total.default("").write_string)
+				.result_rows.add_last(pl)
+			_endloop
+			recs.close()
+
+			_try
+				db_conn.commit()
+			_when error
+				db_conn.rollback()
+			_endtry
+
+			_local n << .result_rows.size
+			.items[:count_label].value << write_string("  ", n, " clusters found  ")
+			_self.log_success(write_string("Found ", n, " clusters"))
+
+			# Refresh table
+			_self.changed(:cluster_list, :renew)
+
+			# Enable buttons
+			_self.manage_actions()
+
+		_when error
+			_self.log_error("Search error: " + errCon.report_contents_string)
+		_endtry
+
+	_protection
+		_if db_conn _isnt _unset
+		_then
+			_try
+				db_conn.rollback()
+				db_conn.close()
+			_when error
+			_endtry
+		_endif
+	_endprotect
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.reset()
+	## Clear results, outage cache, and table
+
+	.result_rows.empty()
+	.outage_cache.empty()
+	.cluster_cache.empty()
+	.selected_cluster << _unset
+
+	_self.changed(:cluster_list, :renew)
+	.items[:count_label].value << "  0 clusters found  "
+	_self.manage_actions()
+	_self.clear_log()
+	_self.log_info("Reset complete.")
+_endmethod
+$
+
+##
+## Table data selector and selection handler
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.cluster_list_data()
+	## Data selector: populate table from result_rows
+
+	_try
+		.cluster_cache.empty()
+		_local row << 0
+
+		_for pl _over .result_rows.fast_elements()
+		_loop
+			row +<< 1
+			_local cc << pl[:cluster_code]
+
+			.items[:table].add_label(row, 1, row.write_string)
+			.items[:table].add_label(row, 2, cc)
+			.items[:table].add_label(row, 3, pl[:cluster_id_stella])
+			.items[:table].add_label(row, 4, pl[:olt_code])
+			.items[:table].add_label(row, 5, pl[:fdt_code])
+			.items[:table].add_label(row, 6, pl[:olt_hostname])
+			.items[:table].add_label(row, 7, pl[:homepass_total])
+			# Is Outage? column — traffic light icon + label
+			_local icon_status
+			_local remark_status
+			_local cached_result << .outage_cache[cc]
+			_if cached_result _is _unset
+			_then
+				# Not yet checked
+				icon_status   << {:traffic_light_yellow, :ui_resources}
+				remark_status << " Unchecked"
+			_elif cached_result[:success] _is _true _andif cached_result[:data].size = 0
+			_then
+				# API success, no active mass problems
+				icon_status   << {:traffic_light_green, :ui_resources}
+				remark_status << " Active"
+			_elif cached_result[:success] _is _true _andif cached_result[:data].size > 0
+			_then
+				# API success, outage active
+				icon_status   << {:traffic_light_red, :ui_resources}
+				remark_status << write_string(" Outage (", cached_result[:data].size, " MP)")
+			_else
+				# API call failed or success=false
+				icon_status   << {:traffic_light_red, :ui_resources}
+				remark_status << " Error"
+			_endif
+			.items[:table].add_cell(row, 8, {}, {:image, icon_status}, {:label, remark_status})
+			# lat/lon not displayed but remain in pl[:lat] / pl[:lon] for map rendering
+			
+			.cluster_cache[row] << pl
+		_endloop
+
+	_when error
+		write("ERROR in cluster_list_data: ", condition.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.cluster_selected(table, selection)
+	## Handle row selection in cluster table
+
+	_if selection _is _unset _orif selection.size = 0
+	_then
+		.selected_cluster << _unset
+		_self.manage_actions()
+		_return
+	_endif
+
+	_local row << selection.an_element()
+	.selected_cluster << .cluster_cache[row]
+	_self.manage_actions()
+_endmethod
+$
+
+##
+## Outage check actions
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.check_outage_selected()
+	## Call NISA API for the currently selected cluster
+
+	_if .selected_cluster _is _unset
+	_then
+		_self.log_warning("No cluster selected.")
+		_return
+	_endif
+
+	_local cc << .selected_cluster[:cluster_code]
+	_self.log_separator()
+	_self.log_info("Checking outage for: " + cc)
+	_self.check_one_cluster(.selected_cluster)
+
+	# Refresh the Is Outage? column
+	_self.changed(:cluster_list, :renew)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.check_outage_all()
+	## Call NISA API for every cluster in result_rows
+
+	_if .result_rows.empty?
+	_then
+		_self.log_warning("No clusters in list.")
+		_return
+	_endif
+
+	_local total << .result_rows.size
+	_self.log_separator()
+	_self.log_info(write_string("Checking outage for all ", total, " clusters..."))
+
+	_local done << 0
+	_for pl _over .result_rows.fast_elements()
+	_loop
+		_self.check_one_cluster(pl)
+		done +<< 1
+		_local cc << pl[:cluster_code]
+		_self.log_info(write_string("  [", done, "/", total, "] ", cc, " -> ",
+			_self.get_outage_label(cc)))
+	_endloop
+
+	_self.log_success("Outage check complete for all clusters.")
+	_self.changed(:cluster_list, :renew)
+_endmethod
+$
+
+_private _method rwwi_nisa_dialog.check_one_cluster(cluster_pl)
+	## Internal: call NISA API using cluster_id_stella already in the result row.
+	## Avoids a second PostgreSQL lookup by using the stella ID from the search.
+	##
+	## Parameters:
+	##   cluster_pl - property_list from result_rows (has :cluster_id_stella and :cluster_code)
+
+	_local cluster_code     << cluster_pl[:cluster_code]
+	_local cluster_id_stella << cluster_pl[:cluster_id_stella]
+
+	_try _with errCon
+		_if cluster_id_stella _is _unset _orif cluster_id_stella = ""
+		_then
+			_self.log_warning(write_string("  No Stella ID for ", cluster_code, " - skipping"))
+			_return
+		_endif
+
+		# Call NISA API directly with stella ID (no DB lookup needed)
+		_local json_result << nisa_get_massproblem_active_cluster(cluster_id_stella)
+		_local result       << _self.parse_massproblem_response_test(json_result)
+		.outage_cache[cluster_code] << result
+
+		_local data_count << result[:data].size
+		_local status_str << _if data_count > 0
+		                     _then >> write_string("OUTAGE (", data_count, " MP)")
+		                     _else >> "OK"
+		                     _endif
+		_self.log_info(write_string("  ", cluster_code, " (", cluster_id_stella, ") -> ", status_str,
+			_if _not result[:success]
+			_then >> write_string(" [msg: ", result[:msg], "]")
+			_else >> ""
+			_endif))
+	_when error
+		_self.log_error(write_string("  Error checking ", cluster_code, ": ",
+			errCon.report_contents_string))
+		# Store error result so it does not remain :unknown
+		_local err_pl << property_list.new_with(
+			:success, _false,
+			:msg,     errCon.report_contents_string,
+			:data,    rope.new())
+		.outage_cache[cluster_code] << err_pl
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.parse_massproblem_response(json_string)
+	## Parse raw NISA mass problem API response JSON into Magik property_lists.
+	## Moved here from global nisa_parse_massproblem_response proc so the dialog
+	## is self-contained.
+	##
+	## Parameters:
+	##   json_string - Raw JSON string from nisa_get_massproblem_active_cluster()
+	##
+	## Returns:
+	##   property_list with:
+	##     :success - Boolean
+	##     :msg     - String message
+	##     :data    - Rope of property_lists, each with:
+	##                  :mp_no, :event, :area, :category,
+	##                  :start_date, :start_time, :estimation,
+	##                  :sites - Rope of property_lists with:
+	##                           :olt_name, :cluster_name, :frame, :slot, :port
+
+	_local result << property_list.new()
+	result[:success] << _false
+	result[:msg]     << ""
+	result[:data]    << rope.new()
+
+	_if json_string _is _unset _orif json_string.empty?
+	_then
+		result[:msg] << "No response"
+		_return result
+	_endif
+
+	_try _with errCon
+		_local json_obj << json_parser.parse(json_string)
+
+		result[:success] << json_obj[:success].default(_false)
+		result[:msg]     << json_obj[:msg].default("").write_string
+
+		_local json_data << json_obj[:data]
+		_if json_data _is _unset _then _return result _endif
+
+		_local data_rope << rope.new()
+
+		_for mp_item _over json_data.fast_elements()
+		_loop
+			_local mp_pl << property_list.new()
+			mp_pl[:mp_no]      << mp_item[:mp_no].default("").write_string
+			mp_pl[:event]      << mp_item[:event].default("").write_string
+			mp_pl[:area]       << mp_item[:area].default("").write_string
+			mp_pl[:category]   << mp_item[:category].default("").write_string
+			mp_pl[:start_date] << mp_item[:start_date].default("").write_string
+			mp_pl[:start_time] << mp_item[:start_time].default("").write_string
+			mp_pl[:estimation] << mp_item[:estimation].default("").write_string
+
+			_local json_sites << mp_item[:sites]
+			_local sites_rope << rope.new()
+			_if json_sites _isnt _unset
+			_then
+				_for site_item _over json_sites.fast_elements()
+				_loop
+					_local site_pl << property_list.new()
+					site_pl[:olt_name]     << site_item[:olt_name].default("").write_string
+					site_pl[:cluster_name] << site_item[:cluster_name].default("").write_string
+					site_pl[:frame]        << site_item[:frame].default("").write_string
+					site_pl[:slot]         << site_item[:slot].default("").write_string
+					site_pl[:port]         << site_item[:port].default("").write_string
+					sites_rope.add_last(site_pl)
+				_endloop
+			_endif
+
+			mp_pl[:sites] << sites_rope
+			data_rope.add_last(mp_pl)
+		_endloop
+
+		result[:data] << data_rope
+
+	_when error
+		result[:msg] << "Parse error: " + errCon.report_contents_string
+		_self.log_error("parse_massproblem_response: " + errCon.report_contents_string)
+	_endtry
+
+	>> result
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={nisa_integration})
+_method rwwi_nisa_dialog.parse_massproblem_response_test(json_string)
+	## TEST VERSION — always injects one dummy mass problem record regardless of
+	## whether the actual JSON response contains data.
+	## Use this during development/testing when the NISA API returns empty data.
+
+	# Run the real parser first
+	_local result << _self.parse_massproblem_response(json_string)
+
+	# If real data came back, return it as-is
+	_if result[:success] _is _true _andif result[:data].size > 0
+	_then
+		>> result
+	_endif
+
+	# Inject dummy mass problem so the outage path can be exercised
+	_local dummy_site << property_list.new_with(
+		:olt_name,     "OLT-TEST-01",
+		:cluster_name, "CLUSTER-DUMMY",
+		:frame,        "1",
+		:slot,         "2",
+		:port,         "3")
+
+	_local dummy_mp << property_list.new_with(
+		:mp_no,      "MP-DUMMY-0001",
+		:event,      "DUMMY FIBRE CUT",
+		:area,       "TEST AREA",
+		:category,   "FIBRE",
+		:start_date, "2026-01-01",
+		:start_time, "08:00:00",
+		:estimation, "2026-01-01 12:00:00",
+		:sites,      rope.new_with(dummy_site))
+
+	result[:success] << _true
+	result[:msg]     << "dummy"
+	result[:data]    << rope.new_with(dummy_mp)
+
+	>> result
+_endmethod
+$
+
+##
+## Database / coordinate helpers — mirrors rwi_aerial_kmz_object_writer.init() pattern
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.init_transform()
+	## Initialise database, view, and WGS84 -> local CS transform.
+	## Mirrors rwi_aerial_kmz_object_writer.init() exactly.
+
+	.database << gis_program_manager.databases[:gis]
+	.view     << gis_program_manager.ace_view
+
+	_if .database _isnt _unset _andif .view _isnt _unset
+	_then
+		_dynamic !current_world!            << .database.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+
+		cs_wgs84 << .view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+		cs_local << .database.world.coordinate_system
+		.cs_transform << transform.new_converting_cs_to_cs(cs_wgs84, cs_local)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.database
+	## Return the GIS database, initialising on first use.
+
+	_if .database _is _unset _then _self.init_transform() _endif
+	>> .database
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.coord_xform()
+	## Return the WGS84 -> local CS transform, initialising on first use.
+
+	_if .cs_transform _is _unset _then _self.init_transform() _endif
+	>> .cs_transform
+_endmethod
+$
+
+##
+## Map action
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.goto_selected()
+	## Navigate the map to the currently selected cluster.
+	## Converts WGS84 lat/lon to a pseudo_point in local CS here in the dialog,
+	## then fires :goto_request with the geom so the plugin only needs goto_bounds.
+	write("goto_selected called")
+	_if .selected_cluster _is _unset
+	_then
+		_self.log_warning("No cluster selected.")
+		_return
+	_endif
+
+	_local pl      << .selected_cluster
+	_local lat_str << pl[:lat].default("")
+	_local lon_str << pl[:lon].default("")
+
+	_if lat_str = "" _orif lon_str = ""
+	_then
+		_self.log_warning("Selected cluster has no coordinates.")
+		_return
+	_endif
+
+	_try _with errCon
+		_local xf << _self.coord_xform()
+		_dynamic !current_world!             << .database.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+		_dynamic !print_float_precision!     << 16
+		_local local_coord << xf.convert(
+			coordinate.new(lon_str.as_number(), lat_str.as_number()))
+
+		_local pp << pseudo_point.new(local_coord)
+		pp.world << _self.database.world
+
+		_self.log_info("Going to cluster: " + pl[:cluster_code])
+		_self.changed(:goto_request, pp)
+
+	_when error
+		_self.log_error("goto_selected error: " + errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.show_map(toggled?)
+	## Toggle cluster outage highlights on the map.
+	## Fires :show_map changed notification consumed by rwwi_nisa_plugin.
+
+	_if .result_rows.empty?
+	_then
+		_self.log_warning("No clusters to show on map.")
+		_return
+	_endif
+	_self.changed(:show_map, toggled?)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.records
+	## Return a rope of outage-active cluster records for map rendering.
+	## Only clusters with red icon (active outage: success=true, data.size > 0)
+	## are included.
+	##
+	## Each element is a property_list with:
+	##   :pseudo_point - pseudo_point in local CS (coordinate only, no world set)
+	##   :cluster_pl   - original cluster property_list from result_rows
+	##   :outage_data  - cached outage result property_list
+
+	_local result << rope.new()
+	_local xf     << _self.coord_xform()
+
+	_for pl _over .result_rows.fast_elements()
+	_loop
+		_local cc     << pl[:cluster_code]
+		_local cached << .outage_cache[cc]
+
+		# Only include clusters with active outage (red icon)
+		_if cached _is _unset _orif
+		    _not (cached[:success] _is _true _andif cached[:data].size > 0)
+		_then
+			_continue
+		_endif
+
+		_local lat_str << pl[:lat].default("")
+		_local lon_str << pl[:lon].default("")
+		_if lat_str = "" _orif lon_str = "" _then _continue _endif
+
+		_try
+			_dynamic !current_world!             << .database.collections[:sw_gis!world].at(0,0)
+			_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+			_dynamic !print_float_precision!     << 16
+			_local local_coord << xf.convert(
+				coordinate.new(lon_str.as_number(), lat_str.as_number()))
+			_local pp << pseudo_point.new(local_coord)
+
+			result.add_last(property_list.new_with(
+				:pseudo_point, pp,
+				:cluster_pl,   pl,
+				:outage_data,  cached))
+		_when error
+			# Skip clusters with bad coordinates
+		_endtry
+	_endloop
+
+	>> result
+_endmethod
+$
+
+##
+## Outage label / icon helpers
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.get_outage_label(cluster_code)
+	## Return a display string for the Is Outage? column.
+	## :unknown -> "(unchecked)"
+	## no data  -> "OK"
+	## has data -> "OUTAGE (N MP)"
+
+	_local result << .outage_cache[cluster_code]
+	_if result _is _unset
+	_then
+		_return "(unchecked)"
+	_endif
+
+	_local data_count << result[:data].size
+	_if data_count > 0
+	_then
+		_return write_string("OUTAGE (", data_count, " MP)")
+	_else
+		_return "OK"
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.outage_status_for(cluster_code)
+	## Return :outage, :ok, or :unknown for the given cluster_code.
+	## Used by the plugin for colour-coded rendering.
+
+	_local result << .outage_cache[cluster_code]
+	_if result _is _unset _then _return :unknown _endif
+	_if result[:data].size > 0 _then _return :outage _endif
+	_return :ok
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.outage_tooltip_for(cluster_code)
+	## Build tooltip string from stored NISA API result.
+	## Shows cluster header + active mass problem details if any.
+	##
+	## Returns a multi-line string.
+
+	_local pl << _unset
+	_for row_pl _over .result_rows.fast_elements()
+	_loop
+		_if row_pl[:cluster_code] = cluster_code
+		_then
+			pl << row_pl
+			_leave
+		_endif
+	_endloop
+
+	_local lines << rope.new()
+	_if pl _isnt _unset
+	_then
+		lines.add_last(write_string("Cluster : ", cluster_code))
+		lines.add_last(write_string("OLT     : ", pl[:olt_code]))
+		lines.add_last(write_string("FDT     : ", pl[:fdt_code]))
+		lines.add_last(write_string("Homepass: ", pl[:homepass_total]))
+	_else
+		lines.add_last(write_string("Cluster : ", cluster_code))
+	_endif
+
+	_local result << .outage_cache[cluster_code]
+	_if result _isnt _unset _andif result[:data].size > 0
+	_then
+		lines.add_last("-- MASS PROBLEM ACTIVE --")
+		_local first_mp << result[:data][1]
+		lines.add_last(write_string("MP No   : ", first_mp[:mp_no]))
+		lines.add_last(write_string("Event   : ", first_mp[:event]))
+		lines.add_last(write_string("Area    : ", first_mp[:area]))
+		lines.add_last(write_string("Category: ", first_mp[:category]))
+		lines.add_last(write_string("Start   : ", first_mp[:start_date], " ", first_mp[:start_time]))
+		lines.add_last(write_string("ETA     : ", first_mp[:estimation]))
+
+		# First site
+		_local sites << first_mp[:sites]
+		_if sites _isnt _unset _andif sites.size > 0
+		_then
+			_local s1 << sites[1]
+			_local site_str << write_string(s1[:cluster_name], " (", s1[:olt_name], ")")
+			_if sites.size > 1
+			_then site_str << site_str + write_string(" +", sites.size - 1, " more")
+			_endif
+			lines.add_last(write_string("Sites   : ", site_str))
+		_endif
+
+		# If more than 1 MP
+		_if result[:data].size > 1
+		_then
+			lines.add_last(write_string("(+", result[:data].size - 1, " more mass problems)"))
+		_endif
+	_endif
+
+	# Join with newlines
+	_local tooltip << ""
+	_for i _over 1.upto(lines.size)
+	_loop
+		_if i > 1 _then tooltip << tooltip + %newline.write_string _endif
+		tooltip << tooltip + lines[i]
+	_endloop
+	_return tooltip
+_endmethod
+$
+
+##
+## Manage action states
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.manage_actions()
+	## Enable / disable buttons based on current state
+
+	_local has_results   << _not .result_rows.empty?
+	_local has_selection << .selected_cluster _isnt _unset
+
+	.items[:run_btn].enabled?       << has_results
+	.items[:goto_btn].enabled?      << has_selection
+	.items[:highlight_btn].enabled? << has_results
+_endmethod
+$
+
+##
+## Logging helpers
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.log_info(message)
+	## Append an info line to the log window
+
+	_if .items[:log] _isnt _unset
+	_then
+		_local t << .items[:log].text.default("")
+		.items[:log].text << t + message + %newline.write_string
+		.items[:log].goto_line_end()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.log_success(message)
+	_self.log_info("[OK] " + message)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.log_error(message)
+	_self.log_info("[ERROR] " + message)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.log_warning(message)
+	_self.log_info("[WARN] " + message)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.log_separator()
+	_self.log_info("-" * 60)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.clear_log()
+	_if .items[:log] _isnt _unset
+	_then
+		.items[:log].text << ""
+	_endif
+_endmethod
+$
