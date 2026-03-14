@@ -346,8 +346,9 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# Step 9: Find structure path via structure_manager (start coord -> end coord)
 		# Uses get_continuous_structures_via_coords to auto-traverse UUBs and underground routes
 		_local stm << structure_manager.new(.database, .database.world)
-		_local path_sector << sector.new_with(l_location_start, l_location_end)
-		_local path_swl << stm.get_continuous_structures_via_coords(path_sector)
+		#_local path_sector << sector.new_with(l_location_start, l_location_end)
+		#_local path_swl << stm.get_continuous_structures_via_coords(path_sector)
+		_local path_swl << stm.structure_route_between(l_result_uub_start, l_result_uub_end)
 
 		# Fallback: manually collect structures if path is empty
 		_if path_swl _is _unset _orif path_swl.size = 0

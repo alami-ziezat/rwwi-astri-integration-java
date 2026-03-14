@@ -87,13 +87,13 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_s
 	# Handle SUBDUCT 40/34 folder
 	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 40") _isnt _unset
 	_then
-		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "40")
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "40/34")
 	_endif
 
 	# Handle SUBDUCT 32/28 folder
 	_if p_folder_name.uppercase.index_of_seq("SUBDUCT 32") _isnt _unset
 	_then
-		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "32")
+		_self.write_sub_duct_for_folder(p_stream, p_area, p_indent, "32/28")
 	_endif
 
 	# Handle OPEN TRENCHING folder

@@ -178,8 +178,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 			:feeder_code,         .feeder_code_db,
 			:subfeeder_code,      .subfeeder_code_db,
 			:cluster_code,        .cluster_code_db,
-			:infra_code,          .cluster_code_db,
-			:infra_type,          infra_type_cap
+			:infra_code,          .cluster_code_db
 		)
 
 		# Step 8: Insert record
@@ -191,9 +190,10 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 			_local stm << structure_manager.new(.database, .database.world)
 			_local path_sector << sector.new_with(start_coord, end_coord)
 			_local path_subduct << stm.get_continuous_structures_via_coords(path_sector)
+			#_local path_subduct << stm.structure_route_between(uu_s, uu_e)
 			_if path_subduct _isnt _unset _andif path_subduct.size > 0
 			_then
-				sub_duct_result.place_in_structures(path_subduct)
+				sub_duct_result.place_in_structures(path_subduct, :straight_through)
 				write("    >> Sub Duct placed in structures (", path_subduct.size, " structures)")
 			_endif
 		_when error

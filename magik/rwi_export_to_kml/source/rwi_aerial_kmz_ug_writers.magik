@@ -433,8 +433,12 @@ $
 _pragma(classify_level=basic, topic={rwi_export})
 _private _method rwi_export_to_aerial_kmz.write_sub_duct_for_folder(p_stream, p_area, p_indent, _optional p_spec_filter)
 	## Write mit_conduit (sub duct) route chains to folder.
-	## Queries mit_conduit objects in area, optionally filtering by spec_id.
-	## Mirrors write_boring_manual_for_folder() pattern.
+	## Conduit path is continuous across UUBs (unlike cable which breaks at each UUB).
+	## Pattern:
+	##   1. Query underground_routes in area
+	##   2. route.conduits to get conduits inside each underground_route
+	##   3. Dedup by conduit id (conduit spans multiple routes, must not repeat)
+	##   4. Get geometry via route_coordinates (returns coords_rope)
 	##
 	## Parameters:
 	##   p_stream      - Output stream
@@ -442,17 +446,31 @@ _private _method rwi_export_to_aerial_kmz.write_sub_duct_for_folder(p_stream, p_
 	##   p_indent      - Indentation string
 	##   p_spec_filter - Optional spec filter: "40/34" or "32/28" (first optional)
 
-	# Query mit_conduit chains in area (uses :route geometry)
-	all_conduits << .gc[:mit_conduit].select(
+	# Step 1: Query underground_routes in area
+	all_ug_routes << .gc[:underground_route].select(
 		predicate.interacts(:route, p_area))
 
-	# Collect valid entries
-	matching << rope.new()
-	_for sd _over all_conduits.fast_elements()
+	# Step 2: Collect unique conduits by id (conduit is continuous across UUBs,
+	# so the same conduit id appears in multiple route sections)
+	seen_ids << set.new()
+	unique_conduits << rope.new()
+	_for route _over all_ug_routes.fast_elements()
 	_loop
-		route_geom << sd.route
-		_if route_geom _is _unset _then _continue _endif
+		route_conduits << route.conduits
+		_if route_conduits _is _unset _then _continue _endif
+		_for sd _over route_conduits.fast_elements()
+		_loop
+			_if seen_ids.includes?(sd.id) _then _continue _endif
+			seen_ids.add(sd.id)
+			unique_conduits.add(sd)
+		_endloop
+	_endloop
 
+	# Step 3: Filter by spec and collect geometry via route_coordinates
+	matching << rope.new()
+	matching_coords << property_list.new()
+	_for sd _over unique_conduits.fast_elements()
+	_loop
 		# Filter by spec if requested
 		_if p_spec_filter _isnt _unset
 		_then
@@ -463,7 +481,12 @@ _private _method rwi_export_to_aerial_kmz.write_sub_duct_for_folder(p_stream, p_
 			_endif
 		_endif
 
+		# Get geometry via route_coordinates - returns coords_rope
+		sd_coords << sd.route_coordinates()
+		_if sd_coords _is _unset _orif sd_coords.empty? _then _continue _endif
+
 		matching.add(sd)
+		matching_coords[sd.id] << sd_coords
 	_endloop
 
 	# Sort by name ascending
@@ -477,8 +500,8 @@ _private _method rwi_export_to_aerial_kmz.write_sub_duct_for_folder(p_stream, p_
 	sd_count << 0
 	_for sd _over sorted_sds.fast_elements()
 	_loop
-		route_geom << sd.route
-		.object_writer.write_sub_duct(sd, route_geom, p_stream, p_indent)
+		sd_coords << matching_coords[sd.id]
+		.object_writer.write_sub_duct(sd, sd_coords, p_stream, p_indent)
 		sd_count +<< 1
 	_endloop
 

@@ -43,14 +43,18 @@ _method rwwi_astri_workorder_plugin.activate_workorder()
 	_then
 		.dialog << rwwi_astri_workorder_dialog.new(_self, _self.application)
 		_self.cache_dialog( name, .dialog)
+		.dialog.activate_relative_to("activate_dialog",
+					_self.top_frame,50,50)
+	_else 
+		.dialog.activate()
 	_endif
 
-	_if .dialog.active?.not
-	_then
-		.dialog.activate()
-	_else
-		write("Dialog already active")
-	_endif
+	#_if .dialog.active?.not
+	#_then
+	#	.dialog.activate()
+	#_else
+	#	write("Dialog already active")
+	#_endif
 	>> .dialog
 _endmethod
 $
