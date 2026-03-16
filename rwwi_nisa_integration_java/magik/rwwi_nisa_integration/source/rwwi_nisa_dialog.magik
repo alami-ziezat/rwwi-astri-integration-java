@@ -129,10 +129,10 @@ _private _method rwwi_nisa_dialog.build_toolbar(parent)
 		:image,    {:highlight, :ui_resources},
 		#:label,    "Show on Map",
 		:model,    _self,
-		:enabled?, _false,
 		:change_selector, :show_map|()|,
 		:value, _false,
 		:tooltip,  "Show/highlight cluster outage status on map")
+	.items[:highlight_btn].enabled? << _false
 
 	.items[:count_label] << sw_label_item.new(tb, "  0 clusters found  ")
 _endmethod
@@ -221,26 +221,42 @@ _method rwwi_nisa_dialog.search_clusters()
 				"SELECT cluster_id_stella, cluster_code_astri, olt_code, fdt_code, ",
 				"cluster_latitude, cluster_longitude, olt_hostname, homepass_total ",
 				"FROM smallworld.dim_cluster_stella_master_smallworld ",
-				"WHERE cluster_code_astri ILIKE ? ",
+				"WHERE cluster_code_astri ILIKE ? OR cluster_id_stella ILIKE ? ",
 				"ORDER BY cluster_code_astri ",
 				"LIMIT 25")
 
 			_local pattern << search_term + "%"
-			_local recs << db_conn.sql_select(sql, pattern)
+			_local recs << db_conn.sql_select(sql, pattern, pattern)
 
 			.result_rows.empty()
 			_loop
 				_local rec << recs.get()
 				_if rec _is _unset _then _leave _endif
+				_local cc << rec.cluster_code_astri.default("").write_string
 				_local pl << property_list.new_with(
 					:cluster_id_stella, rec.cluster_id_stella.default("").write_string,
-					:cluster_code,      rec.cluster_code_astri.default("").write_string,
+					:cluster_code,      cc,
 					:olt_code,          rec.olt_code.default("").write_string,
 					:fdt_code,          rec.fdt_code.default("").write_string,
 					:lat,               rec.cluster_latitude.default("").write_string,
 					:lon,               rec.cluster_longitude.default("").write_string,
 					:olt_hostname,      rec.olt_hostname.default("").write_string,
-					:homepass_total,    rec.homepass_total.default("").write_string)
+					:homepass_total,    rec.homepass_total.default("").write_string,
+					:zone_rwo,          _unset)
+
+				# Look up matching ftth!zone (Macro Cell) in the GIS database
+				_try
+					_local zone_col << _self.database.collections[:ftth!zone]
+					_if zone_col _isnt _unset
+					_then
+						pl[:zone_rwo] << zone_col.select(
+							predicate.eq(:type, "Macro Cell") _and
+							predicate.eq(:cluster_code, cc)).an_element()
+					_endif
+				_when error
+					# Zone lookup failure is non-fatal — zone_rwo stays _unset
+				_endtry
+
 				.result_rows.add_last(pl)
 			_endloop
 			recs.close()
@@ -288,7 +304,9 @@ _method rwwi_nisa_dialog.reset()
 	.selected_cluster << _unset
 
 	_self.changed(:cluster_list, :renew)
+	_self.show_map(_false)
 	.items[:count_label].value << "  0 clusters found  "
+	.items[:highlight_btn].value << _false
 	_self.manage_actions()
 	_self.clear_log()
 	_self.log_info("Reset complete.")
@@ -422,6 +440,7 @@ _method rwwi_nisa_dialog.check_outage_all()
 
 	_self.log_success("Outage check complete for all clusters.")
 	_self.changed(:cluster_list, :renew)
+	_self.manage_actions()
 _endmethod
 $
 
@@ -867,9 +886,23 @@ _method rwwi_nisa_dialog.manage_actions()
 	_local has_results   << _not .result_rows.empty?
 	_local has_selection << .selected_cluster _isnt _unset
 
+	# highlight_btn only enabled when at least one cluster has an active outage
+	_local has_outage << _false
+	_for pl _over .result_rows.fast_elements()
+	_loop
+		_local cached << .outage_cache[pl[:cluster_code]]
+		_if cached _isnt _unset _andif
+		    cached[:success] _is _true _andif
+		    cached[:data].size > 0
+		_then
+			has_outage << _true
+			_leave
+		_endif
+	_endloop
+
 	.items[:run_btn].enabled?       << has_results
 	.items[:goto_btn].enabled?      << has_selection
-	.items[:highlight_btn].enabled? << has_results
+	.items[:highlight_btn].enabled? << has_outage
 _endmethod
 $
 

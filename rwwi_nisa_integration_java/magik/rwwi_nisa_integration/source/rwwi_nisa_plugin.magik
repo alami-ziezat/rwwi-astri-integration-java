@@ -20,7 +20,8 @@ def_slotted_exemplar(:rwwi_nisa_plugin,
 	{:current_doc_gui, _unset},   # Current map document GUI
 	{:current_doc,     _unset},   # Current map document (map view)
 	{:geoms,           _unset},   # Rope of property_lists {local_coord, cluster_pl}
-	{:render_status,   _unset}    # :enable or :disable
+	{:render_status,     _unset},   # :enable or :disable
+	{:zone_pseudo_areas, _unset}    # Rope of pseudo_areas published via :geometry_to_draw
 }, :plugin)
 $
 
@@ -35,9 +36,9 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 rwwi_nisa_plugin.define_shared_constant(:text_style,
 	property_list.new_with(
-		:outage,  text_style.new_with_properties(:colour, colour.called(:white)),
-		:ok,      text_style.new_with_properties(:colour, colour.called(:white)),
-		:unknown, text_style.new_with_properties(:colour, colour.called(:black))),
+		:outage,  text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("bold", 8)),
+		:ok,      text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("plain", 8)),
+		:unknown, text_style.new_with_properties(:colour, colour.called(:black), :font,font.new_logical("plain", 8))),
 	:private)
 $
 
@@ -58,7 +59,15 @@ rwwi_nisa_plugin.define_shared_constant(:line_style,
 $
 
 _pragma(classify_level=basic, topic={nisa_integration})
-rwwi_nisa_plugin.define_shared_constant(:max_text_width, 400, :private)
+rwwi_nisa_plugin.define_shared_constant(:zone_fill_style,
+	fill_style.new_with_properties(
+		:foreground_colour, colour.called(:red),
+		:wash_percent,      50),
+	:private)
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+rwwi_nisa_plugin.define_shared_constant(:max_text_width, 200, :private)
 $
 
 ##
@@ -73,7 +82,7 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 rwwi_nisa_plugin.define_shared_constant(:databus_producer_data_types,
-	{:goto_request},
+	{:goto_request, :geometry_to_draw, :geometry_to_undraw},
 	:public)
 $
 
@@ -128,6 +137,7 @@ _method rwwi_nisa_plugin.sw_databus_data_available(data_type_name, data)
 	## Handle databus events.
 	## :current_document -> data is {doc, doc_gui}, unpacked via _scatter.
 
+	write("Data available on databus: ", data_type_name, " with data: ", data)
 	_if data_type_name _is :current_document
 	_then
 		(doc, doc_gui) << (_scatter data)
@@ -163,9 +173,6 @@ _method rwwi_nisa_plugin.note_change(who, what, data)
 	## :goto_request -> navigate map to the given cluster property_list.
 
 	write("NISA plugin note_change: ", what, " from ", who, " with data: ", data, " (current_doc=", .current_doc, ")")
- 	_global cd, dt
-	cd << .current_doc
-	dt << data
 	_if what _is :show_map
 	_then
 		_self.show_mode(data)
@@ -203,6 +210,15 @@ _method rwwi_nisa_plugin.show_mode(enable?)
 		_endif
 	_else
 		.render_status << :disable
+		# Undraw each zone geometry that was previously published
+		_if .zone_pseudo_areas _isnt _unset
+		_then
+			_for pa _over .zone_pseudo_areas.fast_elements()
+			_loop
+				_self.databus.make_data_available(:geometry_to_undraw, {pa, _self.zone_fill_style})
+			_endloop
+			.zone_pseudo_areas << _unset
+		_endif
 		a_map_manager << _self.get_service_provider(:map_manager)
 		_if a_map_manager _isnt _unset
 		_then
@@ -215,12 +231,14 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.show_records()
-	## Build geom cache from dialog records and trigger map redraw.
+	## Build geom cache from dialog records, publish zone geometries to databus,
+	## then trigger map redraw for tooltips.
 	## Mirrors rwwi_bulk_search_plugin.show_records pattern.
 
 	_if .render_status _is :enable
 	_then
 		_self.build_rwo_cache()
+		_self.publish_zone_geometries()
 		_self.refresh_maps()
 	_endif
 _endmethod
@@ -278,8 +296,8 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_plugin.draw_all_clusters(gc)
-	## Draw all outage-active cluster points with tooltips onto the map gc.
-	## All records in .geoms come from dialog.records, so status is always :outage.
+	## Draw all outage-active cluster tooltips onto the map gc.
+	## Zone areas are published to databus via publish_zone_geometries().
 
 	_if .geoms _is _unset _orif .geoms.empty? _then _return _endif
 
@@ -290,6 +308,39 @@ _private _method rwwi_nisa_plugin.draw_all_clusters(gc)
 		_local local_coord  << rec[:pseudo_point].coordinate
 
 		_self.draw_cluster(gc, local_coord, cluster_code, :outage)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.publish_zone_geometries()
+	## Publish each outage cluster's zone area to the databus as :geometry_to_draw.
+	## Mirrors rwwi_dma_analysis.losses_map pattern:
+	##   pseudo_area.new(geom) + .world + make_data_available(:geometry_to_draw, {pa, style})
+
+	_if .geoms _is _unset _orif .geoms.empty? _then _return _endif
+	_if .current_doc _is _unset _then _return _endif
+
+	_local world << .current_doc.world
+
+	.zone_pseudo_areas << rope.new()
+
+	_for rec _over .geoms.fast_elements()
+	_loop
+		_local zone_rwo << rec[:cluster_pl][:zone_rwo]
+		_if zone_rwo _is _unset _then _continue _endif
+
+		_local geom << zone_rwo.location
+		_if geom _is _unset _then _continue _endif
+
+		_try _with errCon
+			_local pa << pseudo_area.new(geom)
+			pa.world << world
+			.zone_pseudo_areas.add_last(pa)
+			_self.databus.make_data_available(:geometry_to_draw, {pa, _self.zone_fill_style})
+		_when error
+			write("NISA plugin: publish_zone_geometries error - ", errCon.report_contents_string)
+		_endtry
 	_endloop
 _endmethod
 $
@@ -356,6 +407,7 @@ _private _method rwwi_nisa_plugin.int!draw_cluster(line_gc, text_gc, local_coord
 	_for str _over text.split_by(newline_char).fast_elements()
 	_loop
 		_local txt << str
+		write("tooltip line: ", txt, "size: ", txt.size)
 		_loop
 			_local txt_bounds << text_gc.draw_text(t_style, 0, -50, txt, _unset, _unset, :top_left).bounds
 			_local txt_width  << txt_bounds.width
@@ -384,6 +436,7 @@ _private _method rwwi_nisa_plugin.int!draw_cluster(line_gc, text_gc, local_coord
 		text_y << y - text_height - 14
 	_endif
 
+	write("	>> Drawing cluster tooltip at (", x, ", ", y, ") with text: ", text_x, ", ", text_y, " (above? ", above?, ") text_height: ", text_height, " text_width: ", text_width, ")")
 	# Draw tooltip border
 	_local vec << _self.tooltip_border_points(x, y, text_x, text_y, text_width, text_height, above?)
 	line_gc.fill_line(_self.fill_style[status].default(_self.fill_style[:unknown]), vec)
