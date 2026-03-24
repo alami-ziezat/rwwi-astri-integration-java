@@ -1163,19 +1163,22 @@ $
 
 _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 	## Add sheath_with_loc (cable) lengths to BOQ result.
-	## Groups all SWL records by stf_item_code, sums raw lengths per code,
-	## then applies the 5% margin and ceiling ONCE on the total per code.
-	## This avoids over-counting that occurs when ceiling is applied per record.
+	## Groups all SWL records by (stf_item_code, ring_name), sums raw lengths
+	## per group, applies 5% margin + ceiling once per group, then sums all
+	## ceiling values per stf_item_code across ring_names for the final BOQ qty.
 	##
 	## Parameters:
 	##   result - property_list to update
 
 	_try _with errCond
-		write("LOG: Processing sheath_with_loc cables (sum-then-margin approach)...")
+		write("LOG: Processing sheath_with_loc cables (sum-then-margin per ring approach)...")
 
-		# Accumulate raw base lengths per stf_item_code
-		# key: code string, value: total raw length in meters
-		raw_lengths_by_code << equality_hash_table.new()
+		# Accumulate raw base lengths per (stf_item_code, ring_name) pair
+		# key: write_string(code, "|", ring_name), value: total raw length in meters
+		raw_lengths_by_code_ring << equality_hash_table.new()
+		# Track which ring names belong to each code
+		# key: code string, value: equality_hash_table of ring_name -> _true
+		rings_by_code << equality_hash_table.new()
 		swl_count << 0
 
 		_for record_change _over .change_set.fast_elements()
@@ -1203,33 +1206,62 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				_continue
 			_endif
 
+			# Get ring_name (use empty string as fallback for records without one)
+			_local ring << ""
+			_if rec.responds_to?(:ring_name) _andif rec.ring_name _isnt _unset
+			_then
+				ring << rec.ring_name.write_string
+			_endif
+
 			# Get raw base length (no margin, no ceiling yet)
 			_if _not rec.responds_to?(:calculated_sheath_length) _then _continue _endif
 			_local base_length << rec.calculated_sheath_length.value_in(:m).as_number()
 			_if base_length _is _unset _orif base_length <= 0 _then _continue _endif
 
-			write("  SWL ID:", rec.id, "code:", code, "base_length:", base_length, "m")
+			write("  SWL ID:", rec.id, "code:", code, "ring:", ring, "base_length:", base_length, "m")
 
-			# Accumulate raw length per code
-			_local existing_len << raw_lengths_by_code[code]
+			# Accumulate raw length per (code, ring) pair
+			_local pair_key << write_string(code, "|", ring)
+			_local existing_len << raw_lengths_by_code_ring[pair_key]
 			_if existing_len _is _unset
 			_then
-				raw_lengths_by_code[code] << base_length
+				raw_lengths_by_code_ring[pair_key] << base_length
 			_else
-				raw_lengths_by_code[code] << existing_len + base_length
+				raw_lengths_by_code_ring[pair_key] << existing_len + base_length
 			_endif
+
+			# Track ring names per code
+			_local ring_set << rings_by_code[code]
+			_if ring_set _is _unset
+			_then
+				ring_set << equality_hash_table.new()
+				rings_by_code[code] << ring_set
+			_endif
+			ring_set[ring] << _true
+
 			swl_count +<< 1
 		_endloop
 
-		# Now apply 5% margin + ceiling ONCE per code on the total
-		_for code, total_raw _over raw_lengths_by_code.fast_keys_and_elements()
+		# For each stf_item_code, apply ceiling per ring then sum across rings
+		_for code, ring_set _over rings_by_code.fast_keys_and_elements()
 		_loop
-			_local total_with_margin << (total_raw * 1.05).ceiling
-			write("LOG: SWL code:", code, "total raw:", total_raw, "m -> +5% ceiling:", total_with_margin, "m")
-			_self.add_to_boq_result(result, code, total_with_margin)
+			_local total_ceiled << 0
+			_for ring _over ring_set.fast_keys()
+			_loop
+				_local pair_key << write_string(code, "|", ring)
+				_local raw_for_ring << raw_lengths_by_code_ring[pair_key]
+				_if raw_for_ring _is _unset _then _continue _endif
+				#_local ceiled_for_ring << (raw_for_ring * 1.05).ceiling
+				_local ceiled_for_ring << raw_for_ring.ceiling
+				write("LOG: SWL code:", code, " |ring:", ring, "|raw:", raw_for_ring, "m -> ceiling:", ceiled_for_ring, "m")
+				total_ceiled +<< ceiled_for_ring
+			_endloop
+			total_plus_05 << (total_ceiled * 1.05).ceiling  # Sum of ceiled lengths across rings for this code
+			write("LOG: SWL code:", code, "|total across rings:", total_ceiled, "m", "-> +5% ceiling:", total_plus_05, "m")
+			_self.add_to_boq_result(result, code, total_plus_05)
 		_endloop
 
-		write("LOG: Processed", swl_count, "sheath_with_loc records,", raw_lengths_by_code.size, "unique codes")
+		write("LOG: Processed", swl_count, "sheath_with_loc records,", rings_by_code.size, "unique codes")
 	_when error
 		write("LOG: ERROR processing sheath_with_loc:", errCond.report_contents_string)
 	_endtry

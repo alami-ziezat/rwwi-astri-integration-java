@@ -258,32 +258,23 @@ _method rwwi_nisa_plugin.build_rwo_cache()
 	_then
 		_return 
 	_endif
-	_global geo
+
 	.geoms << rope.new()
 
-	#.rwo_cache.empty()
 	_local a << pseudo_area.new_for_world(a_map_view.current_view_bounds.sectors,a_map_view.world)
-	#_local p << predicate.within(:pseudo_point,a)
-	#_local c << .playback_engine.playback_database().collection(:swo_ts_time_series)
-	#_for x _over c.select(p).fast_elements()
-	#_loop
-	#	.rwo_cache[x.id] << x
-	#_endloop
-
 	_try _with errCon
 		_for rec _over .dialog.records.fast_elements()
 		_loop
 			pp << rec[:pseudo_point]
 			_if pp.within?(a)
 			_then  
-			.geoms.add_last(rec)
+				.geoms.add_last(rec)
 			_endif
 		_endloop
 		write("NISA plugin: ", .geoms.size, " outage clusters for rendering")
 	_when error
 		write("NISA plugin: build_rwo_cache error - ", errCon.report_contents_string)
 	_endtry
-	geo << .geoms
 _endmethod
 $
 
