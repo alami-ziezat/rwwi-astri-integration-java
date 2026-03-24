@@ -41,16 +41,16 @@ $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _private _method astri_design_migrator.create_t_wey(pm)
-	## Create point_of_interest record from t_wey placemark.
+	## Create point_of_interest record_transaction and append to p_trans.
 	## Location is snapped to the nearest underground route when one exists
 	## within a 500cm (5m) search radius.
 	##
 	## Parameters:
-	##   pm - Placemark property_list from KML parser
+	##   pm      - Placemark property_list from KML parser
+	##   p_trans - Rope collecting record_transactions for batch dataset_transaction
 
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing T-Wey: ", pm[:name])
 	_try _with errCon
 		# Step 1: Extract folder and matching info
 		_local folders   << _self.truncate_folders(pm[:parent].default(""), 250)
@@ -65,43 +65,68 @@ _private _method astri_design_migrator.create_t_wey(pm)
 		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
 		                         _else >> ""
 		                         _endif
-		write("    Matched line: ", m_line, " | segment: ", segment)
 
 		# Step 2: Parse original point geometry from KML coordinates
 		_local original_location << _self.parse_point_geometry(pm[:coord])
-		_local coord << original_location.as_coord()
 
 		# Step 3: Build search buffer (500cm = 5m radius) around original location
-		_local pa << pseudo_point.new(coord)
-		pa.world << .database.world
-
-		_local buff << pa.buffer(500)  # 5m radius in cm
+		_local isFound? << _false
+		_local pp << original_location
+		_local buff << original_location.buffer(500)  # 5m radius in cm
 		buff.world << .database.world
+
+		# Step 3.5: Skip if existing T-Wey or UUB already present within 500cm radius
+		_local existing_tweys << .poi_col.select(predicate.interacts(:location, {buff}))
+		_if existing_tweys.size > 0 
+		_then
+			#_local ex_tw << existing_tweys.an_element()
+			_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
+			pp << pseudo_point.new(new_coord)
+			pp.world << .database.world
+			write("    >> MOVE: Existing T-Wey found nearby (", pp.a_coord(), "): ")
+			isFound? << _true
+			#_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
+			#.stats[:t_weys_skipped] +<< 1
+			#_return
+		_endif
+
+		_local existing_uubs << .uub_col.select(predicate.interacts(:location, {buff}))
+		_if existing_uubs.size > 0
+		_then
+			_local ex_uub << existing_uubs.an_element()
+			_local ex_uub_name << ex_uub.perform(:label).default("(unnamed)")
+			_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
+			pp << pseudo_point.new(new_coord)
+			pp.world << .database.world
+			write("    >> MOVE: Existing UUB/Handhole found nearby (", existing_uubs.size, "): ", ex_uub_name)
+			isFound? << _true
+			#_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
+			#.stats[:t_weys_skipped] +<< 1
+			#_return
+		_endif
+		#write(" >> isSame? : ",isSame?, " ext t-weys: ",existing_tweys.size, " ext uubs: ", existing_uubs.size)
 
 		# Step 4: Search for nearest underground route within buffer
 		_local pred << predicate.interacts(:route, {buff})
 		_local ug_routes << .ug_route_col.select(pred)
 
 		_local final_location << _unset
-		_if ug_routes.size > 0
+		_if ug_routes.size > 0 _andif _not isFound?
 		_then
 			# Found underground route - snap to nearest point on it
 			_local ugr << ug_routes.an_element()
 			_local pc << pseudo_chain.new(ugr.route)
 			pc.world << .database.world
-			_local snapped_coord << pc.segpoint_near(pa)
+			_local snapped_coord << pc.segpoint_near(pp)
 
 			_local snapped_point << pseudo_point.new(snapped_coord)
 			snapped_point.world << .database.world
 			final_location << snapped_point
-
-			write("    >> T-Wey snapped to underground route: ", ugr.name.default("(unnamed)"))
 		_else
 			# No underground route found within radius - use original location
-			final_location << original_location
-			write("    >> WARNING: No underground route found within 5m, using original location")
+			final_location << pp
+			#write("    >> WARNING T-WEY: No underground route found within 5m, using original location")
 		_endif
-
 		# Step 5: Insert into point_of_interest collection
 		# notes is a dd_join_field and cannot be set via record_transaction
 		# topview_boundary has no source geometry from a KML point placemark
@@ -113,7 +138,6 @@ _private _method astri_design_migrator.create_t_wey(pm)
 			:pop,                .pop_name,
 			:olt,                .pop_name,
 			:region,             .region,
-			#:cluster,            .cluster,
 			:line_type,          m_line,
 			:segment,            segment,
 			:fttx_network_type,  _self.get_fttx_network_type(),
@@ -125,20 +149,13 @@ _private _method astri_design_migrator.create_t_wey(pm)
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
 			:infra_type,         infra_type_cap
-			#:fdt_name,           ring_name
 		)
 
 		_local rec_trans << record_transaction.new_insert(.poi_col, prop_values)
 		rec_trans.run()
 
-		_if .stats[:t_weys] _is _unset
-		_then
-			.stats[:t_weys] << 0
-		_endif
+		_if .stats[:t_weys] _is _unset _then .stats[:t_weys] << 0 _endif
 		.stats[:t_weys] +<< 1
-
-		write("    [OK] T-Wey (point_of_interest) created: ", pm[:name])
-
 	_when error
 		write("ERROR in create_t_wey(): ", errCon.report_contents_string)
 		write("  Placemark name: ", pm[:name].default("(unnamed)"))

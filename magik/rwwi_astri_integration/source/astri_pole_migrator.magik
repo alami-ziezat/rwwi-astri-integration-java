@@ -7,9 +7,11 @@ $
 ## Contains methods for creating poles from KMZ placemarks
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_pole(pm)
+_private _method astri_design_migrator.create_pole(pm, p_trans)
 	## Create pole object from placemark with advanced type detection,
-	## cable snapping, and duplicate detection
+	## cable snapping, and duplicate detection.
+	## Update transactions (placeholder replacement) run immediately.
+	## Insert transactions (new poles) are appended to p_trans for batch execution.
 
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
@@ -128,7 +130,8 @@ _private _method astri_design_migrator.create_pole(pm)
 			_then
 				# Update placeholder pole using property_list
 				write("  [UPDATE] Updating existing placeholder pole: ", existing_pole.id)
-
+		
+				_local anno << pseudo_text.new_for_world(final_location.location, .database.world, property_list.new_with(:string, pm[:name], :orientation, 0))
 				_local update_props << property_list.new_with(
 					:telco_pole_tag, pm[:name],
 					:pop, .pop_name,
@@ -146,7 +149,8 @@ _private _method astri_design_migrator.create_pole(pm)
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
 					:olt_code, .olt_code,
-					:construction_status, pole_const_status
+					:construction_status, pole_const_status,
+					:annotation_3, anno
 				)
 
 				# Add optional fields if available
@@ -162,26 +166,25 @@ _private _method astri_design_migrator.create_pole(pm)
 
 				# Execute update transaction
 				_local update_trans << record_transaction.new_update(existing_pole, update_props)
-				_local updated_pole << update_trans.run()
+				p_trans.add_last(update_trans)
 
 				# Recreate annotation
-				_try
-					updated_pole.unset_geometry(:annotation_3)
-					_local anno << updated_pole.make_geometry(:annotation_3,
-						final_location.location, updated_pole.telco_pole_tag)
-				_when error
+				#_try
+				#	updated_pole.unset_geometry(:annotation_3)
+				#	_local anno << updated_pole.make_geometry(:annotation_3,
+				#		final_location.location, updated_pole.telco_pole_tag)
+				#_when error
 					# Annotation may not exist or may fail - continue
-				_endtry
+				#_endtry
 
 				# Update stats based on pole construction status
-				_if updated_pole.construction_status = "Proposed"
+				_if pole_const_status = "Proposed"
 				_then
 					.stats[:new_poles] +<< 1
 				_else
 					.stats[:existing_poles] +<< 1
 				_endif
-				write("  [OK] Pole updated: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
-				_return updated_pole
+				_return 
 			_else
 				# Existing pole is not a placeholder - skip creation
 				write("  WARNING: Pole already exists nearby (", existing_pole.telco_pole_tag, ") - skipping")
@@ -232,19 +235,16 @@ _private _method astri_design_migrator.create_pole(pm)
 				prop_values[:line_type] << line_type
 			_endif
 			_local rec_trans << record_transaction.new_insert(.pole_col, prop_values)
-			_local result << rec_trans.run()
+			p_trans.add_last(rec_trans)
 
-			# Update stats based on pole construction status
-			_if result.construction_status = "Proposed"
+			# Update stats using already-computed pole_const_status
+			_if pole_const_status = "Proposed"
 			_then
 				.stats[:new_poles] +<< 1
 			_else
 				.stats[:existing_poles] +<< 1
 			_endif
-			write("  [OK] Pole created: ", pm[:name], " (Type: ", pole_type, ", Status: ", pole_emr_status, ")")
-			_return result
 		_endif
-
 	_when error
 		write("ERROR in create_pole():", errCon.report_contents_string)
 		write("  Placemark name:", pm[:name].default("(unnamed)"))

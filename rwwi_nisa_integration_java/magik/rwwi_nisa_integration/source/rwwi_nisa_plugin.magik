@@ -254,18 +254,36 @@ _method rwwi_nisa_plugin.build_rwo_cache()
 	_then
 		_return
 	_endif
-
+	_if (a_map_view << .current_doc) _is _unset 
+	_then
+		_return 
+	_endif
+	_global geo
 	.geoms << rope.new()
+
+	#.rwo_cache.empty()
+	_local a << pseudo_area.new_for_world(a_map_view.current_view_bounds.sectors,a_map_view.world)
+	#_local p << predicate.within(:pseudo_point,a)
+	#_local c << .playback_engine.playback_database().collection(:swo_ts_time_series)
+	#_for x _over c.select(p).fast_elements()
+	#_loop
+	#	.rwo_cache[x.id] << x
+	#_endloop
 
 	_try _with errCon
 		_for rec _over .dialog.records.fast_elements()
 		_loop
+			pp << rec[:pseudo_point]
+			_if pp.within?(a)
+			_then  
 			.geoms.add_last(rec)
+			_endif
 		_endloop
 		write("NISA plugin: ", .geoms.size, " outage clusters for rendering")
 	_when error
 		write("NISA plugin: build_rwo_cache error - ", errCon.report_contents_string)
 	_endtry
+	geo << .geoms
 _endmethod
 $
 
@@ -285,10 +303,11 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.map_damage_notify(gc, a_map_view)
 	## Post-renderer callback — called each time the map redraws.
-
+	
 	_if a_map_view _is .current_doc _andif
 	    .render_status _is :enable
 	_then
+		_self.build_rwo_cache()  # Rebuild cache on each redraw to ensure it stays in sync with dialog records
 		_self.draw_all_clusters(gc)
 	_endif
 _endmethod
@@ -407,7 +426,6 @@ _private _method rwwi_nisa_plugin.int!draw_cluster(line_gc, text_gc, local_coord
 	_for str _over text.split_by(newline_char).fast_elements()
 	_loop
 		_local txt << str
-		write("tooltip line: ", txt, "size: ", txt.size)
 		_loop
 			_local txt_bounds << text_gc.draw_text(t_style, 0, -50, txt, _unset, _unset, :top_left).bounds
 			_local txt_width  << txt_bounds.width
@@ -436,7 +454,6 @@ _private _method rwwi_nisa_plugin.int!draw_cluster(line_gc, text_gc, local_coord
 		text_y << y - text_height - 14
 	_endif
 
-	write("	>> Drawing cluster tooltip at (", x, ", ", y, ") with text: ", text_x, ", ", text_y, " (above? ", above?, ") text_height: ", text_height, " text_width: ", text_width, ")")
 	# Draw tooltip border
 	_local vec << _self.tooltip_border_points(x, y, text_x, text_y, text_width, text_height, above?)
 	line_gc.fill_line(_self.fill_style[status].default(_self.fill_style[:unknown]), vec)

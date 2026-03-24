@@ -462,216 +462,278 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.classify_placemarks(placemarks)
+	## Single-pass classification of all placemarks into typed buckets.
+	## Eliminates the N x passes scanning by identifying each placemark's
+	## type once, then each migration pass iterates only its own bucket.
+	##
+	## Boundary area placemarks are silently skipped.
+	## Classification priority order matches the original pass ordering.
+	##
+	## Returns: property_list of bucket_key -> rope_of_matching_placemarks
+
+	_local b << property_list.new_with(
+		:olt,            rope.new(),
+		:route,          rope.new(),
+		:boring_manual,  rope.new(),
+		:boring_machine, rope.new(),
+		:tali_pancing,   rope.new(),
+		:open_trenching, rope.new(),
+		:sub_duct,       rope.new(),
+		:pole,           rope.new(),
+		:uub,            rope.new(),
+		:splice,         rope.new(),
+		:figure_eight,   rope.new(),
+		:demand_point,   rope.new(),
+		:t_wey,          rope.new(),
+		:micro_cell,     rope.new(),
+		:riser,          rope.new()
+	)
+
+	_for pm _over placemarks.fast_elements()
+	_loop
+		_if _self.is_boundary_area?(pm) _then _continue _endif
+
+		_if _self.is_olt?(pm)
+		_then
+			b[:olt].add_last(pm)
+		_elif _self.is_route?(pm)
+		_then
+			b[:route].add_last(pm)
+		_elif _self.is_boring_manual?(pm)
+		_then
+			b[:boring_manual].add_last(pm)
+		_elif _self.is_boring_machine?(pm)
+		_then
+			b[:boring_machine].add_last(pm)
+		_elif _self.is_tali_pancing?(pm)
+		_then
+			b[:tali_pancing].add_last(pm)
+		_elif _self.is_open_trenching?(pm)
+		_then
+			b[:open_trenching].add_last(pm)
+		_elif _self.is_sub_duct?(pm)
+		_then
+			b[:sub_duct].add_last(pm)
+		_elif _self.is_pole?(pm)
+		_then
+			b[:pole].add_last(pm)
+		_elif _self.is_uub?(pm)
+		_then
+			b[:uub].add_last(pm)
+		_elif _self.is_splice?(pm)
+		_then
+			b[:splice].add_last(pm)
+		_elif _self.is_figure_eight?(pm)
+		_then
+			b[:figure_eight].add_last(pm)
+		_elif _self.is_demand_point?(pm)
+		_then
+			b[:demand_point].add_last(pm)
+		_elif _self.is_t_wey?(pm)
+		_then
+			b[:t_wey].add_last(pm)
+		_elif _self.is_micro_cell?(pm)
+		_then
+			b[:micro_cell].add_last(pm)
+		_elif _self.is_riser?(pm)
+		_then
+			b[:riser].add_last(pm)
+		_endif
+	_endloop
+
+	write("  Classification: ",
+		b[:olt].size,           " OLTs | ",
+		b[:route].size,         " routes | ",
+		b[:boring_manual].size + b[:boring_machine].size +
+		b[:tali_pancing].size + b[:open_trenching].size, " boring/trenching | ",
+		b[:sub_duct].size,      " sub-ducts | ",
+		b[:pole].size,          " poles | ",
+		b[:uub].size,           " UUBs | ",
+		b[:splice].size,        " splices | ",
+		b[:figure_eight].size,  " fig-eights | ",
+		b[:demand_point].size,  " demand-pts | ",
+		b[:t_wey].size,         " t-weys | ",
+		b[:micro_cell].size,    " cells | ",
+		b[:riser].size,         " risers")
+
+	>> b
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
 _method astri_design_migrator.migrate_placemarks(placemarks)
-	## Migrate placemarks to design objects
-	## NOTE: For new projects, design must be activated before calling this method (call create_project_and_design() first)
-	## NOTE: For existing alternatives (construction_status="In Service"), no design activation needed
-	## NOTE: Boundary area (parent=null/empty) is automatically excluded
+	## Migrate placemarks to design objects.
+	## NOTE: For new projects, design must be activated before calling this
+	##       method (call create_project_and_design() first).
+	## NOTE: For existing alternatives (construction_status="In Service"),
+	##       no design activation needed.
+	## NOTE: Boundary area (parent=null/empty) is automatically excluded.
+	##
+	## Placemarks are classified in a single pass, then each migration pass
+	## iterates only its own bucket — avoiding repeated full-list scans.
 	##
 	## Parameters:
 	##   placemarks (rope) - Rope of property_lists from astri_kml_parser
 	##
 	## Returns:
 	##   property_list - Migration statistics
+	write("Starting design migration of ", placemarks.size, " placemarks... [", .construction_status, "]")
 
-	write("Starting design migration of ", placemarks.size, " placemarks...", .construction_status)
-
-	# Only check for activated design if we're creating new objects (Proposed status)
-	# For existing alternative migrations (In Service status), skip this check
 	_if .scheme _is _unset _andif .construction_status = "Proposed"
 	_then
 		condition.raise(:error, :string, "Design not activated. Call create_project_and_design() first.")
 	_endif
 
-	# All object creation automatically goes into the activated design alternative
-	# For existing alternatives, objects go into the current alternative
-	# No need for database mode switching
- 
-	# First pass: Create OLTs (needed for cable snapping)
-	write("  Pass 1: Creating OLTs...")
-	_for pm _over placemarks.fast_elements()
+	# Single pre-classification pass — each pm is typed exactly once
+	write("  Pre-classifying placemarks...")
+	_local b        << _self.classify_placemarks(placemarks)
+	_local topology << .topology.default(:aerial)
+
+	# Pass 1: OLTs (needed for cable snapping in subsequent passes)
+	write("  Pass 1: Creating OLTs (", b[:olt].size, ")...")
+	_for pm _over b[:olt].fast_elements() _loop	_self.create_olt(pm)	_endloop
+
+	# Pass 2: Cables / routes (topology-based)
+	write("  Pass 2: Creating cables and routes (", b[:route].size, ", topology: ", topology, ")...")
+	_for pm _over b[:route].fast_elements()
 	_loop
-		# OLT (point-based: name contains "*OLT*")
-		_local is_olt << _self.is_olt?(pm)
-		#write("    Checking: ", pm[:name], " | is_olt?: ", is_olt, " | Folders: ", pm[:parent].default(""))
-		_if is_olt
+		_if topology = :aerial #_orif topology = :both
 		_then
-			_self.create_olt(pm)
+			_self.create_aerial_route(pm)
 		_endif
-	_endloop
-	# Second pass: Create cables/routes (aerial and/or underground based on topology)
-	write("  Pass 2: Creating cables and routes (topology: ", .topology.default(:aerial), ")...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Skip boundary area
-		_if _self.is_boundary_area?(pm)
+		_if topology = :underground #_orif topology = :both
 		_then
-			_continue
-		_endif
-
-		_local is_route << _self.is_route?(pm)
-		_if is_route
-		_then
-			# TOPOLOGY-BASED ROUTING
-			_local topology << .topology.default(:aerial)
-
-			# Create aerial route if topology supports it
-			_if topology = :aerial #_orif topology = :both
-			_then
-				_self.create_aerial_route(pm)
-			_endif
-
-			# Create underground route if topology supports it
-			_if topology = :underground #_orif topology = :both
-			_then
-				_self.create_underground_route(pm)
-			_endif
+			_self.create_underground_route(pm)
 		_endif
 	_endloop
 
-	# Pass 2.5: Create boring routes and tali pancing
-	write("  Pass 2.5: Creating boring routes and tali pancing...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		_if _self.is_boundary_area?(pm)
-		_then
-			_continue
-		_endif
-
-		_if _self.is_boring_manual?(pm)
-		_then
-			_self.create_boring_manual(pm)
-		_elif _self.is_boring_machine?(pm)
-		_then
-			_self.create_boring_machine(pm)
-		_elif _self.is_tali_pancing?(pm)
-		_then
-			_self.create_tali_pancing(pm)
-		_elif _self.is_open_trenching?(pm)
-		_then
-			_self.create_open_trenching(pm)
-		_endif
-	_endloop
-
-	write("  Pass 3: Creating structures (poles and/or UUBs based on topology)...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Skip boundary area
-		_if _self.is_boundary_area?(pm)
-		_then
-			_continue
-		_endif
-
-		# TOPOLOGY-BASED STRUCTURE CREATION
-		_local topology << .topology.default(:aerial)
-		
-		# Create pole if topology supports it
-		_if (topology = :aerial _orif topology = :both) _andif _self.is_pole?(pm)
-		_then
-			_self.create_pole(pm)
-		_endif
-
-		_if (topology = :underground _orif topology = :both) _andif _self.is_uub?(pm)
-		_then
-			_self.create_uub(pm)
-		_endif
-	_endloop
- 
-	# Third pass: Create other objects (demand points, splices, zones, etc.)
-	write("  Pass 4: Creating demand points, splices, and area-based objects...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Skip boundary area (ONLY areas with parent=null/empty)
-		_if _self.is_boundary_area?(pm)
-		_then
-			_continue
-		_endif
-
-		_local is_splice << _self.is_splice?(pm)
-		_local is_fig8 << _self.is_figure_eight?(pm)
-		_local is_dp << _self.is_demand_point?(pm)
-		#write("    Checking: ", pm[:name], " | is_splice?: ", is_splice, " | is_figure_eight?: ", is_fig8, " | is_demand_point?: ", is_dp, " | Folders: ", pm[:parent].default(""))
-
-		_if is_splice
-		_then
-			_self.create_sheath_splice(pm)
-
-		# Figure eights (point-based: slack, coil)
-		_elif is_fig8
-		_then
-			_self.create_figure_eight(pm)
-		# Demand points
-		_elif is_dp
-		_then
-			_self.create_demand_point(pm)
-
-		# T-Wey points of interest
-		_elif _self.is_t_wey?(pm)
-		_then
-			_self.create_t_wey(pm)
-		_endif
-	_endloop
-
-	# Create sub-ducts in a separate pass to ensure all routes are created (sub-ducts need to snap to routes)
-	_for pm _over placemarks.fast_elements()
-	_loop	
-		_if _self.is_sub_duct?(pm)
-		_then
-			_self.create_sub_duct(pm)
-		_endif 
-	_endloop
-
-	# Update FDT :tp field with total demand points (only for cluster infrastructure)
-	_if .infra_type = "cluster"
+	# Pass 3: Structures — poles and/or UUBs (topology-based)
+	write("  Pass 3: Creating structures (", b[:pole].size, " poles, ", b[:uub].size, " UUBs, topology: ", topology, ")...")
+	_if topology = :aerial _orif topology = :both
 	_then
-		write("  Pass 4.5: Updating FDT :tp field...")
-		_self.update_fdt_tp_field()
+		_local pole_trans << rope.new()
+		_for pm _over b[:pole].fast_elements() _loop _self.create_pole(pm, pole_trans) _endloop
+		_if _not pole_trans.empty?
+		_then
+			dt << dataset_transaction.new(pole_trans, "Insert Poles")
+			dt.run()
+			write("  [OK] Poles inserted: ", pole_trans.size)
+		_endif
+	_endif
+	_if topology = :underground _orif topology = :both
+	_then
+		_local uub_trans << rope.new()
+		_for pm _over b[:uub].fast_elements() _loop _self.create_uub(pm, uub_trans) _endloop
+		_if _not uub_trans.empty?
+		_then
+			dt << dataset_transaction.new(uub_trans, "Insert UUBs")
+			dt.run()
+			write("  [OK] UUBs inserted: ", uub_trans.size)
+		_endif
 	_endif
 
-	# Fourth: Create macro and micro cell
-	write("  Pass 5: Creating micro/macro cells...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Micro cells / zones (area-based with parent folders)
-		_local is_cell << _self.is_micro_cell?(pm)
-		_if pm[:parent].index_of_seq("BOUNDARY") _isnt _unset 
-		_then  
-			write("    Checking: ", pm[:name], " | Network type: ", pm[:network_type], " | is_micro_cell?: ", is_cell, " | Folders: ", pm[:parent].default(""))
-		_endif
-		
-		_if is_cell
-		_then
-			_self.create_micro_cell(pm)
-		_endif
-	_endloop
+	# Pass 4: Splices, figure-eights, demand points, t-weys
+	write("  Pass 4: Creating splices, figure-eights, demand points and t-weys...")
+	_for pm _over b[:splice].fast_elements()       _loop _self.create_sheath_splice(pm) _endloop
+	_for pm _over b[:figure_eight].fast_elements() _loop _self.create_figure_eight(pm)  _endloop
 
-	# Fifth pass: Create risers (point-based: vertical cables to buildings)
-	write("  Pass 6: Creating risers...")
-	_for pm _over placemarks.fast_elements()
-	_loop
-		# Riser cables (point-based: name contains "*riser*")
-		_local is_riser << _self.is_riser?(pm)
-		#write("    Checking: ", pm[:name], " | is_riser?: ", is_riser, " | Folders: ", pm[:parent].default(""))
-		_if is_riser
-		_then
-			_self.create_riser(pm)
-		_endif
-	_endloop
+	# Pass 4.5: Sub-ducts (after all routes are created — sub-ducts snap to routes)
+	write("  Pass 4.5: Creating sub-ducts (", b[:sub_duct].size, ")...")
+	_for pm _over b[:sub_duct].fast_elements() _loop _self.create_sub_duct(pm) _endloop
 
-	# Sixth pass: Create access points (catch-all for remaining points)
-	# write("  Pass 7: Creating access points...")
-	# COMMENTED OUT: Access point migration disabled for now - may be useful later
-	#_for pm _over placemarks.fast_elements()
-	#_loop
-	#	# Access points (point-based: catch-all for points not matching other types)
-	#	_local is_ap << _self.is_access_point?(pm)
-	#	#write("    Checking: ", pm[:name], " | is_access_point?: ", is_ap, " | Folders: ", pm[:parent].default(""))
-	#	_if is_ap
-	#	_then
-	#		_self.create_access_point(pm)
-	#	_endif
-	#_endloop
+	# Pass 5: Objects with dataset transactions approach
+	write("  Pass 5: Creating boring routes and tali pancing (",
+		b[:boring_manual].size + b[:boring_machine].size +
+		b[:tali_pancing].size + b[:open_trenching].size, ")...")
 
+	_local dt_trans << rope.new()	
+	_local bman_trans << rope.new()
+	_for pm _over b[:boring_manual].fast_elements()  _loop _self.create_boring_manual(pm, bman_trans)  _endloop
+	_if _not bman_trans.empty?
+	_then
+		#dt << dataset_transaction.new(bm_trans, "Insert Boring Manual")
+		#dt.run()
+		dt_trans.add_all_last(bman_trans)
+		write("  [OK] Boring Manual created: ", bman_trans.size)
+	_endif
+
+	_local bmach_trans << rope.new()
+	_for pm _over b[:boring_machine].fast_elements() _loop _self.create_boring_machine(pm, bmach_trans) _endloop
+	_if _not bmach_trans.empty?
+	_then
+		#dt << dataset_transaction.new(bmach_trans, "Insert Boring Machine")
+		#dt.run()
+		dt_trans.add_all_last(bmach_trans)
+		write("  [OK] Boring Machine created: ", bmach_trans.size)
+	_endif
+
+	_local tp_trans << rope.new()
+	_for pm _over b[:tali_pancing].fast_elements() _loop _self.create_tali_pancing(pm, tp_trans) _endloop
+	_if _not tp_trans.empty?
+	_then
+		#dt << dataset_transaction.new(tp_trans, "Insert Tali Pancing")
+		#dt.run()
+		dt_trans.add_all_last(tp_trans)
+		write("  [OK] Tali Pancing created: ", tp_trans.size)
+	_endif
+
+	_local ot_trans << rope.new()
+	_for pm _over b[:open_trenching].fast_elements() _loop _self.create_open_trenching(pm, ot_trans) _endloop
+	_if _not ot_trans.empty?
+	_then
+		#dt << dataset_transaction.new(ot_trans, "Insert Open Trenching")
+		#dt.run()
+		dt_trans.add_all_last(ot_trans)
+		write("  [OK] Open Trenching created: ", ot_trans.size)
+	_endif	
+	
+	write("  Pass 6: Creating demand point (",b[:demand_point].size, ")...")
+	_local dp_trans << rope.new()	
+	_for pm _over b[:demand_point].fast_elements() _loop _self.create_demand_point(pm, dp_trans) _endloop
+	_if _not dp_trans.empty?
+	_then  
+		dt << dataset_transaction.new(dp_trans, "Insert Demand Points")
+		dt.run()
+		#dt_trans.add_all_last(dp_trans)
+		write("  [OK] Demand point created: ", dp_trans.size)
+	_endif
+	
+	write("  Pass 7: Creating point of interest (t-wey) (",b[:t_wey].size, ")...")
+	_for pm _over b[:t_wey].fast_elements() _loop _self.create_t_wey(pm) _endloop
+	
+	write("  Pass 8: Creating micro/macro cells (", b[:micro_cell].size, ")...")
+	_local cell_trans << rope.new()	
+	_for pm _over b[:micro_cell].fast_elements() _loop _self.create_micro_cell(pm, cell_trans) _endloop
+	_if _not cell_trans.empty? 
+	_then  
+		#dt << dataset_transaction.new(cell_trans, "Insert Cells")
+		#dt.run()
+		dt_trans.add_all_last(cell_trans)
+		write("  [OK] Macro cell created: ", cell_trans.size)
+	_endif
+
+	# Insert all transactions for Pass 5 and 5.5 together (cells, sub-ducts, demand points, t-weys) to ensure they are all available before Pass 6 riser creation
+	_global dtrx
+	dtrx << dt_trans 
+	_if _not dt_trans.empty?
+	_then
+		dt << dataset_transaction.new(dt_trans, "Insert all transactions for Pass 5 and 5.5")
+		dt.run()
+		write("  [OK] All Pass 5 and 5.5 objects inserted: ", dt_trans.size)	
+	_endif
+
+	# Pass 6: Risers
+	write("  Pass 9: Creating risers (", b[:riser].size, ")...")
+	_for pm _over b[:riser].fast_elements() _loop _self.create_riser(pm) _endloop
+	
+		# Update FDT :tp field with total demand points (cluster infrastructure only)
+	_if .infra_type = "cluster"
+	_then
+		write("  Pass 10: Updating FDT :tp field...")
+		_self.update_fdt_tp_field()
+	_endif
+	
 	_self.print_statistics()
 	>> .stats
 _endmethod

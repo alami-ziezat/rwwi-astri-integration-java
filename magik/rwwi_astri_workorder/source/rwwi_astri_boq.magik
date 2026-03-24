@@ -53,6 +53,7 @@ _proc()
 			_continue
 		_endif
 
+		write(p.spec_id)
 		_if p.spec_id="Join Closure In-line 24 Core" 
 		_then
 			p1 << 	p1 + 1
@@ -173,13 +174,6 @@ _proc()
 	pp_seq_r.add(a_values)
 
 
-
-
-		
-	
-#write("jml :",  p1,p2,p3,p4,p5)
-	
-#>> p1,p2,p3,p4,p5
 >> pp_seq_r		
 _endproc
 $
@@ -309,13 +303,14 @@ _proc()
 		_if p.spec_id="Pole mounted outdoor(16 ports)" 
 		_then
 			p1 << 	p1 + 1
-		_elif p.spec_id="Pole mounted outdoor(16 ports)" 
+		_elif p.spec_id="Pedestal mounted (16 ports)" 
 		_then
 			p2 << p2 + 1
+	
 		_endif 
 	_endloop
 	
->> p1,p2
+>> p1,p2,p3
 	
 _endproc
 $
@@ -411,7 +406,278 @@ _proc()
 	
 _endproc
 $
+
+_global get_count_uub_fdt <<
+_proc()
+
+	table_list << rope.new()
 	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+
+		_if p.spec_id="HH Precast FDT : 80x80x130 cm" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="HH Concrete FDT : 80x80x130 cm" 
+		_then
+			p2 << p2 + 1
+		
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2
+		
+_endproc
+$
+
+	
+_global get_count_uub_fat <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+
+		_if p.spec_id="HH Precast FDT : 40x40x60 cm" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="HH Concrete FDT : 40x40x60 cm" 
+		_then
+			p2 << p2 + 1
+			
+
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2
+		
+_endproc
+$
+
+
+
+_global get_count_pi <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :point_of_interest _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+
+#		_if p.spec_id="HH Precast FDT : 80x80x130 cm" 
+#		_then
+#			p1 << 	p1 + 1
+#		_elif p.spec_id="HH Concrete FDT : 80x80x130 cm" 
+#		_then
+#			p2 << p2 + 1
+#		
+#		_endif
+
+		p1 << 	p1 + 1
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1)
+	
+>> p1
+		
+_endproc
+$
+
+
+_global get_count_uub_home_connect <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+
+		_if p.spec_id="HH Precast Pit : 20x20x20 cm" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="HH Concrete Pit : 20x20x20 cm" 
+		_then
+			p2 << p2 + 1
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2
+		
+_endproc
+$
+
+		
+
 
 
 _global get_count_pole <<
@@ -474,7 +740,7 @@ _proc()
 		_elif p.type="Pole 9-4" 
 		_then
 			p4 << p4 + 1
-		_elif p.type="Pole 7-5" 
+		_elif p.type="Pole 9-5" 
 		_then
 			p5 << p5 + 1
 		_elif p.type="Pole 7-2.5" 
@@ -489,6 +755,64 @@ _proc()
 #write("jml :",  p1,p2,p3,p4,p5)
 	
 >> p1,p2,p3,p4,p5,p6,t_pole
+		
+_endproc
+$
+
+
+_global get_count_pole_emr_existing <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :pole _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status <> "In Service"
+		_then
+			_continue
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> t_pole #p1,p2,p3,p4,p5,p6,t_pole
 		
 _endproc
 $
@@ -571,6 +895,590 @@ _endproc
 $
 
 
+_global get_count_boring_manual <<
+_proc()
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:boring_manual]
+	table_list << rope.new()
+	#_dynamic !current_world! << v_gis.world
+
+
+	_dynamic !current_world! << v_gis.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+	
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+	
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	#write(table_list.size)
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+		#write("boring  :  ",s)
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_boring_machine <<
+_proc()
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:boring_machine]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	#pred_m << predicate.within(:route , {a_region})
+	#table_list << s_col.select(pred_m)
+
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_open_trenching <<
+_proc()
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:open_trenching]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	#pred_m << predicate.within(:route , {a_region})
+	#table_list << s_col.select(pred_m)
+
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_tali_pancing <<
+_proc()
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:tali_pancing]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	#pred_m << predicate.within(:route , {a_region})
+	#table_list << s_col.select(pred_m)
+
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_sewer <<
+_proc()
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:sewer]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	#pred_m << predicate.within(:route , {a_region})
+	#table_list << s_col.select(pred_m)
+
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+
+#feeder
+_global get_count_cable_feeder <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			#_if i.current_record.ring_name=fdt
+			#_then
+				table_list.add(i.current_record)
+			#_endif
+			
+		_endif
+		
+	_endloop
+
+	p1 << 0 #.0
+	p2 << 0 #.0
+	p3 << 0 #.0
+	p4 << 0 #.0
+	p5 << 0 #.0
+	p6 << 0 #.0
+	p7 << 0 #.0
+	p8 << 0
+	p9 << 0
+	p10 << 0
+	p11 << 0
+	p12 << 0
+	
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		
+		_if p.spec_id="SM G652D-ADSS 24C" 
+		_then
+			y << p.route_sectors()
+			
+			yy << y.line_length
+			y_sec << yy/100
+			p1 << 	p1 + y_sec #p.calculated_sheath_length.value_in(:m).as_number()
+		
+		_elif p.spec_id="SM G652D-ADSS 36C"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p2 << 	p5 + y_sec
+			#p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
+
+		
+			
+		_elif p.spec_id="SM G652D-ADSS 48C"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p3 << 	p9 + y_sec
+		
+		_elif p.spec_id="SM G652D-ADSS 72C" 
+		_then
+
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p4 << 	p4 + y_sec
+			#p4 << 	p4 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 96C" 
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p5 << 	p5 + y_sec
+			#p5 << 	p5 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 144C" 
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p6 << 	p6 + y_sec
+			#p6 << 	p6 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 288C" 
+		_then
+
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p7 << 	p7 + y_sec
+			#p7 << 	p7 + p.calculated_sheath_length.value_in(:m).as_number()
+
+		_endif
+
+	_endloop
+
+	pp_seq_r << rope.new()
+	
+	a_values << property_list.new_with(
+			    :id,"clr1",
+			    :jml,p1)
+	
+	pp_seq_r.add(a_values)
+	
+	a_values << property_list.new_with(
+			    :id,"clr2",
+			    :jml,p2)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr3",
+			    :jml,p3)
+	
+	pp_seq_r.add(a_values)
+	
+	a_values << property_list.new_with(
+			    :id,"clr4",
+			    :jml,p4)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr5",
+			    :jml,p5)
+	
+	pp_seq_r.add(a_values)
+	
+	a_values << property_list.new_with(
+			    :id,"clr6",
+			    :jml,p6)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr7",
+			    :jml,p7)
+	
+	pp_seq_r.add(a_values)
+#	a_values << property_list.new_with(
+#			    :id,"clr13",
+#			    :jml,p13)
+#	
+#	pp_seq_r.add(a_values)
+
+
+>> pp_seq_r	
+
+	
+
+		
+_endproc
+$
+
+
+
 _global get_count_cable <<
 _proc()
 
@@ -651,7 +1559,2142 @@ _endproc
 $
 
 
+_global get_count_conduit <<
+_proc()
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :mit_conduit _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0.0
+	p2 << 0.0
+	p3 << 0.0
+	p4 << 0.0
+	p5 << 0.0
+	p6 << 0.0
+	p7 << 0.0
+	p8 << 0.0
+	p9 << 0.0
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		_if p.spec_id="Sub Duct / HDPE 32/28" 
+		_then
+			p1 << 	p1 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Sub Duct / HDPE 40/34" 
+		_then
+			p2 << 	p2 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� 10 x 5 cm" 
+		_then
+			p3 << 	p3 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� 10 x 5 cm" 
+		_then
+			p4 << 	p4 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-2" 
+		_then
+			p5 << 	p5 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-3" 
+		_then
+			p6 << 	p6 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-4" 
+		_then
+			p7 << 	p7 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-5" 
+		_then
+			p8 << 	p8 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-6" 
+		_then
+			p9 << 	p9 + p.calculated_length.value_in(:m).as_number()
+
+
+		_endif
+
+	_endloop
+
+	
+>> p1,p2,p3,p4,p5,p6,p7,p8,p9
+		
+_endproc
+$
+
+_global cek_ug <<
+_proc()
+
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			#table_list.add(i.current_record)
+			e << _true 
+			_leave
+		_endif
+		
+	_endloop
+	
+	>> e
+	
+_endproc
+$
+
+#line
+
+
+_global get_count_pole_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :pole _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service" _orif p.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		
+	#	write(p.type)
+		_if p.type="Pole 7-3" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.type="Pole 7-4" 
+		_then
+			p2 << p2 + 1
+		_elif p.type="Pole 7-5" 
+		_then
+			p3 << p3 + 1
+		_elif p.type="Pole 9-4" 
+		_then
+			p4 << p4 + 1
+		_elif p.type="Pole 9-5" 
+		_then
+			p5 << p5 + 1
+		_elif p.type="Pole 7-2.5" 
+		_then
+			p6 << p6 + 1	
+
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2,p3,p4,p5,p6,t_pole
+		
+_endproc
+$
+
+_global get_count_pole_emr_existing_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :pole _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status <> "In Service" _orif p.ring_name <> fdt
+		_then
+			_continue
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> t_pole #p1,p2,p3,p4,p5,p6,t_pole
+		
+_endproc
+$
+
+_global get_count_fdt_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			_if i.current_record.sheath_splice_object_type ="FDT" _and i.current_record.name=fdt
+			_then
+				table_list.add(i.current_record)
+			_endif
+			
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+
+		_if p.spec_id="48 Core pole mounted FDT" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="72 Core pole mounted FDT" 
+		_then
+			p2 << p2 + 1
+		_elif p.spec_id="96 Core pole mounted FDT" 
+		_then
+			p3 << p3 + 1
+		_elif p.spec_id="144 Core Ground mounted FDT" 
+		_then
+			p4 << p4 + 1
+	
+
+		_endif
+
+	_endloop
+
+	
+	
+	
+>> p1,p2,p3,p4
+	
+_endproc
+$
+
+_global get_count_fat_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			_if i.current_record.sheath_splice_object_type ="FAT" _and i.current_record.ring_name=fdt
+			_then
+				table_list.add(i.current_record)
+			_endif
+			
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+	
+		_if p.line_type ="Line A"
+		_then
+			p1 << 	p1 + 1
+		
+		_elif p.line_type ="Line B"
+		_then
+			p2 << 	p2 + 1
+		
+		_elif p.line_type ="Line C"
+		_then
+			p3 << 	p3 + 1
+	
+		_elif p.line_type ="Line D"
+		_then
+			p4 << 	p4 + 1
+		_endif	
+
+	_endloop
+	
+>> p1,p2,p3,p4
+	
+_endproc
+$
+
+
+
+_global get_count_cable_cluster_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			_if i.current_record.ring_name=fdt
+			_then
+				table_list.add(i.current_record)
+			_endif
+			
+		_endif
+		
+	_endloop
+
+	p1 << 0 #.0
+	p2 << 0 #.0
+	p3 << 0 #.0
+	p4 << 0 #.0
+	p5 << 0 #.0
+	p6 << 0 #.0
+	p7 << 0 #.0
+	p8 << 0
+	p9 << 0
+	p10 << 0
+	p11 << 0
+	p12 << 0
+	
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		
+		_if p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line A"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p1 << 	p1 + y_sec #p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line B"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p2 << 	p2 + y_sec
+			#p.calculated_sheath_length.value_in(:m).as_number()
+
+		_elif p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line C"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p3 << 	p3 + y_sec
+		_elif p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line D"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p4 << 	p4 + y_sec
+		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line A"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p5 << 	p5 + y_sec
+			#p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
+
+		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line B"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p6 << 	p6 + y_sec
+		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line C"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p7 << 	p7 + y_sec
+		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line D"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p8 << 	p8 + y_sec
+			
+		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line A"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p9 << 	p9 + y_sec
+		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line B"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p10 << 	p10 + y_sec
+			#p3 << 	p3 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line C"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p11 << 	p11 + y_sec
+		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line D"
+		_then
+			y << p.route_sectors()
+			yy << y.line_length
+			y_sec << yy/100
+			p12 << 	p12 + y_sec
+#		_elif p.spec_id="SM G652D-ADSS 72C" 
+#		_then
+#
+#			y << p.route_sectors()
+#			yy << y.line_length
+#			y_sec << yy/100
+#			p4 << 	p4 + y_sec
+#			#p4 << 	p4 + p.calculated_sheath_length.value_in(:m).as_number()
+#		_elif p.spec_id="SM G652D-ADSS 96C" 
+#		_then
+#			y << p.route_sectors()
+#			yy << y.line_length
+#			y_sec << yy/100
+#			p5 << 	p5 + y_sec
+#			#p5 << 	p5 + p.calculated_sheath_length.value_in(:m).as_number()
+#		_elif p.spec_id="SM G652D-ADSS 144C" 
+#		_then
+#			y << p.route_sectors()
+#			yy << y.line_length
+#			y_sec << yy/100
+#			p6 << 	p6 + y_sec
+#			#p6 << 	p6 + p.calculated_sheath_length.value_in(:m).as_number()
+#		_elif p.spec_id="SM G652D-ADSS 288C" 
+#		_then
+#
+#			y << p.route_sectors()
+#			yy << y.line_length
+#			y_sec << yy/100
+#			p7 << 	p7 + y_sec
+#			#p7 << 	p7 + p.calculated_sheath_length.value_in(:m).as_number()
+#
+		_endif
+
+	_endloop
+
+	pp_seq_r << rope.new()
+	
+	a_values << property_list.new_with(
+			    :id,"clr1",
+			    :jml,p1)
+	
+	pp_seq_r.add(a_values)
+	
+	a_values << property_list.new_with(
+			    :id,"clr2",
+			    :jml,p2)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr3",
+			    :jml,p3)
+	
+	pp_seq_r.add(a_values)
+	
+	a_values << property_list.new_with(
+			    :id,"clr4",
+			    :jml,p4)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr5",
+			    :jml,p5)
+	
+	pp_seq_r.add(a_values)
+	
+	a_values << property_list.new_with(
+			    :id,"clr6",
+			    :jml,p6)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr7",
+			    :jml,p7)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr8",
+			    :jml,p8)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr9",
+			    :jml,p9)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr10",
+			    :jml,p10)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr11",
+			    :jml,p11)
+	
+	pp_seq_r.add(a_values)
+	a_values << property_list.new_with(
+			    :id,"clr12",
+			    :jml,p12)
+	
+	pp_seq_r.add(a_values)
+#	a_values << property_list.new_with(
+#			    :id,"clr13",
+#			    :jml,p13)
+#	
+#	pp_seq_r.add(a_values)
+
+
+>> pp_seq_r	
+
+	
+
+		
+_endproc
+$
+
+_global get_count_conduit_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :mit_conduit _then
+			_if i.current_record.ring_name=fdt
+			_then
+				table_list.add(i.current_record)
+			_endif
+		_endif
+		
+	_endloop
+
+	p1 << 0.0
+	p2 << 0.0
+	p3 << 0.0
+	p4 << 0.0
+	p5 << 0.0
+	p6 << 0.0
+	p7 << 0.0
+	p8 << 0.0
+	p9 << 0.0
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		_if p.spec_id="Sub Duct / HDPE 32/28" 
+		_then
+			p1 << 	p1 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Sub Duct / HDPE 40/34" 
+		_then
+			p2 << 	p2 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� 10 x 5 cm" 
+		_then
+			p3 << 	p3 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� 10 x 5 cm" 
+		_then
+			p4 << 	p4 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-2" 
+		_then
+			p5 << 	p5 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-3" 
+		_then
+			p6 << 	p6 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-4" 
+		_then
+			p7 << 	p7 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-5" 
+		_then
+			p8 << 	p8 + p.calculated_length.value_in(:m).as_number()
+		_elif p.spec_id="Cable Duct� TC-6" 
+		_then
+			p9 << 	p9 + p.calculated_length.value_in(:m).as_number()
+
+
+		_endif
+
+	_endloop
+
+	
+>> p1,p2,p3,p4,p5,p6,p7,p8,p9
+		
+_endproc
+$
+
+
+_global get_count_sling_wire_line <<
+_proc(fdt)
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:sling_wire]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	pred_m << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m)
+
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service" _orif s.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+
+_global get_count_slack_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :figure_eight _then
+			#_if i.current_record.sheath_splice_object_type ="FAT"
+			#_then
+				table_list.add(i.current_record)
+			#_endif
+			
+		_endif
+		
+	_endloop
+
+	p1 << 0
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service" _orif p.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		p1 << 	p1 + 1
+	
+	_endloop
+	
+>> p1
+	
+_endproc
+$
+
+_global get_count_boring_manual_line <<
+_proc(fdt)
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:boring_manual]
+	table_list << rope.new()
+	#_dynamic !current_world! << v_gis.world
+
+
+	_dynamic !current_world! << v_gis.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+	
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+	
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	#write(table_list.size)
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service" _orif  s.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+		#write("boring  :  ",s)
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+	>> t_pjg
+_endproc
+$
+
+_global get_count_boring_machine_line <<
+_proc(fdt)
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:boring_machine]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	#pred_m << predicate.within(:route , {a_region})
+	#table_list << s_col.select(pred_m)
+
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service"  _orif  s.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_tali_pancing_line <<
+_proc(fdt)
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:tali_pancing]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	#pred_m << predicate.within(:route , {a_region})
+	#table_list << s_col.select(pred_m)
+
+	pred_m << predicate.interacts(:route , {a_region})
+	pred_m2 << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m _or pred_m2)
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service" _orif s.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_pi_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :point_of_interest _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service" _orif p.ring_name <> fdt
+		_then
+			_continue
+		_endif
+
+#		_if p.spec_id="HH Precast FDT : 80x80x130 cm" 
+#		_then
+#			p1 << 	p1 + 1
+#		_elif p.spec_id="HH Concrete FDT : 80x80x130 cm" 
+#		_then
+#			p2 << p2 + 1
+#		
+#		_endif
+
+		p1 << 	p1 + 1
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1)
+	
+>> p1
+		
+_endproc
+$
+
+_global get_count_uub_fdt_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service" _orif p.ring_name <> fdt
+		_then
+			_continue
+		_endif
+
+		_if p.spec_id="HH Precast FDT : 80x80x130 cm" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="HH Concrete FDT : 80x80x130 cm" 
+		_then
+			p2 << p2 + 1
+		
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+#write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2
+		
+_endproc
+$
+
+
+_global get_count_uub_fat_line <<
+_proc(fdt)
+
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0
+	p2 << 0
+	p3 << 0
+	p4 << 0
+	p5 << 0
+	p6 << 0
+
+	t_pole << 0
+
+#	print(.table_list5)
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service" _orif  p.ring_name <> fdt
+		_then
+			_continue
+		_endif
+
+		_if p.spec_id="HH Precast FDT : 40x40x60 cm" 
+		_then
+			p1 << 	p1 + 1
+		_elif p.spec_id="HH Concrete FDT : 40x40x60 cm" 
+		_then
+			p2 << p2 + 1
+			
+
+		_endif
+
+		t_pole +<< 1
+
+	_endloop
+write("jml :",  p1,p2,p3,p4,p5)
+	
+>> p1,p2
+		
+_endproc
+$
+
+
+
+_global seq_fdt <<
+_proc ()
+	# Create a sequence
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	t << rope.new()
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			_if i.current_record.sheath_splice_object_type="FDT"
+			_then
+				_if i.current_record.construction_status="In Service"
+				_then
+					_continue
+				_else
+
+					t.add(i.current_record.name)
+
+				_endif
+
+			_endif
+			#table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	my_seq << equality_set.new_from(t) #{"FDT 1 003", "FDT 1 001", "FDT 1 002"})
+	
+	# Iterate through the sequence
+#	_for i _over my_seq.fast_elements()
+#	_loop
+#		write(i)
+#	_endloop
+
+	>> my_seq
+_endproc
+$
+
+
 _global create_boq <<
+_proc(design, infra_type)
+
+
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	#		dm << gis_program_manager.databases[:design_admin]
+	#		val << s.inf_project.write_string
+	#		c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	#		cur_rec << c.an_element()
+	#		project_id << cur_rec.id.write_string 
+	#		owner << s.owner.write_string
+			#write(project_id,nama)
+	
+	#ignored except these object
+	object_filtered << rope.new_with(:pole,:figure_eight,:sheath_splice,:sheath_with_loc, :mit_terminal_enclosure, :uub, :optical_splitter )
+	
+	
+	#pake equality ->string sebagai key
+	obj << equality_hash_table.new()
+	
+	start << date_time_now()
+	
+	
+	#a_filename << "c:\template_boq\01.2 BOQ Template to Vendor 2024 Final - Distribute to Vendor v2.xlsx"
+	#a_filename << %TEMPLATE_BOQ%
+
+	ug << cek_ug()
+
+	write(infra_type)
+	_if infra_type ="cluster" _then
+		
+		_local a_filename << system.getenv("TEMPLATE_BOQ_CLUSTER")
+		Excel_Object << OLE_Client.Create_Object("Excel.Application")
+		Excel_Object.Visible << _True
+		
+		Workbooks << Excel_Object.Workbooks ()
+		WorkBook << Workbooks.add(a_filename)
+
+		Sheet << Excel_Object.Sheets ("BoM CLUSTER AE & UG")
+		Sheet1 << Excel_Object.Sheets ("BoQ NRO Cluster")
+		#_if infra_type ="cluster" _then
+		#	Sheet << Excel_Object.Sheets ("BoQ NRO Cluster")
+		#_else
+		#	Sheet << Excel_Object.Sheets ("BoQ NRO All Feeder")
+		#_endif
+		
+		a_ff << float_format.new_with_properties(
+				:float_format,:fixed,
+				:float_decimal_places,3)
+		
+		start << date_time_now()
+
+
+		nm_fdt << seq_fdt()
+
+		count_fdt << 0
+		
+		_for nm  _over nm_fdt.fast_elements()
+		_loop
+			count_fdt +<< 1
+
+		
+			_if count_fdt = 1  
+			_then
+				ss << "C"
+			_elif count_fdt = 2
+			_then
+				ss << "D"
+			_elif count_fdt = 3
+			_then
+				ss << "E"
+			_elif count_fdt = 4
+			_then
+				ss << "F"
+			_elif count_fdt = 5
+			_then
+				ss << "G"
+			_elif count_fdt = 6
+			_then
+				ss << "H"
+			_elif count_fdt = 7
+			_then
+				ss << "I"
+			_elif count_fdt = 8
+			_then
+				ss << "J"
+			_elif count_fdt = 9
+			_then
+				ss << "K"
+			_elif count_fdt = 10
+			_then
+				ss << "L"
+
+			_endif
+
+			#pole
+			(p1,p2,p3,p4,p5,p6,t_pl) << get_count_pole_line(nm)
+
+			_if p1 > 0 
+			_then
+				Cell_p1_name << Sheet.Range(ss+"76")
+				Cell_p1_name.value << p1.write_string
+			_endif
+			
+			_if p2 > 0 
+			_then
+				Cell_p11_name << Sheet.Range(ss+"75")
+				Cell_p11_name.value << p2.write_string
+			_endif
+			
+			_if p3 > 0 
+			_then
+				Cell_p2_name << Sheet.Range(ss+"74")
+				Cell_p2_name.value << p3.write_string
+			_endif
+			
+			_if p4 > 0 
+			_then
+				Cell_p22_name << Sheet.Range(ss+"79")
+				Cell_p22_name.value << p4.write_string
+			_endif
+			
+			_if p5 > 0 
+			_then
+				Cell_p3_name << Sheet.Range(ss+"78")
+				Cell_p3_name.value << p5.write_string
+			_endif
+			
+			_if p6 > 0 
+			_then
+				Cell_p33_name << Sheet.Range(ss+"77")
+				Cell_p33_name.value << p6.write_string
+			_endif
+
+			#pole existing
+			px << get_count_pole_emr_existing_line(nm)
+			
+			_if px > 0 
+			_then
+				Cell_p38_name << Sheet.Range(ss+"82")
+				Cell_p38_name.value << px.write_string
+			_endif
+
+			#cable
+			#(c1,c2,c3,c4,c5,c6,c7) << get_count_cable_line(nm)
+			
+			cbl << get_count_cable_cluster_line(nm)
+
+			_for b _over cbl.fast_elements()
+			_loop
+				_if b[:id]="clr1" _then
+					Cell_d55_name << Sheet.Range(ss+"2")
+					Cell_d55_name.value << b[:jml].ceiling.write_string
+					
+				_elif b[:id]="clr2" 
+				_then
+					Cell_d56_name << Sheet.Range(ss+"3")
+					Cell_d56_name.value << b[:jml].ceiling.write_string
+					
+				_elif b[:id]="clr3"
+				_then
+					Cell_d57_name << Sheet.Range(ss+"4")
+					Cell_d57_name.value << b[:jml].ceiling.write_string
+					
+				_elif b[:id]="clr4" 
+				_then
+					Cell_d58_name << Sheet.Range(ss+"5")
+					Cell_d58_name.value << b[:jml].ceiling.write_string
+					
+				_elif b[:id]="clr5"
+				_then
+					Cell_d59_name << Sheet.Range(ss+"6")
+					Cell_d59_name.value << b[:jml].ceiling.write_string
+					
+				_elif b[:id]="clr6" 
+				_then
+					Cell_d60_name << Sheet.Range(ss+"7")
+					Cell_d60_name.value << b[:jml].ceiling.write_string
+					
+				
+				_elif b[:id]="clr7" 
+				_then
+					Cell_d61_name << Sheet.Range(ss+"8")
+					Cell_d61_name.value << b[:jml].ceiling.write_string
+					
+				_elif b[:id]="clr8" 
+				_then
+					Cell_d62_name << Sheet.Range(ss+"9")
+					Cell_d62_name.value << b[:jml].ceiling.write_string
+				_elif b[:id]="clr9"
+				_then
+					Cell_d63_name << Sheet.Range(ss+"10")
+					Cell_d63_name.value << b[:jml].ceiling.write_string
+				_elif b[:id]="clr10" 
+				_then
+					Cell_d64_name << Sheet.Range(ss+"11")
+					Cell_d64_name.value << b[:jml].ceiling.write_string
+				_elif b[:id]="clr11" 
+				_then
+					Cell_d65_name << Sheet.Range(ss+"12")
+					Cell_d65_name.value << b[:jml].ceiling.write_string
+				_elif b[:id]="clr12"
+				_then
+					Cell_d66_name << Sheet.Range(ss+"13")
+					Cell_d66_name.value << b[:jml].ceiling.write_string
+					
+				_endif
+			_endloop
+			
+			#slack
+			slk << get_count_slack_line(nm)
+
+			#sling		
+			slw << get_count_sling_wire_line(nm)
+			_if slw > 0 
+			_then
+				Cell_slw << Sheet.Range(ss+"15")
+				Cell_slw.value << slw.ceiling.write_string
+			_endif
+			
+			#fdt
+			(fdta,fdtb,fdtc,fdtd) << get_count_fdt_line(nm)
+			
+			Cell_fdta << Sheet.Range(ss+"38")
+			Cell_fdta.value << fdta.write_string
+
+			Cell_fdtb << Sheet.Range(ss+"39")
+			Cell_fdtb.value << fdtb.write_string
+			
+			Cell_fdtc << Sheet.Range(ss+"40")
+			Cell_fdtc.value << fdtc.write_string
+			
+			Cell_fdtd << Sheet.Range(ss+"41")
+			Cell_fdtd.value << fdtd.write_string
+			
+
+
+			#fat
+			(fata,fatb,fatc,fatd) << get_count_fat_line(nm)
+			
+			Cell_fata << Sheet.Range(ss+"45")
+			Cell_fata.value << fata.write_string
+
+			Cell_fatb << Sheet.Range(ss+"46")
+			Cell_fatb.value << fatb.write_string
+			
+			Cell_fatc << Sheet.Range(ss+"47")
+			Cell_fatc.value << fatc.write_string
+			
+			Cell_fatd << Sheet.Range(ss+"48")
+			Cell_fatd.value << fatd.write_string
+
+			#underground
+			_if ug _is _true 
+			_then
+				bm << get_count_boring_manual_line(nm)
+				Cell_bm << Sheet.Range(ss+"105")
+				Cell_bm.value << bm.ceiling.write_string
+
+				#bmc << get_count_boring_machine_line(nm)
+				bmc << get_count_boring_machine()
+				Cell_bmc << Sheet1.Range("E119")
+				Cell_bmc.value << bmc.ceiling.write_string
+
+			
+				tp <<  get_count_tali_pancing_line(nm)
+				Cell_tp << Sheet.Range(ss+"123")
+				Cell_tp.value << tp.ceiling.write_string
+
+				pi << get_count_pi_line(nm)
+				Cell_pi << Sheet.Range(ss+"124")
+				Cell_pi.value << pi.write_string
+
+
+				(cdt1,cdt2,cdt3,cdt4,cdt5,cdt6,cdt7,cdt8,cdt9) << get_count_conduit_line(nm)
+				_if cdt1 > 0 
+				_then
+					Cell_cdt1_name << Sheet.Range(ss+"106")
+					Cell_cdt1_name.value << cdt1.ceiling.write_string
+				_endif
+				
+				_if cdt2 > 0 
+				_then
+					Cell_cdt2_name << Sheet.Range(ss+"107")
+					Cell_cdt2_name.value << cdt2.ceiling.write_string
+				_endif
+				
+#				_if c3 > 0 
+#				_then
+#					Cell_c3_name << Sheet1.Range("D158")
+#					Cell_c3_name.value << c3.ceiling.write_string
+#				_endif
+#				
+#				_if c4 > 0 
+#				_then
+#					Cell_c4_name << Sheet1.Range("D159")
+#					Cell_c4_name.value << c4.ceiling.write_string
+#				_endif
+#				
+#				_if c5 > 0 
+#				_then
+#					Cell_c5_name << Sheet1.Range("D153")
+#					Cell_c5_name.value << c5.ceiling.write_string
+#				_endif
+#				
+#				_if c6 > 0 
+#				_then
+#					Cell_c6_name << Sheet1.Range("D154")
+#					Cell_c6_name.value << c6.ceiling.write_string
+#				_endif
+#				
+#				_if c7 > 0 
+#				_then
+#					Cell_c7_name << Sheet1.Range("D155")
+#					Cell_c7_name.value << c7.ceiling.write_string
+#				_endif
+#				
+#				_if c8 > 0 
+#				_then
+#					Cell_c8_name << Sheet1.Range("D156")
+#					Cell_c8_name.value << c8.ceiling.write_string
+#				_endif
+#				
+#				_if c9 > 0 
+#				_then
+#					Cell_c9_name << Sheet1.Range("D157")
+#					Cell_c9_name.value << c9.ceiling.write_string
+#				_endif
+				
+				
+				(ce1,ce2) << get_count_uub_fdt_line(nm)
+				_if ce1 > 0 
+				_then
+					Cell_ce << Sheet.Range(ss+"114")
+					Cell_ce.value << ce1.write_string
+				_endif
+
+				_if ce2 > 0
+				_then
+					Cell_co << Sheet.Range(ss+"118")
+					Cell_co.value << ce2.write_string
+				_endif
+
+				(fa1,fa2) << get_count_uub_fat_line(nm)
+				_if fa1 > 0 
+				_then
+					Cell_fa << Sheet.Range(ss+"115")
+					Cell_fa.value << fa1.write_string
+				_endif
+
+				_if fa2 > 0
+				_then
+					Cell_fo << Sheet.Range(ss+"119")
+					Cell_fo.value << fa2.write_string
+				_endif
+				
+			_endif
+
+		_endloop
+
+		
+		olt_nm << ""
+		#clr_nm << ""
+		_for i _over change_set.fast_elements()
+		_loop
+			
+		
+			name <<   i.current_record.source_collection.name
+			_if name _is :sheath_with_loc _then
+				olt_nm << i.current_record.olt 
+			_endif
+			
+		_endloop
+
+		hdp << get_count_hp()
+		Cell_hdp << Sheet1.Range("O5")
+		Cell_hdp.value << hdp.write_string
+
+
+		Cell_olt << Sheet1.Range("O2")
+		Cell_olt.value << olt_nm.write_string
+
+		Cell_cluster << Sheet1.Range("O3")
+		Cell_cluster.value << nama.write_string
+
+		_if ug _is _true 
+		_then
+			write(ug)
+		#update to Underground
+			Cell_type << Sheet1.Range("O4")
+			Cell_type.value << "Underground"
+		_endif
+		
+		
+	_else
+
+		_local a_filename << system.getenv("TEMPLATE_BOQ_FEEDER")
+		Excel_Object << OLE_Client.Create_Object("Excel.Application")
+		Excel_Object.Visible << _True
+		
+		Workbooks << Excel_Object.Workbooks ()
+		WorkBook << Workbooks.add(a_filename)
+		
+		Sheet << Excel_Object.Sheets ("BoM FEEDER or SUB FEEDER")
+		Sheet1 << Excel_Object.Sheets ("BoQ NRO All Feeder")
+	
+		
+		a_ff << float_format.new_with_properties(
+				:float_format,:fixed,
+				:float_decimal_places,3)
+		
+		start << date_time_now()
+
+		#cable
+		cbl << get_count_cable_feeder()
+		_for b _over cbl.fast_elements()
+		_loop
+			_if b[:id]="clr1" _then
+				Cell_d55_name << Sheet.Range("C2")
+				Cell_d55_name.value << b[:jml].ceiling.write_string
+				
+			_elif b[:id]="clr2" 
+			_then
+				Cell_d56_name << Sheet.Range("C3")
+				Cell_d56_name.value << b[:jml].ceiling.write_string
+				
+			_elif b[:id]="clr3"
+			_then
+				Cell_d57_name << Sheet.Range("C4")
+				Cell_d57_name.value << b[:jml].ceiling.write_string
+				
+			_elif b[:id]="clr4" 
+			_then
+				Cell_d58_name << Sheet.Range("C5")
+				Cell_d58_name.value << b[:jml].ceiling.write_string
+				
+			_elif b[:id]="clr5"
+			_then
+				Cell_d59_name << Sheet.Range("C6")
+				Cell_d59_name.value << b[:jml].ceiling.write_string
+				
+			_elif b[:id]="clr6" 
+			_then
+				Cell_d60_name << Sheet.Range("C7")
+				Cell_d60_name.value << b[:jml].ceiling.write_string
+				
+				
+			_elif b[:id]="clr7" 
+			_then
+				Cell_d61_name << Sheet.Range("C8")
+				Cell_d61_name.value << b[:jml].ceiling.write_string
+				
+			_endif
+			
+		_endloop
+
+		#clusre
+		clr << get_count_closure()
+		
+		_for b _over clr.fast_elements()
+		_loop
+			write(b[:jml])
+			_if b[:id]="clr1" _then
+				Cell_d55_name << Sheet.Range("C23")
+				Cell_d55_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr2" 
+			_then
+				Cell_d56_name << Sheet.Range("C24")
+				Cell_d56_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr3"
+			_then
+				Cell_d57_name << Sheet.Range("C25")
+				Cell_d57_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr4" 
+			_then
+				Cell_d58_name << Sheet.Range("C26")
+				Cell_d58_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr5"
+			_then
+				Cell_d59_name << Sheet.Range("C27")
+				Cell_d59_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr6" 
+			_then
+				Cell_d60_name << Sheet.Range("C28")
+				Cell_d60_name.value << b[:jml].write_string
+				
+				
+			_elif b[:id]="clr7" 
+			_then
+				Cell_d61_name << Sheet.Range("C29")
+				Cell_d61_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr8" 
+			_then
+				Cell_d62_name << Sheet.Range("C30")
+				Cell_d62_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr9"
+			_then
+				Cell_d63_name << Sheet.Range("C31")
+				Cell_d63_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr10" 
+			_then
+				Cell_d64_name << Sheet.Range("C32")
+				Cell_d64_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr11" 
+			_then
+				Cell_d65_name << Sheet.Range("C33")
+				Cell_d65_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr12"
+			_then
+				Cell_d66_name << Sheet.Range("C34")
+				Cell_d66_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr13"
+			_then
+				Cell_d67_name << Sheet.Range("C35")
+				Cell_d67_name.value << b[:jml].write_string
+				
+			_elif b[:id]="clr14"
+			_then
+				Cell_d68_name << Sheet.Range("C36")
+				Cell_d68_name.value << b[:jml].write_string
+			_endif
+		_endloop
+
+		#pole
+		(p1,p2,p3,p4,p5,p6,t_pl) << get_count_pole()
+
+		_if p1 > 0 
+		_then
+			Cell_p1_name << Sheet.Range("C49")
+			Cell_p1_name.value << p1.write_string
+		_endif
+		
+		_if p2 > 0 
+		_then
+			Cell_p11_name << Sheet.Range("C50")
+			Cell_p11_name.value << p2.write_string
+		_endif
+		
+		_if p3 > 0 
+		_then
+			Cell_p2_name << Sheet.Range("C51")
+			Cell_p2_name.value << p3.write_string
+		_endif
+		
+		_if p4 > 0 
+		_then
+			Cell_p22_name << Sheet.Range("C52")
+			Cell_p22_name.value << p4.write_string
+		_endif
+		
+		_if p5 > 0 
+		_then
+			Cell_p3_name << Sheet.Range("C53")
+			Cell_p3_name.value << p5.write_string
+		_endif
+		
+		_if p6 > 0 
+		_then
+			Cell_p33_name << Sheet.Range("C54")
+			Cell_p33_name.value << p6.write_string
+		_endif
+
+		#pole EMR
+		em << get_count_pole_emr_existing()
+
+		_if em > 0 
+		_then
+			Cell_p33_name << Sheet.Range("C59")
+			Cell_p33_name.value << em.write_string
+		_endif
+
+		#sling
+		q1 << get_count_sling_wire()
+		Cell_q1_name << Sheet.Range("C48")
+		Cell_q1_name.value << q1.ceiling.write_string
+
+		_if ug _is _true 
+		_then
+
+			q1 << get_count_tali_pancing()
+			Cell_q1_name << Sheet.Range("D172")
+			Cell_q1_name.value << q1.ceiling.write_string
+
+			(c1,c2,c3,c4,c5,c6,c7,c8,c9) << get_count_conduit()
+			_if c1 > 0 
+			_then
+				Cell_c1_name << Sheet1.Range("D134")
+				Cell_c1_name.value << c1.ceiling.write_string
+			_endif
+			
+			_if c2 > 0 
+			_then
+				Cell_c2_name << Sheet1.Range("D138")
+				Cell_c2_name.value << c2.ceiling.write_string
+			_endif
+			
+			_if c3 > 0 
+			_then
+				Cell_c3_name << Sheet1.Range("D158")
+				Cell_c3_name.value << c3.ceiling.write_string
+			_endif
+
+			_if c4 > 0 
+			_then
+				Cell_c4_name << Sheet1.Range("D159")
+				Cell_c4_name.value << c4.ceiling.write_string
+			_endif
+
+			_if c5 > 0 
+			_then
+				Cell_c5_name << Sheet1.Range("D153")
+				Cell_c5_name.value << c5.ceiling.write_string
+			_endif
+
+			_if c6 > 0 
+			_then
+				Cell_c6_name << Sheet1.Range("D154")
+				Cell_c6_name.value << c6.ceiling.write_string
+			_endif
+
+			_if c7 > 0 
+			_then
+				Cell_c7_name << Sheet1.Range("D155")
+				Cell_c7_name.value << c7.ceiling.write_string
+			_endif
+
+			_if c8 > 0 
+			_then
+				Cell_c8_name << Sheet1.Range("D156")
+				Cell_c8_name.value << c8.ceiling.write_string
+			_endif
+
+			_if c9 > 0 
+			_then
+				Cell_c9_name << Sheet1.Range("D157")
+				Cell_c9_name.value << c9.ceiling.write_string
+			_endif
+			
+			
+			_if infra_type ="cluster" _then
+				b1 << get_count_open_trenching()
+				Cell_b1_name << Sheet.Range("E109")
+				Cell_b1_name.value << b1.ceiling.write_string
+				
+				d1 << get_count_sewer()
+				Cell_d1_name << Sheet.Range("E109")
+				Cell_d1_name.value << d1.ceiling.write_string
+				
+			_else
+				
+				b1 << get_count_open_trenching()
+				Cell_b1_name << Sheet.Range("E110")
+				Cell_b1_name.value << b1.ceiling.write_string
+
+				d1 << get_count_sewer()
+				Cell_d1_name << Sheet.Range("E110")
+				Cell_d1_name.value << d1.ceiling.write_string
+				
+				
+			_endif
+			
+			#write("boring manual")
+			c1 << get_count_boring_manual()
+			Cell_c1_name << Sheet.Range("C65")
+			Cell_c1_name.value << c1.ceiling.write_string
+
+			#write("boring machine")
+			d1 << get_count_boring_machine()
+			Cell_d1_name << Sheet.Range("E119")
+			Cell_d1_name.value << d1.ceiling.write_string
+			
+			
+			(e1,e2) << get_count_uub_fdt()
+			Cell_e1_name << Sheet.Range("C74")
+			Cell_e1_name.value << e1.write_string
+
+			Cell_e2_name << Sheet.Range("C78")
+			Cell_e2_name.value << e2.write_string
+		
+			
+			#FAT
+			(f1,f2) << get_count_uub_fat()
+			Cell_f1_name << Sheet.Range("C75")
+			Cell_f1_name.value << f1.write_string
+					
+			Cell_f2_name << Sheet.Range("C79")
+			Cell_f2_name.value << f2.write_string
+		
+			
+			(y1,y2) << get_count_uub_home_connect()
+
+			Cell_y1_name << Sheet.Range("C76")
+			Cell_y1_name.value << y1.write_string
+			
+			Cell_y2_name << Sheet.Range("C80")
+			Cell_y2_name.value << y2.write_string
+			
+			
+			(g1,g2) << get_count_pi()
+			Cell_g1_name << Sheet.Range("D182")
+			Cell_g1_name.value << g1.write_string
+			Cell_g11_name << Sheet.Range("E183")
+			Cell_g11_name.value << g1.write_string
+			
+			Cell_g2_name << Sheet.Range("D184")
+			Cell_g2_name.value << g1.write_string
+			Cell_g22_name << Sheet.Range("E185")
+			Cell_g22_name.value << g1.write_string
+			
+			
+		_endif
+		
+		
+	_endif
+	
+		
+_endproc
+$
+
+
+_global create_boq_old <<
 _proc(design, infra_type)
 
 
@@ -699,7 +3742,7 @@ _proc(design, infra_type)
 	WorkBook << Workbooks.add(a_filename)
 
 
-	write(infra_type)
+	#write(infra_type)
 	_if infra_type ="cluster" _then
 		Sheet << Excel_Object.Sheets ("BoQ NRO Cluster")
 	_else
@@ -716,12 +3759,12 @@ _proc(design, infra_type)
 	hdp << get_count_hp()
 	Cell_hdp << Sheet.Range("O5")
 	Cell_hdp.value << hdp.write_string
-
+	
 	olt_nm << ""
 	#clr_nm << ""
 	_for i _over change_set.fast_elements()
 	_loop
-	
+		
 		
 		name <<   i.current_record.source_collection.name
 		_if name _is :sheath_with_loc _then
@@ -730,19 +3773,23 @@ _proc(design, infra_type)
 		
 	_endloop
 
+	ug << cek_ug()
+	#write("ug  :  ",ug)
+	
 	Cell_olt << Sheet.Range("O2")
 	Cell_olt.value << olt_nm.write_string
-
+	
 	Cell_cluster << Sheet.Range("O3")
 	Cell_cluster.value << nama.write_string
-
+	
 	pole7m_jml << 0
 	pole9m_jml << 0			
 	
-
+	
 	m1 << get_count_slack()
-	Cell_m1_name << Sheet.Range("E225")
+	Cell_m1_name << Sheet.Range("D225")
 	Cell_m1_name.value << m1.write_string
+
 	
 	(j1,j2) << get_count_fat()
 	Cell_j1_name << Sheet.Range("D63")
@@ -751,30 +3798,41 @@ _proc(design, infra_type)
 	Cell_j11_name.value << j1.write_string
 	Cell_j2_name << Sheet.Range("D65")
 	Cell_j2_name.value << j2.write_string
-	Cell_j22_name << Sheet.Range("D66")
+	Cell_j22_name << Sheet.Range("E66")
 	Cell_j22_name.value << j2.write_string
-
+	
 	total_fat << j1+j2
 
-	Cell_j220_name << Sheet.Range("E96")
-	Cell_j220_name.value << total_fat.write_string
-	Cell_j221_name << Sheet.Range("D96")
-	Cell_j221_name.value << total_fat.write_string
-	#Testcomm OTDR & OPM FDT - FAT
-	Cell_j229_name << Sheet.Range("E287")
-	Cell_j229_name.value << total_fat.write_string
-	Cell_j228_name << Sheet.Range("D287")
-	Cell_j228_name.value << total_fat.write_string
+	_if ug _is _false  
+	_then
+		Cell_j220_name << Sheet.Range("E96")
+		Cell_j220_name.value << total_fat.write_string
+	_else
 
+		Cell_j220_name << Sheet.Range("E96")
+		Cell_j220_name.value << total_fat.write_string
+		
+		Cell_j2208_name << Sheet.Range("D98")
+		Cell_j2208_name.value << total_fat.write_string
+	_endif
+	
+	
+	#Cell_j221_name << Sheet.Range("D96")
+	#Cell_j221_name.value << total_fat.write_string
+	#Testcomm OTDR & OPM FDT - FAT
+	#Cell_j229_name << Sheet.Range("E287")
+	#Cell_j229_name.value << total_fat.write_string
+	Cell_j228_name << Sheet.Range("E287")
+	Cell_j228_name.value << total_fat.write_string
+	
 	#splicing
 	total_fatx << total_fat * 2
-	Cell_j222_name << Sheet.Range("D92")
-	Cell_j222_name.value << total_fatx.write_string
+	#Cell_j222_name << Sheet.Range("D92")
+	#Cell_j222_name.value << total_fatx.write_string
 	Cell_j222_name << Sheet.Range("E92")
 	Cell_j222_name.value << total_fatx.write_string
 
 	
-		
 	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
 	
 	Cell_f1_name << Sheet.Range("D42")
@@ -791,7 +3849,7 @@ _proc(design, infra_type)
 	Cell_f33_name.value << f3.write_string
 	Cell_f4_name << Sheet.Range("D48")
 	Cell_f4_name.value << f4.write_string
-	Cell_f44_name << Sheet.Range("E48")
+	Cell_f44_name << Sheet.Range("E49")
 	Cell_f44_name.value << f4.write_string
 	Cell_f5_name << Sheet.Range("D50")
 	Cell_f5_name.value << f5.write_string
@@ -803,13 +3861,14 @@ _proc(design, infra_type)
 	Cell_f66_name.value << f6.write_string
 	
 	total_fdt << f1+f2+f3+f4+f5+f6
-
 	
-	Cell_f661_name << Sheet.Range("D95")
-	Cell_f661_name.value << total_fdt.write_string
+	
+	#Cell_f661_name << Sheet.Range("D95")
+	#Cell_f661_name.value << total_fdt.write_string
 	Cell_f662_name << Sheet.Range("E95")
 	Cell_f662_name.value << total_fdt.write_string
 	
+		
 	(p1,p2,p3,p4,p5,p6,t_pl) << get_count_pole()
 	
 	Cell_p1_name << Sheet.Range("D217")
@@ -836,66 +3895,66 @@ _proc(design, infra_type)
 	Cell_p6_name.value << p6.write_string
 	Cell_p66_name << Sheet.Range("E220")
 	Cell_p66_name.value << p6.write_string
-
+	
 	Cell_c611_name << Sheet.Range("D239")
 	Cell_c611_name.value << t_pl.write_string
-	Cell_c711_name << Sheet.Range("D97")
-	Cell_c711_name.value << t_pl.write_string
-	Cell_c61_name << Sheet.Range("E239")
-	Cell_c61_name.value << t_pl.write_string
+	#Cell_c711_name << Sheet.Range("D97")
+	#Cell_c711_name.value << t_pl.write_string
+	#Cell_c61_name << Sheet.Range("E239")
+	#Cell_c61_name.value << t_pl.write_string
 	Cell_c71_name << Sheet.Range("E97")
 	Cell_c71_name.value << t_pl.write_string
 	
 	
 	
 	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
-	write(c1)
+	#write(c1)
 	c1 << c1 + (c1 * (5/100))
 	Cell_c1_name << Sheet.Range("D15")
-	Cell_c1_name.value << c1.write_string
-
+	Cell_c1_name.value << c1.ceiling.write_string
+	
 	c2 << c2 + (c2 * (5/100))
 	Cell_c2_name << Sheet.Range("D17")
-	Cell_c2_name.value << c2.write_string
+	Cell_c2_name.value << c2.ceiling.write_string
 	
 	c3 << c3 + (c3 * (5/100))
 	Cell_c3_name << Sheet.Range("D19")
-	Cell_c3_name.value << c3.write_string
-
+	Cell_c3_name.value << c3.ceiling.write_string
+	
 	c4 << c4 + (c4 * (5/100))
 	Cell_c4_name << Sheet.Range("D21")
-	Cell_c4_name.value << p4.write_string
-
+	Cell_c4_name.value << p4.ceiling.write_string
+	
 	c5 << c5 + (c5 * (5/100))
 	Cell_c5_name << Sheet.Range("D23")
-	Cell_c5_name.value << c5.write_string
-
+	Cell_c5_name.value << c5.ceiling.write_string
+	
 	c6 << c6 + (c6 * (5/100))
 	Cell_c6_name << Sheet.Range("D25")
-	Cell_c6_name.value << c6.write_string
-
+	Cell_c6_name.value << c6.ceiling.write_string
+	
 	c7 << c7 + (c7 * (5/100))
 	Cell_c7_name << Sheet.Range("D27")
-	Cell_c7_name.value << c7.write_string
-
+	Cell_c7_name.value << c7.ceiling.write_string
+	
 	Cell_c11_name << Sheet.Range("E16")
-	Cell_c11_name.value << c1.write_string
+	Cell_c11_name.value << c1.ceiling.write_string
 	Cell_c22_name << Sheet.Range("E18")
-	Cell_c22_name.value << c2.write_string
+	Cell_c22_name.value << c2.ceiling.write_string
 	Cell_c33_name << Sheet.Range("E20")
-	Cell_c33_name.value << c3.write_string
+	Cell_c33_name.value << c3.ceiling.write_string
 	Cell_c44_name << Sheet.Range("E22")
-	Cell_c44_name.value << p4.write_string
+	Cell_c44_name.value << p4.ceiling.write_string
 	Cell_c55_name << Sheet.Range("E24")
-	Cell_c55_name.value << c5.write_string
+	Cell_c55_name.value << c5.ceiling.write_string
 	Cell_c66_name << Sheet.Range("E26")
-	Cell_c66_name.value << c6.write_string
+	Cell_c66_name.value << c6.ceiling.write_string
 	Cell_c77_name << Sheet.Range("E28")
-	Cell_c77_name.value << c7.write_string
-
-
-
-	total_cable_length << c1+c2+c3+c4+c5+c6+c7
+	Cell_c77_name.value << c7.ceiling.write_string
+	
+	
+	
+	total_cable_length << c1.ceiling+c2.ceiling+c3.ceiling+c4.ceiling+c5.ceiling+c6.ceiling+c7.ceiling
 	
 	clr << get_count_closure()
 	
@@ -904,38 +3963,38 @@ _proc(design, infra_type)
 		_if b[:id]="clr1" _then
 			Cell_d55_name << Sheet.Range("D76")
 			Cell_d55_name.value << b[:jml].write_string
-		
+			
 		_elif b[:id]="clr2" 
 		_then
 			Cell_d56_name << Sheet.Range("D77")
 			Cell_d56_name.value << b[:jml].write_string
-		
+			
 		_elif b[:id]="clr3"
 		_then
 			Cell_d57_name << Sheet.Range("D78")
 			Cell_d57_name.value << b[:jml].write_string
-		
+			
 		_elif b[:id]="clr4" 
 		_then
 			Cell_d58_name << Sheet.Range("D80")
 			Cell_d58_name.value << b[:jml].write_string
-		
+			
 		_elif b[:id]="clr5"
 		_then
 			Cell_d59_name << Sheet.Range("D81")
 			Cell_d59_name.value << b[:jml].write_string
-		
+			
 		_elif b[:id]="clr6" 
 		_then
 			Cell_d60_name << Sheet.Range("D82")
 			Cell_d60_name.value << b[:jml].write_string
-		
+			
 			
 		_elif b[:id]="clr7" 
 		_then
 			Cell_d61_name << Sheet.Range("D83")
 			Cell_d61_name.value << b[:jml].write_string
-		
+			
 		_elif b[:id]="clr8" 
 		_then
 			Cell_d62_name << Sheet.Range("D84")
@@ -966,33 +4025,122 @@ _proc(design, infra_type)
 			Cell_d68_name.value << b[:jml].write_string
 		_endif
 	_endloop
-
 	
-
+	
+	
 	q1 << get_count_sling_wire()
 	Cell_q1_name << Sheet.Range("E226")
-	Cell_q1_name.value << q1.write_string
-
-	_local total_length << total_cable_length + q1
+	Cell_q1_name.value << q1.ceiling.write_string
+	
+	_local total_length << total_cable_length + q1.ceiling
 	
 	Cell_q1_name << Sheet.Range("E296")
 	Cell_q1_name.value << total_length.write_string
 	Cell_q1_name << Sheet.Range("E291")
 	Cell_q1_name.value << total_length.write_string
-
+	
 	_local total_splicing << total_fat * 2
-
-
-	#Cell_q1_name << Sheet.Range("E291")
-	#Cell_q1_name.value << total_length.write_string
-
+	
+	
 	#Cell_q1_name << Sheet.Range("E291")
 	#Cell_q1_name.value << total_length.write_string
 	
+	#Cell_q1_name << Sheet.Range("E291")
+	#Cell_q1_name.value << total_length.write_string
 	
+		
+	_if ug _is _true 
+	_then
+
+		q1 << get_count_tali_pancing()
+		Cell_q1_name << Sheet.Range("D172")
+		Cell_q1_name.value << q1.ceiling.write_string
+		
+		_if infra_type ="cluster" _then
+			b1 << get_count_open_trenching()
+			Cell_b1_name << Sheet.Range("E109")
+			Cell_b1_name.value << b1.ceiling.write_string
+
+			d1 << get_count_sewer()
+			Cell_d1_name << Sheet.Range("E109")
+			Cell_d1_name.value << d1.ceiling.write_string
+
+		_else
+
+			b1 << get_count_open_trenching()
+			Cell_b1_name << Sheet.Range("E110")
+			Cell_b1_name.value << b1.ceiling.write_string
+
+			d1 << get_count_sewer()
+			Cell_d1_name << Sheet.Range("E110")
+			Cell_d1_name.value << d1.ceiling.write_string
+
+
+		_endif
+		
+		#write("boring manual")
+		c1 << get_count_boring_manual()
+		Cell_c1_name << Sheet.Range("E112")
+		Cell_c1_name.value << c1.ceiling.write_string
+
+		#write("boring machine")
+		d1 << get_count_boring_machine()
+		Cell_d1_name << Sheet.Range("E119")
+		Cell_d1_name.value << d1.ceiling.write_string
+
+
+		(e1,e2) << get_count_uub_fdt()
+		Cell_e1_name << Sheet.Range("D174")
+		Cell_e1_name.value << e1.write_string
+		Cell_e11_name << Sheet.Range("E175")
+		Cell_e11_name.value << e1.write_string
+		
+		Cell_e2_name << Sheet.Range("D176")
+		Cell_e2_name.value << e2.write_string
+		Cell_e22_name << Sheet.Range("E177")
+		Cell_e22_name.value << e2.write_string
+		
+
+		(f1,f2) << get_count_uub_fat()
+		Cell_f1_name << Sheet.Range("D178")
+		Cell_f1_name.value << f1.write_string
+		Cell_f11_name << Sheet.Range("E179")
+		Cell_f11_name.value << f1.write_string
+		
+		Cell_f2_name << Sheet.Range("D180")
+		Cell_f2_name.value << f2.write_string
+		Cell_f22_name << Sheet.Range("E181")
+		Cell_f22_name.value << f2.write_string
+
+		Cell_f23_name << Sheet.Range("D73")
+		Cell_f23_name.value << total_fat.write_string
+		Cell_f24_name << Sheet.Range("E74")
+		Cell_f24_name.value << total_fat.write_string
+
+		(g1,g2) << get_count_pi()
+		Cell_g1_name << Sheet.Range("D182")
+		Cell_g1_name.value << g1.write_string
+		Cell_g11_name << Sheet.Range("E183")
+		Cell_g11_name.value << g1.write_string
+		
+		Cell_g2_name << Sheet.Range("D184")
+		Cell_g2_name.value << g1.write_string
+		Cell_g22_name << Sheet.Range("E185")
+		Cell_g22_name.value << g1.write_string
+
+		
+	_endif
+	
+
+
+	
+		
 _endproc
 
 $
+
+
+
 
 
 _global backup_create_pl_boq <<

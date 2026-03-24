@@ -8,22 +8,22 @@ $
 ## with type detection, cable snapping, and placeholder update support
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_uub(pm)
+_private _method astri_design_migrator.create_uub(pm, p_trans)
 	## Create UUB (underground utility box/handhole) object from placemark
 	## with advanced mode:
 	## - Type detection: MH folder/name -> Manhole, HH -> Handhole (ref: fttx_uub_migration)
 	## - Construction status detection from folder patterns
 	## - Cable snapping to nearest underground route (500cm radius)
-	## - Placeholder update: if existing UUB has label "HH-*" -> update with real data
+	## - Placeholder update: if existing UUB has label "HH-*" -> update immediately
 	## - Duplicate skip: if existing non-placeholder UUB found -> skip
-	## - Create new UUB when nothing found nearby
+	## - Create new UUB: record_transaction appended to p_trans for batch execution
 	##
 	## Parameters:
-	##   pm - Placemark property_list from KML parser
+	##   pm      - Placemark property_list from KML parser
+	##   p_trans - Rope collecting insert record_transactions for batch dataset_transaction
 
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing UUB/Handhole: ", pm[:name])
 	_try _with errCon
 		# Step 0: Validate folder
 		_local folders << pm[:parent].default("")
@@ -101,9 +101,6 @@ _private _method astri_design_migrator.create_uub(pm)
 			_else
 				>> .construction_status
 			_endif
-
-		write("  >> Detected type: ", uub_type, " | spec: ", uub_spec_id, " | status: ", uub_const_status)
-
 		# Step 3: Parse point geometry
 		_local original_location << _self.parse_point_geometry(pm[:coord])
 		_local coord << original_location.as_coord()
@@ -131,12 +128,9 @@ _private _method astri_design_migrator.create_uub(pm)
 			_local snapped_point << pseudo_point.new(cp)
 			snapped_point.world << .database.world
 			final_location << snapped_point
-
-			write("  >> UUB snapped to underground route")
 		_else
 			# No underground route - use original location
 			final_location << original_location
-			write("  >> UUB placed at original location (no route nearby)")
 		_endif
 
 		# Step 5: Check for existing UUB within 200cm (2m radius)
@@ -157,8 +151,6 @@ _private _method astri_design_migrator.create_uub(pm)
 			_if existing_uub.label.default("").matches?("HH-*")
 			_then
 				# Update placeholder with real KML data
-				write("  [UPDATE] Updating placeholder UUB: ", existing_uub.id)
-
 				_local update_props << property_list.new_with(
 					:label, pm[:name],
 					:type, uub_type,
@@ -183,12 +175,11 @@ _private _method astri_design_migrator.create_uub(pm)
 				)
 
 				_local update_trans << record_transaction.new_update(existing_uub, update_props)
-				_local updated_uub << update_trans.run()
+				p_trans.add_last(update_trans)
 
 				_if .stats[:uubs] _is _unset _then .stats[:uubs] << 0 _endif
 				.stats[:uubs] +<< 1
-				write("  [OK] UUB updated: ", pm[:name], " (Type: ", uub_type, ", Status: ", uub_const_status, ")")
-				_return updated_uub
+				_return 
 			_else
 				# Real existing UUB - skip creation (not a placeholder)
 				write("  [SKIP] UUB already exists nearby (", existing_uub.label, ") - skipping")
@@ -197,7 +188,6 @@ _private _method astri_design_migrator.create_uub(pm)
 			_endif
 		_else
 			# Step 6: No existing UUB found - create new one
-			write("  [OK] Creating UUB...")
 			_local uub_prop_values << property_list.new_with(
 				:type, uub_type,
 				:label, pm[:name],
@@ -224,13 +214,11 @@ _private _method astri_design_migrator.create_uub(pm)
 				:width, 0.8
 			)
 
-			_local uub_rec_trans << record_transaction.new_insert(.uub_col, uub_prop_values)
-			_local uub_result << uub_rec_trans.run()
+			_local uub_trans << record_transaction.new_insert(.uub_col, uub_prop_values)
+			p_trans.add_last(uub_trans)
 
 			_if .stats[:uubs] _is _unset _then .stats[:uubs] << 0 _endif
 			.stats[:uubs] +<< 1
-			write("  [OK] UUB created: ", pm[:name], " (Type: ", uub_type, ", Status: ", uub_const_status, ")")
-			_return uub_result
 		_endif
 
 	_when error

@@ -7,7 +7,7 @@ $
 ## Contains methods for creating micro cells and macro cells from KMZ placemarks
 
 _pragma(classify_level=basic, topic={astri_integration})
- _private _method astri_design_migrator.create_micro_cell(pm)
+ _private _method astri_design_migrator.create_micro_cell(pm, p_trans)
 	## Create micro cell or macro cell from area placemark
 	## - Areas WITHOUT folders = Macro Cell (boundary areas)
 	## - Areas WITH folders + LINE + boundary patterns = Micro Cell
@@ -66,8 +66,6 @@ _pragma(classify_level=basic, topic={astri_integration})
 		# Step 1: Check if this is a MACRO CELL (boundary area without folders)
 		_if folders _is _unset _orif folders = "" _orif folders.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
 		_then
-			write("  Processing Macro Cell: ", pm[:name])
-
 			# Parse area geometry
 			_local area << _self.parse_area_geometry(pm[:coord])
 
@@ -96,11 +94,10 @@ _pragma(classify_level=basic, topic={astri_integration})
 			)
 
 			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
-			_local result << rec_trans.run()
+			p_trans.add_last(rec_trans)
 
 			.stats[:micro_cells] +<< 1
-			write("    [OK] Macro cell created: ", pm[:name], " (Type: Macro Cell)")
-			_return result
+			_return 
 		_endif
 
 		# Step 2: Check for LINE pattern (required for Micro Cell)
@@ -117,23 +114,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 			_return
 		_endif
 
-		# Step 3: Check for boundary pattern (required for Micro Cell)
-		#_local has_boundary << _false
-
-		#_if fol[fsize] = "FAT COVERAGE" _orif fol[fparent] = "FAT COVERAGE" _orif
-		#   fol[fsize] = "BOUNDARY" _orif fol[fparent] = "BOUNDARY" _orif
-		#   fol[fsize] = "BOUNDARY FAT" _orif fol[fparent] = "BOUNDARY FAT" _orif
-		#   fol[fsize] = "SH" _orif fol[fparent] = "SH"
-		#_then
-		#	has_boundary << _true
-		#_else
-		#	write("  WARNING: Skipping - no boundary pattern: ", folders)
-		#	_return
-		#_endif
-
 		# Step 4: Valid Micro Cell - proceed with creation
-		write("  Processing Micro Cell: ", pm[:name])
-
 		# Parse area geometry
 		_local area << _self.parse_area_geometry(pm[:coord])
 
@@ -175,12 +156,9 @@ _pragma(classify_level=basic, topic={astri_integration})
 		)
 
 		_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)
-		_local result << rec_trans.run()
+		p_trans.add_last(rec_trans)
 
 		.stats[:micro_cells] +<< 1
-		write("    [OK] Micro cell created: ", pm[:name], " (Type: Micro Cell, Splitter: ", s_id.default("_unset"), ")")
-		>> result
-
 	_when error
 		write("ERROR in create_micro_cell():", errCon.report_contents_string)
 		write("  Placemark name:", pm[:name].default("(unnamed)"))

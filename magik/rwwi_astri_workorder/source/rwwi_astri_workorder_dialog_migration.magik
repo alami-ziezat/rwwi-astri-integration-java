@@ -27,6 +27,8 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 		_return
 	_endif
 
+	_local start_time << date_time.now()
+
 	_self.clear_log()
 	_self.log_separator()
 	_self.log_info("STARTING DESIGN MIGRATION")
@@ -92,6 +94,11 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_info("  Network topology: " + topology.write_string)
 			_self.log_info("")
 			write("KML parsing complete. Found", placemarks.size, "placemarks")
+			_local end_time << date_time.now()
+			_local duration_seconds << (end_time - start_time)
+			_local string_duration << duration_seconds.write_string
+			write("Done parsing : ", string_duration)
+			_self.log_info("Done parsing: " + string_duration)
 
 			# Prepare project and design names
 			_local wo_number << wo[:wo_number].default("WO_" + kmz_uuid.subseq(1, 8))
@@ -177,6 +184,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 			# Migrate placemarks to design
 			_self.log_info("Step 6: Migrating " + placemarks.size.write_string + " objects to design (poles, routes, cables, splices, demand points)...")
+
 			_self.user_info(write_string(
 				"Migration to Design is now in progress.", %newline,
 				%newline,
@@ -188,6 +196,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 				"Click OK to start and do not close the dialog."))
 	
 			write("Migrating objects to design...")
+			start_time << date_time.now()
 			_local stats << migrator.migrate_placemarks(placemarks)
 			_self.log_success("Migration complete!")
 			_self.log_info("")
@@ -251,6 +260,12 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_info("Total objects:      " + total_objs.write_string)
 			_self.log_separator()
 
+			end_time << date_time.now()
+			duration_seconds << (end_time - start_time)
+			string_duration << duration_seconds.write_string
+			write("Done Migration: ", string_duration)
+			_self.log_info("Done Migration: " + string_duration)
+
 			_local msg << write_string(
 				" >>> Design Migration Complete! <<<", %newline,
 				"File: ", kml_file_path, %newline,
@@ -279,7 +294,6 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_self.log_separator()
 			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
 		_endif
-
 	_when error
 		_self.log_separator()
 		_self.log_error("MIGRATION FAILED")
@@ -298,7 +312,6 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 	## Sets construction_status to "In Service" for all migrated objects
 	##
 	## Uses file download approach (Scenario 2) to avoid large XML string issues
-
 	_if .selected_wo _is _unset
 	_then
 		_self.user_info("Please select a work order first")
@@ -577,7 +590,6 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 			_self.log_separator()
 			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
 		_endif
-
 	_when error
 		_self.log_separator()
 		_self.log_error("MIGRATION FAILED")

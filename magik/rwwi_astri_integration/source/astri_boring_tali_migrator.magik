@@ -13,14 +13,13 @@ $
 ##   :tali_pancing   - parent folder contains "tali pancing"  + line geometry
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_boring_manual(pm)
+_private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 	## Create boring_manual record from placemark
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing Boring Manual: ", pm[:name])
 	_try _with errCon
 		_local folders  << pm[:parent].default("")
 		_local route    << _self.parse_line_geometry(pm[:coord])
@@ -37,7 +36,6 @@ _private _method astri_design_migrator.create_boring_manual(pm)
 		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
 		                         _else >> ""
 		                         _endif
-		write("	Matched line: ", m_line, " | segment: ", segment)
 		_local prop_values << property_list.new_with(
 			:name,               pm[:name],
 			:folders,            folders,
@@ -62,16 +60,13 @@ _private _method astri_design_migrator.create_boring_manual(pm)
 		)
 
 		_local rec_trans << record_transaction.new_insert(.boring_manual_col, prop_values)
-		rec_trans.run()
+		p_trans.add_last(rec_trans)
 
 		_if .stats[:boring_manuals] _is _unset
 		_then
 			.stats[:boring_manuals] << 0
 		_endif
 		.stats[:boring_manuals] +<< 1
-
-		write("    [OK] Boring Manual created: ", pm[:name])
-
 	_when error
 		write("ERROR in create_boring_manual(): ", errCon.report_contents_string)
 		write("  Placemark name: ", pm[:name].default("(unnamed)"))
@@ -82,14 +77,14 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_boring_machine(pm)
-	## Create boring_machine record from placemark
+_private _method astri_design_migrator.create_boring_machine(pm, p_trans)
+	## Create boring_machine record_transaction and append to p_trans.
 	##
 	## Parameters:
-	##   pm - Placemark property_list from KML parser
+	##   pm      - Placemark property_list from KML parser
+	##   p_trans - Rope collecting record_transactions for batch dataset_transaction
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing Boring Machine: ", pm[:name])
 	_try _with errCon
 		_local folders  << pm[:parent].default("")
 		_local route    << _self.parse_line_geometry(pm[:coord])
@@ -131,15 +126,10 @@ _private _method astri_design_migrator.create_boring_machine(pm)
 		)
 
 		_local rec_trans << record_transaction.new_insert(.boring_machine_col, prop_values)
-		rec_trans.run()
+		p_trans.add_last(rec_trans)
 
-		_if .stats[:boring_machines] _is _unset
-		_then
-			.stats[:boring_machines] << 0
-		_endif
+		_if .stats[:boring_machines] _is _unset _then .stats[:boring_machines] << 0 _endif
 		.stats[:boring_machines] +<< 1
-
-		write("    [OK] Boring Machine created: ", pm[:name])
 
 	_when error
 		write("ERROR in create_boring_machine(): ", errCon.report_contents_string)
@@ -151,14 +141,14 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_tali_pancing(pm)
-	## Create tali_pancing record from placemark
+_private _method astri_design_migrator.create_tali_pancing(pm, p_trans)
+	## Create tali_pancing record_transaction and append to p_trans.
 	##
 	## Parameters:
-	##   pm - Placemark property_list from KML parser
+	##   pm      - Placemark property_list from KML parser
+	##   p_trans - Rope collecting record_transactions for batch dataset_transaction
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing Tali Pancing: ", pm[:name])
 	_try _with errCon
 		_local folders  << pm[:parent].default("")
 		_local route    << _self.parse_line_geometry(pm[:coord])
@@ -199,15 +189,10 @@ _private _method astri_design_migrator.create_tali_pancing(pm)
 		)
 
 		_local rec_trans << record_transaction.new_insert(.tali_pancing_col, prop_values)
-		rec_trans.run()
+		p_trans.add_last(rec_trans)
 
-		_if .stats[:tali_pancings] _is _unset
-		_then
-			.stats[:tali_pancings] << 0
-		_endif
+		_if .stats[:tali_pancings] _is _unset _then .stats[:tali_pancings] << 0 _endif
 		.stats[:tali_pancings] +<< 1
-
-		write("    [OK] Tali Pancing created: ", pm[:name])
 
 	_when error
 		write("ERROR in create_tali_pancing(): ", errCon.report_contents_string)

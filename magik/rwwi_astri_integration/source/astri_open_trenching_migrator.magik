@@ -17,16 +17,15 @@ $
 ## Valid for all infrastructure types.
 
 _pragma(classify_level=basic, topic={astri_integration})
-_private _method astri_design_migrator.create_open_trenching(pm)
-	## Create open_trenching record from a placemark.
+_private _method astri_design_migrator.create_open_trenching(pm, p_trans)
+	## Create open_trenching record_transaction and append to p_trans.
 	##
 	## Parameters:
-	##   pm - Placemark property_list from KML parser
+	##   pm      - Placemark property_list from KML parser
+	##   p_trans - Rope collecting record_transactions for batch dataset_transaction
 
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-
-	write("  Processing Open Trenching: ", pm[:name])
 
 	_try _with errCon
 
@@ -40,8 +39,6 @@ _private _method astri_design_migrator.create_open_trenching(pm)
 		                   _then >> "500002116"
 		                   _else >> "500002115"  # feeder or subfeeder (150cm depth)
 		                   _endif
-
-		write("    >> infra_type: ", .infra_type, " -> stf_code: ", stf_code)
 
 		# Step 3: Parse line geometry (world coordinate route, same as boring_manual)
 		_local route << _self.parse_line_geometry(pm[:coord])
@@ -61,8 +58,6 @@ _private _method astri_design_migrator.create_open_trenching(pm)
 		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
 		                         _else >> ""
 		                         _endif
-
-		write("    >> line: ", m_line, " | segment: ", segment_id)
 
 		# Step 6: Build property_list with all requested fields
 		_local prop_values << property_list.new_with(
@@ -92,12 +87,10 @@ _private _method astri_design_migrator.create_open_trenching(pm)
 
 		# Step 7: Insert record
 		_local rec_trans << record_transaction.new_insert(.ot_col, prop_values)
-		rec_trans.run()
+		p_trans.add_last(rec_trans)
 
 		_if .stats[:open_trenchings] _is _unset _then .stats[:open_trenchings] << 0 _endif
 		.stats[:open_trenchings] +<< 1
-
-		write("    [OK] Open Trenching created: ", pm[:name], " (stf:", stf_code, ")")
 
 	_when error
 		write("ERROR in create_open_trenching(): ", errCon.report_contents_string)

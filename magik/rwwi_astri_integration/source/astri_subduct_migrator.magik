@@ -29,8 +29,6 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 
-	write("  Processing Sub Duct: ", pm[:name])
-
 	_try _with errCon
 
 		# Guard: only feeder and subfeeder infra types
@@ -194,7 +192,6 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 			_if path_subduct _isnt _unset _andif path_subduct.size > 0
 			_then
 				sub_duct_result.place_in_structures(path_subduct, :straight_through)
-				write("    >> Sub Duct placed in structures (", path_subduct.size, " structures)")
 			_endif
 		_when error
 			# place_in_structures is optional for conduits - ignore errors

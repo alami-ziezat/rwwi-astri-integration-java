@@ -94,9 +94,6 @@ _method astri_kml_parser.parse()
 
 	# Detect topology based on equipment types
 	topology << _self.detect_topology(placemarks)
-
-	write("Detected network topology: ", topology)
-
 	>> placemarks, topology
 _endmethod
 $
@@ -123,7 +120,6 @@ _private _method astri_kml_parser.detect_topology(placemarks)
 		parent << placemark[:parent].lowercase
 		_if network_type _isnt _unset
 		_then
-			write(network_type, " found in placemark with parent folders: ", parent)
 			_if network_type = "pole" _andif parent.index_of_seq("new") _isnt _unset
 			_then
 				has_poles? << _true
@@ -1132,17 +1128,17 @@ _private _method astri_kml_parser.check_and_build_splice_mappings(folder_element
 		_endif
 
 		elem_type << child.type.write_string
-		write("  Checking element type: ", elem_type)
+		#write("  Checking element type: ", elem_type)
 
 		# Check if this is a Placemark
 		_if elem_type.matches?(C_PLACEMARK)
 		_then
 			# Extract placemark name
-			write("	Found Placemark element")
+			#write("	Found Placemark element")
 			_local pm_name << _unset
 			_for pm_child _over child.xml_elements.fast_elements()
 			_loop
-				write("	  Checking placemark child type: ", pm_child.type.write_string)
+				#write("	  Checking placemark child type: ", pm_child.type.write_string)
 				_if pm_child _isnt _unset _andif
 				    pm_child.type.write_string.matches?(C_NAME)
 				_then
@@ -1158,13 +1154,10 @@ _private _method astri_kml_parser.check_and_build_splice_mappings(folder_element
 			# Build mapping for this placemark
 			_if pm_name _isnt _unset
 			_then
-				write("	  Placemark name: ", pm_name)
 				splice_counter +<< 1
 
 				# Use the original placemark name as the splice name (no modification)
 				_local sheath_splice_name << pm_name.trim_spaces()
-
-				write("Splice mapping created: ", pm_name, " -> ", sheath_splice_name)
 
 				# Store mapping (original placemark name → splice name)
 				.splice_name_mapping[pm_name] << sheath_splice_name
@@ -1172,7 +1165,6 @@ _private _method astri_kml_parser.check_and_build_splice_mappings(folder_element
 				# Store index mapping ("FDT 1", "FDT 2", "Closure 1", etc. → splice name)
 				_local index_key << splice_type + " " + splice_counter.write_string
 				.splice_index_mapping[index_key] << sheath_splice_name
-				write("Index mapping created: ", index_key, " -> ", sheath_splice_name)
 
 				# Remember first splice name
 				_if first_splice_name _is _unset
@@ -1190,11 +1182,11 @@ _private _method astri_kml_parser.check_and_build_splice_mappings(folder_element
 	_elif splice_counter = 1
 	_then
 		# Single FDT - return its splice name for child folders to inherit
-		write("  Single ", splice_type, " found - children will inherit: ", first_splice_name)
+		#write("  Single ", splice_type, " found - children will inherit: ", first_splice_name)
 		_return first_splice_name
 	_else
 		# Multiple FDTs - return :multiple symbol
-		write("  Multiple ", splice_type, " found (", splice_counter, ") - children must specify which one")
+		#write("  Multiple ", splice_type, " found (", splice_counter, ") - children must specify which one")
 		_return :multiple
 	_endif
 _endmethod
@@ -1256,7 +1248,7 @@ _private _method astri_kml_parser.find_sibling_fdt_context(parent_element)
 				_if olt_result _is _false
 				_then
 					olt_result << "OLT"
-					write("  Found OLT folder (no placemarks) - using default 'OLT'")
+					#write("  Found OLT folder (no placemarks) - using default 'OLT'")
 				_endif
 
 			_elif child_folder_lc = "closure" _orif
@@ -1277,15 +1269,15 @@ _private _method astri_kml_parser.find_sibling_fdt_context(parent_element)
 	# Priority: OLT > CLOSURE > FDT
 	_if olt_result _isnt _unset
 	_then
-		write("  Found OLT folder - using OLT name (feeder infrastructure)")
+		#write("  Found OLT folder - using OLT name (feeder infrastructure)")
 		_return olt_result
 	_elif closure_result _isnt _unset
 	_then
-		write("  Found CLOSURE folder - using CLOSURE name (subfeeder infrastructure)")
+		#write("  Found CLOSURE folder - using CLOSURE name (subfeeder infrastructure)")
 		_return closure_result
 	_elif fdt_result _isnt _unset
 	_then
-		write("  Found FDT folder - using FDT name (cluster infrastructure)")
+		#write("  Found FDT folder - using FDT name (cluster infrastructure)")
 		_return fdt_result
 	_endif
 
@@ -1312,8 +1304,6 @@ _private _method astri_kml_parser.make_unique_splice_name(base_name)
 	_if .splice_names.includes?(candidate_name)
 	_then
 		# Duplicate detected - increment until we find a unique one
-		write("  Duplicate splice name detected: ", candidate_name)
-
 		_loop
 			counter +<< 1
 			candidate_name << trimmed_name + " (" + counter.write_string + ")"
@@ -1395,11 +1385,11 @@ _private _method astri_kml_parser.find_matching_subfolder_splice(folder_element,
 
 		_if mapped_splice_name _isnt _unset
 		_then
-			write("  Matched folder '", folder_name, "' (extracted: '", splice_reference, "') to splice: ", mapped_splice_name)
+			#"  Matched folder '", folder_name, "' (extracted: '", splice_reference, "') to splice: ", mapped_splice_name)
 			_return mapped_splice_name
 		_else
 			write("  WARNING: Folder '", folder_name, "' references '", splice_reference, "' but no mapping found")
-			write("    Available index mappings: ", .splice_index_mapping.keys)
+			#write("    Available index mappings: ", .splice_index_mapping.keys)
 		_endif
 	_endif
 

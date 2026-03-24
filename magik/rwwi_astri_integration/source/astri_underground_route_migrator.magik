@@ -25,7 +25,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 	##   pm - Placemark property_list from KML parser
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing Underground Route: ", pm[:name])
 	_try _with errCon
 		# Step 0: Parse folders
 		_local folders << pm[:parent].default("")
@@ -136,8 +135,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# Step 4.5: Extract ring_name from placemark
 		_local ring_name << pm[:ring_name]
 
-		write("    >> Detected fiber count: ", fb_c, " cores | line: ", m_line)
-
 		# Step 5: Pre-scan UUBs at start/end BEFORE creating UR
 		# If a UUB is found, snap the route endpoint to the UUB's exact coordinate
 		# so the UR geometry is consistent with the UUB position.
@@ -226,7 +223,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		_endif
 
 		# Step 6: Create underground route (with snapped geometry)
-		write("    [OK] Creating underground route...")
 		_local ug_prop_values << property_list.new_with(
 			:construction_status, .construction_status,
 			:name, pm[:name],
@@ -260,8 +256,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 
 		_if .stats[:underground_routes] _is _unset _then .stats[:underground_routes] << 0 _endif
 		.stats[:underground_routes] +<< 1
-
-		write("    [OK] Underground route created: ", pm[:name], " (", fb_c, " cores, ", (t_len/100.0).ceiling, "m)")
 
 		# Step 7: Handle START UUB
 		# UUB was pre-scanned above. Use existing if found, else create placeholder
@@ -370,7 +364,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		_local ftri << _if fsize >= 3 _then >> fol[3] _else >> fol[fsize] _endif
 		_local rtr << _if ftri.size > 120 _then >> ftri.slice(1, 120) _else >> ftri _endif
 
-		write("    >> Creating sheath with ", path_swl.size, " structures")
 		_local sheath_props << property_list.new_with(
 			:name, pm[:name],
 			:spec_id, s_sp,
@@ -402,8 +395,6 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# Track sheath length in meters using calculated fibre length
 		_local sheath_length << sheath_result.calculated_sheath_length.value_in(:m).as_number()
 		.stats[:sheath_length] +<< sheath_length
-		write("    [OK] Sheath created and placed in structures (Fibre Length: ", sheath_length.rounded, "m)")
-
 		_return ug_result
 
 	_when error

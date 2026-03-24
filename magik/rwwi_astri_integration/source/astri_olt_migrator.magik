@@ -28,8 +28,6 @@ _private _method astri_design_migrator.create_olt(pm)
 			_return
 		_endif
 
-		write("  Processing OLT: ", pm[:name])
-
 		# Step 1: Get folder information
 		_local folders << pm[:parent].default("")
 		_if folders = "" _orif folders _is _unset
