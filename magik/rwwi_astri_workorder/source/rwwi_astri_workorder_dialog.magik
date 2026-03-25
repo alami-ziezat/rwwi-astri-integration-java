@@ -66,9 +66,9 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:model, _self)
 
 	# Create outer container with flexible row sizing
-	# 4 rows: Toolbar (fixed), Table (flexible), Text Window (flexible), Detail Panel (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 5, 1,
-		:row_resize_values, {0, 1, 1, 1, 0})  # Toolbar fixed, Table flexible, Text Window flexible, Detail fixed
+	# 6 rows: Toolbar1 (fixed), Toolbar2 (fixed), Table (flexible), Text Window (flexible), Detail Panel (fixed), Progress Footer (fixed)
+	.items[:outer] << outer << sw_container.new(top_c, 6, 1,
+		:row_resize_values, {0, 0, 1, 1, 0, 0})
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
@@ -82,6 +82,9 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 
 	# Build detail panel (buttons only)
 	_self.build_detail_panel(outer)
+
+	# Build progress footer (non-editable status line)
+	_self.build_progress_footer(outer)
 
 	# Initial data load
 	_self.changed(:workorder_list, :refresh)
@@ -250,6 +253,44 @@ _private _method rwwi_astri_workorder_dialog.build_text_window(parent)
 	_self.log_info("=" * 80)
 	_self.log_info("Select a work order from the table above to view details and perform actions.")
 	_self.log_info("")
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_progress_footer(parent)
+	## Build non-editable footer status line for real-time migration progress display
+	## Shows the current process step (e.g. "Processing 5 OLTs, please wait...")
+	## Completed steps are logged to the main text window above via set_progress()
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _false,
+		:enable_action_menu?, _false)
+
+	a_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(a_toolbar, "  Progress:")
+	.items[:progress_footer] << sw_label_item.new(a_toolbar, "Ready.")
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.set_progress(status_msg, _optional done_msg)
+	## Update the progress footer with current step status.
+	## If done_msg is provided, also logs it to the main text window.
+	##
+	## Parameters:
+	##   status_msg (string) - Text to display in the footer (current step)
+	##   done_msg   (string) - Optional completed-step message for the text window
+
+	_if done_msg _isnt _unset _andif done_msg <> ""
+	_then
+		_self.log_info("[DONE] " + done_msg)
+	_endif
+
+	_if .items[:progress_footer] _isnt _unset
+	_then
+		.items[:progress_footer].label << "  " + status_msg
+	_endif
 _endmethod
 $
 

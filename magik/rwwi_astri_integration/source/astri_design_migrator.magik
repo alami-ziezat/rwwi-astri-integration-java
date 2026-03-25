@@ -76,7 +76,10 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:olt_code,             _unset, :writable},   # OLT code from database
 
 	# Statistics
-	{:stats,           _unset, :writable}    # Migration results
+	{:stats,           _unset, :writable},   # Migration results
+
+	# Progress reporting
+	{:dialog,          _unset, :writable}    # Optional dialog reference for set_progress() calls
 })
 $
 
@@ -562,6 +565,19 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_design_migrator.notify_progress(status_msg, _optional done_msg)
+	## Call dialog.set_progress() if a dialog is set, to update the footer and log.
+	##
+	## Parameters:
+	##   status_msg (string) - Text to show in the dialog progress footer (current step)
+	##   done_msg   (string) - Optional text to log as completed step in text window
+	_if .dialog _isnt _unset
+	_then
+		.dialog.set_progress(status_msg, done_msg)
+	_endif
+_endmethod
+$
+
 _method astri_design_migrator.migrate_placemarks(placemarks)
 	## Migrate placemarks to design objects.
 	## NOTE: For new projects, design must be activated before calling this
@@ -587,15 +603,22 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 	# Single pre-classification pass — each pm is typed exactly once
 	write("  Pre-classifying placemarks...")
+	_self.notify_progress("Pre-classifying " + placemarks.size.write_string + " placemarks, please wait...")
 	_local b        << _self.classify_placemarks(placemarks)
 	_local topology << .topology.default(:aerial)
 
 	# Pass 1: OLTs (needed for cable snapping in subsequent passes)
 	write("  Pass 1: Creating OLTs (", b[:olt].size, ")...")
+	_self.notify_progress(
+		"Processing " + b[:olt].size.write_string + " OLTs, please wait...",
+		"Pre-classification done: " + placemarks.size.write_string + " placemarks classified")
 	_for pm _over b[:olt].fast_elements() _loop	_self.create_olt(pm)	_endloop
 
 	# Pass 2: Cables / routes (topology-based)
 	write("  Pass 2: Creating cables and routes (", b[:route].size, ", topology: ", topology, ")...")
+	_self.notify_progress(
+		"Processing " + b[:route].size.write_string + " cables/routes (" + topology.write_string + "), please wait...",
+		"Done: " + b[:olt].size.write_string + " OLTs processed")
 	_for pm _over b[:route].fast_elements()
 	_loop
 		_if topology = :aerial #_orif topology = :both
@@ -610,6 +633,9 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 	# Pass 3: Structures — poles and/or UUBs (topology-based)
 	write("  Pass 3: Creating structures (", b[:pole].size, " poles, ", b[:uub].size, " UUBs, topology: ", topology, ")...")
+	_self.notify_progress(
+		"Processing " + b[:pole].size.write_string + " poles / " + b[:uub].size.write_string + " UUBs, please wait...",
+		"Done: " + b[:route].size.write_string + " cables/routes processed")
 	_if topology = :aerial _orif topology = :both
 	_then
 		_local pole_trans << rope.new()
@@ -635,17 +661,26 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 	# Pass 4: Splices, figure-eights, demand points, t-weys
 	write("  Pass 4: Creating splices, figure-eights, demand points and t-weys...")
+	_self.notify_progress(
+		"Processing " + b[:splice].size.write_string + " splices / " + b[:figure_eight].size.write_string + " slack hangers, please wait...",
+		"Done: " + b[:pole].size.write_string + " poles / " + b[:uub].size.write_string + " UUBs processed")
 	_for pm _over b[:splice].fast_elements()       _loop _self.create_sheath_splice(pm) _endloop
 	_for pm _over b[:figure_eight].fast_elements() _loop _self.create_figure_eight(pm)  _endloop
 
 	# Pass 4.5: Sub-ducts (after all routes are created — sub-ducts snap to routes)
 	write("  Pass 4.5: Creating sub-ducts (", b[:sub_duct].size, ")...")
+	_self.notify_progress(
+		"Processing " + b[:sub_duct].size.write_string + " sub-ducts, please wait...",
+		"Done: " + b[:splice].size.write_string + " splices / " + b[:figure_eight].size.write_string + " slack hangers processed")
 	_for pm _over b[:sub_duct].fast_elements() _loop _self.create_sub_duct(pm) _endloop
 
 	# Pass 5: Objects with dataset transactions approach
 	write("  Pass 5: Creating boring routes and tali pancing (",
 		b[:boring_manual].size + b[:boring_machine].size +
 		b[:tali_pancing].size + b[:open_trenching].size, ")...")
+	_self.notify_progress(
+		"Processing " + (b[:boring_manual].size + b[:boring_machine].size + b[:tali_pancing].size + b[:open_trenching].size).write_string + " boring/tali pancing/trenching objects, please wait...",
+		"Done: " + b[:sub_duct].size.write_string + " sub-ducts processed")
 
 	_local dt_trans << rope.new()	
 	_local bman_trans << rope.new()
@@ -688,25 +723,35 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		write("  [OK] Open Trenching created: ", ot_trans.size)
 	_endif	
 	
+	_local pass5_total << b[:boring_manual].size + b[:boring_machine].size + b[:tali_pancing].size + b[:open_trenching].size
 	write("  Pass 6: Creating demand point (",b[:demand_point].size, ")...")
-	_local dp_trans << rope.new()	
+	_self.notify_progress(
+		"Processing " + b[:demand_point].size.write_string + " demand points (homepass), please wait...",
+		"Done: " + pass5_total.write_string + " boring/tali pancing/trenching objects processed")
+	_local dp_trans << rope.new()
 	_for pm _over b[:demand_point].fast_elements() _loop _self.create_demand_point(pm, dp_trans) _endloop
 	_if _not dp_trans.empty?
-	_then  
+	_then
 		dt << dataset_transaction.new(dp_trans, "Insert Demand Points")
 		dt.run()
 		#dt_trans.add_all_last(dp_trans)
 		write("  [OK] Demand point created: ", dp_trans.size)
 	_endif
-	
+
 	write("  Pass 7: Creating point of interest (t-wey) (",b[:t_wey].size, ")...")
+	_self.notify_progress(
+		"Processing " + b[:t_wey].size.write_string + " T-Wey (POI) objects, please wait...",
+		"Done: " + b[:demand_point].size.write_string + " demand points processed")
 	_for pm _over b[:t_wey].fast_elements() _loop _self.create_t_wey(pm) _endloop
-	
+
 	write("  Pass 8: Creating micro/macro cells (", b[:micro_cell].size, ")...")
-	_local cell_trans << rope.new()	
+	_self.notify_progress(
+		"Processing " + b[:micro_cell].size.write_string + " boundary FAT (micro/macro cells), please wait...",
+		"Done: " + b[:t_wey].size.write_string + " T-Wey (POI) objects processed")
+	_local cell_trans << rope.new()
 	_for pm _over b[:micro_cell].fast_elements() _loop _self.create_micro_cell(pm, cell_trans) _endloop
-	_if _not cell_trans.empty? 
-	_then  
+	_if _not cell_trans.empty?
+	_then
 		#dt << dataset_transaction.new(cell_trans, "Insert Cells")
 		#dt.run()
 		dt_trans.add_all_last(cell_trans)
@@ -715,25 +760,38 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 
 	# Insert all transactions for Pass 5 and 5.5 together (cells, sub-ducts, demand points, t-weys) to ensure they are all available before Pass 6 riser creation
 	_global dtrx
-	dtrx << dt_trans 
+	dtrx << dt_trans
 	_if _not dt_trans.empty?
 	_then
 		dt << dataset_transaction.new(dt_trans, "Insert all transactions for Pass 5 and 5.5")
 		dt.run()
-		write("  [OK] All Pass 5 and 5.5 objects inserted: ", dt_trans.size)	
+		write("  [OK] All Pass 5 and 5.5 objects inserted: ", dt_trans.size)
 	_endif
 
-	# Pass 6: Risers
+	# Pass 9: Risers
 	write("  Pass 9: Creating risers (", b[:riser].size, ")...")
+	_self.notify_progress(
+		"Processing " + b[:riser].size.write_string + " risers, please wait...",
+		"Done: " + b[:micro_cell].size.write_string + " boundary FAT objects processed")
 	_for pm _over b[:riser].fast_elements() _loop _self.create_riser(pm) _endloop
-	
-		# Update FDT :tp field with total demand points (cluster infrastructure only)
+
+	# Update FDT :tp field with total demand points (cluster infrastructure only)
 	_if .infra_type = "cluster"
 	_then
 		write("  Pass 10: Updating FDT :tp field...")
+		_self.notify_progress(
+			"Updating FDT demand point totals, please wait...",
+			"Done: " + b[:riser].size.write_string + " risers processed")
 		_self.update_fdt_tp_field()
+		_self.notify_progress(
+			"Migration complete!",
+			"Done: FDT demand point totals updated")
+	_else
+		_self.notify_progress(
+			"Migration complete!",
+			"Done: " + b[:riser].size.write_string + " risers processed")
 	_endif
-	
+
 	_self.print_statistics()
 	>> .stats
 _endmethod
