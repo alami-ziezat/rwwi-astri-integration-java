@@ -26,4 +26,5 @@ astri_t_wey_migrator
 
 # ASTRI Data Migrator - PostgreSQL to Smallworld migration
 astri_data_migrator
+astri_design_migrator_batch
 

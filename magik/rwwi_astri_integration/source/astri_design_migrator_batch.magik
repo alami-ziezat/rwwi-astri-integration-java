@@ -1,0 +1,270 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_global migrate_clusters_from_db << _proc(_optional date_pattern, cluster_code_pattern)
+	## Migrate all cluster KML files to Smallworld design for clusters matching
+	## the given cluster_code ILIKE pattern, restricted to records created yesterday.
+	##
+	## Queries smallworld.dim_cluster_master_smallworld for KMZ UUIDs, then
+	## for each UUID runs the full download -> parse -> create_project_and_design
+	## -> migrate_placemarks -> commit pipeline (same as migrate_to_design()).
+	## Only supports cluster infrastructure type.
+	##
+	## Parameters:
+	##   cluster_code_pattern (string) - ILIKE pattern for cluster_code, e.g. "M-JKT-%"
+	##
+	## Usage:
+	##   migrate_clusters_from_db() --> default H-1 and all cluster_code
+	##   migrate_clusters_from_db(unset, "BDG%") --> default H-1 and cluster_code ILIKE 'BDG%'
+	##   migrate_clusters_from_db("2026-03-01", "BDG%") --> created_timestamp = '2026-03-01' and cluster_code ILIKE 'BDG%'
+
+	_local infra << "cluster"
+	_local output_dir << system.getenv("TEMP").default("C:\temp")
+	_local database << gis_program_manager.databases[:gis]
+
+	write("=" * 70)
+	write("BATCH MIGRATE CLUSTERS FROM DATABASE")
+	write("=" * 70)
+	write("Cluster   : ", cluster_code_pattern)
+	write("Date      : yesterday (CURRENT_DATE - 1)")
+	write("Infra type: cluster")
+	write("")
+
+	_if database _is _unset
+	_then
+		write("ERROR: GIS database not available")
+		_return
+	_endif
+
+	# --- Step 1: Connect to PostgreSQL ---
+	_local db_conn
+	_local is_connect?
+	(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+	_if _not is_connect?
+	_then
+		write("ERROR: Failed to connect to POSTGRESQL_ASTRI_DB")
+		_return
+	_endif
+	write("Connected to POSTGRESQL_ASTRI_DB")
+
+	_local date_string << ""
+	# --- Step 2: Query KMZ UUIDs for matching clusters created yesterday ---
+	_if date_pattern _isnt _unset  
+	_then  
+		date_string << write_string(" updated_timestamp::date = '",date_pattern,"'")
+	_else 
+		date_string << write_string(" updated_timestamp::date = CURRENT_DATE - 1")
+	_endif
+	
+	_local cluster_code_string << ""
+	_if cluster_code_pattern _isnt _unset  
+	_then  
+		cluster_code_string << write_string(" AND cluster_code ILIKE '", cluster_code_pattern, "'")
+	_endif
+	
+		#cluster_code ILIKE ? "
+	_local sql << write_string(
+		"SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, ",
+		"CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, ",
+		"cluster_code, subfeeder_code, feeder_code, olt_code, topology ",
+		"FROM smallworld.dim_cluster_master_smallworld ",
+		"WHERE ",date_string, cluster_code_string)
+	_local recs
+	_try _with errCon
+		recs << db_conn.sql_select(sql)
+	_when error
+		write("ERROR executing query: ", errCon.report_contents_string)
+		_try
+			db_conn.rollback()
+		_when error
+		_endtry
+		_return
+	_endtry
+
+	# --- Step 3: Collect all rows first (so we can report total count) ---
+	_local rows << rope.new()
+	_loop
+		_local rec << recs.get()
+		_if rec _is _unset _then _leave _endif
+		rows.add_last(rec)
+	_endloop
+	recs.close()
+	_try
+		db_conn.commit()
+	_when error
+		db_conn.rollback()
+	_endtry
+
+	write("Found ", rows.size, " cluster(s) to migrate")
+	write("")
+
+	_if rows.empty?
+	_then
+		write("No clusters found for pattern '", cluster_code_pattern, "' created yesterday.")
+		_return
+	_endif
+
+	# --- Step 4: Migrate each cluster ---
+	_local success_count << 0
+	_local fail_count    << 0
+
+	_for i, rec _over rows.fast_keys_and_elements()
+	_loop
+		_local kmz_uuid     << rec.kmz_uuid.default("")
+		_local kmz_source   << rec.kmz_source.default("APD")
+		_local cluster_code << rec.cluster_code.default("")
+		_local olt_code     << rec.olt_code.default("")
+		_local topology_str << rec.topology.default("")
+
+		write("-" * 70)
+		write("Cluster ", i, "/", rows.size, ": ", cluster_code)
+		write("  KMZ UUID  : ", kmz_uuid)
+		write("  KMZ Source: ", kmz_source)
+		write("  OLT Code  : ", olt_code)
+		write("  Topology  : ", topology_str)
+		_if kmz_uuid = "" _orif kmz_uuid _is _unset
+		_then
+			write("  SKIP: No KMZ UUID available")
+			fail_count +<< 1
+			_continue
+		_endif
+
+		_try _with migErr
+
+			# Download KMZ
+			write("  Downloading KMZ...")
+			_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+
+			_if xml_result _is _unset _orif xml_result = ""
+			_then
+				write("  ERROR: KMZ download returned empty result")
+				fail_count +<< 1
+				_continue
+			_endif
+
+			# Parse download response XML for file path
+			_local xml_doc   << simple_xml.read_element_string(xml_result)
+			_local succ_elem << xml_doc.element_matching_name(:success)
+			_local path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+			_if succ_elem _is _unset _orif
+			    succ_elem.xml_result <> "true" _orif
+			    path_elem _is _unset
+			_then
+				_local err_elem << xml_doc.element_matching_name(:error)
+				_local err_msg  << _if err_elem _isnt _unset
+				                   _then >> err_elem.xml_result
+				                   _else >> "Unknown download error"
+				                   _endif
+				write("  ERROR: ", err_msg)
+				fail_count +<< 1
+				_continue
+			_endif
+
+			_local kml_file_path << path_elem.xml_result
+			write("  KML file  : ", kml_file_path)
+
+			# Parse KML
+			write("  Parsing KML...")
+			_local parser               << astri_kml_parser.new(kml_file_path)
+			_local (placemarks, kml_topo) << parser.parse()
+			write("  Placemarks: ", placemarks.size)
+
+			# Resolve topology: prefer DB field, fallback to KML detection
+			_local final_topology << kml_topo
+			_if topology_str _isnt _unset _andif topology_str <> ""
+			_then
+				_if topology_str = "AE"
+				_then
+					final_topology << :aerial
+				_elif topology_str = "UG"
+				_then
+					final_topology << :underground
+				_elif topology_str = "AE&UG"
+				_then
+					final_topology << :both
+				_endif
+			_endif
+
+			# Build work order property_list (same fields expected by migrator/create_project_and_design)
+			_local wo << property_list.new_with(
+				:wo_number,          cluster_code,
+				:infra_code,         cluster_code,
+				:infra_name,         cluster_code,
+				:kmz_uuid,           kmz_uuid,
+				:kmz_source,         kmz_source,
+				:infrastructure_type, infra,
+				:topology,           topology_str,
+				:olt_label,          olt_code,
+				:olt_name,           olt_code,
+				:area,               "",
+				:area_plant_code,    "")
+
+			# Truncate infra_name to 64 chars (same guard as dialog)
+			_local infra_name << cluster_code
+			_if infra_name.size > 64
+			_then
+				infra_name << infra_name.subseq(infra_name.size - 64, 64)
+			_endif
+
+			# Create migrator
+			write("  Creating migrator...")
+			_local migrator << astri_design_migrator.new(database, wo)
+			migrator.topology << final_topology
+
+			# Create project and design
+			write("  Creating project and design...")
+			_local (project, scheme) << migrator.create_project_and_design(
+				placemarks,
+				cluster_code,   # project name
+				cluster_code,   # project title
+				infra_name,     # design name
+				infra)          # infra type
+
+			write("  Project ID: ", project.id, "  Design ID: ", scheme.id)
+
+			# Migrate all placemarks
+			write("  Migrating placemarks...")
+			_local stats << migrator.migrate_placemarks(placemarks)
+
+			# Commit
+			write("  Committing...")
+			_try _with commitErr
+				database.commit()
+				write("  [OK] Committed")
+			_when error
+				write("  WARNING: Commit failed: ", commitErr.report_contents_string)
+			_endtry
+
+			write("  [OK] Migration complete")
+			write("       Poles: ", stats[:new_poles], "  Routes: ", stats[:aerial_routes],
+			      "  Splices: ", stats[:sheath_splices], "  Homepass: ", stats[:demand_points],
+			      "  Errors: ", stats[:errors])
+			success_count +<< 1
+
+		_when error
+			write("  ERROR migrating ", cluster_code, ": ", migErr.report_contents_string)
+			fail_count +<< 1
+		_endtry
+	_endloop
+
+	# --- Summary ---
+	write("")
+	write("=" * 70)
+	write("BATCH MIGRATION COMPLETE")
+	write("=" * 70)
+	write("Total    : ", rows.size)
+	write("Success  : ", success_count)
+	write("Failed   : ", fail_count)
+	write("=" * 70)
+_endproc
+$
+
+## Usage Examples:
+## Batch migrate yesterday's clusters matching a cluster_code ILIKE pattern:
+##   migrate_clusters_from_db() --> default H-1 and all cluster_code	
+##   migrate_clusters_from_db(unset, "BDG%") --> default H-1 and cluster_code ILIKE 'BDG%'
+##   migrate_clusters_from_db("2026-03-01", "BDG%") --> created_timestamp = '2026-03-01' and cluster_code ILIKE 'BDG%'
