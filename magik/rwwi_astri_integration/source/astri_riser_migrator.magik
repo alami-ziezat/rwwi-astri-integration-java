@@ -66,7 +66,7 @@ _private _method astri_design_migrator.create_riser(pm)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:infra_type,         infra_type_cap,
+			#:infra_type,         infra_type_cap,
 			:fdt_name,           ring_name,
 			:stf_item_code,      "200001034"
 		)

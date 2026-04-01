@@ -11,8 +11,9 @@ _private _method astri_design_migrator.create_olt(pm)
 	## Create OLT (Optical Line Terminal) from point placemark
 	## - Point type with name matching "*OLT*"
 	## - Saved to mit_hub collection
-	## - Scans for existing OLT within 500m radius
-	## - If found: skip creation
+	## - Scans for existing OLT within 500m radius (by area)
+	## - Checks for existing OLT with same name (by name)
+	## - If found by either check: skip creation
 	## - If not found: create new OLT
 	##
 	## Parameters:
@@ -42,7 +43,7 @@ _private _method astri_design_migrator.create_olt(pm)
 		_local location << _self.parse_point_geometry(pm[:coord])
 		_local coord << location.as_coord()
 
-		# Step 4: Scan for existing OLT within 500m
+		# Step 4a: Scan for existing OLT within 500m (by area)
 		_local pa << pseudo_point.new(coord)
 		pa.world << .database.world
 
@@ -51,6 +52,16 @@ _private _method astri_design_migrator.create_olt(pm)
 		_if found?
 		_then
 			write("  WARNING: OLT already exists nearby (", existing_olt.name, ") - skipping")
+			.stats[:skipped] +<< 1
+			_return
+		_endif
+
+		# Step 4b: Check for existing OLT by olt_code
+		_local name_pred << predicate.eq(:olt_code, .olt_code)
+		_local name_matches << .olt_col.select(name_pred)
+		_if name_matches.size > 0
+		_then
+			write("  WARNING: OLT with same olt_code already exists (", pm[:olt_code], ") - skipping")
 			.stats[:skipped] +<< 1
 			_return
 		_endif

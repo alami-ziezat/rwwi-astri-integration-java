@@ -89,8 +89,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 				:olt_code, .olt_code,
 				:feeder_code, .feeder_code_db,
 				:subfeeder_code, .subfeeder_code_db,
-				:cluster_code, .cluster_code_db,
-				:infra_type, infra_type_cap
+				:cluster_code, .cluster_code_db
 			)
 
 			_local rec_trans << record_transaction.new_insert(.cell_col, prop_values)

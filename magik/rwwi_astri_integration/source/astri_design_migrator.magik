@@ -759,8 +759,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endif
 
 	# Insert all transactions for Pass 5 and 5.5 together (cells, sub-ducts, demand points, t-weys) to ensure they are all available before Pass 6 riser creation
-	_global dtrx
-	dtrx << dt_trans
+	write(" Inserting all Pass 5 and 5.5 objects (boring routes, tali pancing, open trenching, sub-ducts, demand points, t-weys, micro/macro cells) together...")
 	_if _not dt_trans.empty?
 	_then
 		dt << dataset_transaction.new(dt_trans, "Insert all transactions for Pass 5 and 5.5")

@@ -66,13 +66,16 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:model, _self)
 
 	# Create outer container with flexible row sizing
-	# 6 rows: Toolbar1 (fixed), Toolbar2 (fixed), Table (flexible), Text Window (flexible), Detail Panel (fixed), Progress Footer (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 6, 1,
-		:row_resize_values, {0, 0, 1, 1, 0, 0})
+	# 7 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed), Table (flexible), Text Window (flexible), Detail Panel (fixed), Progress Footer (fixed)
+	.items[:outer] << outer << sw_container.new(top_c, 7, 1,
+		:row_resize_values, {0, 0, 0, 1, 1, 0, 0})
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
 	_self.build_toolbar2(outer)
+
+	# Build local KMZ file browser toolbar
+	_self.build_toolbar3(outer)
 
 	# Build work order table
 	_self.build_table(outer)
@@ -194,6 +197,79 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
 		:model, _self,
 		:selector, :apply_filters|()|,
 		:tooltip, "Apply current filters")
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
+	## Build local KMZ file browser toolbar.
+	## Provides a browse button + path field so the user can point to a local
+	## KMZ/KML file.  When a path is set, migrate_to_design() uses it instead
+	## of downloading from the ASTRI API.
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
+
+	a_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(a_toolbar, "  Local KMZ:  ")
+
+	.items[:browse_kmz_btn] << sw_button_item.new(a_toolbar,
+		:image, {:browse, :ui_resources},
+		:model, _self,
+		:selector, :browse_kmz|()|,
+		:tooltip, "Browse for local KMZ/KML file")
+
+	.items[:local_kmz_path] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 60,
+		:editable?, _true)
+	.items[:local_kmz_path].value << ""
+
+	.items[:clear_kmz_btn] << sw_button_item.new(a_toolbar,
+		:label, "Clear",
+		:model, _self,
+		:selector, :clear_local_kmz|()|,
+		:tooltip, "Clear local KMZ path (revert to API download)")
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.browse_kmz()
+	## Open file dialog to select a local KMZ or KML file.
+	## Selected path is stored in the local_kmz_path text field.
+
+	_local fd << file_dialog.new(_self, :ok_kmz|()|)
+	fd.filter << {"KML files (*.kml)", "*.kml"}
+
+	_local current_path << .items[:local_kmz_path].value.default("")
+	_if current_path <> ""
+	_then
+		fd.directory << current_path
+	_else
+		fd.directory << system.getenv("TEMP").default("C:\")
+	_endif
+
+	fd.activate()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.ok_kmz(path)
+	## Callback from file_dialog — store the selected KMZ/KML path.
+
+	.items[:local_kmz_path].value << path
+	write("Local KMZ path set: ", path)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.clear_local_kmz()
+	## Clear the local KMZ path field — next migration will use the API.
+
+	.items[:local_kmz_path].value << ""
+	write("Local KMZ path cleared - will use API download")
 _endmethod
 $
 

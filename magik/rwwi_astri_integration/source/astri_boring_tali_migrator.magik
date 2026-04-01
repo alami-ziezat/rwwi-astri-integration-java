@@ -18,6 +18,7 @@ _private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 	##
 	## Parameters:
 	##   pm - Placemark property_list from KML parser
+	#write("Processing boring manual: ", pm[:name])
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
 	_try _with errCon
@@ -36,6 +37,7 @@ _private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
 		                         _else >> ""
 		                         _endif
+		#write(" Processed folders: ", folders, " | matched line: ", m_line, " | segment: ", segment)
 		_local prop_values << property_list.new_with(
 			:name,               pm[:name],
 			:folders,            folders,
@@ -55,7 +57,6 @@ _private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:infra_type,         infra_type_cap,
 			:fdt_name,           ring_name
 		)
 
@@ -67,6 +68,7 @@ _private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 			.stats[:boring_manuals] << 0
 		_endif
 		.stats[:boring_manuals] +<< 1
+		#write("  Created boring_manual record for: ", pm[:name])
 	_when error
 		write("ERROR in create_boring_manual(): ", errCon.report_contents_string)
 		write("  Placemark name: ", pm[:name].default("(unnamed)"))
@@ -121,7 +123,6 @@ _private _method astri_design_migrator.create_boring_machine(pm, p_trans)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:infra_type,         infra_type_cap,
 			:fdt_name,           ring_name
 		)
 
@@ -184,7 +185,6 @@ _private _method astri_design_migrator.create_tali_pancing(pm, p_trans)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:infra_type,         infra_type_cap,
 			:fdt_name,           ring_name
 		)
 

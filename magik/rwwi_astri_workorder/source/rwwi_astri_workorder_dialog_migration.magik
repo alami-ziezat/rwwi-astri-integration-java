@@ -41,48 +41,131 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 	write("Migrating KML to Design objects for UUID:", kmz_uuid)
 
 	_try _with errCon
-		# Use Scenario 2: Download files to disk, then read KML file
-		_local output_dir << system.getenv("TEMP").default("C:\temp")
 		_local infra_type << .filters[:infrastructure_type].default("cluster")
-		_self.log_info("Step 1: Downloading KMZ file...")
-		_self.log_info("  Output directory: " + output_dir)
-		_self.log_info("  Infrastructure type: " + infra_type)
-		write("Infra type: ",infra_type)
-		_local xml_result << _if infra_type = "cluster"
-		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
-		                     _elif infra_type = "subfeeder"
-		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
-		                     _elif infra_type = "feeder"
-		                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
-		                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
-		                     _endif
 
-		_if xml_result _is _unset _orif xml_result = ""
+		# Check if a local KMZ/KML file path has been set via the browse toolbar
+		_local local_kmz_path << .items[:local_kmz_path].value.default("")
+		_local use_local_file? << local_kmz_path _isnt _unset _andif local_kmz_path <> ""
+
+		_local kml_file_path
+
+		_if use_local_file?
 		_then
-			_self.log_error("Failed to download KML file")
-			_self.user_error("Failed to download KML file")
-			_return
-		_endif
+			# --- Validate file name matches <INFRA_TYPE>_<INFRA_CODE> ---
+			_local infra_code_val << wo[:infra_code].default("")
+			_local expected_token << (infra_type + "_" + infra_code_val).uppercase
 
-		_self.log_success("KMZ file downloaded successfully")
-		_self.log_info("")
-		_self.log_info("Step 2: Parsing download response...")
+			# Extract just the file name from the full path (find last \ or /)
+			_local last_sep << 0
+			_for ci _over 1.upto(local_kmz_path.size)
+			_loop
+				_local ch << local_kmz_path[ci]
+				_if ch = %\ _orif ch = %/
+				_then
+					last_sep << ci
+				_endif
+			_endloop
+			_local file_name << local_kmz_path.subseq(last_sep + 1)
 
-		# Parse XML response to get file path
-		_local xml_doc << simple_xml.read_element_string(xml_result)
-		_local success_elem << xml_doc.element_matching_name(:success)
-		_local kml_file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+			# --- Validation 1: file must be .kml ---
+			_if file_name.uppercase.index_of_seq(".KML") _is _unset
+			_then
+				_self.log_error("Invalid file format: " + file_name + " (must be .kml)")
+				_self.user_error(write_string(
+					"Invalid file format.", %newline,
+					%newline,
+					"File name : ", file_name, %newline,
+					"Required  : KML format (.kml)", %newline,
+					%newline,
+					"Please select a .kml file."))
+				_return
+			_endif
 
-		_if success_elem _isnt _unset _andif
-		    success_elem.xml_result = "true" _andif
-		    kml_file_path_elem _isnt _unset
-		_then
-			_local kml_file_path << kml_file_path_elem.xml_result
+			# --- Validation 2: file name must contain INFRA_TYPE_INFRA_CODE ---
+			_if file_name.uppercase.index_of_seq(expected_token) _is _unset
+			_then
+				_self.log_error("Local KML file name mismatch: " + file_name +
+				                " does not contain " + expected_token)
+				_self.user_error(write_string(
+					"The selected file does not match the selected work order.", %newline,
+					%newline,
+					"File name           : ", file_name, %newline,
+					"Expected to contain : ", expected_token, %newline,
+					%newline,
+					"Please select a KML file whose name contains:", %newline,
+					"  ", expected_token))
+				_return
+			_endif
+
+			# --- Local file path provided: skip API download ---
+			_self.log_info("Step 1: Using local KML file (API download skipped)")
+			_self.log_info("  Local file: " + local_kmz_path)
+			_self.log_info("  File name : " + file_name)
+			_self.log_info("  Validated : " + expected_token + " found in file name")
+			write("Using local KML file:", local_kmz_path)
+			kml_file_path << local_kmz_path
+			_self.log_success("Local KML file accepted and validated")
+			_self.log_info("")
+		_else
+			# --- No local path: download from ASTRI API ---
+			_local output_dir << system.getenv("TEMP").default("C:\temp")
+			_self.log_info("Step 1: Downloading KMZ file from API...")
+			_self.log_info("  Output directory: " + output_dir)
+			_self.log_info("  Infrastructure type: " + infra_type)
+			write("Infra type: ", infra_type)
+			_local xml_result << _if infra_type = "cluster"
+			                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+			                     _elif infra_type = "subfeeder"
+			                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+			                     _elif infra_type = "feeder"
+			                     _then >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+			                     _else >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+			                     _endif
+
+			_if xml_result _is _unset _orif xml_result = ""
+			_then
+				_self.log_error("Failed to download KML file")
+				_self.user_error("Failed to download KML file")
+				_return
+			_endif
+
+			_self.log_success("KMZ file downloaded successfully")
+			_self.log_info("")
+			_self.log_info("Step 2: Parsing download response...")
+
+			_local xml_doc << simple_xml.read_element_string(xml_result)
+			_local success_elem << xml_doc.element_matching_name(:success)
+			_local kml_file_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+			_if success_elem _is _unset _orif
+			    success_elem.xml_result <> "true" _orif
+			    kml_file_path_elem _is _unset
+			_then
+				_local error_elem << xml_doc.element_matching_name(:error)
+				_local error_msg << _if error_elem _isnt _unset
+				                    _then >> error_elem.xml_result
+				                    _else >> "Unknown error"
+				                    _endif
+				_self.log_separator()
+				_self.log_error("MIGRATION FAILED")
+				_self.log_separator()
+				_self.log_error("Failed to download KML file")
+				_self.log_error("Error: " + error_msg)
+				_self.log_separator()
+				_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
+				_return
+			_endif
+
+			kml_file_path << kml_file_path_elem.xml_result
 			_self.log_success("KML file path extracted")
 			_self.log_info("  File: " + kml_file_path)
 			_self.log_info("")
 			write("KML file downloaded to:", kml_file_path)
+		_endif
 
+		# Both local-file and API-download paths converge here with kml_file_path set
+
+		_block
 			# Parse KML file using astri_kml_parser
 			_self.log_info("Step 3: Parsing KML file...")
 			write("Parsing KML file...")
@@ -283,20 +366,7 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			# Refresh button states to enable BoQ buttons now that design exists
 			write("Migration successful - refreshing button states...")
 			_self.refresh_button_states()
-		_else
-			_local error_elem << xml_doc.element_matching_name(:error)
-			_local error_msg << _if error_elem _isnt _unset
-					    _then >> error_elem.xml_result
-					    _else >> "Unknown error"
-					    _endif
-			_self.log_separator()
-			_self.log_error("MIGRATION FAILED")
-			_self.log_separator()
-			_self.log_error("Failed to download KML file")
-			_self.log_error("Error: " + error_msg)
-			_self.log_separator()
-			_self.user_error(write_string("Failed to download KML file:", %newline, error_msg))
-		_endif
+		_endblock
 	_when error
 		_self.log_separator()
 		_self.log_error("MIGRATION FAILED")

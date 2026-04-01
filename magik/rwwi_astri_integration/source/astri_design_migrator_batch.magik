@@ -134,6 +134,62 @@ _global migrate_clusters_from_db << _proc(_optional date_pattern, cluster_code_p
 
 		_try _with migErr
 
+			# --- Call Work Order API to get wo_number and infra_name ---
+			_local wo_number  << cluster_code   # fallback
+			_local infra_name << cluster_code   # fallback
+			_local infra_code << cluster_code   # fallback
+			_local wo_area    << ""
+			_local wo_olt_label << olt_code
+
+			write("  Fetching work order from API for cluster: ", cluster_code)
+			_try _with apiErr
+				_local wo_filters << property_list.new_with(:target_cluster_code, cluster_code)
+				_local api_xml << astri_get_work_orders("cluster", 1, 0, wo_filters)
+				_if api_xml _isnt _unset _andif api_xml <> ""
+				_then
+					_local api_doc    << simple_xml.read_element_string(api_xml)
+					_local data_elem  << api_doc.element_matching_name(:data)
+					_if data_elem _isnt _unset
+					_then
+						_local wo_elem << data_elem.element_matching_name(:workorder)
+						_if wo_elem _isnt _unset
+						_then
+							_local num_elem  << wo_elem.element_matching_name(:number)
+							_local name_elem << wo_elem.element_matching_name(:target_cluster_name)
+							_local code_elem << wo_elem.element_matching_name(:target_cluster_code)
+							_local area_elem << wo_elem.element_matching_name(:target_cluster_area)
+							_local olt_label_elem << wo_elem.element_matching_name(:target_cluster_olt_label)
+							_if num_elem _isnt _unset _andif num_elem.xml_result <> ""
+							_then
+								wo_number << num_elem.xml_result
+							_endif
+							_if name_elem _isnt _unset _andif name_elem.xml_result <> ""
+							_then
+								infra_name << name_elem.xml_result
+							_endif
+							_if code_elem _isnt _unset _andif code_elem.xml_result <> ""
+							_then
+								infra_code << code_elem.xml_result
+							_endif
+							_if area_elem _isnt _unset
+							_then
+								wo_area << area_elem.xml_result.default("")
+							_endif
+							_if olt_label_elem _isnt _unset
+							_then
+								wo_olt_label << olt_label_elem.xml_result.default(olt_code)
+							_endif
+							write("  WO Number : ", wo_number)
+							write("  Infra Name: ", infra_name)
+						_else
+							write("  WARNING: No workorder element in API response, using cluster_code as fallback")
+						_endif
+					_endif
+				_endif
+			_when error
+				write("  WARNING: API call failed (", apiErr.report_contents_string, "), using cluster_code as fallback")
+			_endtry
+
 			# Download KMZ
 			write("  Downloading KMZ...")
 			_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
@@ -189,26 +245,28 @@ _global migrate_clusters_from_db << _proc(_optional date_pattern, cluster_code_p
 				_endif
 			_endif
 
-			# Build work order property_list (same fields expected by migrator/create_project_and_design)
-			_local wo << property_list.new_with(
-				:wo_number,          cluster_code,
-				:infra_code,         cluster_code,
-				:infra_name,         cluster_code,
-				:kmz_uuid,           kmz_uuid,
-				:kmz_source,         kmz_source,
-				:infrastructure_type, infra,
-				:topology,           topology_str,
-				:olt_label,          olt_code,
-				:olt_name,           olt_code,
-				:area,               "",
-				:area_plant_code,    "")
-
 			# Truncate infra_name to 64 chars (same guard as dialog)
-			_local infra_name << cluster_code
 			_if infra_name.size > 64
 			_then
 				infra_name << infra_name.subseq(infra_name.size - 64, 64)
 			_endif
+
+			# Title = "CLUSTER-<cluster_code>" (matches dialog convention)
+			_local project_title << write_string("CLUSTER-", cluster_code)
+
+			# Build work order property_list (same fields expected by migrator/create_project_and_design)
+			_local wo << property_list.new_with(
+				:wo_number,           wo_number,
+				:infra_code,          infra_code,
+				:infra_name,          infra_name,
+				:kmz_uuid,            kmz_uuid,
+				:kmz_source,          kmz_source,
+				:infrastructure_type, infra,
+				:topology,            topology_str,
+				:olt_label,           wo_olt_label,
+				:olt_name,            wo_olt_label,
+				:area,                wo_area,
+				:area_plant_code,     "")
 
 			# Create migrator
 			write("  Creating migrator...")
@@ -217,12 +275,15 @@ _global migrate_clusters_from_db << _proc(_optional date_pattern, cluster_code_p
 
 			# Create project and design
 			write("  Creating project and design...")
+			write("    Project name : ", wo_number)
+			write("    Project title: ", project_title)
+			write("    Design name  : ", infra_name)
 			_local (project, scheme) << migrator.create_project_and_design(
 				placemarks,
-				cluster_code,   # project name
-				cluster_code,   # project title
-				infra_name,     # design name
-				infra)          # infra type
+				wo_number,       # project name  (from API wo_number)
+				project_title,   # project title (CLUSTER-<cluster_code>)
+				infra_name,      # design name   (from API infra_name)
+				infra)           # infra type
 
 			write("  Project ID: ", project.id, "  Design ID: ", scheme.id)
 

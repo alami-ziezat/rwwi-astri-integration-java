@@ -201,14 +201,13 @@ _method astri_data_migrator.migrate_all()
 	write("")
 
 	_local overall_end_time << date_time.now()
-	_local overall_duration_seconds << (overall_end_time - overall_start_time).value.rounded
-	_local overall_duration_minutes << (overall_duration_seconds / 60.0).rounded
+	_local overall_duration << (overall_end_time - overall_start_time)
 
 	write("===========================================================")
 	write("=== MIGRATION COMPLETE ===")
 	write("===========================================================")
 	write("Overall end time: ", overall_end_time.write_string)
-	write("Total duration: ", overall_duration_minutes, " minutes (", overall_duration_seconds, " seconds)")
+	write("Total duration: ", overall_duration.write_string)
 	write("===========================================================")
 
 	>> overall_stats
@@ -1171,7 +1170,6 @@ _method astri_data_migrator.migrate_clusters()
 					.db_connection.commit()
 					write("  [COMMIT] Committed batch at record ", .stats[:total])
 					batch_count << 0
-					_return 
 				_when error
 					write("  WARNING: Batch commit failed at record ", .stats[:total])
 					.db_connection.rollback()
@@ -1441,7 +1439,7 @@ _private _method astri_data_migrator.process_feeder_kml_migration(rec, obj_stats
 
 			_local wo << property_list.new_with(:wo_number, feeder_code, :infra_code, feeder_code, :infrastructure_type, "feeder", :kmz_uuid, kmz_uuid)
 
-			_self.migrate_to_sw_alternative(wo, placemarks, "feeder")
+			_self.migrate_to_sw_alternative(wo, placemarks, "feeder", topology)
 
 			rec.feeder_status << "MIGRATED"
 			_return _true
@@ -1542,7 +1540,7 @@ _private _method astri_data_migrator.process_subfeeder_kml_migration(rec, obj_st
 
 			_local wo << property_list.new_with(:wo_number, subfeeder_code, :infra_code, subfeeder_code, :infrastructure_type, "subfeeder", :kmz_uuid, kmz_uuid)
 
-			_self.migrate_to_sw_alternative(wo, placemarks, "subfeeder")
+			_self.migrate_to_sw_alternative(wo, placemarks, "subfeeder", topology)
 
 			rec.subfeeder_status << "MIGRATED"
 			_return _true
@@ -1642,7 +1640,7 @@ _private _method astri_data_migrator.process_cluster_kml_migration(rec, obj_stat
 
 			_local wo << property_list.new_with(:wo_number, cluster_code, :infra_code, cluster_code, :infrastructure_type, "cluster", :kmz_uuid, kmz_uuid)
 
-			_self.migrate_to_sw_alternative(wo, placemarks, "cluster")
+			_self.migrate_to_sw_alternative(wo, placemarks, "cluster", topology)
 
 			rec.subfeeder_status << "MIGRATED"
 			_return _true
@@ -1661,7 +1659,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator.migrate_to_sw_alternative(wo, placemarks, infra_type)
+_private _method astri_data_migrator.migrate_to_sw_alternative(wo, placemarks, infra_type, _optional kml_topology)
 	_local database << gis_program_manager.databases[:gis]
 	_local gv << gis_program_manager.cached_dataset(:gis)
 	_local alt_name << "|Engineering Design|migration"
@@ -1670,6 +1668,29 @@ _private _method astri_data_migrator.migrate_to_sw_alternative(wo, placemarks, i
 	gv.switch(:write)
 
 	_local migrator << astri_design_migrator.new(database, wo, "In Service")
+
+	# Resolve topology: prefer wo[:topology] DB field, fallback to KML-detected topology
+	_local final_topology << kml_topology
+	_local topology_str << wo[:topology].default("")
+	_if topology_str _isnt _unset _andif topology_str <> ""
+	_then
+		_if topology_str = "AE"
+		_then
+			final_topology << :aerial
+		_elif topology_str = "UG"
+		_then
+			final_topology << :underground
+		_elif topology_str = "AE&UG"
+		_then
+			final_topology << :both
+		_endif
+	_endif
+	_if final_topology _isnt _unset
+	_then
+		migrator.topology << final_topology
+	_endif
+	write("  Topology: ", final_topology.default(:unset), " (wo[:topology]: ", topology_str.default("unset"), ", KML detected: ", kml_topology.default(:unset), ")")
+
 	_local stats << migrator.migrate_placemarks(placemarks)
 
 	write("  [MIGRATED] Routes: ", stats[:aerial_routes], ", Poles: ", stats[:new_poles], ", Cable: ", stats[:sheath_length].rounded, "m")
