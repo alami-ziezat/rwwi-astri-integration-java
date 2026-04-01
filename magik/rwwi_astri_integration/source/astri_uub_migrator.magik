@@ -89,6 +89,14 @@ _private _method astri_design_migrator.create_uub(pm, p_trans)
 		_endif
 		_local segment_id << _self.match_segment(folders)
 		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 
 		# Determine construction status from folder patterns (ref: pole_migrator)
 		_local uub_const_status <<
@@ -171,7 +179,8 @@ _private _method astri_design_migrator.create_uub(pm, p_trans)
 					:cluster_code, .cluster_code_db,
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
-					:olt_code, .olt_code
+					:olt_code, .olt_code,
+					:infra_type, infra_type_cap
 				)
 
 				_local update_trans << record_transaction.new_update(existing_uub, update_props)
@@ -210,6 +219,7 @@ _private _method astri_design_migrator.create_uub(pm, p_trans)
 				:subfeeder_code, .subfeeder_code_db,
 				:feeder_code, .feeder_code_db,
 				:olt_code, .olt_code,
+				:infra_type, infra_type_cap,
 				:depth, 1.3,
 				:width, 0.8
 			)

@@ -134,6 +134,14 @@ _private _method astri_design_migrator.create_underground_route(pm)
 
 		# Step 4.5: Extract ring_name from placemark
 		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 
 		# Step 5: Pre-scan UUBs at start/end BEFORE creating UR
 		# If a UUB is found, snap the route endpoint to the UUB's exact coordinate
@@ -242,6 +250,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			:subfeeder_code, .subfeeder_code_db,
 			:feeder_code, .feeder_code_db,
 			:olt_code, .olt_code,
+			:infra_type, infra_type_cap,
 			:underground_route_type, "Bore",  # Default type
 			:width, 300,
 			:upper_material_depth, 700,

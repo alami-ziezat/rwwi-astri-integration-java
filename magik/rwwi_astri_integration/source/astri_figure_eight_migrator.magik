@@ -153,6 +153,14 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_endif
 
 		# Step 4: Create figure_eight
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 		_local l_prop_values << property_list.new_with(
 			:construction_status, .construction_status,
 			:type, "Circle",
@@ -168,7 +176,8 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
 			:feeder_code, .feeder_code_db,
-			:olt_code, .olt_code
+			:olt_code, .olt_code,
+			:infra_type, infra_type_cap
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.fe_col, l_prop_values)
@@ -344,6 +353,14 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 		_local noted << "UUB Name : " + n_obj.label.default("") +
 		                "  UUB ID : " + n_obj.id.write_string
 
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 		_local l_prop_values << property_list.new_with(
 			:construction_status, .construction_status,
 			:type, "Circle",
@@ -360,7 +377,8 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
 			:feeder_code, .feeder_code_db,
-			:olt_code, .olt_code
+			:olt_code, .olt_code,
+			:infra_type, infra_type_cap
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.fe_col, l_prop_values)

@@ -33,8 +33,12 @@ _private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 		_endif
 		_local segment   << _self.match_segment(folders)
 		_local ring_name << pm[:ring_name]
-		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
-		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
 		#write(" Processed folders: ", folders, " | matched line: ", m_line, " | segment: ", segment)
@@ -57,7 +61,8 @@ _private _method astri_design_migrator.create_boring_manual(pm, p_trans)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:fdt_name,           ring_name
+			:fdt_name,           ring_name,
+			:infra_type,         infra_type_cap
 		)
 
 		_local rec_trans << record_transaction.new_insert(.boring_manual_col, prop_values)
@@ -99,8 +104,12 @@ _private _method astri_design_migrator.create_boring_machine(pm, p_trans)
 		_endif
 		_local segment   << _self.match_segment(folders)
 		_local ring_name << pm[:ring_name]
-		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
-		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
 
@@ -123,7 +132,8 @@ _private _method astri_design_migrator.create_boring_machine(pm, p_trans)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:fdt_name,           ring_name
+			:fdt_name,           ring_name,
+			:infra_type,         infra_type_cap
 		)
 
 		_local rec_trans << record_transaction.new_insert(.boring_machine_col, prop_values)
@@ -162,8 +172,12 @@ _private _method astri_design_migrator.create_tali_pancing(pm, p_trans)
 		_endif
 		_local segment   << _self.match_segment(folders)
 		_local ring_name << pm[:ring_name]
-		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
-		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
 
@@ -185,7 +199,8 @@ _private _method astri_design_migrator.create_tali_pancing(pm, p_trans)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			:fdt_name,           ring_name
+			:fdt_name,           ring_name,
+			:infra_type,         infra_type_cap
 		)
 
 		_local rec_trans << record_transaction.new_insert(.tali_pancing_col, prop_values)

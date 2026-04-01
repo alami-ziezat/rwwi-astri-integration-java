@@ -54,8 +54,12 @@ _private _method astri_design_migrator.create_open_trenching(pm, p_trans)
 		_local segment_id << _self.match_segment(folders)
 
 		# Step 5: Infra type capitalised
-		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
-		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
 

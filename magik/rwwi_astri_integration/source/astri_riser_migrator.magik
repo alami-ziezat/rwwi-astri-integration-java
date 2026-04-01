@@ -37,8 +37,12 @@ _private _method astri_design_migrator.create_riser(pm)
 		_endif
 		_local segment_id << _self.match_segment(folders)
 		_local ring_name  << pm[:ring_name]
-		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
-		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
 		write("    Matched line: ", m_line, " | segment: ", segment_id)
@@ -66,7 +70,7 @@ _private _method astri_design_migrator.create_riser(pm)
 			:feeder_code,        .feeder_code_db,
 			:subfeeder_code,     .subfeeder_code_db,
 			:cluster_code,       .cluster_code_db,
-			#:infra_type,         infra_type_cap,
+			:infra_type,          infra_type_cap,
 			:fdt_name,           ring_name,
 			:stf_item_code,      "200001034"
 		)

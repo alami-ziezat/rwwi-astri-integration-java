@@ -115,13 +115,22 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 				>> "Proposed"  # Default to Proposed
 			_endif
 
-		_local pole_asset_owner << 
+		_local pole_asset_owner <<
 			_if pole_emr_status.matches?("*Partner")
 			_then
 				>> "Third Party"
 			_else
 				>> "Owned"  # Default to Owned
 			_endif
+
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 
 		_if h _is _true _andif existing_pole _isnt _unset
 		_then
@@ -149,6 +158,7 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
 					:olt_code, .olt_code,
+					:infra_type, infra_type_cap,
 					:construction_status, pole_const_status,
 					:annotation_3, anno
 				)
@@ -221,7 +231,8 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 				:cluster_code, .cluster_code_db,
 				:subfeeder_code, .subfeeder_code_db,
 				:feeder_code, .feeder_code_db,
-				:olt_code, .olt_code
+				:olt_code, .olt_code,
+				:infra_type, infra_type_cap
 			)
 
 			# Add optional fields if available

@@ -58,8 +58,12 @@ _pragma(classify_level=basic, topic={astri_integration})
 		_endif
 
 		# Capitalize infra_type for field value (e.g. "cluster" -> "Cluster")
-		_local infra_type_cap << _if .infra_type _isnt _unset _andif .infra_type.size > 0
-		                         _then >> write_string(.infra_type[1].uppercase, .infra_type.subseq(2))
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
 

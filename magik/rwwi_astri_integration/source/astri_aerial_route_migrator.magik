@@ -135,6 +135,14 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 
 		# Step 4.5: Extract ring_name from folders
 		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 
 		write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
 		# Step 5: Check for SLING WIRE - special handling
@@ -160,6 +168,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 					:subfeeder_code, .subfeeder_code_db,
 					:feeder_code, .feeder_code_db,
 					:olt_code, .olt_code,
+					:infra_type, infra_type_cap,
 					:stf_item_code, "200001033"
 				)
 				_local rec_trans_sw << record_transaction.new_insert(.sw_col, prop_values_sw)
@@ -195,7 +204,8 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
 			:feeder_code, .feeder_code_db,
-			:olt_code, .olt_code
+			:olt_code, .olt_code,
+			:infra_type, infra_type_cap
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.ar_col, l_prop_values)

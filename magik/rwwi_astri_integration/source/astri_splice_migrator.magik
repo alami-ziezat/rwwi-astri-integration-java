@@ -211,6 +211,14 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 		# Step 5: Get line_type, ring_name, const_status
 		_local line_type << _self.match_line(folders)
 		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 		_local splice_name_lc << pm[:name].lowercase
 		_local const_status <<
 			_if .construction_status = "In Service"
@@ -251,7 +259,8 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
 			:feeder_code, .feeder_code_db,
-			:olt_code, .olt_code
+			:olt_code, .olt_code,
+			:infra_type, infra_type_cap
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.sc_col, l_prop_values)
@@ -593,6 +602,14 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 		# Step 6: Get line_type, ring_name, const_status
 		_local line_type << _self.match_line(folders)
 		_local ring_name << pm[:ring_name]
+		_local infra_type_cap << _if .infra_type = "cluster"
+		                         _then >> "Cluster"
+		                         _elif .infra_type = "subfeeder"
+		                         _then >> "SubFeeder"
+		                         _elif .infra_type = "feeder"
+		                         _then >> "Feeder"
+		                         _else >> ""
+		                         _endif
 		_local splice_name_lc << pm[:name].lowercase
 		_local const_status <<
 			_if .construction_status = "In Service"
@@ -636,7 +653,8 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
 			:feeder_code, .feeder_code_db,
-			:olt_code, .olt_code
+			:olt_code, .olt_code,
+			:infra_type, infra_type_cap
 		)
 
 		_local l_rec_trans << record_transaction.new_insert(.sc_col, l_prop_values)
