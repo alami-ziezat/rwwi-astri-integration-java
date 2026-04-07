@@ -737,6 +737,40 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:object, "T-WEY",
 			:name, "Instal Concrete Hand hole for pulling pit : 20x20x20 cm",
 			:material_slot, :service
+		),
+
+		# Flexible conduit for FDT (qty = total FDT * 2)
+		"200001018", property_list.new_with(
+			:code, "200001018",
+			:object, "FDT",
+			:name, "Flexible 3/4 inch",
+			:material_slot, :material
+		),
+
+		# Plate belt 20mm for FAT (qty = total FAT * 4)
+		# Also used for Suspension clamp for Pole (qty = total Pole * 20%)
+		# Both share this code and accumulate into one BOQ line item
+		"200000148", property_list.new_with(
+			:code, "200000148",
+			:object, "FAT/Pole",
+			:name, "Plate belt 20mm / Suspension clamp",
+			:material_slot, :material
+		),
+
+		# Pole clamp single (qty = total Pole * 80%)
+		"200000145", property_list.new_with(
+			:code, "200000145",
+			:object, "Pole",
+			:name, "Pole clamp single",
+			:material_slot, :material
+		),
+
+		# Clamps Dead end Fittings / clamp buaya (qty = Pole clamp single * 2)
+		"500001103", property_list.new_with(
+			:code, "500001103",
+			:object, "Pole",
+			:name, "Clamps Dead end Fittings/clamp buaya",
+			:material_slot, :service
 		)
 	),
 	:public
@@ -1163,40 +1197,81 @@ $
 
 _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 	## Add sheath_with_loc (cable) lengths to BOQ result.
-	## Groups all SWL records by (stf_item_code, ring_name, line_type), sums
-	## raw lengths per group, applies ceiling once per group, then sums all
-	## ceiled values per stf_item_code across groups, and applies 5% margin +
-	## ceiling on that total for the final BOQ qty.
+	##
+	## Length calculation uses route_sectors() line_length (in cm, converted to m)
+	## for each cable record, grouped by (stf_item_code, ring_name, line_type).
+	##
+	## Excel formula applied per group:
+	##   ROUNDUP(((base_length) + (fat_count + fdt_count) * 20) * 1.05, 0)
+	## where:
+	##   base_length  = sum of route_sectors().line_length (cm->m) per group
+	##   fat_count    = number of FAT objects sharing the same ring_name
+	##   fdt_count    = number of FDT objects sharing the same ring_name
+	##   20           = slack allowance in metres per FAT/FDT
+	##   1.05         = 5% tolerance factor
+	##
+	## Final BOQ quantity per stf_item_code = sum of all group results.
 	##
 	## Parameters:
 	##   result - property_list to update
 
-	_try _with errCond
-		write("LOG: Processing sheath_with_loc cables (ceiling per code+ring+line_type approach)...")
+	_local fat_codes << {"200001047", "100000824"}
+	_local fdt_codes << {"200001039", "200001040", "200001041", "200001042", "200001043", "200001044"}
 
-		# Accumulate raw base lengths per (stf_item_code, ring_name, line_type) group
-		# key: write_string(code, "|", ring, "|", line_type), value: total raw length in meters
-		raw_lengths_by_group << equality_hash_table.new()
-		# Track which (ring, line_type) combinations belong to each code
-		# key: code string, value: equality_hash_table of "ring|line_type" -> _true
-		groups_by_code << equality_hash_table.new()
-		swl_count << 0
+	_try _with errCond
+		write("LOG: Processing sheath_with_loc cables (route_sectors + Excel formula approach)...")
+
+		# ---- Phase 1: count FAT and FDT per ring_name from change_set ----
+		_local fat_by_ring << equality_hash_table.new()   # ring -> count
+		_local fdt_by_ring << equality_hash_table.new()   # ring -> count
+
+		_for rc _over .change_set.fast_elements()
+		_loop
+			_local obj << rc.current_record
+			_if obj _is _unset _then _continue _endif
+			_if obj.responds_to?(:construction_status) _andif
+			    obj.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+			_if _not obj.responds_to?(:stf_item_code) _then _continue _endif
+			_local obj_code << obj.stf_item_code
+			_if obj_code _is _unset _then _continue _endif
+
+			_local obj_ring << ""
+			_if obj.responds_to?(:ring_name) _andif obj.ring_name _isnt _unset
+			_then
+				obj_ring << obj.ring_name.write_string
+			_endif
+
+			_if fat_codes.includes?(obj_code)
+			_then
+				fat_by_ring[obj_ring] << fat_by_ring[obj_ring].default(0) + 1
+			_elif fdt_codes.includes?(obj_code)
+			_then
+				fdt_by_ring[obj_ring] << fdt_by_ring[obj_ring].default(0) + 1
+			_endif
+		_endloop
+
+		# ---- Phase 2: accumulate cable lengths per (code, ring, line_type) group ----
+		# key: "code|ring|ltype"  value: total length in metres
+		_local lengths_by_group << equality_hash_table.new()
+		# key: code string  value: equality_hash_table of "ring|ltype" -> _true
+		_local groups_by_code << equality_hash_table.new()
+		_local swl_count << 0
 
 		_for record_change _over .change_set.fast_elements()
 		_loop
 			_local rec << record_change.current_record
 			_if rec _is _unset _then _continue _endif
-
 			_if rec.source_collection.name _isnt :sheath_with_loc _then _continue _endif
 
-			# Only Proposed objects
 			_if rec.responds_to?(:construction_status) _andif
 			    rec.construction_status <> "Proposed"
 			_then
 				_continue
 			_endif
 
-			# Must have a valid stf_item_code in catalog
 			_local code << _unset
 			_if rec.responds_to?(:stf_item_code)
 			_then
@@ -1207,66 +1282,83 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				_continue
 			_endif
 
-			# Get ring_name (use empty string as fallback)
 			_local ring << ""
 			_if rec.responds_to?(:ring_name) _andif rec.ring_name _isnt _unset
 			_then
 				ring << rec.ring_name.write_string
 			_endif
 
-			# Get line_type (use empty string as fallback)
 			_local ltype << ""
 			_if rec.responds_to?(:line_type) _andif rec.line_type _isnt _unset
 			_then
 				ltype << rec.line_type.write_string
 			_endif
 
-			# Get raw base length (no margin, no ceiling yet)
-			_if _not rec.responds_to?(:calculated_sheath_length) _then _continue _endif
-			_local base_length << rec.calculated_sheath_length.value_in(:m).as_number()
-			_if base_length _is _unset _orif base_length <= 0 _then _continue _endif
-
-			write("  SWL ID:", rec.id, "code:", code, "ring:", ring, "line_type:", ltype, "base_length:", base_length, "m")
-
-			# Accumulate raw length per (code, ring, line_type) group
-			_local group_key << write_string(code, "|", ring, "|", ltype)
-			_local existing_len << raw_lengths_by_group[group_key]
-			_if existing_len _is _unset
+			# Sum route_sectors line_length (cm -> m)
+			_local seg_length << 0.0
+			_if rec.responds_to?(:route_sectors)
 			_then
-				raw_lengths_by_group[group_key] << base_length
-			_else
-				raw_lengths_by_group[group_key] << existing_len + base_length
+				_for rs _over rec.route_sectors()
+				_loop
+					seg_length +<< rs.line_length / 100.0
+				_endloop
 			_endif
+			_if seg_length <= 0 _then _continue _endif
 
-			# Track (ring, line_type) combinations per code
+			write("  SWL ID:", rec.id, "code:", code, "ring:", ring, "ltype:", ltype, "length:", seg_length, "m")
+
+			_local group_key << write_string(code, "|", ring, "|", ltype)
+			_local prev << lengths_by_group[group_key]
+			lengths_by_group[group_key] << prev.default(0) + seg_length
+
 			_local group_set << groups_by_code[code]
 			_if group_set _is _unset
 			_then
 				group_set << equality_hash_table.new()
 				groups_by_code[code] << group_set
 			_endif
-			_local sub_key << write_string(ring, "|", ltype)
-			group_set[sub_key] << _true
+			group_set[write_string(ring, "|", ltype)] << _true
 
 			swl_count +<< 1
 		_endloop
 
-		# For each stf_item_code: ceiling per (ring, line_type) group, sum, then +5% ceiling
+		# ---- Phase 3: apply Excel formula per group, sum per code ----
+		# Formula: ROUNDUP(((base_length) + (fat_count + fdt_count) * 20) * 1.05, 0)
+		_local total_by_code << equality_hash_table.new()
+
 		_for code, group_set _over groups_by_code.fast_keys_and_elements()
 		_loop
-			_local total_ceiled << 0
+			_local code_total << 0
 			_for sub_key _over group_set.fast_keys()
 			_loop
 				_local group_key << write_string(code, "|", sub_key)
-				_local raw_for_group << raw_lengths_by_group[group_key]
-				_if raw_for_group _is _unset _then _continue _endif
-				_local ceiled_for_group << raw_for_group.ceiling
-				write("LOG: SWL code:", code, "|group:", sub_key, "|raw:", raw_for_group, "m -> ceiling:", ceiled_for_group, "m")
-				total_ceiled +<< ceiled_for_group
+				_local base_len  << lengths_by_group[group_key].default(0)
+
+				# Extract ring from sub_key ("ring|ltype")
+				_local sep_pos << sub_key.index_of(%|)
+				_local grp_ring << _if sep_pos _isnt _unset
+				                   _then >> sub_key.substring(1, sep_pos - 1)
+				                   _else >> sub_key
+				                   _endif
+
+				_local fat_cnt  << fat_by_ring[grp_ring].default(0)
+				_local fdt_cnt  << fdt_by_ring[grp_ring].default(0)
+				_local slack    << (fat_cnt + fdt_cnt) * 20
+
+				_local qty << ((base_len + slack) * 1.05).ceiling
+				write("LOG: SWL code:", code, "|group:", sub_key,
+				      "|base:", base_len, "m |FAT:", fat_cnt, "|FDT:", fdt_cnt,
+				      "|slack:", slack, "m -> qty:", qty)
+				code_total +<< qty
 			_endloop
-			total_plus_05 << (total_ceiled * 1.05).ceiling
-			write("LOG: SWL code:", code, "|total across groups:", total_ceiled, "m -> +5% ceiling:", total_plus_05, "m")
-			_self.add_to_boq_result(result, code, total_plus_05)
+			total_by_code[code] << code_total
+		_endloop
+
+		# Add final quantities to BOQ result
+		_for code, qty _over total_by_code.fast_keys_and_elements()
+		_loop
+			write("LOG: SWL code:", code, "| total BOQ qty:", qty, "m")
+			_self.add_to_boq_result(result, code, qty)
 		_endloop
 
 		write("LOG: Processed", swl_count, "sheath_with_loc records,", groups_by_code.size, "unique codes")
@@ -1351,6 +1443,20 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 		_then
 			_self.add_to_boq_result(result, "200000690", total_poles)  # Bahan Pondasi tiang -> auto-adds 500001742 (Label Pole)
 			write("LOG: Added pole accessories (1 material + 1 service pair) with total pole count:", total_poles)
+
+			# Suspension clamp (200000148) - 20% of total poles, ceiling
+			_local suspension_qty << (total_poles * 0.2).ceiling
+			_self.add_to_boq_result(result, "200000148", suspension_qty)
+			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_qty, "(20% of", total_poles, "poles)")
+
+			# Pole clamp single (200000145) - 80% of total poles, ceiling
+			_local pole_clamp_qty << (total_poles * 0.8).ceiling
+			_self.add_to_boq_result(result, "200000145", pole_clamp_qty)
+			write("LOG: Added Pole clamp single (200000145) with quantity:", pole_clamp_qty, "(80% of", total_poles, "poles)")
+
+			# Clamp buaya / Dead end Fittings (500001103) - 2x Pole clamp single
+			_self.add_to_boq_result(result, "500001103", pole_clamp_qty * 2)
+			write("LOG: Added Clamp buaya (500001103) with quantity:", pole_clamp_qty * 2, "(2x Pole clamp single)")
 		_else
 			write("LOG: No poles found, skipping pole accessories")
 		_endif
@@ -1393,7 +1499,8 @@ _private _method rwwi_astri_boq_generator.add_fdt_accessories(result)
 		# If FDTs exist, add the accessories
 		_if total_fdts > 0
 		_then
-			_self.add_to_boq_result(result, "200000273", total_fdts)  # Label FDT
+			_self.add_to_boq_result(result, "200000273", total_fdts)         # Label FDT
+			_self.add_to_boq_result(result, "200001018", total_fdts * 2)     # Flexible 3/4 inch (2 per FDT)
 			write("LOG: Added FDT accessories with total FDT count:", total_fdts)
 		_else
 			write("LOG: No FDTs found, skipping FDT accessories")
@@ -1472,6 +1579,10 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 			# Testcomm - total FAT count
 			_self.add_to_boq_result(result, "500002107", total_fats)
 			write("LOG: Added Testcomm (500002107) with quantity:", total_fats)
+
+			# Plate belt 20mm - 4 per FAT
+			_self.add_to_boq_result(result, "200000148", total_fats * 4)
+			write("LOG: Added Plate belt 20mm (200000148) with quantity:", total_fats * 4)
 
 			write("LOG: Added FAT accessories with total FAT count:", total_fats)
 		_else

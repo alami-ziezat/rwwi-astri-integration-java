@@ -79,7 +79,8 @@ def_slotted_exemplar(:astri_design_migrator,
 	{:stats,           _unset, :writable},   # Migration results
 
 	# Progress reporting
-	{:dialog,          _unset, :writable}    # Optional dialog reference for set_progress() calls
+	{:dialog,          _unset, :writable},   # Optional dialog reference for set_progress() calls
+	{:migration_scope, "All", :writable}   # Migration scope: "All" (all records), "Network" (network only), "HP and Boundary" (homepass/boundary only)
 })
 $
 
@@ -490,12 +491,22 @@ _private _method astri_design_migrator.classify_placemarks(placemarks)
 		:demand_point,   rope.new(),
 		:t_wey,          rope.new(),
 		:micro_cell,     rope.new(),
-		:riser,          rope.new()
+		:riser,          rope.new(),
+		:boundary_cluster, rope.new()
 	)
 
 	_for pm _over placemarks.fast_elements()
 	_loop
-		_if _self.is_boundary_area?(pm) _then _continue _endif
+		_if _self.is_boundary_area?(pm)
+		_then
+			# When migration scope includes HP/boundary, capture boundary cluster areas for processing
+			_if .migration_scope <> "Network" _andif
+			   pm[:parent].default("").lowercase.index_of_seq("boundary cluster") _isnt _unset
+			_then
+				b[:boundary_cluster].add_last(pm)
+			_endif
+			_continue
+		_endif
 
 		_if _self.is_olt?(pm)
 		_then
@@ -558,7 +569,8 @@ _private _method astri_design_migrator.classify_placemarks(placemarks)
 		b[:demand_point].size,  " demand-pts | ",
 		b[:t_wey].size,         " t-weys | ",
 		b[:micro_cell].size,    " cells | ",
-		b[:riser].size,         " risers")
+		b[:riser].size,         " risers | ",
+		b[:boundary_cluster].size, " boundary-clusters")
 
 	>> b
 _endmethod
@@ -607,155 +619,171 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_local b        << _self.classify_placemarks(placemarks)
 	_local topology << .topology.default(:aerial)
 
-	# Pass 1: OLTs (needed for cable snapping in subsequent passes)
-	write("  Pass 1: Creating OLTs (", b[:olt].size, ")...")
-	_self.notify_progress(
-		"Processing " + b[:olt].size.write_string + " OLTs, please wait...",
-		"Pre-classification done: " + placemarks.size.write_string + " placemarks classified")
-	_for pm _over b[:olt].fast_elements() _loop	_self.create_olt(pm)	_endloop
+	# dt_trans is shared between network pass 5 and HP/boundary pass 8 — initialise here
+	_local dt_trans << rope.new()
 
-	# Pass 2: Cables / routes (topology-based)
-	write("  Pass 2: Creating cables and routes (", b[:route].size, ", topology: ", topology, ")...")
-	_self.notify_progress(
-		"Processing " + b[:route].size.write_string + " cables/routes (" + topology.write_string + "), please wait...",
-		"Done: " + b[:olt].size.write_string + " OLTs processed")
-	_for pm _over b[:route].fast_elements()
-	_loop
-		_if topology = :aerial #_orif topology = :both
+	_if .migration_scope <> "HP and Boundary"
+	_then
+		# Pass 1: OLTs (needed for cable snapping in subsequent passes)
+		write("  Pass 1: Creating OLTs (", b[:olt].size, ")...")
+		_self.notify_progress(
+			"Processing " + b[:olt].size.write_string + " OLTs, please wait...",
+			"Pre-classification done: " + placemarks.size.write_string + " placemarks classified")
+		_for pm _over b[:olt].fast_elements() _loop	_self.create_olt(pm)	_endloop
+
+		# Pass 2: Cables / routes (topology-based)
+		write("  Pass 2: Creating cables and routes (", b[:route].size, ", topology: ", topology, ")...")
+		_self.notify_progress(
+			"Processing " + b[:route].size.write_string + " cables/routes (" + topology.write_string + "), please wait...",
+			"Done: " + b[:olt].size.write_string + " OLTs processed")
+		_for pm _over b[:route].fast_elements()
+		_loop
+			_if topology = :aerial #_orif topology = :both
+			_then
+				_self.create_aerial_route(pm)
+			_endif
+			_if topology = :underground #_orif topology = :both
+			_then
+				_self.create_underground_route(pm)
+			_endif
+		_endloop
+
+		# Pass 3: Structures — poles and/or UUBs (topology-based)
+		write("  Pass 3: Creating structures (", b[:pole].size, " poles, ", b[:uub].size, " UUBs, topology: ", topology, ")...")
+		_self.notify_progress(
+			"Processing " + b[:pole].size.write_string + " poles / " + b[:uub].size.write_string + " UUBs, please wait...",
+			"Done: " + b[:route].size.write_string + " cables/routes processed")
+		_if topology = :aerial _orif topology = :both
 		_then
-			_self.create_aerial_route(pm)
+			_local pole_trans << rope.new()
+			_for pm _over b[:pole].fast_elements() _loop _self.create_pole(pm, pole_trans) _endloop
+			_if _not pole_trans.empty?
+			_then
+				dt << dataset_transaction.new(pole_trans, "Insert Poles")
+				dt.run()
+				write("  [OK] Poles inserted: ", pole_trans.size)
+			_endif
 		_endif
-		_if topology = :underground #_orif topology = :both
+		_if topology = :underground _orif topology = :both
 		_then
-			_self.create_underground_route(pm)
+			_local uub_trans << rope.new()
+			_for pm _over b[:uub].fast_elements() _loop _self.create_uub(pm, uub_trans) _endloop
+			_if _not uub_trans.empty?
+			_then
+				dt << dataset_transaction.new(uub_trans, "Insert UUBs")
+				dt.run()
+				write("  [OK] UUBs inserted: ", uub_trans.size)
+			_endif
 		_endif
-	_endloop
 
-	# Pass 3: Structures — poles and/or UUBs (topology-based)
-	write("  Pass 3: Creating structures (", b[:pole].size, " poles, ", b[:uub].size, " UUBs, topology: ", topology, ")...")
-	_self.notify_progress(
-		"Processing " + b[:pole].size.write_string + " poles / " + b[:uub].size.write_string + " UUBs, please wait...",
-		"Done: " + b[:route].size.write_string + " cables/routes processed")
-	_if topology = :aerial _orif topology = :both
-	_then
-		_local pole_trans << rope.new()
-		_for pm _over b[:pole].fast_elements() _loop _self.create_pole(pm, pole_trans) _endloop
-		_if _not pole_trans.empty?
+		# Pass 4: Splices, figure-eights
+		write("  Pass 4: Creating splices, figure-eights...")
+		_self.notify_progress(
+			"Processing " + b[:splice].size.write_string + " splices / " + b[:figure_eight].size.write_string + " slack hangers, please wait...",
+			"Done: " + b[:pole].size.write_string + " poles / " + b[:uub].size.write_string + " UUBs processed")
+		_for pm _over b[:splice].fast_elements()       _loop _self.create_sheath_splice(pm) _endloop
+		_for pm _over b[:figure_eight].fast_elements() _loop _self.create_figure_eight(pm)  _endloop
+
+		# Pass 4.5: Sub-ducts (after all routes are created — sub-ducts snap to routes)
+		write("  Pass 4.5: Creating sub-ducts (", b[:sub_duct].size, ")...")
+		_self.notify_progress(
+			"Processing " + b[:sub_duct].size.write_string + " sub-ducts, please wait...",
+			"Done: " + b[:splice].size.write_string + " splices / " + b[:figure_eight].size.write_string + " slack hangers processed")
+		_for pm _over b[:sub_duct].fast_elements() _loop _self.create_sub_duct(pm) _endloop
+
+		# Pass 5: Objects with dataset transactions approach
+		write("  Pass 5: Creating boring routes and tali pancing (",
+			b[:boring_manual].size + b[:boring_machine].size +
+			b[:tali_pancing].size + b[:open_trenching].size, ")...")
+		_self.notify_progress(
+			"Processing " + (b[:boring_manual].size + b[:boring_machine].size + b[:tali_pancing].size + b[:open_trenching].size).write_string + " boring/tali pancing/trenching objects, please wait...",
+			"Done: " + b[:sub_duct].size.write_string + " sub-ducts processed")
+
+		_local bman_trans << rope.new()
+		_for pm _over b[:boring_manual].fast_elements()  _loop _self.create_boring_manual(pm, bman_trans)  _endloop
+		_if _not bman_trans.empty?
 		_then
-			dt << dataset_transaction.new(pole_trans, "Insert Poles")
-			dt.run()
-			write("  [OK] Poles inserted: ", pole_trans.size)
+			dt_trans.add_all_last(bman_trans)
+			write("  [OK] Boring Manual created: ", bman_trans.size)
 		_endif
-	_endif
-	_if topology = :underground _orif topology = :both
-	_then
-		_local uub_trans << rope.new()
-		_for pm _over b[:uub].fast_elements() _loop _self.create_uub(pm, uub_trans) _endloop
-		_if _not uub_trans.empty?
+
+		_local bmach_trans << rope.new()
+		_for pm _over b[:boring_machine].fast_elements() _loop _self.create_boring_machine(pm, bmach_trans) _endloop
+		_if _not bmach_trans.empty?
 		_then
-			dt << dataset_transaction.new(uub_trans, "Insert UUBs")
-			dt.run()
-			write("  [OK] UUBs inserted: ", uub_trans.size)
+			dt_trans.add_all_last(bmach_trans)
+			write("  [OK] Boring Machine created: ", bmach_trans.size)
 		_endif
+
+		_local tp_trans << rope.new()
+		_for pm _over b[:tali_pancing].fast_elements() _loop _self.create_tali_pancing(pm, tp_trans) _endloop
+		_if _not tp_trans.empty?
+		_then
+			dt_trans.add_all_last(tp_trans)
+			write("  [OK] Tali Pancing created: ", tp_trans.size)
+		_endif
+
+		_local ot_trans << rope.new()
+		_for pm _over b[:open_trenching].fast_elements() _loop _self.create_open_trenching(pm, ot_trans) _endloop
+		_if _not ot_trans.empty?
+		_then
+			dt_trans.add_all_last(ot_trans)
+			write("  [OK] Open Trenching created: ", ot_trans.size)
+		_endif
+	_else
+		write("  Passes 1-5: Skipped (migration scope: HP and Boundary)")
 	_endif
 
-	# Pass 4: Splices, figure-eights, demand points, t-weys
-	write("  Pass 4: Creating splices, figure-eights, demand points and t-weys...")
-	_self.notify_progress(
-		"Processing " + b[:splice].size.write_string + " splices / " + b[:figure_eight].size.write_string + " slack hangers, please wait...",
-		"Done: " + b[:pole].size.write_string + " poles / " + b[:uub].size.write_string + " UUBs processed")
-	_for pm _over b[:splice].fast_elements()       _loop _self.create_sheath_splice(pm) _endloop
-	_for pm _over b[:figure_eight].fast_elements() _loop _self.create_figure_eight(pm)  _endloop
-
-	# Pass 4.5: Sub-ducts (after all routes are created — sub-ducts snap to routes)
-	write("  Pass 4.5: Creating sub-ducts (", b[:sub_duct].size, ")...")
-	_self.notify_progress(
-		"Processing " + b[:sub_duct].size.write_string + " sub-ducts, please wait...",
-		"Done: " + b[:splice].size.write_string + " splices / " + b[:figure_eight].size.write_string + " slack hangers processed")
-	_for pm _over b[:sub_duct].fast_elements() _loop _self.create_sub_duct(pm) _endloop
-
-	# Pass 5: Objects with dataset transactions approach
-	write("  Pass 5: Creating boring routes and tali pancing (",
-		b[:boring_manual].size + b[:boring_machine].size +
-		b[:tali_pancing].size + b[:open_trenching].size, ")...")
-	_self.notify_progress(
-		"Processing " + (b[:boring_manual].size + b[:boring_machine].size + b[:tali_pancing].size + b[:open_trenching].size).write_string + " boring/tali pancing/trenching objects, please wait...",
-		"Done: " + b[:sub_duct].size.write_string + " sub-ducts processed")
-
-	_local dt_trans << rope.new()	
-	_local bman_trans << rope.new()
-	_for pm _over b[:boring_manual].fast_elements()  _loop _self.create_boring_manual(pm, bman_trans)  _endloop
-	_if _not bman_trans.empty?
-	_then
-		#dt << dataset_transaction.new(bm_trans, "Insert Boring Manual")
-		#dt.run()
-		dt_trans.add_all_last(bman_trans)
-		write("  [OK] Boring Manual created: ", bman_trans.size)
-	_endif
-
-	_local bmach_trans << rope.new()
-	_for pm _over b[:boring_machine].fast_elements() _loop _self.create_boring_machine(pm, bmach_trans) _endloop
-	_if _not bmach_trans.empty?
-	_then
-		#dt << dataset_transaction.new(bmach_trans, "Insert Boring Machine")
-		#dt.run()
-		dt_trans.add_all_last(bmach_trans)
-		write("  [OK] Boring Machine created: ", bmach_trans.size)
-	_endif
-
-	_local tp_trans << rope.new()
-	_for pm _over b[:tali_pancing].fast_elements() _loop _self.create_tali_pancing(pm, tp_trans) _endloop
-	_if _not tp_trans.empty?
-	_then
-		#dt << dataset_transaction.new(tp_trans, "Insert Tali Pancing")
-		#dt.run()
-		dt_trans.add_all_last(tp_trans)
-		write("  [OK] Tali Pancing created: ", tp_trans.size)
-	_endif
-
-	_local ot_trans << rope.new()
-	_for pm _over b[:open_trenching].fast_elements() _loop _self.create_open_trenching(pm, ot_trans) _endloop
-	_if _not ot_trans.empty?
-	_then
-		#dt << dataset_transaction.new(ot_trans, "Insert Open Trenching")
-		#dt.run()
-		dt_trans.add_all_last(ot_trans)
-		write("  [OK] Open Trenching created: ", ot_trans.size)
-	_endif	
-	
 	_local pass5_total << b[:boring_manual].size + b[:boring_machine].size + b[:tali_pancing].size + b[:open_trenching].size
 	write("  Pass 6: Creating demand point (",b[:demand_point].size, ")...")
-	_self.notify_progress(
-		"Processing " + b[:demand_point].size.write_string + " demand points (homepass), please wait...",
-		"Done: " + pass5_total.write_string + " boring/tali pancing/trenching objects processed")
-	_local dp_trans << rope.new()
-	_for pm _over b[:demand_point].fast_elements() _loop _self.create_demand_point(pm, dp_trans) _endloop
-	_if _not dp_trans.empty?
+	_if .migration_scope <> "Network"
 	_then
-		dt << dataset_transaction.new(dp_trans, "Insert Demand Points")
-		dt.run()
-		#dt_trans.add_all_last(dp_trans)
-		write("  [OK] Demand point created: ", dp_trans.size)
+		_self.notify_progress(
+			"Processing " + b[:demand_point].size.write_string + " demand points (homepass), please wait...",
+			"Done: " + pass5_total.write_string + " boring/tali pancing/trenching objects processed")
+		_local dp_trans << rope.new()
+		_for pm _over b[:demand_point].fast_elements() _loop _self.create_demand_point(pm, dp_trans) _endloop
+		_if _not dp_trans.empty?
+		_then
+			dt << dataset_transaction.new(dp_trans, "Insert Demand Points")
+			dt.run()
+			write("  [OK] Demand point created: ", dp_trans.size)
+		_endif
+	_else
+		write("  Pass 6: Skipped (migration scope: Network)")
 	_endif
 
-	write("  Pass 7: Creating point of interest (t-wey) (",b[:t_wey].size, ")...")
-	_self.notify_progress(
-		"Processing " + b[:t_wey].size.write_string + " T-Wey (POI) objects, please wait...",
-		"Done: " + b[:demand_point].size.write_string + " demand points processed")
-	_for pm _over b[:t_wey].fast_elements() _loop _self.create_t_wey(pm) _endloop
+	_if .migration_scope <> "HP and Boundary"
+	_then
+		write("  Pass 7: Creating point of interest (t-wey) (",b[:t_wey].size, ")...")
+		_self.notify_progress(
+			"Processing " + b[:t_wey].size.write_string + " T-Wey (POI) objects, please wait...",
+			"Done: " + b[:demand_point].size.write_string + " demand points processed")
+		_for pm _over b[:t_wey].fast_elements() _loop _self.create_t_wey(pm) _endloop
+	_else
+		write("  Pass 7: Skipped (migration scope: HP and Boundary)")
+	_endif
 
 	write("  Pass 8: Creating micro/macro cells (", b[:micro_cell].size, ")...")
-	_self.notify_progress(
-		"Processing " + b[:micro_cell].size.write_string + " boundary FAT (micro/macro cells), please wait...",
-		"Done: " + b[:t_wey].size.write_string + " T-Wey (POI) objects processed")
-	_local cell_trans << rope.new()
-	_for pm _over b[:micro_cell].fast_elements() _loop _self.create_micro_cell(pm, cell_trans) _endloop
-	_if _not cell_trans.empty?
+	_if .migration_scope <> "Network"
 	_then
-		#dt << dataset_transaction.new(cell_trans, "Insert Cells")
-		#dt.run()
-		dt_trans.add_all_last(cell_trans)
-		write("  [OK] Macro cell created: ", cell_trans.size)
+		_self.notify_progress(
+			"Processing " + b[:micro_cell].size.write_string + " boundary FAT (micro/macro cells), please wait...",
+			"Done: " + b[:t_wey].size.write_string + " T-Wey (POI) objects processed")
+		_local cell_trans << rope.new()
+		_for pm _over b[:micro_cell].fast_elements() _loop _self.create_micro_cell(pm, cell_trans) _endloop
+		_if _not cell_trans.empty?
+		_then
+			dt_trans.add_all_last(cell_trans)
+			write("  [OK] Macro cell created: ", cell_trans.size)
+		_endif
+
+		# Pass 8.5: Boundary cluster areas
+		write("  Pass 8.5: Creating boundary cluster areas (", b[:boundary_cluster].size, ")...")
+		_for pm _over b[:boundary_cluster].fast_elements() _loop _self.create_area_based_object(pm) _endloop
+		write("  [OK] Boundary cluster areas processed: ", b[:boundary_cluster].size)
+	_else
+		write("  Pass 8: Skipped (migration scope: Network)")
 	_endif
 
 	# Insert all transactions for Pass 5 and 5.5 together (cells, sub-ducts, demand points, t-weys) to ensure they are all available before Pass 6 riser creation
@@ -768,11 +796,16 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 	_endif
 
 	# Pass 9: Risers
-	write("  Pass 9: Creating risers (", b[:riser].size, ")...")
-	_self.notify_progress(
-		"Processing " + b[:riser].size.write_string + " risers, please wait...",
-		"Done: " + b[:micro_cell].size.write_string + " boundary FAT objects processed")
-	_for pm _over b[:riser].fast_elements() _loop _self.create_riser(pm) _endloop
+	_if .migration_scope <> "HP and Boundary"
+	_then
+		write("  Pass 9: Creating risers (", b[:riser].size, ")...")
+		_self.notify_progress(
+			"Processing " + b[:riser].size.write_string + " risers, please wait...",
+			"Done: " + b[:micro_cell].size.write_string + " boundary FAT objects processed")
+		_for pm _over b[:riser].fast_elements() _loop _self.create_riser(pm) _endloop
+	_else
+		write("  Pass 9: Skipped (migration scope: HP and Boundary)")
+	_endif
 
 	# Update FDT :tp field with total demand points (cluster infrastructure only)
 	_if .infra_type = "cluster"

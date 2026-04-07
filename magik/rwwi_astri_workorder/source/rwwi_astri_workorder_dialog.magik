@@ -232,6 +232,14 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
 		:model, _self,
 		:selector, :clear_local_kmz|()|,
 		:tooltip, "Clear local KMZ path (revert to API download)")
+
+	sw_label_item.new(a_toolbar, "  Migrate:  ")
+	.items[:migration_scope] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 18,
+		:editable?, _false)
+	.items[:migration_scope].text_items << {"All", "Network", "HP and Boundary"}
+	.items[:migration_scope].value << "All"
 _endmethod
 $
 

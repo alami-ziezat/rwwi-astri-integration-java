@@ -236,6 +236,9 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			# Wire progress feedback: give migrator direct access to this dialog
 			migrator.dialog << _self
 
+			# Pass migration scope selection to migrator
+			migrator.migration_scope << .items[:migration_scope].value.default("All")
+
 			# Set topology on migrator - prefer UI field, fallback to KML parser
 			_local ui_topology_str << wo[:topology]
 			_local final_topology << topology
@@ -529,6 +532,9 @@ _method rwwi_astri_workorder_dialog.migrate_existing()
 
 			# Wire progress feedback: give migrator direct access to this dialog
 			migrator.dialog << _self
+
+			# Pass migration scope selection to migrator
+			migrator.migration_scope << .items[:migration_scope].value.default("All")
 
 			# Set topology on migrator - prefer UI field, fallback to KML parser
 			_local ui_topology_str << wo[:topology]
