@@ -23,7 +23,7 @@ _private _method astri_design_migrator.create_demand_point(pm, p_trans)
 		_local folders << pm[:parent].default("")
 		_if _not _self.is_demand_point?(pm)
 		_then
-			write("  WARNING: Skipping - not a demand point: ", folders)
+			#write("  WARNING: Skipping - not a demand point: ", folders)
 			_return
 		_endif
 
@@ -101,7 +101,7 @@ _private _method astri_design_migrator.create_demand_point(pm, p_trans)
 _endmethod
 $
 
-_private _method astri_design_migrator.update_fdt_tp_field()
+_private _method astri_design_migrator.update_fdt_tp_field(demand_point_count)
 	## Update :tp field of FDT (sheath_splice) with total demand points
 	##
 	## This method:
@@ -110,21 +110,21 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	_local total_dp << .stats[:demand_points]
+	_local total_dp << demand_point_count
 
 	_if total_dp = 0
 	_then
-		write("  No demand points to update FDT :tp field")
+		#write("  No demand points to update FDT :tp field")
 		_return
 	_endif
 
 	_if .cluster_code_db _is _unset _orif .cluster_code_db = ""
 	_then
-		write("  WARNING: No cluster_code_db available, skipping FDT :tp update")
+		#write("  WARNING: No cluster_code_db available, skipping FDT :tp update")
 		_return
 	_endif
 
-	write("  Updating FDT :tp field with total demand points: ", total_dp)
+	#write("  Updating FDT :tp field with total demand points: ", total_dp)
 
 	_local updated_count << 0
 	_local not_found_count << 0
@@ -139,7 +139,7 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 
 		_if fdts.empty?
 		_then
-			write("    WARNING: No FDT found for cluster_code: ", .cluster_code_db)
+			#write("    WARNING: No FDT found for cluster_code: ", .cluster_code_db)
 			not_found_count << 1
 		_else
 			# Update :tp field for all matching FDTs
@@ -152,9 +152,9 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 					update_trans.run()
 
 					updated_count +<< 1
-					write("    [OK] Updated FDT ", fdt.name.default("(unnamed)"),
-					      " cluster: ", .cluster_code_db,
-					      " :tp ", old_tp, " -> ", total_dp)
+					#write("    [OK] Updated FDT ", fdt.name.default("(unnamed)"),
+					#      " cluster: ", .cluster_code_db,
+					#      " :tp ", old_tp, " -> ", total_dp)
 				_when error
 					write("    ERROR updating FDT: ", cond.report_contents_string)
 				_endtry
@@ -165,9 +165,9 @@ _private _method astri_design_migrator.update_fdt_tp_field()
 		write("    ERROR querying FDT for cluster ", .cluster_code_db, ": ", err.report_contents_string)
 	_endtry
 
-	write("  FDT :tp field update complete:")
-	write("    - Updated: ", updated_count)
-	write("    - Not found: ", not_found_count)
+	#write("  FDT :tp field update complete:")
+	#write("    - Updated: ", updated_count)
+	#write("    - Not found: ", not_found_count)
 
 _endmethod
 $

@@ -42,7 +42,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 		_if folders.size > 100
 		_then
 			ff << folders.slice(1, 120)  # Truncate to 120 chars
-			write("    >> Folders truncated to 120 chars")
+			#write("    >> Folders truncated to 120 chars")
 		_else
 			ff << folders
 		_endif
@@ -113,7 +113,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 		_then
 			has_line << _true
 		_else
-			write("  WARNING: Skipping - no LINE pattern: ", folders)
+			#write("  WARNING: Skipping - no LINE pattern: ", folders)
 			_return
 		_endif
 
@@ -130,7 +130,7 @@ _pragma(classify_level=basic, topic={astri_integration})
 			nm << fol[fsize]  # Use folder name as fallback
 		_else
 			nm << s_id        # Use splitter name
-			write("    >> Found splitter: ", s_id)
+			#write("    >> Found splitter: ", s_id)
 		_endif
 
 		# Step 6: Create Micro Cell
@@ -191,7 +191,7 @@ _private _method astri_design_migrator.create_area_based_object(pm)
 		# Parse area geometry
 		_local area << _self.parse_area_geometry(pm[:coord])
 
-		write("  >> Other area object: ", pm[:name], " (folder: ", parent, ")")
+		#write("  >> Other area object: ", pm[:name], " (folder: ", parent, ")")
 
 		.stats[:areas_created] +<< 1
 

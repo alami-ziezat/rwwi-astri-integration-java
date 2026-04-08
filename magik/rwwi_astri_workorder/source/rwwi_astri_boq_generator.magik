@@ -470,7 +470,7 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:code, "200000185",
 			:object, "Cable Hanger",
 			:name, "CABLE HANGER",
-			:material_slot, :material
+			:material_slot, :both
 		),
 
 		# Closures - Dome
@@ -744,7 +744,7 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:code, "200001018",
 			:object, "FDT",
 			:name, "Flexible 3/4 inch",
-			:material_slot, :material
+			:material_slot, :both
 		),
 
 		# Plate belt 20mm for FAT (qty = total FAT * 4)
@@ -752,9 +752,17 @@ rwwi_astri_boq_generator.define_shared_constant(
 		# Both share this code and accumulate into one BOQ line item
 		"200000148", property_list.new_with(
 			:code, "200000148",
-			:object, "FAT/Pole",
-			:name, "Plate belt 20mm / Suspension clamp",
-			:material_slot, :material
+			:object, "Pole",
+			:name, "Suspension clamp",
+			:material_slot, :both
+		),
+
+		# Plate belt 20mm for FAT (qty = total FAT * 4), fills both material and service slots
+		"200000149", property_list.new_with(
+			:code, "200000149",
+			:object, "FAT",
+			:name, "Plate belt 20mm",
+			:material_slot, :both
 		),
 
 		# Pole clamp single (qty = total Pole * 80%)
@@ -762,7 +770,7 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:code, "200000145",
 			:object, "Pole",
 			:name, "Pole clamp single",
-			:material_slot, :material
+			:material_slot, :both
 		),
 
 		# Clamps Dead end Fittings / clamp buaya (qty = Pole clamp single * 2)
@@ -770,7 +778,15 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:code, "500001103",
 			:object, "Pole",
 			:name, "Clamps Dead end Fittings/clamp buaya",
-			:material_slot, :service
+			:material_slot, :both
+		),
+
+		# Buldog grip (qty = sum per ring of ROUND(group_sling_qty / 40 * 6))
+		"200000172", property_list.new_with(
+			:code, "200000172",
+			:object, "Pole",
+			:name, "Buldog grip",
+			:material_slot, :both
 		)
 	),
 	:public
@@ -1093,6 +1109,9 @@ _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 	_elif slot_type = :service
 	_then
 		svc_val << qty
+	_else 
+		mat_val << qty
+		svc_val << qty
 	_endif
 
 	_if existing _is _unset
@@ -1120,6 +1139,22 @@ _private _method rwwi_astri_boq_generator.add_to_boq_result(result, code, qty)
 			_else
 				existing[:quantity_service] << current + qty
 			_endif
+		_else 
+			_local current_m << existing[:quantity_material]
+			_if current_m _is _unset
+			_then
+				existing[:quantity_material] << qty
+			_else
+				existing[:quantity_material] << current_m + qty
+			_endif
+
+			_local current_s << existing[:quantity_service]
+			_if current_s _is _unset
+			_then
+				existing[:quantity_service] << qty
+			_else
+				existing[:quantity_service] << current_s + qty
+			_endif
 		_endif
 	_endif
 
@@ -1133,13 +1168,14 @@ _endmethod
 $
 
 _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
-	## Query sling_wire objects from area/project and add to result
-	## Sling wires are not in change_set, so need special query
+	## Query sling_wire objects from area/project and add to result.
+	## Groups lengths by ring_name, applies ceiling per group, then sums
+	## all groups — same pattern as add_sheath_with_loc_to_result.
+	##
+	## Formula per ring group: ROUNDUP(raw_length * 1.05, 0)
+	## Final qty = sum of all group results.
 
 	_try _with errCond
-		write("LOG: Querying sling_wire objects...")
-
-		_local total_length << 0
 		_local sling_col << .dataset.collections[:sling_wire]
 
 		_if sling_col _is _unset
@@ -1158,35 +1194,49 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
 
 		_local pred << predicate.interacts(:route, area)
 		_local sling_wires << sling_col.select(pred)
-	
-		_local filter_type << _self.normalize_infra_type(.infra_type)
+
+		# Accumulate raw lengths per ring_name
+		_local lengths_by_ring << equality_hash_table.new()
 
 		_for sw _over sling_wires.fast_elements()
 		_loop
-			# Only count Proposed sling wires with matching infra type
 			_if sw.responds_to?(:construction_status) _andif
-			    sw.construction_status = "Proposed"
+			    sw.construction_status <> "Proposed"
 			_then
-				# Check infrastructure type
-				#_if sw.responds_to?(:fttx_network_type)
-				#_then
-				#	_local sw_type << sw.fttx_network_type.default("").lowercase
-				#	_if sw_type <> filter_type
-				#	_then
-				#		_continue
-				#	_endif
-				#_endif
-
-				_local length << sw.route.line_length / 100  # Convert cm to m
-				total_length +<< length
+				_continue
 			_endif
+
+			_local length << sw.route.line_length / 100.0  # cm -> m
+
+			_local ring << ""
+			_if sw.responds_to?(:ring_name) _andif sw.ring_name _isnt _unset
+			_then
+				ring << sw.ring_name.write_string
+			_endif
+			lengths_by_ring[ring] << lengths_by_ring[ring].default(0) + length
+		_endloop
+
+		# Per ring group: sling wire ceiling(raw * 1.05), then buldog grip = ROUND(group_qty / 40 * 6)
+		_local total_length  << 0
+		_local total_buldog  << 0
+		_for ring, raw_len _over lengths_by_ring.fast_keys_and_elements()
+		_loop
+			_local group_qty   << (raw_len * 1.05).ceiling
+			_local buldog_qty  << (group_qty / 40.0 * 6).rounded
+			total_length +<< group_qty
+			total_buldog +<< buldog_qty
 		_endloop
 
 		_if total_length > 0
 		_then
-			# Sling wire code is "200001033", material_slot is :service
 			_self.add_to_boq_result(result, "200001033", total_length)
-			write("LOG: Sling wire total length:", total_length, "m")
+			write("LOG: Sling wire total:", total_length, "m (", lengths_by_ring.size, "ring groups)")
+		_endif
+
+		_if total_buldog > 0
+		_then
+			_self.add_to_boq_result(result, "200000172", total_buldog)
+			write("LOG: Buldog grip total:", total_buldog, "(sum of ROUND(group_qty/40*6) per ring)")
 		_endif
 
 	_when error
@@ -1279,6 +1329,7 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 			_endif
 			_if code _is _unset _orif _self.MATERIAL_CATALOG[code] _is _unset
 			_then
+				write("LOG: Skipping SWL record ID:", rec.id, "- invalid or missing stf_item_code")
 				_continue
 			_endif
 
@@ -1295,17 +1346,11 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 			_endif
 
 			# Sum route_sectors line_length (cm -> m)
-			_local seg_length << 0.0
-			_if rec.responds_to?(:route_sectors)
-			_then
-				_for rs _over rec.route_sectors()
-				_loop
-					seg_length +<< rs.line_length / 100.0
-				_endloop
-			_endif
-			_if seg_length <= 0 _then _continue _endif
-
+			_local seg_length << rec.route_sectors().line_length / 100
+			
 			write("  SWL ID:", rec.id, "code:", code, "ring:", ring, "ltype:", ltype, "length:", seg_length, "m")
+			
+		    _if seg_length <= 0 _then _continue _endif
 
 			_local group_key << write_string(code, "|", ring, "|", ltype)
 			_local prev << lengths_by_group[group_key]
@@ -1337,7 +1382,7 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				# Extract ring from sub_key ("ring|ltype")
 				_local sep_pos << sub_key.index_of(%|)
 				_local grp_ring << _if sep_pos _isnt _unset
-				                   _then >> sub_key.substring(1, sep_pos - 1)
+				                   _then >> sub_key.slice(1, sep_pos - 1)
 				                   _else >> sub_key
 				                   _endif
 
@@ -1555,6 +1600,22 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 		# Calculate total FAT count
 		_local total_fats << pole_fat_count + pedestal_fat_count
 
+		# Count total FDTs (needed for 200000149 quantity)
+		_local fdt_codes << {"200001039", "200001040", "200001041", "200001042", "200001043", "200001044"}
+		_local total_fdts << 0
+		_for fdt_code _over fdt_codes.fast_elements()
+		_loop
+			_local fdt_item << result[fdt_code.as_symbol()]
+			_if fdt_item _isnt _unset
+			_then
+				_local fdt_qty << fdt_item[:quantity_material]
+				_if fdt_qty _isnt _unset
+				_then
+					total_fdts +<< fdt_qty
+				_endif
+			_endif
+		_endloop
+
 		# If FATs exist, add the accessories
 		_if total_fats > 0
 		_then
@@ -1580,9 +1641,10 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 			_self.add_to_boq_result(result, "500002107", total_fats)
 			write("LOG: Added Testcomm (500002107) with quantity:", total_fats)
 
-			# Plate belt 20mm - 4 per FAT
-			_self.add_to_boq_result(result, "200000148", total_fats * 4)
-			write("LOG: Added Plate belt 20mm (200000148) with quantity:", total_fats * 4)
+			# Plate belt 20mm (200000149) - (total FDTs + total FATs) * 4, both slots
+			_local plate_belt_qty << (total_fdts + total_fats) * 4
+			_self.add_to_boq_result(result, "200000149", plate_belt_qty)
+			write("LOG: Added Plate belt 20mm (200000149) with quantity:", plate_belt_qty, "(FDTs:", total_fdts, "+ FATs:", total_fats, "x4)")
 
 			write("LOG: Added FAT accessories with total FAT count:", total_fats)
 		_else
@@ -1629,7 +1691,7 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 		_endloop
 
 		# Get sling wire length (code: 200001033, material_slot is :service)
-		# No 5% margin for sling wire
+		# 5% margin for sling wire
 		_local sling_wire_length << 0
 		_local sling_item << result[:|200001033|]
 		_if sling_item _isnt _unset
@@ -1638,7 +1700,7 @@ _private _method rwwi_astri_boq_generator.add_cable_based_services(result)
 			_if qty _isnt _unset
 			_then
 				sling_wire_length << qty
-				write("LOG: Sling wire (200001033) has length:", qty, "m (no margin)")
+				write("LOG: Sling wire (200001033) has length:", qty, "m (with 5% margin)")
 			_endif
 		_endif
 

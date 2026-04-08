@@ -17,7 +17,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 	## - Sheath creation with structure placement
 	_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
 	_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
-	write("  Processing Aerial Route: ", pm[:name])
+	#write("  Processing Aerial Route: ", pm[:name])
 	_try _with errCon
 		# Step 0: Parse folders
 		_local folders << pm[:parent].default("")
@@ -37,7 +37,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local last_folder << fol[fsize]
 		_local valid_cable_keywords << {"KABEL", "CABLE", "CABEL","FO", "ROUTE"}
 
-		write("	Checking AERIAL ROUTE for in name: ",pm[:name].uppercase)
+		#write("	Checking AERIAL ROUTE for in name: ",pm[:name].uppercase)
 		_local is_cable? << _false
 		_local is_sw? << _false
 		_local name_upper << pm[:name].uppercase
@@ -72,7 +72,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		# Check minimum length
 		_if t_len < 0.4
 		_then
-			write("    WARNING: Route too short (", t_len, "m) - skipping")
+			#write("    WARNING: Route too short (", t_len, "m) - skipping")
 			_return
 		_endif
 
@@ -144,13 +144,13 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		                         _else >> ""
 		                         _endif
 
-		write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
+		#write("    >> Detected fiber count: ", fb_c, " cores| line: ", m_line)
 		# Step 5: Check for SLING WIRE - special handling
 		_if is_sw?
 		_then
 			_if t_len > 0.6
 			_then
-				write("    >> Creating sling wire (", t_len, "m)")
+				#write("    >> Creating sling wire (", t_len, "m)")
 				_local prop_values_sw << property_list.new_with(
 					:construction_status, .construction_status,
 					:name, pm[:name],
@@ -175,16 +175,16 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				_local result_sw << rec_trans_sw.run()
 
 				.stats[:sling_wires] +<< 1
-				write("    [OK] Sling wire created: ", pm[:name])
+				#write("    [OK] Sling wire created: ", pm[:name])
 				_return result_sw
 			_else
-				write("    WARNING: Sling wire too short - skipping")
+				#write("    WARNING: Sling wire too short - skipping")
 				_return
 			_endif
 		_endif
 
 		# Step 6: Create main aerial route
-		write("     [OK] Creating aerial route...")
+		#write("     [OK] Creating aerial route...")
 		_local l_prop_values << property_list.new_with(
 			:construction_status, .construction_status,
 			:name, pm[:name],
@@ -212,7 +212,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local l_result << l_rec_trans.run()
 
 		.stats[:aerial_routes] +<< 1
-		write("    [OK] Main aerial route created: ", pm[:name], " (", fb_c, " cores)")
+		#write("    [OK] Main aerial route created: ", pm[:name], " (", fb_c, " cores)")
 
 		# Step 7: Handle START POINT
 		_local l_location_start << route.first_coord
@@ -225,11 +225,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local fs << _unset
 		
 		_local (k1, a_hub) << _self.scan_olt(pp, 500)
-		write("OLT found start: ",k1)
+		#write("OLT found start: ",k1)
 		_if _not k1
 		_then
 			(k1, a_hub) << _self.scan_pole_st(pp, 500)
-			write("POLE found start: ",k1)
+			#write("POLE found start: ",k1)
 		_endif
 
 		_if k1 _is _true
@@ -245,7 +245,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_if dist > 0.6
 			_then
 				# Create additional AR segment from pole to start
-				write("    >> Creating start AR segment (", dist, "m)")
+				#write("    >> Creating start AR segment (", dist, "m)")
 				_local l_prop_values_ar << property_list.new_with(
 					:construction_status, .construction_status,
 					:name, pm[:name],
@@ -274,13 +274,13 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_endif
 
 			l_result_pl << a_hub
-			write("    >> Using existing pole at start: ", a_hub)
+			#write("    >> Using existing pole at start: ", a_hub)
 		_else
 			# No pole found - create placeholder
 			fs << route.as_sector_rope()
 			n_coord << route.first_coord
 
-			write("    >> Creating placeholder pole at start")
+			#write("    >> Creating placeholder pole at start")
 			_local l_prop_values_pl << property_list.new_with(
 				:location, n_coord,
 				:telco_pole_tag, "Existing Pole AR",
@@ -321,11 +321,11 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local e_coord << _unset
 
 		_local (k2, b_hub) << _self.scan_olt(ppr, 500)
-		write("OLT found end: ",k2)
+		#write("OLT found end: ",k2)
 		_if _not k2
 		_then
 			(k2, b_hub) << _self.scan_pole_st(ppr, 500)
-			write("POLE found end: ",k2)
+			#write("POLE found end: ",k2)
 		_endif
 		
 		_if k2 _is _true
@@ -347,7 +347,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				_if dist > 0.6
 				_then
 					# Create additional AR segment from end to pole
-					write("    >> Creating end AR segment (", dist, "m)")
+					#write("    >> Creating end AR segment (", dist, "m)")
 					_local l_prop_values_ar2 << property_list.new_with(
 						:construction_status, .construction_status,
 						:name, pm[:name],
@@ -376,12 +376,12 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 			_endif
 
 			l_result_pl2 << b_hub
-			write("    >> Using existing pole at end: ", b_hub)
+			#write("    >> Using existing pole at end: ", b_hub)
 		_else
 			# No pole found - create placeholder
 			e_coord << route.last_coord
 
-			write("    >> Creating placeholder pole at end")
+			#write("    >> Creating placeholder pole at end")
 			_local l_prop_values_pl2 << property_list.new_with(
 				:location, e_coord,
 				:telco_pole_tag, "Existing Pole AR",
@@ -434,7 +434,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local ftri << _if fsize >= 3 _then >> fol[3] _else >> fol[fsize] _endif
 		_local rtr << _if ftri.size > 120 _then >> ftri.slice(1, 120) _else >> ftri _endif
 
-		write("    >> Creating sheath with ", l_structures.size, " structures")
+		#write("    >> Creating sheath with ", l_structures.size, " structures")
 		_local l_prop_values_swl << property_list.new_with(
 			:name, pm[:name],
 			:spec_id, s_sp,
@@ -466,7 +466,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		# Track sheath length in meters using calculated fibre length
 		_local sheath_length << l_result_swl.calculated_sheath_length.value_in(:m).as_number()
 		.stats[:sheath_length] +<< sheath_length
-		write("    [OK] Sheath created and placed in structures (Fibre Length: ", sheath_length.rounded, "m)")
+		#write("    [OK] Sheath created and placed in structures (Fibre Length: ", sheath_length.rounded, "m)")
 
 		_return l_result
 
@@ -474,7 +474,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		write("ERROR in create_aerial_route():", errCon.report_contents_string)
 		write("  Placemark name:", pm[:name].default("(unnamed)"))
 		write("  Folders:", pm[:parent].default("(none)"))
-		#write("  Coordinates:", pm[:coord].default("(none)"))
+		write("  Coordinates:", pm[:coord].default("(none)"))
 		.stats[:errors] +<< 1
 	_endtry
 _endmethod

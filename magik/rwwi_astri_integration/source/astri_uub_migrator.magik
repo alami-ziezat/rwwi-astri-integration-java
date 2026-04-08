@@ -191,7 +191,7 @@ _private _method astri_design_migrator.create_uub(pm, p_trans)
 				_return 
 			_else
 				# Real existing UUB - skip creation (not a placeholder)
-				write("  [SKIP] UUB already exists nearby (", existing_uub.label, ") - skipping")
+				#write("  [SKIP] UUB already exists nearby (", existing_uub.label, ") - skipping")
 				.stats[:skipped] +<< 1
 				_return existing_uub
 			_endif

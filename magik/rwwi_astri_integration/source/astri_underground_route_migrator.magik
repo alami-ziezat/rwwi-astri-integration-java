@@ -32,7 +32,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# Validate folders exist
 		_if folders _is _unset _orif folders = ""
 		_then
-			write("    >> SKIP: No folder hierarchy found - not a route placemark")
+			#write("    >> SKIP: No folder hierarchy found - not a route placemark")
 			.stats[:skipped] +<< 1
 			_return
 		_endif
@@ -57,7 +57,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 
 		_if _not is_cable?
 		_then
-			write("    >> SKIP: Name does not match cable keywords (", pm[:name], ")")
+			#write("    >> SKIP: Name does not match cable keywords (", pm[:name], ")")
 			.stats[:skipped] +<< 1
 			_return
 		_endif
@@ -71,7 +71,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# Check minimum length (in cm, convert to meters for display)
 		_if t_len < 40  # 0.4 meters in cm
 		_then
-			write("    WARNING: Route too short (", (t_len/100.0), "m) - skipping")
+			#write("    WARNING: Route too short (", (t_len/100.0), "m) - skipping")
 			_return
 		_endif
 
@@ -176,7 +176,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			_endif
 			# Snap: substitute route start coord with UUB's exact position
 			l_location_start << l_result_uub_start.location.coord
-			write("    >> Found UUB at start: ", l_result_uub_start.perform(:label).default("(unnamed)"), " - snapping route start")
+			#write("    >> Found UUB at start: ", l_result_uub_start.perform(:label).default("(unnamed)"), " - snapping route start")
 		_endif
 
 		# --- Pre-scan END point ---
@@ -208,7 +208,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			_endif
 			# Snap: substitute route end coord with UUB's exact position
 			l_location_end << l_result_uub_end.location.coord
-			write("    >> Found UUB at end: ", l_result_uub_end.perform(:label).default("(unnamed)"), " - snapping route end")
+			#write("    >> Found UUB at end: ", l_result_uub_end.perform(:label).default("(unnamed)"), " - snapping route end")
 		_endif
 
 		# Step 5.5: Snap route endpoint(s) to UUB position(s) if any were found
@@ -227,7 +227,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 			pc << pseudo_chain.new(route)
 			pc.world << .database.world
 			t_len << pc.line_length
-			write("    >> Route geometry adjusted to UUB position(s)")
+			#write("    >> Route geometry adjusted to UUB position(s)")
 		_endif
 
 		# Step 6: Create underground route (with snapped geometry)
@@ -271,10 +271,10 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# at the (possibly snapped) start coordinate.
 		_if l_result_uub_start _isnt _unset
 		_then
-			write("    >> Using existing UUB at start: ", l_result_uub_start.perform(:label).default("(unnamed)"))
+			#write("    >> Using existing UUB at start: ", l_result_uub_start.perform(:label).default("(unnamed)"))
 		_else
 			# No UUB found nearby - create placeholder handhole at start coord
-			write("    >> Creating placeholder UUB at start")
+			#write("    >> Creating placeholder UUB at start")
 			_local pp_start << pseudo_point.new(l_location_start)
 			pp_start.world << .database.world
 			_local uub_start_props << property_list.new_with(
@@ -311,10 +311,10 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# at the (possibly snapped) end coordinate.
 		_if l_result_uub_end _isnt _unset
 		_then
-			write("    >> Using existing UUB at end: ", l_result_uub_end.perform(:label).default("(unnamed)"))
+			#write("    >> Using existing UUB at end: ", l_result_uub_end.perform(:label).default("(unnamed)"))
 		_else
 			# No UUB found nearby - create placeholder handhole at end coord
-			write("    >> Creating placeholder UUB at end")
+			#write("    >> Creating placeholder UUB at end")
 			_local pp_end << pseudo_point.new(l_location_end)
 			pp_end.world << .database.world
 			_local uub_end_props << property_list.new_with(
@@ -356,7 +356,7 @@ _private _method astri_design_migrator.create_underground_route(pm)
 		# Fallback: manually collect structures if path is empty
 		_if path_swl _is _unset _orif path_swl.size = 0
 		_then
-			write("    >> WARNING: structure_manager path empty, using manual structure list")
+			#write("    >> WARNING: structure_manager path empty, using manual structure list")
 			path_swl << rope.new()
 			_if l_result_uub_start _isnt _unset
 			_then

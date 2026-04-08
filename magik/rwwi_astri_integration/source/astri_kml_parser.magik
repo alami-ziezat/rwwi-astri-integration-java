@@ -178,7 +178,7 @@ _private _method astri_kml_parser.extract_placemarks_from_file(kml_file_path)
 	##   kml_file_path: Path to KML file
 	##
 	## Returns: rope of property_lists
-	write("Parsing KML file: ", kml_file_path)
+	#write("Parsing KML file: ", kml_file_path)
 	_constant C_DOCUMENT << "Document"
 	_constant C_FOLDER << "Folder"
 	_constant C_PLACEMARK << "Placemark"
@@ -409,6 +409,20 @@ _private _method astri_kml_parser.parse_placemark(placemark_element, parent_path
 				_endif
 				pl[:name] << name_text
 
+				# Resolve :multiple ring_name to actual FDT name as soon as we know
+				# the placemark's own name.
+				# When an FDT folder holds several FDT placemarks,
+				# check_and_build_splice_mappings returns :multiple and each FDT
+				# placemark must carry its OWN name as ring_name, not :multiple.
+				_if pl[:ring_name] _is :multiple
+				_then
+					_local own_ring << .splice_name_mapping[name_text]
+					_if own_ring _isnt _unset
+					_then
+						pl[:ring_name] << own_ring
+					_endif
+				_endif
+
 			# Extract description
 			_elif elem_type.matches?(C_DESC)
 			_then
@@ -459,6 +473,23 @@ _private _method astri_kml_parser.parse_placemark(placemark_element, parent_path
 		write("Warning: Failed to parse placemark: ", condition.report_contents_string)
 		>> _unset
 	_endtry
+
+	# If ring_name is still :multiple at this point, try to resolve it from the
+	# parent folder path.  A folder name like "LINE A - FDT 1" is already
+	# resolved by process_element before we get here, but if an object sits
+	# directly inside the "FDT" folder and its name was not in splice_name_mapping,
+	# fall back to the first FDT in the index mapping so we never store :multiple.
+	_if pl[:ring_name] _is :multiple
+	_then
+		# Last resort: use the first entry in splice_index_mapping
+		_local fallback_ring << .splice_index_mapping.an_element()
+		_if fallback_ring _isnt _unset
+		_then
+			pl[:ring_name] << fallback_ring
+		_else
+			pl[:ring_name] << _unset
+		_endif
+	_endif
 
 	# Detect network type based on styleUrl and geometry
 	_local network_type << _self.detect_network_type(placemark_element, pl)
@@ -894,7 +925,7 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 
 	_else
 		# Unknown icon
-		write("Unknow icon")
+		#write("Unknow icon")
 		_return _unset
 	_endif
 _endmethod
@@ -1316,7 +1347,7 @@ _private _method astri_kml_parser.make_unique_splice_name(base_name)
 			_endif
 		_endloop
 
-		write("  Generated unique name: ", candidate_name)
+		#write("  Generated unique name: ", candidate_name)
 	_endif
 
 	# Add the unique name to splice_names set
@@ -1371,29 +1402,85 @@ _private _method astri_kml_parser.find_matching_subfolder_splice(folder_element,
 		_endif
 	_endif
 
-	# Look up the splice reference in the index mapping
+	# Look up the splice reference in the index mapping.
+	# Try in order:
+	#   1. Exact match in splice_name_mapping  (actual placemark name, e.g. "FDT 62")
+	#   2. Exact match in splice_index_mapping (relative key, e.g. "FDT 1")
+	#   3. Normalized match (strip leading zeros) so "FDT 01" matches index key "FDT 1"
 	_if splice_reference _isnt _unset
 	_then
-		# First try direct lookup in splice_name_mapping (for exact placemark name matches)
 		_local mapped_splice_name << .splice_name_mapping[splice_reference]
 
-		# If not found, try index mapping (for "FDT 1", "FDT 2" patterns)
 		_if mapped_splice_name _is _unset
 		_then
 			mapped_splice_name << .splice_index_mapping[splice_reference]
 		_endif
 
+		# If still not found, normalize leading zeros and retry
+		# e.g. "FDT 01" -> "FDT 1",  "Closure 002" -> "Closure 2"
+		_if mapped_splice_name _is _unset
+		_then
+			_local norm_ref << _self.normalize_splice_ref(splice_reference)
+			_if norm_ref <> splice_reference
+			_then
+				mapped_splice_name << .splice_name_mapping[norm_ref]
+				_if mapped_splice_name _is _unset
+				_then
+					mapped_splice_name << .splice_index_mapping[norm_ref]
+				_endif
+			_endif
+		_endif
+
 		_if mapped_splice_name _isnt _unset
 		_then
-			#"  Matched folder '", folder_name, "' (extracted: '", splice_reference, "') to splice: ", mapped_splice_name)
 			_return mapped_splice_name
-		_else
-			write("  WARNING: Folder '", folder_name, "' references '", splice_reference, "' but no mapping found")
-			#write("    Available index mappings: ", .splice_index_mapping.keys)
 		_endif
 	_endif
 
 	# No matching splice reference found
 	_return _unset
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_private _method astri_kml_parser.normalize_splice_ref(ref)
+	## Normalize a splice index reference by stripping leading zeros from the
+	## trailing number so that index mapping keys always match.
+	##
+	## Examples:
+	##   "FDT 01"      -> "FDT 1"
+	##   "FDT 02"      -> "FDT 2"
+	##   "Closure 003" -> "Closure 3"
+	##   "FDT 1"       -> "FDT 1"   (unchanged)
+	##   "FDT 10"      -> "FDT 10"  (unchanged)
+	##
+	## Parameters:
+	##   ref - splice reference string (e.g. "FDT 01")
+	##
+	## Returns: normalized string
+
+	_if ref _is _unset _orif ref = ""
+	_then
+		>> ref
+	_endif
+
+	# Find the last space separating type prefix from the number
+	_local last_space << ref.rindex_of(% )
+	_if last_space _is _unset
+	_then
+		>> ref
+	_endif
+
+	_local type_part << ref.slice(1, last_space - 1)
+	_local num_str   << ref.slice(last_space + 1, ref.size)
+
+	# Convert to integer (strips leading zeros) and back to string
+	_local num_val << num_str.as_number()
+	_if num_val _is _unset
+	_then
+		>> ref   # Not a plain integer - return unchanged
+	_endif
+
+	>> type_part + " " + num_val.floor.write_string
 _endmethod
 $

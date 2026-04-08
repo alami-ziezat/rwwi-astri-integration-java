@@ -546,20 +546,14 @@ _private _method astri_design_migrator.match_cable_core(cable_name)
 
 	_local cn << cable_name.lowercase
 	_local cable_core <<
-		# Check largest numbers first
-		_if cn.matches?("*576*")
-		_then
-			>> "576"
-		_elif cn.matches?("*288*")
-		_then
-			>> "288"
-		_elif cn.matches?("*144*")
+		# Check the string  first
+		_if (cn.matches?("*fo*144*") _orif cn.matches?("*144c*"))
 		_then
 			>> "144"
-		_elif cn.matches?("*96*") 
+		_elif (cn.matches?("*fo*96*") _orif cn.matches?("*96c*"))
 		_then
 			>> "96"
-		_elif cn.matches?("*72*") 
+		_elif (cn.matches?("*fo*72*") _orif cn.matches?("*72c*"))
 		_then
 			>> "72"
 		_elif (cn.matches?("*fo*48*") _orif cn.matches?("*48c*"))
@@ -574,6 +568,21 @@ _private _method astri_design_migrator.match_cable_core(cable_name)
 		_elif (cn.matches?("*fo*12*") _orif cn.matches?("*12c*"))
 		_then
 			>> "12"
+		_elif cn.matches?("*576*")
+		_then
+			>> "576"
+		_elif cn.matches?("*288*")
+		_then
+			>> "288"
+		_elif cn.matches?("*144*")
+		_then
+			>> "144"
+		_elif cn.matches?("*96*") 
+		_then
+			>> "96"
+		_elif cn.matches?("*72*") 
+		_then
+			>> "72"
 		_else
 			>> "24"  # Default to 24 cores
 		_endif

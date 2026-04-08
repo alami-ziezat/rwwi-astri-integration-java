@@ -26,7 +26,7 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 
 		_if fsize < 2 _andif .infra_type = "Cluster"
 		_then
-			write("  WARNING: Skipping - folder hierarchy too shallow: ", folders)
+			#write("  WARNING: Skipping - folder hierarchy too shallow: ", folders)
 			_return
 		_endif
 
@@ -91,7 +91,7 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 			snapped_point.world << .database.world
 			final_location << snapped_point
 
-			write("  >> Pole snapped to aerial route")
+			#write("  >> Pole snapped to aerial route")
 		_else
 			# No aerial route - use original location
 			final_location << original_location
@@ -138,9 +138,9 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 			_if existing_pole.telco_pole_tag = "Existing Pole AR"
 			_then
 				# Update placeholder pole using property_list
-				write("  [UPDATE] Updating existing placeholder pole: ", existing_pole.id)
+				#write("  [UPDATE] Updating existing placeholder pole: ", existing_pole.id)
 		
-				_local anno << pseudo_text.new_for_world(final_location.location, .database.world, property_list.new_with(:string, pm[:name], :orientation, 0))
+				_local anno << pseudo_text.new_for_world(final_location, .database.world, property_list.new_with(:string, pm[:name], :orientation, 0))
 				_local update_props << property_list.new_with(
 					:telco_pole_tag, pm[:name],
 					:pop, .pop_name,
@@ -197,7 +197,7 @@ _private _method astri_design_migrator.create_pole(pm, p_trans)
 				_return 
 			_else
 				# Existing pole is not a placeholder - skip creation
-				write("  WARNING: Pole already exists nearby (", existing_pole.telco_pole_tag, ") - skipping")
+				#write("  WARNING: Pole already exists nearby (", existing_pole.telco_pole_tag, ") - skipping")
 				.stats[:skipped] +<< 1
 				_return
 			_endif

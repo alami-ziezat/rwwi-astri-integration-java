@@ -87,7 +87,7 @@ _private _method astri_design_migrator.create_t_wey(pm)
 			_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
 			pp << pseudo_point.new(new_coord)
 			pp.world << .database.world
-			write("    >> MOVE: Existing T-Wey found nearby (", pp.a_coord(), "): ")
+			#write("    >> MOVE: Existing T-Wey found nearby (", pp.a_coord(), "): ")
 			isFound? << _true
 			#_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
 			#.stats[:t_weys_skipped] +<< 1
@@ -102,7 +102,7 @@ _private _method astri_design_migrator.create_t_wey(pm)
 			_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
 			pp << pseudo_point.new(new_coord)
 			pp.world << .database.world
-			write("    >> MOVE: Existing UUB/Handhole found nearby (", existing_uubs.size, "): ", ex_uub_name)
+			#write("    >> MOVE: Existing UUB/Handhole found nearby (", existing_uubs.size, "): ", ex_uub_name)
 			isFound? << _true
 			#_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
 			#.stats[:t_weys_skipped] +<< 1

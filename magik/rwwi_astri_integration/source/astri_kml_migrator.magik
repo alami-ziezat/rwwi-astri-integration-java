@@ -79,11 +79,11 @@ _private _method astri_kml_migrator.init(database, uuid)
 
 	_if .was_readonly
 	_then
-		write("Database is readonly. Switching to writable mode...")
+		#write("Database is readonly. Switching to writable mode...")
 		.database.switch(:write)
-		write("Database switched to writable mode")
+		#write("Database switched to writable mode")
 	_else
-		write("Database is already writable")
+		#write("Database is already writable")
 	_endif
 
 	>> _self
@@ -100,7 +100,7 @@ _method astri_kml_migrator.migrate_placemarks(placemarks)
 	## Returns:
 	##   property_list - Migration statistics
 
-	write("Starting migration of ", placemarks.size, " placemarks...")
+	#write("Starting migration of ", placemarks.size, " placemarks...")
 
 	_protect
 		_for i, pm _over placemarks.fast_keys_and_elements()
@@ -142,7 +142,7 @@ _method astri_kml_migrator.migrate_placemarks(placemarks)
 					_endif
 
 				_else
-					write("WARNING: Unknown type '", pm[:type], "' for placemark: ", pm[:name])
+					#write("WARNING: Unknown type '", pm[:type], "' for placemark: ", pm[:name])
 					.stats[:skipped] +<< 1
 				_endif
 
@@ -155,11 +155,11 @@ _method astri_kml_migrator.migrate_placemarks(placemarks)
 			# Progress indicator every 100 placemarks
 			_if i _mod 100 = 0
 			_then
-				write("  Progress: ", i, "/", placemarks.size, " placemarks processed")
+				#write("  Progress: ", i, "/", placemarks.size, " placemarks processed")
 			_endif
 		_endloop
 
-		write("Migration complete!")
+		#write("Migration complete!")
 		_self.print_statistics()
 
 	_protection
@@ -167,9 +167,9 @@ _method astri_kml_migrator.migrate_placemarks(placemarks)
 		_if .was_readonly
 		_then
 			.database.commit()
-			write("Restoring database to readonly mode...")
+			#write("Restoring database to readonly mode...")
 			.database.switch(:readonly)
-			write("Database switched back to readonly")
+			#write("Database switched back to readonly")
 		_endif
 	_endprotect
 
@@ -243,7 +243,7 @@ _private _method astri_kml_migrator.create_or_update_point(pm)
 			property_list.new_with(:location, local_coord))
 		rec_trans.run()
 
-		write("  ↻ Point updated: ", pm[:name])
+		#write("  ↻ Point updated: ", pm[:name])
 		_return :updated
 	_else
 		# Create new record
@@ -258,7 +258,7 @@ _private _method astri_kml_migrator.create_or_update_point(pm)
 		_local rec_trans << record_transaction.new_insert(.point_col, prop_values)
 		rec_trans.run()
 
-		write("  ✓ Point created: ", pm[:name])
+		#write("  ✓ Point created: ", pm[:name])
 		_return :created
 	_endif
 _endmethod
@@ -304,7 +304,7 @@ _private _method astri_kml_migrator.create_or_update_area(pm)
 	# Validate closure
 	_if sector_rope.closed? _is _false
 	_then
-		write("  ⚠ Area not closed, skipping: ", pm[:name])
+		#write("  ⚠ Area not closed, skipping: ", pm[:name])
 		condition.raise(:area_not_closed, :name, pm[:name])
 	_endif
 
@@ -322,7 +322,7 @@ _private _method astri_kml_migrator.create_or_update_area(pm)
 			property_list.new_with(:area, p_area))
 		rec_trans.run()
 
-		write("  ↻ Area updated: ", pm[:name])
+		#write("  ↻ Area updated: ", pm[:name])
 		_return :updated
 	_else
 		# Create new record
@@ -336,7 +336,7 @@ _private _method astri_kml_migrator.create_or_update_area(pm)
 		_local rec_trans << record_transaction.new_insert(.area_col, prop_values)
 		rec_trans.run()
 
-		write("  ✓ Area created: ", pm[:name])
+		#write("  ✓ Area created: ", pm[:name])
 		_return :created
 	_endif
 _endmethod
@@ -393,7 +393,7 @@ _private _method astri_kml_migrator.create_or_update_line(pm)
 			property_list.new_with(:route, p_chain))
 		rec_trans.run()
 
-		write("  ↻ Line updated: ", pm[:name])
+		#write("  ↻ Line updated: ", pm[:name])
 		_return :updated
 	_else
 		# Create new record
@@ -407,7 +407,7 @@ _private _method astri_kml_migrator.create_or_update_line(pm)
 		_local rec_trans << record_transaction.new_insert(.line_col, prop_values)
 		rec_trans.run()
 
-		write("  ✓ Line created: ", pm[:name])
+		#write("  ✓ Line created: ", pm[:name])
 		_return :created
 	_endif
 _endmethod
@@ -417,24 +417,24 @@ _pragma(classify_level=basic, topic={astri_integration})
 _method astri_kml_migrator.print_statistics()
 	## Print migration statistics
 
-	write("")
-	write("=" * 60)
-	write("Migration Statistics")
-	write("=" * 60)
-	write("Points created:  ", .stats[:points_created])
-	write("Points updated:  ", .stats[:points_updated])
-	write("Lines created:   ", .stats[:lines_created])
-	write("Lines updated:   ", .stats[:lines_updated])
-	write("Areas created:   ", .stats[:areas_created])
-	write("Areas updated:   ", .stats[:areas_updated])
-	write("Errors:          ", .stats[:errors])
-	write("Skipped:         ", .stats[:skipped])
-	write("")
+	#write("")
+	#write("=" * 60)
+	#write("Migration Statistics")
+	#write("=" * 60)
+	#write("Points created:  ", .stats[:points_created])
+	#write("Points updated:  ", .stats[:points_updated])
+	#write("Lines created:   ", .stats[:lines_created])
+	#write("Lines updated:   ", .stats[:lines_updated])
+	#write("Areas created:   ", .stats[:areas_created])
+	#write("Areas updated:   ", .stats[:areas_updated])
+	#write("Errors:          ", .stats[:errors])
+	#write("Skipped:         ", .stats[:skipped])
+	#write("")
 	_local total_created << .stats[:points_created] + .stats[:lines_created] + .stats[:areas_created]
 	_local total_updated << .stats[:points_updated] + .stats[:lines_updated] + .stats[:areas_updated]
-	write("Total created:   ", total_created)
-	write("Total updated:   ", total_updated)
-	write("Total objects:   ", total_created + total_updated)
-	write("=" * 60)
+	#write("Total created:   ", total_created)
+	#write("Total updated:   ", total_updated)
+	#write("Total objects:   ", total_created + total_updated)
+	#write("=" * 60)
 _endmethod
 $

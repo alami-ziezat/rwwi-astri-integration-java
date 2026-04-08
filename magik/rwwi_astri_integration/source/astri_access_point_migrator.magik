@@ -19,11 +19,11 @@ _private _method astri_design_migrator.create_access_point(pm)
 		# Step 0: Validate this is an access point
 		_if _not _self.is_access_point?(pm)
 		_then
-			write("  WARNING: Skipping - not an access_point: ", pm[:name])
+			#write("  WARNING: Skipping - not an access_point: ", pm[:name])
 			_return
 		_endif
 
-		write("  Processing access_point: ", pm[:name])
+		#write("  Processing access_point: ", pm[:name])
 
 		# Step 1: Get folder information
 		_local folders << pm[:parent].default("")
@@ -70,7 +70,7 @@ _private _method astri_design_migrator.create_access_point(pm)
 		_local result << rec_trans.run()
 
 		.stats[:access_points] +<< 1
-		write("  [OK] Access point created: ", pm[:name])
+		#write("  [OK] Access point created: ", pm[:name])
 
 	_when error
 		write("ERROR in create_access_point():", errCon.report_contents_string)

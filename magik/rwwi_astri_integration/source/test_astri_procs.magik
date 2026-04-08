@@ -40,22 +40,22 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_work_orders << _proc()
 	## Test Work Order API - basic call
 
-	write("=" * 60)
-	write("Testing ASTRI Work Order API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Work Order API")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc directly - returns JSON string
 		json_result << astri_get_work_orders(10, 0)
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -63,22 +63,22 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_price_list << _proc()
 	## Test Price List API
 
-	write("=" * 60)
-	write("Testing ASTRI Price List API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Price List API")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc directly
 		json_result << astri_get_price_list()
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -86,9 +86,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_work_order_single << _proc()
 	## Test Get Single Work Order API
 
-	write("=" * 60)
-	write("Testing ASTRI Get Single Work Order API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Get Single Work Order API")
+	#write("=" * 60)
 
 	_try
 		# Replace with actual UUID
@@ -97,14 +97,14 @@ _global test_astri_work_order_single << _proc()
 		# Call the @MagikProc directly
 		json_result << astri_get_work_order(uuid)
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -112,9 +112,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_kmz_download_cluster << _proc()
 	## Test Cluster KMZ Download
 
-	write("=" * 60)
-	write("Testing ASTRI Cluster KMZ Download")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Cluster KMZ Download")
+	#write("=" * 60)
 
 	_try
 		uuid << "2989eecc-3fd0-402c-bd81-99e02caa7ef5"
@@ -122,14 +122,14 @@ _global test_astri_kmz_download_cluster << _proc()
 		# Call the @MagikProc directly
 		kml_path << astri_download_cluster_kmz(uuid)
 
-		write("KML file path: ", kml_path)
-		write("")
+		#write("KML file path: ", kml_path)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -137,9 +137,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_kmz_download_subfeeder << _proc()
 	## Test Subfeeder KMZ Download
 
-	write("=" * 60)
-	write("Testing ASTRI Subfeeder KMZ Download")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Subfeeder KMZ Download")
+	#write("=" * 60)
 
 	_try
 		# Replace with actual UUID
@@ -148,14 +148,14 @@ _global test_astri_kmz_download_subfeeder << _proc()
 		# Call the @MagikProc directly
 		xml_result << astri_download_subfeeder_kmz(uuid)
 
-		write("Response: ", xml_result)
-		write("")
+		#write("Response: ", xml_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -163,9 +163,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_kmz_download_feeder << _proc()
 	## Test Feeder KMZ Download
 
-	write("=" * 60)
-	write("Testing ASTRI Feeder KMZ Download")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Feeder KMZ Download")
+	#write("=" * 60)
 
 	_try
 		# Replace with actual UUID
@@ -174,14 +174,14 @@ _global test_astri_kmz_download_feeder << _proc()
 		# Call the @MagikProc directly
 		xml_result << astri_download_feeder_kmz(uuid)
 
-		write("Response: ", xml_result)
-		write("")
+		#write("Response: ", xml_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -189,9 +189,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_kmz_download_olt_site << _proc()
 	## Test OLT Site KMZ Download
 
-	write("=" * 60)
-	write("Testing ASTRI OLT Site KMZ Download")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI OLT Site KMZ Download")
+	#write("=" * 60)
 
 	_try
 		# Replace with actual UUID
@@ -200,14 +200,14 @@ _global test_astri_kmz_download_olt_site << _proc()
 		# Call the @MagikProc directly
 		xml_result << astri_download_olt_site_kmz(uuid)
 
-		write("Response: ", xml_result)
-		write("")
+		#write("Response: ", xml_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -219,29 +219,29 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 	##   p_uuid (optional): Document UUID to download
 	##                      If not provided, uses default test UUID
 
-	write("=" * 60)
-	write("Testing ASTRI KML Parser")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI KML Parser")
+	#write("=" * 60)
 
 	_try
 		# Use provided UUID or default
 		_if p_uuid _is _unset _orif p_uuid = ""
 		_then
 			uuid << "2989eecc-3fd0-402c-bd81-99e02caa7ef5"
-			write("Using default UUID: ", uuid)
+			#write("Using default UUID: ", uuid)
 		_else
 			uuid << p_uuid
-			write("Using provided UUID: ", uuid)
+			#write("Using provided UUID: ", uuid)
 		_endif
 
 		# Download KMZ and get KML file path (returns simple string)
-		write("Downloading KMZ for UUID: ", uuid)
+		#write("Downloading KMZ for UUID: ", uuid)
 		java_result << astri_download_cluster_kmz(uuid)
 
 		# Convert Java String to Magik string
 		_if java_result _is _unset
 		_then
-			write("ERROR: Download failed, no result returned")
+			#write("ERROR: Download failed, no result returned")
 			_return
 		_endif
 
@@ -251,26 +251,26 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 		# Check if download was successful
 		_if kml_file_path _is _unset _orif kml_file_path = ""
 		_then
-			write("ERROR: Download failed, empty file path returned")
+			#write("ERROR: Download failed, empty file path returned")
 			_return
 		_endif
 
-		write("KML file path: ", kml_file_path)
+		#write("KML file path: ", kml_file_path)
 
 		# Parse KML file directly using astri_kml_parser
-		write("Parsing KML file...")
+		#write("Parsing KML file...")
 		parser << astri_kml_parser.new(kml_file_path)
 		(placemarks, topology) << parser.parse()
 
-		write("✓ Parsed ", placemarks.size, " placemarks")
-		write("✓ Network topology: ", topology)
-		write("")
+		#write("✓ Parsed ", placemarks.size, " placemarks")
+		#write("✓ Network topology: ", topology)
+		#write("")
 
 		# Display first 3 placemarks as examples
 		_if placemarks.size > 0
 		_then
-			write("Sample placemarks:")
-			write("-" * 60)
+			#write("Sample placemarks:")
+			#write("-" * 60)
 			_for i, pm _over placemarks.fast_keys_and_elements()
 			_loop
 				_if i > 20
@@ -278,10 +278,10 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 					_leave
 				_endif
 
-				write("Placemark #", i, ":")
-				write("  Name: ", pm[:name])
-				write("  Type: ", pm[:type])
-				write("  Parent: ", pm[:parent])
+				#write("Placemark #", i, ":")
+				#write("  Name: ", pm[:name])
+				#write("  Type: ", pm[:type])
+				#write("  Parent: ", pm[:parent])
 
 				# Display coordinates (truncate if too long)
 				coord_str << pm[:coord]
@@ -289,7 +289,7 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 				_then
 					coord_str << coord_str.subseq(1, 50) + "..."
 				_endif
-				write("  Coords: ", coord_str)
+				#write("  Coords: ", coord_str)
 
 				# Display description (truncate if too long)
 				desc_str << pm[:desc]
@@ -297,17 +297,17 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 				_then
 					desc_str << desc_str.subseq(1, 50) + "..."
 				_endif
-				write("  Description: ", desc_str)
+				#write("  Description: ", desc_str)
 
 				_if pm[:extended].size > 0
 				_then
-					write("  Extended data:")
+					#write("  Extended data:")
 					_for key, val _over pm[:extended].fast_keys_and_elements()
 					_loop
-						write("    ", key, ": ", val)
+						#write("    ", key, ": ", val)
 					_endloop
 				_endif
-				write("")
+				#write("")
 			_endloop
 		_endif
 
@@ -315,7 +315,7 @@ _global test_astri_kml_parser << _proc(_optional p_uuid)
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -330,29 +330,29 @@ _global test_astri_kml_network_types << _proc(kml_file_path)
 	## Usage:
 	##   test_astri_kml_network_types("C:/path/to/file.kml")
 
-	write("=" * 80)
-	write("Testing ASTRI KML Parser - Network Type Detection")
-	write("=" * 80)
+	#write("=" * 80)
+	#write("Testing ASTRI KML Parser - Network Type Detection")
+	#write("=" * 80)
 
 	_try
 		# Validate input
 		_if kml_file_path _is _unset _orif kml_file_path = ""
 		_then
-			write("ERROR: KML file path is required")
-			write("Usage: test_astri_kml_network_types(", %", "C:/path/to/file.kml", %", ")")
+			#write("ERROR: KML file path is required")
+			#write("Usage: test_astri_kml_network_types(", %", "C:/path/to/file.kml", %", ")")
 			_return
 		_endif
 
-		write("KML file path: ", kml_file_path)
-		write("")
+		#write("KML file path: ", kml_file_path)
+		#write("")
 
 		# Parse KML file
-		write("Parsing KML file...")
+		#write("Parsing KML file...")
 		_local parser << astri_kml_parser.new(kml_file_path)
 		_local placemarks << parser.parse()
 
-		write("✓ Parsed ", placemarks.size, " placemarks")
-		write("")
+		#write("✓ Parsed ", placemarks.size, " placemarks")
+		#write("")
 
 		# Group placemarks by network_type
 		_local grouped << equality_hash_table.new()
@@ -373,10 +373,10 @@ _global test_astri_kml_network_types << _proc(kml_file_path)
 		_endloop
 
 		# Display statistics
-		write("=" * 80)
-		write("NETWORK TYPE STATISTICS")
-		write("=" * 80)
-		write("")
+		#write("=" * 80)
+		#write("NETWORK TYPE STATISTICS")
+		#write("=" * 80)
+		#write("")
 
 		# Build list of (network_type, count) pairs and sort by count
 		_local type_counts << rope.new()
@@ -395,14 +395,14 @@ _global test_astri_kml_network_types << _proc(kml_file_path)
 		_loop
 			_local net_type << pair[1]
 			_local count << pair[2]
-			write(net_type.write_string.uppercase.space_pad(20, _true), " : ", count)
+			#write(net_type.write_string.uppercase.space_pad(20, _true), " : ", count)
 		_endloop
 
-		write("")
-		write("=" * 80)
-		write("SAMPLE PLACEMARKS (5 per network type)")
-		write("=" * 80)
-		write("")
+		#write("")
+		#write("=" * 80)
+		#write("SAMPLE PLACEMARKS (5 per network type)")
+		#write("=" * 80)
+		#write("")
 
 		# Display 5 samples for each network type
 		_for pair _over sorted_types.fast_elements()
@@ -411,22 +411,22 @@ _global test_astri_kml_network_types << _proc(kml_file_path)
 			_local items << grouped[net_type]
 			_local sample_count << items.size.min(5)
 
-			write("-" * 80)
-			write("Network Type: ", net_type.write_string.uppercase)
-			write("Total Count: ", items.size)
-			write("Showing ", sample_count, " sample(s)")
-			write("-" * 80)
+			#write("-" * 80)
+			#write("Network Type: ", net_type.write_string.uppercase)
+			#write("Total Count: ", items.size)
+			#write("Showing ", sample_count, " sample(s)")
+			#write("-" * 80)
 
 			_for i _over 1.upto(sample_count)
 			_loop
 				_local pm << items[i]
 
-				write("")
-				write("Sample #", i, ":")
-				write("  Name        : ", pm[:name])
-				write("  Type        : ", pm[:type])
-				write("  Network Type: ", pm[:network_type])
-				write("  Parent      : ", pm[:parent])
+				#write("")
+				#write("Sample #", i, ":")
+				#write("  Name        : ", pm[:name])
+				#write("  Type        : ", pm[:type])
+				#write("  Network Type: ", pm[:network_type])
+				#write("  Parent      : ", pm[:parent])
 
 				# Display coordinates (truncate if too long)
 				_local coord_str << pm[:coord]
@@ -434,7 +434,7 @@ _global test_astri_kml_network_types << _proc(kml_file_path)
 				_then
 					coord_str << coord_str.subseq(1, 60) + "..."
 				_endif
-				write("  Coordinates: ", coord_str)
+				#write("  Coordinates: ", coord_str)
 
 				# Display description (truncate if too long)
 				_local desc_str << pm[:desc]
@@ -444,34 +444,34 @@ _global test_astri_kml_network_types << _proc(kml_file_path)
 				_endif
 				_if desc_str _isnt _unset _andif desc_str <> ""
 				_then
-					write("  Description: ", desc_str)
+					#write("  Description: ", desc_str)
 				_endif
 
 				# Display extended data if available
 				_if pm[:extended] _isnt _unset _andif pm[:extended].size > 0
 				_then
-					write("  Extended Data:")
+					#write("  Extended Data:")
 					_local ext_count << 0
 					_for key, val _over pm[:extended].fast_keys_and_elements()
 					_loop
 						ext_count +<< 1
 						_if ext_count > 3  # Limit to 3 extended fields per sample
 						_then
-							write("    ... (", pm[:extended].size - 3, " more fields)")
+							#write("    ... (", pm[:extended].size - 3, " more fields)")
 							_leave
 						_endif
-						write("    ", key, ": ", val)
+						#write("    ", key, ": ", val)
 					_endloop
 				_endif
 			_endloop
 
-			write("")
+			#write("")
 		_endloop
 
-		write("=" * 80)
-		write("Test completed successfully")
-		write("=" * 80)
-		write("")
+		#write("=" * 80)
+		#write("Test completed successfully")
+		#write("=" * 80)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
@@ -485,23 +485,23 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_vendor_list << _proc()
 	## Test Vendor List API
 
-	write("=" * 60)
-	write("Testing ASTRI Vendor List API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Vendor List API")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc directly - returns JSON string
 		# Test with basic pagination
 		json_result << astri_get_vendor_list(10, 0)
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -509,22 +509,22 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_vendor_list_with_filters << _proc()
 	## Test Vendor List API with filters
 
-	write("=" * 60)
-	write("Testing ASTRI Vendor List API with Filters")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Vendor List API with Filters")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc with optional filters
 		json_result << astri_get_vendor_list(10, 0, "PT Test", _unset, _unset, _unset)
 
-		write("Response with name filter: ", json_result)
-		write("")
+		#write("Response with name filter: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -532,9 +532,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_add_boq_drm << _proc()
 	## Test Add BOQ DRM API (supports cluster, subfeeder, feeder)
 
-	write("=" * 60)
-	write("Testing ASTRI Add BOQ DRM API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Add BOQ DRM API")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc with test data
@@ -555,14 +555,14 @@ _global test_astri_add_boq_drm << _proc()
 			500000                  # override_price_service
 		)
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -570,9 +570,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_update_work_order << _proc()
 	## Test Update Work Order API
 
-	write("=" * 60)
-	write("Testing ASTRI Update Work Order API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI Update Work Order API")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc with test data
@@ -582,14 +582,14 @@ _global test_astri_update_work_order << _proc()
 			"Test update detail"    # detail
 		)
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -597,23 +597,23 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_olt_list << _proc()
 	## Test OLT List API
 
-	write("=" * 60)
-	write("Testing ASTRI OLT List API")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI OLT List API")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc directly - returns JSON string
 		# Test with basic pagination
 		json_result << astri_get_olt_list(10, 0)
 
-		write("Response: ", json_result)
-		write("")
+		#write("Response: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -621,22 +621,22 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_astri_olt_list_with_filters << _proc()
 	## Test OLT List API with filters
 
-	write("=" * 60)
-	write("Testing ASTRI OLT List API with Filters")
-	write("=" * 60)
+	#write("=" * 60)
+	#write("Testing ASTRI OLT List API with Filters")
+	#write("=" * 60)
 
 	_try
 		# Call the @MagikProc with optional filters
 		json_result << astri_get_olt_list(10, 0, _unset, "Test OLT", _unset)
 
-		write("Response with name filter: ", json_result)
-		write("")
+		#write("Response with name filter: ", json_result)
+		#write("")
 
 	_when error
 		write("ERROR: ", condition.report_contents_string)
 	_endtry
 
-	write("")
+	#write("")
 _endproc
 $
 
@@ -644,12 +644,12 @@ _pragma(classify_level=debug, topic={astri_integration})
 _global test_all_astri_apis << _proc()
 	## Run all ASTRI API tests
 
-	write("")
-	write("#" * 60)
-	write("## ASTRI API Integration Test Suite (v2.0)")
-	write("## Using @MagikProc annotation pattern")
-	write("#" * 60)
-	write("")
+	#write("")
+	#write("#" * 60)
+	#write("## ASTRI API Integration Test Suite (v2.0)")
+	#write("## Using @MagikProc annotation pattern")
+	#write("#" * 60)
+	#write("")
 
 	# Work Order APIs
 	test_astri_work_orders()
@@ -681,10 +681,10 @@ _global test_all_astri_apis << _proc()
 	test_astri_olt_list()
 	test_astri_olt_list_with_filters()
 
-	write("#" * 60)
-	write("## All tests completed")
-	write("#" * 60)
-	write("")
+	#write("#" * 60)
+	#write("## All tests completed")
+	#write("#" * 60)
+	#write("")
 _endproc
 $
 

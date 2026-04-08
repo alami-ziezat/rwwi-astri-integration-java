@@ -55,7 +55,10 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 
 		# Step 2: Determine closure type
 		_local closure_type << _self.match_closure_type(folders, pm[:infrastructure_type].default("cluster"))
-		write("  Processing ", closure_type, " (aerial): ", pm[:name])
+		_if closure_type = "FDT"
+		_then 
+			write("  Processing ", closure_type, " (aerial): ", pm[:name])
+		_endif 
 
 		# Step 3: Detect core count and map to spec/STF
 		_local core_count << _unset
@@ -156,7 +159,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 		# Step 4: Parse original location and scan for pole
 		_local original_location << _self.parse_point_geometry(pm[:coord])
 		_local l_location_start << original_location
-		write("    >> Searching for pole within 250cm...")
+		#write("    >> Searching for pole within 250cm...")
 		_local (k1, pt) << _self.scan_pole_st(l_location_start, 250)
 		_local sh_loc << _unset
 		_local l_result_pl << _unset
@@ -165,17 +168,35 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 		_then
 			sh_loc << pt.location.coord
 			l_result_pl << pt
-			write("    >> Found existing pole within 250cm")
+			_if closure_type = "FDT"
+			_then 
+				write("    >> Found existing pole within 250cm")
+			_endif 
 		_else
 			# No pole found - create placeholder
-			write("    >> Creating placeholder pole")
+			_if closure_type = "FDT"
+			_then 
+				write("    >> Creating placeholder pole")
+			_endif 
+			
 			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(original_location)
 			_if tf _is _true
 			_then
 				l_location_start << snap_loc
-				write("    >> Pole snapped to aerial route")
+				(pole_found?, pole_rec) << _self.scan_pole_st(l_location_start, 250)
+				_if closure_type = "FDT"
+				_then 
+					write("    >> Pole snapped to aerial route")
+				_endif 
 			_endif
 
+			_if pole_found? _is _true
+			_then
+				sh_loc << pole_rec.location.coord
+				l_result_pl << pole_rec
+				write("  >> Found pole after snapping to aerial route")
+			_else 
+			
 			_local m_line << _self.match_line(folders)
 			_local l_prop_values_pl << property_list.new_with(
 				:location, l_location_start,
@@ -206,6 +227,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 			_local l_rec_trans_pl << record_transaction.new_insert(.pole_col, l_prop_values_pl)
 			l_result_pl << l_rec_trans_pl.run()
 			sh_loc << l_result_pl.location.coord
+			_endif
 		_endif
 
 		# Step 5: Get line_type, ring_name, const_status
@@ -235,7 +257,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 			_endif
 
 		# Step 6: Create sheath splice
-		write("    >> Creating sheath splice")
+		#write("    >> Creating sheath splice")
 		_local l_prop_values << property_list.new_with(
 			:location, sh_loc,
 			:asset_owner, "Owned",
@@ -277,9 +299,9 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 		_elif closure_type.index_of_seq("Joint") _isnt _unset _orif
 		      closure_type.index_of_seq("Closure") _isnt _unset
 		_then
-			.stats[:joint_closures] +<< 1
+			.stats[:joint_closures] +<< 1 
 		_endif
-		write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
+		#write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
 
 		# Step 7: Associate to pole
 		_try
@@ -288,7 +310,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 				_if l_result_pl.external_name = "Pole"
 				_then
 					l_result.associate_to_structure(l_result_pl)
-					write("    >> Associated to pole: ", l_result_pl.telco_pole_tag)
+					#write("    >> Associated to pole: ", l_result_pl.telco_pole_tag)
 				_endif
 			_endif
 		_when error
@@ -301,7 +323,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 			_if l_swl _isnt _unset
 			_then
 				l_result.add_loop_cable(l_swl)
-				write("    >> Connected to cable: ", l_swl.name)
+				#write("    >> Connected to cable: ", l_swl.name)
 			_endif
 		_when error
 			# Continue if connection fails
@@ -337,7 +359,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 					_local l_result_s << l_rec_trans_s.run()
 					.stats[:optical_splitters] +<< 1
 				_endloop
-				write("    [OK] Created ", c_spl, " optical splitters")
+				#write("    [OK] Created ", c_spl, " optical splitters")
 			_when error
 				write("    WARNING: Error creating optical splitters: ", errCon.report_contents_string)
 			_endtry
@@ -347,7 +369,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 		_if closure_type = "FAT" _orif closure_type = "FDT"  # Note: original requirement was FAT only, but FDT can also have figure eights in some cases
 		_then
 			_try _with errCon
-				write("    >> Creating figure_eight for FAT")
+				#write("    >> Creating figure_eight for FAT")
 				_local l_prop_values_fe << property_list.new_with(
 					:construction_status, .construction_status,
 					:type, "Circle",
@@ -368,13 +390,13 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 				_local l_rec_trans_fe << record_transaction.new_insert(.fe_col, l_prop_values_fe)
 				_local l_result_fe << l_rec_trans_fe.run()
 				.stats[:figure_eights] +<< 1
-				write("    [OK] Figure eight created for FAT: ", pm[:name] + " Slack")
+				#write("    [OK] Figure eight created for FAT: ", pm[:name] + " Slack")
 
 				_try
 					_if l_result_pl _isnt _unset
 					_then
 						l_result_fe.associate_to_structure(l_result_pl)
-						write("    >> Figure eight associated to pole")
+						#write("    >> Figure eight associated to pole")
 					_endif
 				_when error
 				_endtry
@@ -384,7 +406,7 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 					_if l_swl_fe _isnt _unset
 					_then
 						l_swl_fe.mcn!connect(l_result_fe)
-						write("    >> Figure eight connected to cable: ", l_swl_fe.name)
+						#write("    >> Figure eight connected to cable: ", l_swl_fe.name)
 					_endif
 				_when error
 				_endtry
@@ -430,7 +452,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 
 		# Step 2: Determine closure type
 		_local closure_type << _self.match_closure_type(folders, pm[:infrastructure_type].default("cluster"))
-		write("  Processing ", closure_type, " (underground): ", pm[:name])
+		#write("  Processing ", closure_type, " (underground): ", pm[:name])
 
 		# Step 3: Detect core count and map to spec/STF (same as aerial)
 		_local core_count << _unset
@@ -562,10 +584,10 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 			_then
 				l_result_uub << uubs.an_element()
 			_endif
-			write("    >> Found existing UUB within 200cm: ", l_result_uub.label)
+			#write("    >> Found existing UUB within 200cm: ", l_result_uub.label)
 		_else
 			# No UUB found - create placeholder handhole
-			write("    >> Creating placeholder UUB for closure")
+			#write("    >> Creating placeholder UUB for closure")
 			_local m_line << _self.match_line(folders)
 			_local uub_props << property_list.new_with(
 				:type, "Handhole",
@@ -593,7 +615,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 
 			_if .stats[:uubs] _is _unset _then .stats[:uubs] << 0 _endif
 			.stats[:uubs] +<< 1
-			write("    >> Placeholder UUB created")
+			#write("    >> Placeholder UUB created")
 		_endif
 
 		# Splice is placed at UUB location (ref: fttx_ur_closure_migration)
@@ -626,7 +648,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 			_endif
 
 		# Step 7: Create sheath splice at UUB location
-		write("    >> Creating sheath splice at UUB location")
+		#write("    >> Creating sheath splice at UUB location")
 		_local noted << "UUB Name : " + l_result_uub.label.default("") +
 		                "  UUB ID : " + l_result_uub.id.write_string
 
@@ -673,12 +695,12 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 		_then
 			.stats[:joint_closures] +<< 1
 		_endif
-		write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
+		#write("    [OK] Sheath splice created: ", pm[:name], " (Type: ", closure_type, ", Core: ", core_count.default("N/A"), ")")
 
 		# Step 8: Associate to UUB (ref: fttx_ur_closure_migration: associate_to_structure)
 		_try
 			l_result.associate_to_structure(l_result_uub)
-			write("    >> Associated to UUB: ", l_result_uub.label)
+			#write("    >> Associated to UUB: ", l_result_uub.label)
 		_when error
 			# Continue if association fails
 		_endtry
@@ -689,7 +711,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 			_if l_swl _isnt _unset
 			_then
 				l_result.add_loop_cable(l_swl)
-				write("    >> Connected to cable: ", l_swl.name)
+				#write("    >> Connected to cable: ", l_swl.name)
 			_endif
 		_when error
 			# Continue if connection fails
@@ -725,7 +747,7 @@ _private _method astri_design_migrator.create_sheath_splice_underground(pm)
 					_local l_result_s << l_rec_trans_s.run()
 					.stats[:optical_splitters] +<< 1
 				_endloop
-				write("    [OK] Created ", c_spl, " optical splitters")
+				#write("    [OK] Created ", c_spl, " optical splitters")
 			_when error
 				write("    WARNING: Error creating optical splitters: ", errCon.report_contents_string)
 			_endtry

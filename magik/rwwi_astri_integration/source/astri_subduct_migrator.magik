@@ -35,7 +35,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 		_local infra_lc << .infra_type.default("").lowercase
 		_if infra_lc = "cluster"
 		_then
-			write("    >> SKIP: Sub Duct only valid for feeder/subfeeder (infra_type=", .infra_type, ")")
+			#write("    >> SKIP: Sub Duct only valid for feeder/subfeeder (infra_type=", .infra_type, ")")
 			.stats[:skipped] +<< 1
 			_return
 		_endif
@@ -59,7 +59,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 			# Fallback: use 40/34 as default
 			spec_id  << "Sub Duct / HDPE 40/34"
 			stf_code << "200000510"
-			write("    >> WARNING: Cannot determine subduct spec from folder: ", folders, " - defaulting to 40/34")
+			#write("    >> WARNING: Cannot determine subduct spec from folder: ", folders, " - defaulting to 40/34")
 		_endif
 
 		# Step 2: Parse line geometry
@@ -88,7 +88,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 		                         _else >> ""
 		                         _endif
 
-		write("    >> spec: ", spec_id, " | stf: ", stf_code, " | line: ", m_line, " | segment: ", segment_id)
+		#write("    >> spec: ", spec_id, " | stf: ", stf_code, " | line: ", m_line, " | segment: ", segment_id)
 
 		# Step 5: Locate nearest UUBs at start/end for :span field (500 cm radius)
 		_local start_coord << route.first_coord
@@ -107,7 +107,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 				_local uu_s << uubs_start.an_element()
 				start_coord << uub_s.location.coord
 				start_uub_label << uu_s.perform(:label).default(uu_s.perform(:name).default("HH"))
-				write("    >> Found UUB at start: ", start_uub_label)
+				#write("    >> Found UUB at start: ", start_uub_label)
 			_endif
 		_when error
 			# UUB search is optional - ignore errors
@@ -124,7 +124,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 				_local uu_e << uubs_end.an_element()
 				end_coord << uu_e.location.coord
 				end_uub_label << uu_e.perform(:label).default(uu_e.perform(:name).default("HH"))
-				write("    >> Found UUB at end: ", end_uub_label)
+				#write("    >> Found UUB at end: ", end_uub_label)
 			_endif
 		_when error
 			# UUB search is optional - ignore errors
@@ -148,7 +148,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 				jalur_str << ur.perform(:name).default(_unset)
 				_if jalur_str _isnt _unset
 				_then
-					write("    >> Found UR for jalur: ", jalur_str)
+					#write("    >> Found UR for jalur: ", jalur_str)
 				_endif
 			_endif
 		_when error
@@ -204,7 +204,7 @@ _private _method astri_design_migrator.create_sub_duct(pm)
 		_if .stats[:sub_ducts] _is _unset _then .stats[:sub_ducts] << 0 _endif
 		.stats[:sub_ducts] +<< 1
 
-		write("    [OK] Sub Duct created: ", pm[:name], " (", spec_id, ")")
+		#write("    [OK] Sub Duct created: ", pm[:name], " (", spec_id, ")")
 
 	_when error
 		write("ERROR in create_sub_duct(): ", errCon.report_contents_string)

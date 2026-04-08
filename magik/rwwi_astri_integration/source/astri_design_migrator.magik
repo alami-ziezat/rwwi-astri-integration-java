@@ -814,7 +814,7 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_self.notify_progress(
 			"Updating FDT demand point totals, please wait...",
 			"Done: " + b[:riser].size.write_string + " risers processed")
-		_self.update_fdt_tp_field()
+		_self.update_fdt_tp_field(b[:demand_point])
 		_self.notify_progress(
 			"Migration complete!",
 			"Done: FDT demand point totals updated")

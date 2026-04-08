@@ -25,7 +25,7 @@ _private _method astri_design_migrator.create_olt(pm)
 		# Step 0: Validate this is an OLT
 		_if _not _self.is_olt?(pm)
 		_then
-			write("  WARNING: Skipping - not an OLT: ", pm[:name])
+			#write("  WARNING: Skipping - not an OLT: ", pm[:name])
 			_return
 		_endif
 
@@ -33,7 +33,7 @@ _private _method astri_design_migrator.create_olt(pm)
 		_local folders << pm[:parent].default("")
 		_if folders = "" _orif folders _is _unset
 		_then
-			write("  WARNING: OLT has no folder information")
+			#write("  WARNING: OLT has no folder information")
 		_endif
 
 		# Step 2: Extract segment_id from folders
@@ -51,7 +51,7 @@ _private _method astri_design_migrator.create_olt(pm)
 
 		_if found?
 		_then
-			write("  WARNING: OLT already exists nearby (", existing_olt.name, ") - skipping")
+			#write("  WARNING: OLT already exists nearby (", existing_olt.name, ") - skipping")
 			.stats[:skipped] +<< 1
 			_return
 		_endif
@@ -61,7 +61,7 @@ _private _method astri_design_migrator.create_olt(pm)
 		_local name_matches << .olt_col.select(name_pred)
 		_if name_matches.size > 0
 		_then
-			write("  WARNING: OLT with same olt_code already exists (", pm[:olt_code], ") - skipping")
+			#write("  WARNING: OLT with same olt_code already exists (", pm[:olt_code], ") - skipping")
 			.stats[:skipped] +<< 1
 			_return
 		_endif
@@ -83,7 +83,7 @@ _private _method astri_design_migrator.create_olt(pm)
 		_local result << rec_trans.run()
 
 		.stats[:olts] +<< 1
-		write("  [OK] OLT created: ", pm[:name])
+		#write("  [OK] OLT created: ", pm[:name])
 
 	_when error
 		write("ERROR in create_olt():", errCon.report_contents_string)

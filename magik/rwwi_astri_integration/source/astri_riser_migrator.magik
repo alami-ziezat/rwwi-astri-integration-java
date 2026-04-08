@@ -22,11 +22,11 @@ _private _method astri_design_migrator.create_riser(pm)
 		# Step 0: Validate this is a riser
 		_if _not _self.is_riser?(pm)
 		_then
-			write("  WARNING: Skipping - not a riser: ", pm[:name])
+			#write("  WARNING: Skipping - not a riser: ", pm[:name])
 			_return
 		_endif
 
-		write("  Processing riser: ", pm[:name])
+		#write("  Processing riser: ", pm[:name])
 
 		# Step 1: Get folder information and matching
 		_local folders   << pm[:parent].default("")
@@ -45,7 +45,7 @@ _private _method astri_design_migrator.create_riser(pm)
 		                         _then >> "Feeder"
 		                         _else >> ""
 		                         _endif
-		write("    Matched line: ", m_line, " | segment: ", segment_id)
+		#write("    Matched line: ", m_line, " | segment: ", segment_id)
 
 		# Step 2: Parse point geometry
 		_local location << _self.parse_point_geometry(pm[:coord])
@@ -79,7 +79,7 @@ _private _method astri_design_migrator.create_riser(pm)
 		_local result << rec_trans.run()
 
 		.stats[:risers] +<< 1
-		write("  [OK] Riser created: ", pm[:name])
+		#write("  [OK] Riser created: ", pm[:name])
 
 	_when error
 		write("ERROR in create_riser():", errCon.report_contents_string)

@@ -48,11 +48,11 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_local folders << pm[:parent].default("")
 		_if _not _self.is_figure_eight?(pm)
 		_then
-			write("  WARNING: Skipping - not a figure_eight: ", folders)
+			#write("  WARNING: Skipping - not a figure_eight: ", folders)
 			_return
 		_endif
 
-		write("  Processing figure_eight (aerial): ", pm[:name])
+		#write("  Processing figure_eight (aerial): ", pm[:name])
 
 		# Step 1: Extract attributes from folders
 		_local segment_id << _self.match_segment(folders)
@@ -77,7 +77,7 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_then
 			# Pole/OLT found - use it as structure
 			sh_loc << n_obj.location.coord
-			write("    >> Found existing structure within 700cm: ", n_obj)
+			#write("    >> Found existing structure within 700cm: ", n_obj)
 
 			# Check if structure already has a figure_eight
 			_local existing_fe << _unset
@@ -100,12 +100,12 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 
 			_if existing_fe _isnt _unset
 			_then
-				write("    >> Structure already has figure_eight, skipping: ", existing_fe.name)
+				#write("    >> Structure already has figure_eight, skipping: ", existing_fe.name)
 				_return
 			_endif
 		_else
 			# No pole found - create placeholder pole
-			write("    >> Creating placeholder pole for slack")
+			#write("    >> Creating placeholder pole for slack")
 
 			# Try to snap to aerial route
 			_local (tf, r_pipe, snap_loc) << _self.scan_ar_on_design(pp)
@@ -113,7 +113,7 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			_if tf _is _true
 			_then
 				sh_loc << snap_loc
-				write("    >> Pole snapped to aerial route")
+				#write("    >> Pole snapped to aerial route")
 			_else
 				sh_loc << coord
 			_endif
@@ -149,7 +149,7 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			n_obj << l_rec_trans_pl.run()
 
 			.stats[:existing_poles] +<< 1
-			write("    >> Placeholder pole created (In Service)")
+			#write("    >> Placeholder pole created (In Service)")
 		_endif
 
 		# Step 4: Create figure_eight
@@ -172,6 +172,7 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			:pop, .pop_name,
 			:olt, .pop_name,
 			:uuid, .uuid,
+			:ring_name, pm[:ring_name],
 			:stf_item_code, "200000185",
 			:cluster_code, .cluster_code_db,
 			:subfeeder_code, .subfeeder_code_db,
@@ -184,14 +185,14 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_local l_result << l_rec_trans.run()
 
 		.stats[:figure_eights] +<< 1
-		write("    [OK] Figure eight created: ", pm[:name], " (Type: Circle, Length: 20)")
+		#write("    [OK] Figure eight created: ", pm[:name], " (Type: Circle, Length: 20)")
 
 		# Step 5: Associate to pole structure
 		_try
 			_if n_obj _isnt _unset
 			_then
 				l_result.associate_to_structure(n_obj)
-				write("    >> Associated to structure: ", n_obj.telco_pole_tag)
+				#write("    >> Associated to structure: ", n_obj.telco_pole_tag)
 			_endif
 		_when error
 			# Continue if association fails
@@ -203,7 +204,7 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			_if l_cable _isnt _unset
 			_then
 				l_cable.mcn!connect(l_result)
-				write("    >> Connected to cable")
+				#write("    >> Connected to cable")
 			_endif
 		_when error
 			# Continue if cable connection fails
@@ -238,11 +239,11 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 		_local folders << pm[:parent].default("")
 		_if _not _self.is_figure_eight?(pm)
 		_then
-			write("  WARNING: Skipping - not a figure_eight: ", folders)
+			#write("  WARNING: Skipping - not a figure_eight: ", folders)
 			_return
 		_endif
 
-		write("  Processing figure_eight (underground): ", pm[:name])
+		#write("  Processing figure_eight (underground): ", pm[:name])
 
 		# Step 1: Extract attributes from folders
 		_local segment_id << _self.match_segment(folders)
@@ -286,7 +287,7 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 			_then
 				n_obj << uubs.an_element()
 			_endif
-			write("    >> Found existing UUB within 700cm: ", n_obj.label)
+			#write("    >> Found existing UUB within 700cm: ", n_obj.label)
 		_endif
 
 		_if found _is _true
@@ -312,12 +313,12 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 
 			_if existing_fe _isnt _unset
 			_then
-				write("    >> UUB already has figure_eight, skipping: ", existing_fe.name)
+				#write("    >> UUB already has figure_eight, skipping: ", existing_fe.name)
 				_return
 			_endif
 		_else
 			# No UUB found - create placeholder handhole for slack
-			write("    >> Creating placeholder UUB for slack")
+			#write("    >> Creating placeholder UUB for slack")
 
 			_local uub_props << property_list.new_with(
 				:type, "Handhole",
@@ -345,7 +346,7 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 
 			_if .stats[:uubs] _is _unset _then .stats[:uubs] << 0 _endif
 			.stats[:uubs] +<< 1
-			write("    >> Placeholder UUB created (In Service)")
+			#write("    >> Placeholder UUB created (In Service)")
 		_endif
 
 		# Step 4: Create figure_eight
@@ -385,14 +386,14 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 		_local l_result << l_rec_trans.run()
 
 		.stats[:figure_eights] +<< 1
-		write("    [OK] Figure eight created (underground): ", pm[:name], " (Type: Circle, Length: 20)")
+		#write("    [OK] Figure eight created (underground): ", pm[:name], " (Type: Circle, Length: 20)")
 
 		# Step 5: Associate to UUB structure
 		_try
 			_if n_obj _isnt _unset
 			_then
 				l_result.associate_to_structure(n_obj)
-				write("    >> Associated to UUB: ", n_obj.label)
+				#write("    >> Associated to UUB: ", n_obj.label)
 			_endif
 		_when error
 			# Continue if association fails
@@ -405,7 +406,7 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 			_if l_cable _isnt _unset
 			_then
 				l_cable.mcn!connect(l_result)
-				write("    >> Connected to cable")
+				#write("    >> Connected to cable")
 			_endif
 		_when error
 			# Continue if cable connection fails
