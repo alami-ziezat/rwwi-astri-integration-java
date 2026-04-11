@@ -326,7 +326,7 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_ug_folders(p_fdts)
 		# No FDTs found - still create LINE A/B/C/D folders so UG objects
 		# (CABLE, JOINT CLOSURE, HH, BORING MANUAL, T-WEY, TALI PANCING) can be exported.
 		# These objects query by area only and do not require FDT context.
-		write("WARNING: No FDTs detected in cluster export area - LINE folders created without FDT container")
+		#write("WARNING: No FDTs detected in cluster export area - LINE folders created without FDT container")
 		_for line_id _over {"A", "B", "C", "D"}.fast_elements()
 		_loop
 			folder_defs.add(_self.build_cluster_ug_line_folders(line_id, _unset))
@@ -414,7 +414,7 @@ _method rwi_aerial_kmz_folder_builder.build_cluster_folders(p_fdts)
 	_if fdt_count = 0
 	_then
 		# No FDTs - create minimal structure (rare case)
-		write("WARNING: No FDTs detected in cluster export area")
+		#write("WARNING: No FDTs detected in cluster export area")
 		>> folder_defs
 
 	_elif fdt_count = 1

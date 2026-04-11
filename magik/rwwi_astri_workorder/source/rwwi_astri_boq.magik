@@ -1664,7 +1664,7 @@ _proc()
 	pj << s.inf_project.write_string
 	st << s.status.write_string	
 	change_set << mit_scheme_record_change_set.new(s)
-	
+	e << _false
 	_for i _over change_set.fast_elements()
 	_loop
 		
@@ -1683,6 +1683,40 @@ _endproc
 $
 
 #line
+_global cek_ae <<
+_proc()
+
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	e << _false
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :pole _then
+			#table_list.add(i.current_record)
+			e << _true 
+			_leave
+		_endif
+		
+	_endloop
+	
+	>> e
+	
+_endproc
+$
 
 
 _global get_count_pole_line <<
@@ -2951,7 +2985,11 @@ $
 _global create_boq <<
 _proc(design, infra_type)
 
+	#rwwi_astri_workorder.show_messages("test")
 
+	grs << smallworld_product.pni_application() 
+	grs.show_message("Pastikan semua aplikasi Excel lainnya sudah ditutup!")
+	system.do_command("taskkill /IM excel.exe /f")
 	s << swg_dsn_admin_engine.get_current_job()
 
 	_if s _is _unset
@@ -2990,18 +3028,47 @@ _proc(design, infra_type)
 	#a_filename << %TEMPLATE_BOQ%
 
 	ug << cek_ug()
+	ae << cek_ae()
 
-	write(infra_type)
+	_if ug _is _true _and ae _is _false 
+	_then
+		nt << "Underground"
+	_elif ae _is _true _and ug _is _false
+	_then 
+		nt << "Aerial"
+	_elif ae _is _true _and ug _is _true
+	_then 
+		nt << "Aerial & Underground"	
+	_endif
+
+	write(infra_type,nt)
+
 	_if infra_type ="cluster" _then
 		
-		_local a_filename << system.getenv("TEMPLATE_BOQ_CLUSTER")
+		#_local a_filename << system.getenv("TEMPLATE_BOQ_CLUSTER")
+		write("nt  :",nt)
+		_if nt = "Underground"
+		_then
+			a_filename << system.getenv("TEMPLATE_BOQ_CLUSTER_UG")
+			sht << "BoM CLUSTER UG"
+		_elif nt = "Aerial"
+		_then
+			a_filename << system.getenv("TEMPLATE_BOQ_CLUSTER_AE")
+			sht << "BoM CLUSTER AE"
+
+		_else
+			a_filename << system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+			sht << "BoM CLUSTER AE & UG"
+		_endif
+		
 		Excel_Object << OLE_Client.Create_Object("Excel.Application")
 		Excel_Object.Visible << _True
-		
+		write(a_filename,"  :  ",sht)
 		Workbooks << Excel_Object.Workbooks ()
 		WorkBook << Workbooks.add(a_filename)
 
-		Sheet << Excel_Object.Sheets ("BoM CLUSTER AE & UG")
+	
+		Sheet << Excel_Object.Sheets (sht)
 		Sheet1 << Excel_Object.Sheets ("BoQ NRO Cluster")
 		#_if infra_type ="cluster" _then
 		#	Sheet << Excel_Object.Sheets ("BoQ NRO Cluster")
@@ -3332,7 +3399,8 @@ _proc(design, infra_type)
 		
 			name <<   i.current_record.source_collection.name
 			_if name _is :sheath_with_loc _then
-				olt_nm << i.current_record.olt 
+				olt_nm << i.current_record.olt
+				cl_code << i.current_record.cluster_code
 			_endif
 			
 		_endloop
@@ -3348,13 +3416,18 @@ _proc(design, infra_type)
 		Cell_cluster << Sheet1.Range("O3")
 		Cell_cluster.value << nama.write_string
 
-		_if ug _is _true 
+	
+		Cell_type << Sheet1.Range("O4")
+		_if ug _is _true _and ae _is _false 
 		_then
-			write(ug)
-		#update to Underground
-			Cell_type << Sheet1.Range("O4")
 			Cell_type.value << "Underground"
+		_elif ae _is _true _and ug _is _false
+		_then 
+			Cell_type.value << "Aerial"
+		_else
+			Cell_type.value << "Aerial & Underground"	
 		_endif
+			
 		
 		
 	_else
@@ -3424,7 +3497,6 @@ _proc(design, infra_type)
 		
 		_for b _over clr.fast_elements()
 		_loop
-			write(b[:jml])
 			_if b[:id]="clr1" _then
 				Cell_d55_name << Sheet.Range("C23")
 				Cell_d55_name.value << b[:jml].write_string
@@ -3685,1109 +3757,167 @@ _proc(design, infra_type)
 			
 			
 		_endif
-		
-		
-	_endif
-	
-		
-_endproc
-$
 
+		olt_nm << ""
+		#clr_nm << ""
 
-_global create_boq_old <<
-_proc(design, infra_type)
-
-
-	s << swg_dsn_admin_engine.get_current_job()
-
-	_if s _is _unset
-	_then
-		write("No Design Selected")
-		_leave 
-	_endif
-	
-	
-	id << s.id.write_string 
-	nama << s.name.write_string
-	owner << s.owner.write_string
-	pj << s.inf_project.write_string
-	st << s.status.write_string	
-	change_set << mit_scheme_record_change_set.new(s)
-	
-	#		dm << gis_program_manager.databases[:design_admin]
-	#		val << s.inf_project.write_string
-	#		c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
-	#		cur_rec << c.an_element()
-	#		project_id << cur_rec.id.write_string 
-	#		owner << s.owner.write_string
-			#write(project_id,nama)
-	
-	#ignored except these object
-	object_filtered << rope.new_with(:pole,:figure_eight,:sheath_splice,:sheath_with_loc, :mit_terminal_enclosure, :uub, :optical_splitter )
-	
-	
-	#pake equality ->string sebagai key
-	obj << equality_hash_table.new()
-	
-	start << date_time_now()
-	
-	
-	#a_filename << "c:\template_boq\01.2 BOQ Template to Vendor 2024 Final - Distribute to Vendor v2.xlsx"
-	#a_filename << %TEMPLATE_BOQ%
-	_local a_filename << system.getenv("TEMPLATE_BOQ")
-	Excel_Object << OLE_Client.Create_Object("Excel.Application")
-	Excel_Object.Visible << _True
-	
-	Workbooks << Excel_Object.Workbooks ()
-	WorkBook << Workbooks.add(a_filename)
-
-
-	#write(infra_type)
-	_if infra_type ="cluster" _then
-		Sheet << Excel_Object.Sheets ("BoQ NRO Cluster")
-	_else
-		Sheet << Excel_Object.Sheets ("BoQ NRO All Feeder")
-	_endif
-	
-	a_ff << float_format.new_with_properties(
-			:float_format,:fixed,
-			:float_decimal_places,3)
-	
-	start << date_time_now()
-
-
-	hdp << get_count_hp()
-	Cell_hdp << Sheet.Range("O5")
-	Cell_hdp.value << hdp.write_string
-	
-	olt_nm << ""
-	#clr_nm << ""
-	_for i _over change_set.fast_elements()
-	_loop
-		
-		
-		name <<   i.current_record.source_collection.name
-		_if name _is :sheath_with_loc _then
-			olt_nm << i.current_record.olt 
-		_endif
-		
-	_endloop
-
-	ug << cek_ug()
-	#write("ug  :  ",ug)
-	
-	Cell_olt << Sheet.Range("O2")
-	Cell_olt.value << olt_nm.write_string
-	
-	Cell_cluster << Sheet.Range("O3")
-	Cell_cluster.value << nama.write_string
-	
-	pole7m_jml << 0
-	pole9m_jml << 0			
-	
-	
-	m1 << get_count_slack()
-	Cell_m1_name << Sheet.Range("D225")
-	Cell_m1_name.value << m1.write_string
-
-	
-	(j1,j2) << get_count_fat()
-	Cell_j1_name << Sheet.Range("D63")
-	Cell_j1_name.value << j1.write_string
-	Cell_j11_name << Sheet.Range("E64")
-	Cell_j11_name.value << j1.write_string
-	Cell_j2_name << Sheet.Range("D65")
-	Cell_j2_name.value << j2.write_string
-	Cell_j22_name << Sheet.Range("E66")
-	Cell_j22_name.value << j2.write_string
-	
-	total_fat << j1+j2
-
-	_if ug _is _false  
-	_then
-		Cell_j220_name << Sheet.Range("E96")
-		Cell_j220_name.value << total_fat.write_string
-	_else
-
-		Cell_j220_name << Sheet.Range("E96")
-		Cell_j220_name.value << total_fat.write_string
-		
-		Cell_j2208_name << Sheet.Range("D98")
-		Cell_j2208_name.value << total_fat.write_string
-	_endif
-	
-	
-	#Cell_j221_name << Sheet.Range("D96")
-	#Cell_j221_name.value << total_fat.write_string
-	#Testcomm OTDR & OPM FDT - FAT
-	#Cell_j229_name << Sheet.Range("E287")
-	#Cell_j229_name.value << total_fat.write_string
-	Cell_j228_name << Sheet.Range("E287")
-	Cell_j228_name.value << total_fat.write_string
-	
-	#splicing
-	total_fatx << total_fat * 2
-	#Cell_j222_name << Sheet.Range("D92")
-	#Cell_j222_name.value << total_fatx.write_string
-	Cell_j222_name << Sheet.Range("E92")
-	Cell_j222_name.value << total_fatx.write_string
-
-	
-	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
-	
-	Cell_f1_name << Sheet.Range("D42")
-	Cell_f1_name.value << f1.write_string
-	Cell_f11_name << Sheet.Range("E43")
-	Cell_f11_name.value << f1.write_string
-	Cell_f2_name << Sheet.Range("D44")
-	Cell_f2_name.value << f2.write_string
-	Cell_f22_name << Sheet.Range("E45")
-	Cell_f22_name.value << f2.write_string
-	Cell_f3_name << Sheet.Range("D46")
-	Cell_f3_name.value << f3.write_string
-	Cell_f33_name << Sheet.Range("E47")
-	Cell_f33_name.value << f3.write_string
-	Cell_f4_name << Sheet.Range("D48")
-	Cell_f4_name.value << f4.write_string
-	Cell_f44_name << Sheet.Range("E49")
-	Cell_f44_name.value << f4.write_string
-	Cell_f5_name << Sheet.Range("D50")
-	Cell_f5_name.value << f5.write_string
-	Cell_f55_name << Sheet.Range("E51")
-	Cell_f55_name.value << f5.write_string
-	Cell_f6_name << Sheet.Range("D52")
-	Cell_f6_name.value << f6.write_string
-	Cell_f66_name << Sheet.Range("D53")
-	Cell_f66_name.value << f6.write_string
-	
-	total_fdt << f1+f2+f3+f4+f5+f6
-	
-	
-	#Cell_f661_name << Sheet.Range("D95")
-	#Cell_f661_name.value << total_fdt.write_string
-	Cell_f662_name << Sheet.Range("E95")
-	Cell_f662_name.value << total_fdt.write_string
-	
-		
-	(p1,p2,p3,p4,p5,p6,t_pl) << get_count_pole()
-	
-	Cell_p1_name << Sheet.Range("D217")
-	Cell_p1_name.value << p1.write_string
-	Cell_p11_name << Sheet.Range("E218")
-	Cell_p11_name.value << p1.write_string
-	Cell_p2_name << Sheet.Range("D213")
-	Cell_p2_name.value << p2.write_string
-	Cell_p22_name << Sheet.Range("E214")
-	Cell_p22_name.value << p2.write_string
-	Cell_p3_name << Sheet.Range("D209")
-	Cell_p3_name.value << p3.write_string
-	Cell_p33_name << Sheet.Range("E210")
-	Cell_p33_name.value << p3.write_string
-	Cell_p4_name << Sheet.Range("D215")
-	Cell_p4_name.value << p4.write_string
-	Cell_p44_name << Sheet.Range("E216")
-	Cell_p44_name.value << p4.write_string
-	Cell_p5_name << Sheet.Range("D211")
-	Cell_p5_name.value << p5.write_string
-	Cell_p55_name << Sheet.Range("E212")
-	Cell_p55_name.value << p5.write_string
-	Cell_p6_name << Sheet.Range("D219")
-	Cell_p6_name.value << p6.write_string
-	Cell_p66_name << Sheet.Range("E220")
-	Cell_p66_name.value << p6.write_string
-	
-	Cell_c611_name << Sheet.Range("D239")
-	Cell_c611_name.value << t_pl.write_string
-	#Cell_c711_name << Sheet.Range("D97")
-	#Cell_c711_name.value << t_pl.write_string
-	#Cell_c61_name << Sheet.Range("E239")
-	#Cell_c61_name.value << t_pl.write_string
-	Cell_c71_name << Sheet.Range("E97")
-	Cell_c71_name.value << t_pl.write_string
-	
-	
-	
-	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
-	#write(c1)
-	c1 << c1 + (c1 * (5/100))
-	Cell_c1_name << Sheet.Range("D15")
-	Cell_c1_name.value << c1.ceiling.write_string
-	
-	c2 << c2 + (c2 * (5/100))
-	Cell_c2_name << Sheet.Range("D17")
-	Cell_c2_name.value << c2.ceiling.write_string
-	
-	c3 << c3 + (c3 * (5/100))
-	Cell_c3_name << Sheet.Range("D19")
-	Cell_c3_name.value << c3.ceiling.write_string
-	
-	c4 << c4 + (c4 * (5/100))
-	Cell_c4_name << Sheet.Range("D21")
-	Cell_c4_name.value << p4.ceiling.write_string
-	
-	c5 << c5 + (c5 * (5/100))
-	Cell_c5_name << Sheet.Range("D23")
-	Cell_c5_name.value << c5.ceiling.write_string
-	
-	c6 << c6 + (c6 * (5/100))
-	Cell_c6_name << Sheet.Range("D25")
-	Cell_c6_name.value << c6.ceiling.write_string
-	
-	c7 << c7 + (c7 * (5/100))
-	Cell_c7_name << Sheet.Range("D27")
-	Cell_c7_name.value << c7.ceiling.write_string
-	
-	Cell_c11_name << Sheet.Range("E16")
-	Cell_c11_name.value << c1.ceiling.write_string
-	Cell_c22_name << Sheet.Range("E18")
-	Cell_c22_name.value << c2.ceiling.write_string
-	Cell_c33_name << Sheet.Range("E20")
-	Cell_c33_name.value << c3.ceiling.write_string
-	Cell_c44_name << Sheet.Range("E22")
-	Cell_c44_name.value << p4.ceiling.write_string
-	Cell_c55_name << Sheet.Range("E24")
-	Cell_c55_name.value << c5.ceiling.write_string
-	Cell_c66_name << Sheet.Range("E26")
-	Cell_c66_name.value << c6.ceiling.write_string
-	Cell_c77_name << Sheet.Range("E28")
-	Cell_c77_name.value << c7.ceiling.write_string
-	
-	
-	
-	total_cable_length << c1.ceiling+c2.ceiling+c3.ceiling+c4.ceiling+c5.ceiling+c6.ceiling+c7.ceiling
-	
-	clr << get_count_closure()
-	
-	_for b _over clr.fast_elements()
-	_loop
-		_if b[:id]="clr1" _then
-			Cell_d55_name << Sheet.Range("D76")
-			Cell_d55_name.value << b[:jml].write_string
+		_for i _over change_set.fast_elements()
+		_loop
 			
-		_elif b[:id]="clr2" 
-		_then
-			Cell_d56_name << Sheet.Range("D77")
-			Cell_d56_name.value << b[:jml].write_string
-			
-		_elif b[:id]="clr3"
-		_then
-			Cell_d57_name << Sheet.Range("D78")
-			Cell_d57_name.value << b[:jml].write_string
-			
-		_elif b[:id]="clr4" 
-		_then
-			Cell_d58_name << Sheet.Range("D80")
-			Cell_d58_name.value << b[:jml].write_string
-			
-		_elif b[:id]="clr5"
-		_then
-			Cell_d59_name << Sheet.Range("D81")
-			Cell_d59_name.value << b[:jml].write_string
-			
-		_elif b[:id]="clr6" 
-		_then
-			Cell_d60_name << Sheet.Range("D82")
-			Cell_d60_name.value << b[:jml].write_string
-			
-			
-		_elif b[:id]="clr7" 
-		_then
-			Cell_d61_name << Sheet.Range("D83")
-			Cell_d61_name.value << b[:jml].write_string
-			
-		_elif b[:id]="clr8" 
-		_then
-			Cell_d62_name << Sheet.Range("D84")
-			Cell_d62_name.value << b[:jml].write_string
-		_elif b[:id]="clr9"
-		_then
-			Cell_d63_name << Sheet.Range("D85")
-			Cell_d63_name.value << b[:jml].write_string
-		_elif b[:id]="clr10" 
-		_then
-			Cell_d64_name << Sheet.Range("D86")
-			Cell_d64_name.value << b[:jml].write_string
-		_elif b[:id]="clr11" 
-		_then
-			Cell_d65_name << Sheet.Range("D87")
-			Cell_d65_name.value << b[:jml].write_string
-		_elif b[:id]="clr12"
-		_then
-			Cell_d66_name << Sheet.Range("D88")
-			Cell_d66_name.value << b[:jml].write_string
-		_elif b[:id]="clr13"
-		_then
-			Cell_d67_name << Sheet.Range("D89")
-			Cell_d67_name.value << b[:jml].write_string
-		_elif b[:id]="clr14"
-		_then
-			Cell_d68_name << Sheet.Range("D79")
-			Cell_d68_name.value << b[:jml].write_string
-		_endif
-	_endloop
-	
-	
-	
-	q1 << get_count_sling_wire()
-	Cell_q1_name << Sheet.Range("E226")
-	Cell_q1_name.value << q1.ceiling.write_string
-	
-	_local total_length << total_cable_length + q1.ceiling
-	
-	Cell_q1_name << Sheet.Range("E296")
-	Cell_q1_name.value << total_length.write_string
-	Cell_q1_name << Sheet.Range("E291")
-	Cell_q1_name.value << total_length.write_string
-	
-	_local total_splicing << total_fat * 2
-	
-	
-	#Cell_q1_name << Sheet.Range("E291")
-	#Cell_q1_name.value << total_length.write_string
-	
-	#Cell_q1_name << Sheet.Range("E291")
-	#Cell_q1_name.value << total_length.write_string
-	
+			name <<   i.current_record.source_collection.name
+			_if name _is :sheath_with_loc _then
+				olt_nm << i.current_record.olt
+				cl_code << i.current_record.cluster_code
+				sf_code << i.current_record.subfeeder_code
+				fd_code << i.current_record.feeder_code
+			_endif	
+		_endloop
+
+		#hdp << get_count_hp()
+		#Cell_hdp << Sheet1.Range("O5")
+		#Cell_hdp.value << hdp.write_string
+
+		Cell_olt << Sheet1.Range("O2")
+		Cell_olt.value << olt_nm.write_string
+
+		Cell_nama << Sheet1.Range("O3")
+		Cell_nama.value << nama.write_string
 		
-	_if ug _is _true 
-	_then
+#		_if ug _is _true 
+#		_then
+#			write(ug)
+#		#update to Underground
+#			Cell_type << Sheet1.Range("O4")
+#			Cell_type.value << "Underground"
+#		_else
+#			Cell_type << Sheet1.Range("O4")
+#			Cell_type.value << "Aerial"
+#		_endif
 
-		q1 << get_count_tali_pancing()
-		Cell_q1_name << Sheet.Range("D172")
-		Cell_q1_name.value << q1.ceiling.write_string
+		Cell_type << Sheet1.Range("O4")
 		
-		_if infra_type ="cluster" _then
-			b1 << get_count_open_trenching()
-			Cell_b1_name << Sheet.Range("E109")
-			Cell_b1_name.value << b1.ceiling.write_string
-
-			d1 << get_count_sewer()
-			Cell_d1_name << Sheet.Range("E109")
-			Cell_d1_name.value << d1.ceiling.write_string
-
+		_if ug _is _true _and ae _is _false 
+		_then
+			Cell_type.value << "Underground"
+		_elif ae _is _true _and ug _is _false
+		_then 
+			Cell_type.value << "Aerial"
 		_else
-
-			b1 << get_count_open_trenching()
-			Cell_b1_name << Sheet.Range("E110")
-			Cell_b1_name.value << b1.ceiling.write_string
-
-			d1 << get_count_sewer()
-			Cell_d1_name << Sheet.Range("E110")
-			Cell_d1_name.value << d1.ceiling.write_string
-
-
+			Cell_type.value << "Aerial & Underground"	
 		_endif
 		
-		#write("boring manual")
-		c1 << get_count_boring_manual()
-		Cell_c1_name << Sheet.Range("E112")
-		Cell_c1_name.value << c1.ceiling.write_string
-
-		#write("boring machine")
-		d1 << get_count_boring_machine()
-		Cell_d1_name << Sheet.Range("E119")
-		Cell_d1_name.value << d1.ceiling.write_string
-
-
-		(e1,e2) << get_count_uub_fdt()
-		Cell_e1_name << Sheet.Range("D174")
-		Cell_e1_name.value << e1.write_string
-		Cell_e11_name << Sheet.Range("E175")
-		Cell_e11_name.value << e1.write_string
-		
-		Cell_e2_name << Sheet.Range("D176")
-		Cell_e2_name.value << e2.write_string
-		Cell_e22_name << Sheet.Range("E177")
-		Cell_e22_name.value << e2.write_string
-		
-
-		(f1,f2) << get_count_uub_fat()
-		Cell_f1_name << Sheet.Range("D178")
-		Cell_f1_name.value << f1.write_string
-		Cell_f11_name << Sheet.Range("E179")
-		Cell_f11_name.value << f1.write_string
-		
-		Cell_f2_name << Sheet.Range("D180")
-		Cell_f2_name.value << f2.write_string
-		Cell_f22_name << Sheet.Range("E181")
-		Cell_f22_name.value << f2.write_string
-
-		Cell_f23_name << Sheet.Range("D73")
-		Cell_f23_name.value << total_fat.write_string
-		Cell_f24_name << Sheet.Range("E74")
-		Cell_f24_name.value << total_fat.write_string
-
-		(g1,g2) << get_count_pi()
-		Cell_g1_name << Sheet.Range("D182")
-		Cell_g1_name.value << g1.write_string
-		Cell_g11_name << Sheet.Range("E183")
-		Cell_g11_name.value << g1.write_string
-		
-		Cell_g2_name << Sheet.Range("D184")
-		Cell_g2_name.value << g1.write_string
-		Cell_g22_name << Sheet.Range("E185")
-		Cell_g22_name.value << g1.write_string
-
 		
 	_endif
-	
 
-
-	
-		
-_endproc
-
-$
-
-
-
-
-
-_global backup_create_pl_boq <<
-_proc(type)
-	## DEPRECATED: Use rwwi_astri_boq_generator.new_for_current_design() instead
-	## This procedure maintained for backward compatibility
-	##
-	## Wrapper around new class-based BoQ generator
-	## Parameters:
-	##   type - Output type ("json", etc.)
-	## Returns:
-	##   rope of property_lists with BoQ items
-
-	_try _with errCond
-		# Use new class-based implementation
-		_local generator << rwwi_astri_boq_generator.new_for_current_design(type)
-		_if generator _is _unset
-		_then
-			write("No Design Selected")
-			_return rope.new()
-		_endif
-
-		>> generator.generate()
-	_when error
-		write("LOG: ERROR in create_pl_boq:", errCond.report_contents_string)
-		_return rope.new()
-	_endtry
-_endproc
-$
-
-# ============================================================================
-# OLD IMPLEMENTATION - Preserved for reference only
-# ============================================================================
-# The following is the original 608-line procedural implementation.
-# It has been replaced by the rwwi_astri_boq_generator class.
-# Kept here for reference and potential rollback if needed.
-# ============================================================================
-
-#_block
-	## Old implementation commented out - using new class instead
-	_global create_pl_boq <<
-	_proc(type)
-
-	_local r_result << rope.new()
-	#_local l_result << property_list.new()
-	s << swg_dsn_admin_engine.get_current_job()
-
-	_if s _is _unset
+	# Get user home directory
+	_local home_dir << system.getenv("USERPROFILE")  # Windows
+	_if home_dir _is _unset _orif home_dir = ""
 	_then
-		write("No Design Selected")
-		_leave
+		# Fallback to TEMP if USERPROFILE not available
+		home_dir << system.temp_directory_name
 	_endif
 
-	id << s.id.write_string
-	nama << s.name.write_string
-	owner << s.owner.write_string
-	pj << s.inf_project.write_string
-	st << s.status.write_string
-	change_set << mit_scheme_record_change_set.new(s)
+	# Create sw_kml subdirectory path
+	_local output_dir << system.pathname_from_components("sw_boq", home_dir)
+
+	# Create directory if it doesn't exist
+	_if _not system.file_exists?(output_dir)
+	_then
+		_try
+			system.mkdir(output_dir)
+			write("Created BOQ output directory: ", output_dir)
+		_when error
+			write("WARNING: Could not create sw_kml directory, using temp instead")
+			output_dir << system.temp_directory_name
+		_endtry
+	_endif
+
+	#ex << Excel_Object.save_file( output_dir,"test.xls")
+	#ex << Excel_Object.save_as( "test.xlsx")
+
+	d << date_now()
+	days_number << d.day_of_month_number
+	months_number << d.month_number
+	years_number << d.year
+
+	_if months_number.write_string.size = 1
+	_then 
+		mth << "0"+months_number.write_string
+	_endif
+
+	_if days_number.write_string.size = 1
+	_then 
+		dys << "0"+days_number.write_string
+	_else	
+		dys << days_number
+	_endif
+
+	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
 	
-	start << date_time_now()
-	
-	a_ff << float_format.new_with_properties(
-			:float_format,:fixed,
-			:float_decimal_places,3)
-	
-	#sling wire
-	q1 << get_count_sling_wire()
-
-#	Cell_q1_name << Sheet.Range("D206")
-#	Cell_q1_name.value << q1.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001033",
-			   :object,"Sling Wire",
-			   :name, "Instalasi strand wire/sling messenger 6 mm",
-			   :material, _unset ,
-			   :service, q1 
-				 )
-
-	r_result.add(results)
-
-	
-	#fat
-	(j1,j2) << get_count_fat()
-#	Cell_j1_name << Sheet.Range("D48")
-#	Cell_j1_name.value << j1.write_string
-#	Cell_j2_name << Sheet.Range("D50")
-#	Cell_j2_name.value << j2.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001047",
-			   :object,"FAT",
-			   :name, "Pole mounted outdoor type (16 ports type)",
-			   :material, j1,
-			   :service, _unset 
-				 )
-	r_result.add(results)
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "100000824",
-			   :object,"FAT",
-			   :name, "Pedestal mounted type (16 ports type)",
-			   :material, j2,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-	#fdt
-	(f1,f2,f3,f4,f5,f6) << get_count_fdt()
-	
-#	Cell_f1_name << Sheet.Range("D29")
-#	Cell_f1_name.value << f1.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001039",
-			   :object,"FDT",
-			   :name, "48 cores capacity pole mounted FDT",
-			   :material, f1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-#	Cell_f2_name << Sheet.Range("D31")
-#	Cell_f2_name.value << f2.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001040",
-			   :object,"FDT",
-			   :name, "72 cores capacity pole mounted FDT",
-			   :material, f1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-#	Cell_f3_name << Sheet.Range("D33")
-#	Cell_f3_name.value << f3.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001041",
-			   :object,"FDT",
-			   :name, "96 cores capacity pole mounted FDT",
-			   :material, f1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-#	Cell_f4_name << Sheet.Range("D35")
-#	Cell_f4_name.value << f4.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001042",
-			   :object,"FDT",
-			   :name, "144 cores capacity ground mounted FDT",
-			   :material, f1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-#	Cell_f5_name << Sheet.Range("D37")
-#	Cell_f5_name.value << f5.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001043",
-			   :object,"FDT",
-			   :name, "288 cores capacity ground mounted FDT",
-			   :material, f1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-#	Cell_f6_name << Sheet.Range("D39")
-#	Cell_f6_name.value << f6.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001044",
-			   :object,"FDT",
-			   :name, "576 cores capacity ground mounted FDT",
-			   :material, f1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-
-
-	#pole
-	(p1,p2,p3,p4,p5) << get_count_pole()
-
-#	Cell_p1_name << Sheet.Range("D198")
-#	Cell_p1_name.value << p1.write_string
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001055",
-			   :object,"Pole",
-			   :name, "Pengadaan Tiang 7 meter 3 inch",
-			   :material, p1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-#	Cell_p2_name << Sheet.Range("D194")
-#	Cell_p2_name.value << p2.write_string
-
-	pl_nm << "Pengadaan Tiang 7 meter 4"+%"+%,+"  STEL L-003 1996"
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001183",
-			   :object,"Pole",
-			   :name, pl_nm,
-			   :material, p2,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-	
-#	Cell_p3_name << Sheet.Range("D190")
-#	Cell_p3_name.value << p3.write_string
-
-	pl_nm << "Pengadaan Tiang 7 meter 5"+%"+%,+"  STEL L-003 1996"
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200000187",
-			   :object,"Pole",
-			   :name, pl_nm,
-			   :material, p3,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-	
-#	Cell_p4_name << Sheet.Range("D196")
-#	Cell_p4_name.value << p4.write_string
-
-
-
-	pl_nm << "Pengadaan  Tiang Tunggal 9 meter 4"+%"+%,+"  STEL L-003 1996"
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001181",
-			   :object,"Pole",
-			   :name, pl_nm,
-			   :material, p4,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-	
-#	Cell_p5_name << Sheet.Range("D192")
-#	Cell_p5_name.value << p5.write_string
-
-
-	pl_nm << "Pengadaan  Tiang Tunggal 9 meter 5"+%"+%,+"  STEL L-003 1996"
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200000169",
-			   :object,"Pole",
-			   :name, pl_nm,
-			   :material, p5,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-	#cable
-	(c1,c2,c3,c4,c5,c6,c7) << get_count_cable()
-#	Cell_c1_name << Sheet.Range("D16")
-#	Cell_c1_name.value << c1.write_string
-
-	
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200000100",
-			   :object,"Cable",
-			   :name, "FO core type SM G.652.D-ADSS 24 cores",
-			   :material, c1,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-
-	
-	
-#	Cell_c2_name << Sheet.Range("D18")
-#	Cell_c2_name.value << c2.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200000975",
-			   :object,"Cable",
-			   :name, "FO core type SM G.652.D-ADSS 36 cores",
-			   :material, c2,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-#	Cell_c3_name << Sheet.Range("D20")
-#	Cell_c3_name.value << c3.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001038",
-			   :object,"Cable",
-			   :name, "FO core type SM G.652.D-ADSS 48 cores",
-			   :material, c3,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-#	#Cell_c4_name << Sheet.Range("D196")
-#	#Cell_c4_name.value << p4.write_string
-
-#	results << property_list.new_with(
-#			   :type, type,
-#			   :code, "1",
-#			   :object,"Cable",
-#			   :name, "FO core type SM G.652.D-ADSS 72 cores",
-#			   :material, c4,
-#			   :service, _unset 
-#				 )
-#
-#	r_result.add(results)
-	
-#	Cell_c5_name << Sheet.Range("D22")
-#	Cell_c5_name.value << c5.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001630",
-			   :object,"Cable",
-			   :name, "FO core type SM G.652.D-ADSS 96 cores",
-			   :material, c5,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-#	Cell_c6_name << Sheet.Range("D24")
-#	Cell_c6_name.value << c6.write_string
-
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001030",
-			   :object,"Cable",
-			   :name, "FO core  type SM G.652.D-ADSS 144 cores",
-			   :material, c6,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-#	Cell_c7_name << Sheet.Range("D26")
-#	Cell_c7_name.value << c7.write_string
-
-	results << property_list.new_with(
-			   :type, type,
-			   :code, "200001015",
-			   :object,"Cable",
-			   :name, "FO core type SM G.652.D-ADSS 288 cores",
-			   :material, c7,
-			   :service, _unset 
-				 )
-
-	r_result.add(results)
-	
-
-
-
-	#closure
-	clr << get_count_closure()
-#	
-	_for b _over clr.fast_elements()
-	_loop
-		_if b[:id]="clr1" _then
-#			Cell_d55_name << Sheet.Range("D55")
-#			Cell_d55_name.value << b[:jml].write_string
-	
-			results << property_list.new_with(
-					   :type, type,
-					   :code, "200000182",
-					   :object,"Closure",
-					   :name, "Fiber Optic Joint Closure Type In-line 24 Core",
-					   :material, b[:jml].write_string,
-					   :service, _unset 
-						 )
-
-			r_result.add(results)
-	
-
-	
-		_elif b[:id]="clr2" 
+	_if infra_type ="cluster" _then
+		_if ug _is _true _and ae _is _false 
 		_then
-#			Cell_d56_name << Sheet.Range("D56")
-#			Cell_d56_name.value << b[:jml].write_string
+			ad << output_dir+"\BoQ_("+nama+"), ("+cl_code+"), ("+hari+") UG.xlsx"
+			WorkBook.saveas(ad)
 
-			results << property_list.new_with(
-					   :type, type,
-					   :code, "200001048",
-					   :object,"Closure",
-					   :name, "Fiber Optic Joint Closure Type In-line 36 Core",
-					   :material, b[:jml].write_string,
-					   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-	
-		_elif b[:id]="clr3"
+		_elif ae _is _true _and ug _is _false
 		_then
-#			Cell_d57_name << Sheet.Range("D57")
-#			Cell_d57_name.value << b[:jml].write_string
-
-			results << property_list.new_with(
-					   :type, type,
-					   :code, "200000159",
-					   :object,"Closure",
-					   :name, "Fiber Optic Joint Closure Type In-line 48 Core",
-					   :material, b[:jml].write_string,
-					   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-
-
-			
-		_elif b[:id]="clr4" 
-		_then
-#			Cell_d58_name << Sheet.Range("D58")
-#			Cell_d58_name.value << b[:jml].write_string
-
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200000179",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type In-line 96 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-			
-		_elif b[:id]="clr5"
-		_then
-#			Cell_d59_name << Sheet.Range("D59")
-#			Cell_d59_name.value << b[:jml].write_string
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200000186",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type In-line 144 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-
-
-			
-		_elif b[:id]="clr6" 
-		_then
-#			Cell_d60_name << Sheet.Range("D60")
-#			Cell_d60_name.value << b[:jml].write_string
-
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200000155",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type In-line 288 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-
-			
-		_elif b[:id]="clr7" 
-		_then
-#			Cell_d61_name << Sheet.Range("D61")
-#			Cell_d61_name.value << b[:jml].write_string
-
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200000180",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type Dome 24 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-			
-		_elif b[:id]="clr8" 
-		_then
-#			Cell_d62_name << Sheet.Range("D62")
-#			Cell_d62_name.value << b[:jml].write_string
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200001049",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type Dome 36 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-
-			
-		_elif b[:id]="clr9"
-		_then
-#			Cell_d63_name << Sheet.Range("D63")
-#			Cell_d63_name.value << b[:jml].write_string
-
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200000164",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type Dome 48 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-
-
-			
-		_elif b[:id]="clr10" 
-		_then
-#			Cell_d64_name << Sheet.Range("D64")
-#			Cell_d64_name.value << b[:jml].write_string
-#			results << property_list.new_with(
-#						   :type, type,
-#						   :code, "1",
-#						   :object,"Closure",
-#						   :name, "Fiber Optic Joint Closure Type Dome 72 Core",
-#						   :material, b[:jml].write_string,
-#						   :service, _unset 
-#						 )
-#
-#			r_result.add(results)
-
-
-			
-		_elif b[:id]="clr11" 
-		_then
-#			Cell_d65_name << Sheet.Range("D65")
-#			Cell_d65_name.value << b[:jml].write_string
-			results << property_list.new_with(
-						   :type, type,
-						   :code, "200000176",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type Dome 96 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-			r_result.add(results)
-
-			
-		_elif b[:id]="clr12"
-		_then
-#			Cell_d66_name << Sheet.Range("D66")
-#			Cell_d66_name.value << b[:jml].write_string
-
-				results << property_list.new_with(
-						   :type, type,
-						   :code, "200000158",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type Dome 144 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-				r_result.add(results)
-
-
-
-			
-		_elif b[:id]="clr13"
-		_then
-#			Cell_d67_name << Sheet.Range("D67")
-#			Cell_d67_name.value << b[:jml].write_string
-
-				results << property_list.new_with(
-						   :type, type,
-						   :code, "200000156",
-						   :object,"Closure",
-						   :name, "Fiber Optic Joint Closure Type Dome 288 Core",
-						   :material, b[:jml].write_string,
-						   :service, _unset 
-						 )
-
-				r_result.add(results)
-
-
-			
+			ad << output_dir+"\BoQ_("+nama+"), ("+cl_code+"), ("+hari+") AE.xlsx"
+			WorkBook.saveas(ad)
+		
+		_elif ae _is _true _and ug _is _true
+		_then 
+			ad << output_dir+"\BoQ_("+nama+"), ("+cl_code+"), ("+hari+") AE + UG.xlsx"
+			WorkBook.saveas(ad)
 		_endif
-	_endloop
+			
+	_elif infra_type ="subfeeder"
+	_then
+	#	ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+").xlsx"
+	#	WorkBook.saveas(ad)
 
-	>> r_result
-	_endproc ## End of old implementation
+		_if ug _is _true _and ae _is _false 
+		_then
+			ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+") SF UG.xlsx"
+			WorkBook.saveas(ad)
 
-	# Block to prevent old implementation from being executed
-#_endblock
+		_elif ae _is _true _and ug _is _false
+		_then
+			ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+") SF AE.xlsx"
+			WorkBook.saveas(ad)
+		
+		_elif ae _is _true _and ug _is _true
+		_then 
+			ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+") SF AE + UG.xlsx"
+			WorkBook.saveas(ad)
+		_endif
+			
+	_else
+	#	ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+").xlsx"
+	#	WorkBook.saveas(ad)
+		
+		_if ug _is _true _and ae _is _false 
+		_then
+			ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+") UG.xlsx"
+			WorkBook.saveas(ad)
+
+		_elif ae _is _true _and ug _is _false
+		_then
+			ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+") AE.xlsx"
+			WorkBook.saveas(ad)
+		
+		_elif ae _is _true _and ug _is _true
+		_then 
+			ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+") AE + UG.xlsx"
+			WorkBook.saveas(ad)
+		_endif
+		
+	_endif
+	WorkBook.Release_Object ()
+	Excel_Object.Release_Object ()
+_endproc
 $
+
+
+
+

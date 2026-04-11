@@ -47,12 +47,12 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_ug_folder_contents(p_stre
 	##   p_area - Design boundary area
 	##   p_indent - Indentation string
 
-	write("Processing UG feeder folder: ", p_folder_name)
+	#write("Processing UG feeder folder: ", p_folder_name)
 
 	# Handle OLT folder - same collection as aerial (mit_hub)
 	_if p_folder_name.index_of_seq("OLT") _isnt _unset
 	_then
-		write("  Exporting OLTs...")
+		#write("  Exporting OLTs...")
 		all_olts << .gc[:mit_hub].select(
 			predicate.interacts(:location, p_area))
 
@@ -66,11 +66,6 @@ _private _method rwi_export_to_aerial_kmz.write_feeder_ug_folder_contents(p_stre
 				olt_count +<< 1
 			_endif
 		_endloop
-
-		_if olt_count > 0
-		_then
-			write("  Wrote ", olt_count, " OLTs to folder: ", p_folder_name)
-		_endif
 	_endif
 
 	# Handle JOINT CLOSURE folder - UG: query sheath_splice directly (no poles)
@@ -204,11 +199,6 @@ _private _method rwi_export_to_aerial_kmz.write_open_trenching_for_folder(p_stre
 		.object_writer.write_open_trenching(ot, route_geom, p_stream, p_indent)
 		ot_count +<< 1
 	_endloop
-
-	_if ot_count > 0
-	_then
-		write("  Wrote ", ot_count, " OPEN TRENCHING chains")
-	_endif
 _endmethod
 $
 
@@ -334,11 +324,6 @@ _private _method rwi_export_to_aerial_kmz.write_uub_for_folder(p_stream, p_folde
 			.total_uub_new_count +<< 1
 		_endif
 	_endloop
-
-	_if uub_count > 0
-	_then
-		write("  Wrote ", uub_count, " UUBs to folder: ", p_folder_name)
-	_endif
 _endmethod
 $
 
@@ -422,11 +407,6 @@ _private _method rwi_export_to_aerial_kmz.write_boring_manual_for_folder(p_strea
 		bm_count +<< 1
 		.total_boring_manual_count +<< 1
 	_endloop
-
-	_if bm_count > 0
-	_then
-		write("  Wrote ", bm_count, " BORING MANUAL chains")
-	_endif
 _endmethod
 $
 
@@ -511,7 +491,7 @@ _private _method rwi_export_to_aerial_kmz.write_sub_duct_for_folder(p_stream, p_
 		                   _then >> write_string(" (", p_spec_filter, ")")
 		                   _else >> ""
 		                   _endif
-		write("  Wrote ", sd_count, " SUB DUCT chains", spec_msg)
+		#write("  Wrote ", sd_count, " SUB DUCT chains", spec_msg)
 	_endif
 _endmethod
 $
@@ -615,11 +595,6 @@ _private _method rwi_export_to_aerial_kmz.write_ug_closure_for_folder(p_stream, 
 		closure_count +<< 1
 		.total_closure_count +<< 1
 	_endloop
-
-	_if closure_count > 0
-	_then
-		write("  Wrote ", closure_count, " JOINT CLOSURE(s)")
-	_endif
 _endmethod
 $
 
@@ -764,7 +739,7 @@ _private _method rwi_export_to_aerial_kmz.write_ug_sheath_splices_for_folder(p_s
 		_endif
 	_endloop
 
-	write("  ", p_equipment_type, " summary: Checked ", uubs_checked, " UUBs, found ", splices_found, " total splices, wrote ", equipment_count, " matching ", p_equipment_type)
+	#write("  ", p_equipment_type, " summary: Checked ", uubs_checked, " UUBs, found ", splices_found, " total splices, wrote ", equipment_count, " matching ", p_equipment_type)
 _endmethod
 $
 
@@ -884,11 +859,6 @@ _private _method rwi_export_to_aerial_kmz.write_ug_fdt_equipment(p_stream, p_are
 		fdt_count +<< 1
 		.total_fdt_count +<< 1
 	_endloop
-
-	_if fdt_count > 0
-	_then
-		write("  Wrote ", fdt_count, " FDT equipment (UG)")
-	_endif
 _endmethod
 $
 
@@ -1006,11 +976,6 @@ _private _method rwi_export_to_aerial_kmz.write_ug_figure_eight_for_folder(p_str
 		fig8_count +<< 1
 		.total_slack_hanger_count +<< 1
 	_endloop
-
-	_if fig8_count > 0
-	_then
-		write("  Wrote ", fig8_count, " SLACK HANGER (figure_eight) object(s)")
-	_endif
 _endmethod
 $
 
@@ -1064,7 +1029,7 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_s
 	##   p_area        - Design boundary area
 	##   p_indent      - Indentation string
 
-	write("Processing UG subfeeder folder: ", p_folder_name)
+	#write("Processing UG subfeeder folder: ", p_folder_name)
 
 	# JOINT CLOSURE - sheath_splice direct (no poles in UG)
 	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset

@@ -254,6 +254,16 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 			write_string("Created: ", output_path))
 		_self.log_info(write_string("Export completed: ", output_path))
 
+		# Store path for manual/auto upload
+		.last_kmz_path << output_path
+
+		# Auto-upload KMZ to ASTRI if toggle is On
+		_if .items[:auto_upload_kmz] _isnt _unset _andif
+		    .items[:auto_upload_kmz].value = "On"
+		_then
+			_self.upload_kmz_to_astri(output_path)
+		_endif
+
 		# Auto-open KML file in default application (Google Earth, etc.)
 		_try
 			_self.log_info("Opening KML file in default application...")
@@ -267,7 +277,6 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 			write("WARNING: Could not auto-open KML file: ", condition.report_contents_string)
 			_self.log_info("Note: Could not auto-open KML file automatically")
 		_endtry
-
 	_when error
 		_self.show_alert("Export Failed", errCond.report_contents_string)
 		_self.log_info(write_string("Export failed: ", errCond.report_contents_string))

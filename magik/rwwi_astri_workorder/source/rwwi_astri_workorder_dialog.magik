@@ -11,12 +11,14 @@ $
 
 def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 {
-	{:engine,     _unset, :writable},       # Engine instance
-	{:items,      _unset, :writable},       # UI components cache
-	{:owner,     _unset, :writable},        # Parent plugin
-	{:filters,    _unset, :writable},       # Current filter values
-	{:selected_wo, _unset, :writable},      # Currently selected work order
-	{:wo_cache,   _unset, :writable}        # Cache to store work orders by row number
+	{:engine,        _unset, :writable},    # Engine instance
+	{:items,         _unset, :writable},    # UI components cache
+	{:owner,         _unset, :writable},    # Parent plugin
+	{:filters,       _unset, :writable},    # Current filter values
+	{:selected_wo,   _unset, :writable},    # Currently selected work order
+	{:wo_cache,      _unset, :writable},    # Cache to store work orders by row number
+	{:last_kmz_path, _unset, :writable},    # Path of most recently exported KMZ
+	{:last_boq_path, _unset, :writable}     # Path of most recently saved BOQ document
 }, :model)
 $
 
@@ -66,9 +68,10 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:model, _self)
 
 	# Create outer container with flexible row sizing
-	# 7 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed), Table (flexible), Text Window (flexible), Detail Panel (fixed), Progress Footer (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 7, 1,
-		:row_resize_values, {0, 0, 0, 1, 1, 0, 0})
+	# 8 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed), Toolbar4/Upload (fixed),
+	#         Table (flexible), Text Window (flexible), Detail Panel (fixed), Progress Footer (fixed)
+	.items[:outer] << outer << sw_container.new(top_c, 8, 1,
+		:row_resize_values, {0, 0, 0, 0, 1, 1, 0, 0})
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
@@ -76,6 +79,9 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 
 	# Build local KMZ file browser toolbar
 	_self.build_toolbar3(outer)
+
+	# Build upload toolbar
+	_self.build_toolbar4(outer)
 
 	# Build work order table
 	_self.build_table(outer)
@@ -240,6 +246,66 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
 		:editable?, _false)
 	.items[:migration_scope].text_items << {"All", "Network", "HP and Boundary"}
 	.items[:migration_scope].value << "All"
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
+	## Build upload toolbar for sending KMZ documents to the ASTRI Document API.
+	## Contains: Upload Type dropdown, Upload KMZ button, Auto-upload toggle.
+	## BOQ upload buttons are reserved for future implementation.
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
+
+	a_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(a_toolbar, "  Upload:  ")
+
+	# Document type dropdown — allows operator to override auto-resolved type_name
+	sw_label_item.new(a_toolbar, "Type:  ")
+	.items[:upload_type_name] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 30,
+		:editable?, _false)
+	.items[:upload_type_name].text_items << {
+		"(auto)",
+		"as_plan_drawing_kmz",
+		"as_plan_drawing_kmz_main_feeder",
+		"as_plan_drawing_subfeeder_kmz",
+		"as_built_drawing_kmz",
+		"as_built_drawing_kmz_main_feeder",
+		"network_design",
+		"boundary_kmz",
+		"high_level_design",
+		"pre_abd_kmz",
+		"pre_abd_kmz_feeder",
+		"compiled_abd_feeder_kmz"}
+	.items[:upload_type_name].value << "(auto)"
+
+	# Upload KMZ button
+	.items[:upload_kmz_btn] << sw_button_item.new(a_toolbar,
+		:label, "Upload KMZ",
+		:model, _self,
+		:selector, :upload_kmz|()|,
+		:tooltip, "Upload last exported KMZ to ASTRI Document API")
+
+	# Auto-upload toggle — when On, KMZ is uploaded immediately after every export
+	sw_label_item.new(a_toolbar, "  Auto-upload:  ")
+	.items[:auto_upload_kmz] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 5,
+		:editable?, _false)
+	.items[:auto_upload_kmz].text_items << {"Off", "On"}
+	.items[:auto_upload_kmz].value << "Off"
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.upload_kmz()
+	## Button handler for "Upload KMZ" — delegates to upload_kmz_to_astri
+	_self.upload_kmz_to_astri(.last_kmz_path)
 _endmethod
 $
 

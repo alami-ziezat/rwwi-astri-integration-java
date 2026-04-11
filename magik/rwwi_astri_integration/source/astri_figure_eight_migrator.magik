@@ -68,27 +68,34 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_local (found, n_obj) << _self.scan_olt(pp, 700)
 		_if _not found
 		_then
-			(found, n_obj) << _self.scan_pole_st(pp, 700)
+			(found, n_obj) << _self.scan_sheath_splice(pp, 700)
 		_endif
 
 		_local sh_loc << _unset
 
 		_if found _is _true
 		_then
-			# Pole/OLT found - use it as structure
-			sh_loc << n_obj.location.coord
-			#write("    >> Found existing structure within 700cm: ", n_obj)
+			# Sheath splice/OLT found - use it as structure
+			#sh_loc << n_obj.location.coord
+			write("    >> Found FE existing structure within 700cm: ", n_obj)
 
 			# Check if structure already has a figure_eight
 			_local existing_fe << _unset
 			_try
-				_local equipment_set << n_obj.get_equipment()
+				_local l_structure << n_obj
+				_if eq.source_collection.name _is :sheath_splice
+				_then
+					l_structure << n_obj.get_structure()
+				_endif
+				_local equipment_set << l_structure.get_equipment()
 				_if equipment_set _isnt _unset
 				_then
 					_for eq _over equipment_set.fast_elements()
 					_loop
 						_if eq.source_collection.name _is :figure_eight
 						_then
+							_local upd_trx << record_transaction.new_update(eq, property_list.new_with(:name, pm[:name]))
+							upd_trx.run()
 							existing_fe << eq
 							_leave
 						_endif

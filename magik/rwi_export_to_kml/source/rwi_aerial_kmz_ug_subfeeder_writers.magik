@@ -50,7 +50,7 @@ _private _method rwi_export_to_aerial_kmz.write_subfeeder_ug_folder_contents(p_s
 	##   p_area - Design boundary area
 	##   p_indent - Indentation string
 
-	write("Processing UG subfeeder folder: ", p_folder_name)
+	#write("Processing UG subfeeder folder: ", p_folder_name)
 
 	# Handle JOINT CLOSURE folder - UG: query sheath_splice directly (no poles)
 	_if p_folder_name.index_of_seq("JOINT CLOSURE") _isnt _unset

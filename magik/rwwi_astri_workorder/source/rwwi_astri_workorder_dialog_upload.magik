@@ -1,0 +1,197 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## ASTRI Work Order Dialog - Document Upload Methods
+## Handles uploading KMZ and BOQ Excel files to the ASTRI Document Management API.
+##
+## Global Java procs used:
+##   astri_upload_kmz(file_path, type_name, _optional cluster_code, osp_route_name, olt_name, olt_site_name)
+##   astri_upload_document(file_path, type_name, _optional cluster_code, osp_route_name, olt_name, olt_site_name)
+##
+## type_name values for KMZ:
+##   as_plan_drawing_kmz              - APD Cluster KMZ         (cluster, Proposed)
+##   as_plan_drawing_kmz_main_feeder  - APD Main Feeder KMZ     (feeder,  Proposed)
+##   as_plan_drawing_subfeeder_kmz    - APD Subfeeder KMZ       (subfeeder, Proposed)
+##   as_built_drawing_kmz             - ABD Cluster KMZ         (cluster, In Service)
+##   as_built_drawing_kmz_main_feeder - ABD Main Feeder KMZ     (feeder,  In Service)
+##   network_design                   - Network Design           (fallback)
+##   boundary_kmz                     - Boundary KMZ
+##   high_level_design                - High Level Design        (BOQ / HLD docs)
+##   pre_abd_kmz                      - Pre-ABD KMZ             (cluster, Pre-ABD)
+##   pre_abd_kmz_feeder               - Pre-ABD KMZ Feeder      (feeder,  Pre-ABD)
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.resolve_upload_type_name(infra_type, const_status)
+	## Determine the ASTRI type_name for a KMZ upload based on infrastructure
+	## type and construction status.
+	##
+	## Parameters:
+	##   infra_type   - "cluster", "subfeeder" or "feeder" (string)
+	##   const_status - "Proposed", "In Service", "Pre-ABD" (string)
+	## Returns:
+	##   type_name string to pass to the ASTRI upload API
+
+	_local it << infra_type.default("cluster").lowercase
+	_local cs << const_status.default("Proposed")
+
+	_if cs = "In Service"
+	_then
+		_if it = "cluster"    _then >> "as_built_drawing_kmz"             _endif
+		_if it = "feeder"     _then >> "as_built_drawing_kmz_main_feeder" _endif
+		_if it = "subfeeder"  _then >> "as_built_drawing_kmz"             _endif
+	_elif cs = "Pre-ABD"
+	_then
+		_if it = "cluster"    _then >> "pre_abd_kmz"                      _endif
+		_if it = "feeder"     _then >> "pre_abd_kmz_feeder"               _endif
+		_if it = "subfeeder"  _then >> "pre_abd_kmz"                      _endif
+	_else
+		# Proposed (default)
+		_if it = "cluster"    _then >> "as_plan_drawing_kmz"              _endif
+		_if it = "feeder"     _then >> "as_plan_drawing_kmz_main_feeder"  _endif
+		_if it = "subfeeder"  _then >> "as_plan_drawing_subfeeder_kmz"    _endif
+	_endif
+	>> "network_design"   # fallback
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.upload_kmz_to_astri(_optional file_path)
+	## Upload a KMZ file to the ASTRI document API.
+	## If file_path is unset, uses .last_kmz_path (set after every KMZ export).
+	## The type_name is resolved automatically from the selected work order but
+	## can be overridden via the .items[:upload_type_name] dropdown.
+	##
+	## Parameters:
+	##   file_path - (optional) absolute path to .kmz or .kml file
+
+	_local path << file_path.default(.last_kmz_path)
+	_if path _is _unset _orif path = ""
+	_then
+		_self.user_error("No KMZ file available. Please export a KMZ first.")
+		_return
+	_endif
+
+	_if .selected_wo _is _unset
+	_then
+		_self.user_error("Please select a work order before uploading.")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	
+	# Resolve conditional fields from work order
+	_local infra_type   << wo[:infrastructure_type].default("cluster").lowercase
+	_local cluster_code << _unset
+	_local osp_route    << _unset
+	_local olt_name     << _unset
+	
+	# Resolve type_name from UI dropdown.
+	# "(auto)" and empty both default to "as_plan_drawing_kmz".
+	_local type_name << _unset
+	_if .items[:upload_type_name] _isnt _unset
+	_then
+		type_name << .items[:upload_type_name].value
+	_endif
+	write("")
+	_if type_name = "(auto)" _orif type_name _is _unset _orif type_name = ""
+	_then
+		type_name << "as_plan_drawing_kmz"  # default fallback
+		#_self.resolve_upload_type_name(infra_type, const_status)  
+	_endif
+	wo.p
+	_if infra_type = "cluster"
+	_then
+		cluster_code << wo[:infra_code]
+		olt_name << olt_site_name << wo[:olt_name]
+	_elif infra_type = "subfeeder"
+	_then
+		cluster_code << wo[:infra_code]
+		olt_name << olt_site_name << wo[:olt_name]	
+	_elif infra_type = "feeder"
+	_then
+		osp_route << wo[:infra_name]
+		olt_name << olt_site_name << wo[:olt_name]
+	_endif
+
+	_self.log_info("")
+	_self.log_info("="*55)
+	_self.log_info("UPLOADING KMZ TO ASTRI")
+	_self.log_info("="*55)
+	_self.log_info(write_string("  File:         ", path))
+	_self.log_info(write_string("  Type:         ", type_name))
+	_self.log_info(write_string("  Infra Code:   ", cluster_code.default(osp_route.default(olt_name.default("(none)")))))
+	_self.log_info("-"*55)
+
+	_try _with errCond
+		_local xml_result << astri_upload_kmz(
+			path,
+			type_name,
+			cluster_code,
+			osp_route,
+			olt_name,
+			olt_site_name)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.log_info("ERROR: No response from upload API")
+			_self.user_error("Upload failed - no response from server")
+			_return
+		_endif
+
+		# Parse XML response
+		_local xml_doc      << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local success      << success_elem _isnt _unset _andif
+		                       success_elem.xml_result = "true"
+
+		_if success
+		_then
+			_local msg_elem << xml_doc.element_matching_name(:message)
+			_local msg << _if msg_elem _isnt _unset
+			              _then >> msg_elem.xml_result
+			              _else >> "Upload completed"
+			              _endif
+			_self.log_success("UPLOAD SUCCESSFUL")
+			_self.log_info(write_string("  Response: ", msg.slice(1, msg.size.min(200))))
+			_self.log_info("="*55)
+			_self.user_info(write_string("KMZ uploaded successfully!", %newline,
+				"Type: ", type_name, %newline, "File: ", path))
+		_else
+			_local err_elem << xml_doc.element_matching_name(:error)
+			_local err_msg  << _if err_elem _isnt _unset
+			                   _then >> err_elem.xml_result
+			                   _else >> "Unknown error"
+			                   _endif
+			_self.log_info(write_string("ERROR: ", err_msg))
+			_self.log_info("="*55)
+			_self.user_error(write_string("Upload failed:", %newline, err_msg))
+		_endif
+
+	_when error
+		_self.log_info(write_string("EXCEPTION: ", errCond.report_contents_string))
+		_self.log_info("="*55)
+		_self.user_error(write_string("Upload error:", %newline,
+			errCond.report_contents_string))
+	_endtry
+_endmethod
+$
+
+# BOQ upload — reserved for future implementation
+#
+#_pragma(classify_level=basic, topic={astri_integration})
+#_method rwwi_astri_workorder_dialog.upload_boq_to_astri(_optional file_path)
+#	_local path << file_path
+#	_if path _is _unset _orif path = "" _then path << .last_boq_path _endif
+#	_if path _is _unset _orif path = "" _then path << _self.choose_boq_file() _endif
+#	_if path _is _unset _orif path = "" _then _return _endif
+#	# TODO: implement BOQ upload logic (same pattern as upload_kmz_to_astri)
+#_endmethod
+#$
+#
+#_pragma(classify_level=basic, topic={astri_integration})
+#_method rwwi_astri_workorder_dialog.choose_boq_file()
+#	# TODO: open file chooser for BOQ Excel selection
+#_endmethod
+#$

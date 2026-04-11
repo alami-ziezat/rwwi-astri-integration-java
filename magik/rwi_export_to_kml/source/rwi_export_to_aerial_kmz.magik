@@ -722,7 +722,7 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 			line_id << folder_def[:line_id]
 			fdt_name << folder_def[:fdt_name]
 
-			write("  DEBUG: Checking folder '", folder_name, "' | line_id=", line_id, " | fdt_name=", fdt_name)
+			#write("  DEBUG: Checking folder '", folder_name, "' | line_id=", line_id, " | fdt_name=", fdt_name)
 
 			# Check if this is a LINE folder (has line_id property)
 			_if folder_def[:line_id] _isnt _unset
@@ -730,7 +730,7 @@ _private _method rwi_export_to_aerial_kmz.write_cluster_section(p_stream, p_area
 				# Count objects in this LINE folder and all its subfolders
 				object_count << _self.count_line_folder_objects(folder_def, p_area)
 
-				write("    DEBUG: count_line_folder_objects returned: ", object_count)
+				#write("    DEBUG: count_line_folder_objects returned: ", object_count)
 
 				_if object_count > 0
 				_then
@@ -2312,13 +2312,13 @@ _private _method rwi_export_to_aerial_kmz.count_line_folder_objects(p_folder_def
 	current_line_id << p_folder_def[:line_id].default(p_parent_line_id)
 	current_fdt_folder << p_folder_def[:fdt_name].default(p_parent_fdt_folder)
 
-	write("      DEBUG: Counting objects for LINE ", current_line_id, " FDT ", current_fdt_folder)
+	#write("      DEBUG: Counting objects for LINE ", current_line_id, " FDT ", current_fdt_folder)
 
 	# Simplified: Just count poles that match this LINE and FDT
 	# If there are poles, there will likely be other objects too
 	_if current_line_id _is _unset
 	_then
-		write("        DEBUG: No LINE ID, returning 0")
+		#write("        DEBUG: No LINE ID, returning 0")
 		>> 0
 	_endif
 
@@ -2358,7 +2358,7 @@ _private _method rwi_export_to_aerial_kmz.count_line_folder_objects(p_folder_def
 		pole_count +<< 1
 	_endloop
 
-	write("        DEBUG: Found ", pole_count, " poles for LINE ", current_line_id)
+	#write("        DEBUG: Found ", pole_count, " poles for LINE ", current_line_id)
 
 	>> pole_count
 _endmethod
