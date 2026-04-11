@@ -3915,6 +3915,7 @@ _proc(design, infra_type)
 	_endif
 	WorkBook.Release_Object ()
 	Excel_Object.Release_Object ()
+	>> ad   # return saved file path for auto-upload
 _endproc
 $
 

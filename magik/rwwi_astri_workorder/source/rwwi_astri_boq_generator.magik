@@ -1221,7 +1221,7 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
 		_local total_buldog  << 0
 		_for ring, raw_len _over lengths_by_ring.fast_keys_and_elements()
 		_loop
-			_local group_qty   << (raw_len * 1.05).ceiling
+			_local group_qty   << (raw_len.ceiling * 1.05).ceiling
 			_local buldog_qty  << (group_qty / 40.0 * 6).rounded
 			total_length +<< group_qty
 			total_buldog +<< buldog_qty
@@ -1252,11 +1252,11 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 	## for each cable record, grouped by (stf_item_code, ring_name, line_type).
 	##
 	## Excel formula applied per group:
-	##   ROUNDUP(((base_length) + (fat_count + fdt_count) * 20) * 1.05, 0)
+	##   ROUNDUP((CEILING(base_length) + (fat_count + fdt_count) * 20) * 1.05, 0)
 	## where:
 	##   base_length  = sum of route_sectors().line_length (cm->m) per group
-	##   fat_count    = number of FAT objects sharing the same ring_name
-	##   fdt_count    = number of FDT objects sharing the same ring_name
+	##   fat_count    = number of FAT objects sharing the same ring_name AND line_type
+	##   fdt_count    = number of FDT objects sharing the same ring_name (1 FDT serves multiple lines)
 	##   20           = slack allowance in metres per FAT/FDT
 	##   1.05         = 5% tolerance factor
 	##
@@ -1294,11 +1294,20 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				obj_ring << obj.ring_name.write_string
 			_endif
 
-			_if fat_codes.includes?(obj_code)
+			_local obj_ltype << ""
+			_if obj.responds_to?(:line_type) _andif obj.line_type _isnt _unset
 			_then
-				fat_by_ring[obj_ring] << fat_by_ring[obj_ring].default(0) + 1
-			_elif fdt_codes.includes?(obj_code)
+				obj_ltype << obj.line_type.write_string
+			_endif
+
+			_local fat_ring_line_key << write_string(obj_ring, "|", obj_ltype)
+
+			_if fat_codes.eq_includes?(obj_code)
 			_then
+				fat_by_ring[fat_ring_line_key] << fat_by_ring[fat_ring_line_key].default(0) + 1
+			_elif fdt_codes.eq_includes?(obj_code)
+			_then
+				# FDT keyed by ring only - 1 FDT can serve multiple line types
 				fdt_by_ring[obj_ring] << fdt_by_ring[obj_ring].default(0) + 1
 			_endif
 		_endloop
@@ -1348,7 +1357,7 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 			# Sum route_sectors line_length (cm -> m)
 			_local seg_length << rec.route_sectors().line_length / 100
 			
-			write("  SWL ID:", rec.id, "code:", code, "ring:", ring, "ltype:", ltype, "length:", seg_length, "m")
+			#write("  SWL ID:", rec.id, "code:", code, "ring:", ring, "ltype:", ltype, "length:", seg_length, "m")
 			
 		    _if seg_length <= 0 _then _continue _endif
 
@@ -1379,20 +1388,21 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				_local group_key << write_string(code, "|", sub_key)
 				_local base_len  << lengths_by_group[group_key].default(0)
 
-				# Extract ring from sub_key ("ring|ltype")
-				_local sep_pos << sub_key.index_of(%|)
+				# FAT keyed by ring|ltype (sub_key is already "ring|ltype")
+				_local fat_cnt  << fat_by_ring[sub_key].default(0)
+				# FDT keyed by ring only - extract ring from sub_key ("ring|ltype")
+				_local sep_pos  << sub_key.index_of(%|)
 				_local grp_ring << _if sep_pos _isnt _unset
 				                   _then >> sub_key.slice(1, sep_pos - 1)
 				                   _else >> sub_key
 				                   _endif
-
-				_local fat_cnt  << fat_by_ring[grp_ring].default(0)
 				_local fdt_cnt  << fdt_by_ring[grp_ring].default(0)
 				_local slack    << (fat_cnt + fdt_cnt) * 20
 
-				_local qty << ((base_len + slack) * 1.05).ceiling
+				_local qty << ((base_len.ceiling + slack) * 1.05).ceiling
 				write("LOG: SWL code:", code, "|group:", sub_key,
-				      "|base:", base_len, "m |FAT:", fat_cnt, "|FDT:", fdt_cnt,
+				      "|base:", base_len, "m |base_ceiled:", base_len.ceiling,
+				      "|FAT:", fat_cnt, "|FDT:", fdt_cnt,
 				      "|slack:", slack, "m -> qty:", qty)
 				code_total +<< qty
 			_endloop

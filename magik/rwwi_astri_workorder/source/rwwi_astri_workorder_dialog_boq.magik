@@ -36,12 +36,18 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 			_return
 		_endif
 
-		# Call the global create_boq procedure
+		# Call the global create_boq procedure (returns saved file path)
 		write("Calling create_boq procedure...")
-		create_boq(scheme, wo[:infrastructure_type].default("cluster").lowercase)
+		_local boq_file_path << create_boq(scheme, wo[:infrastructure_type].default("cluster").lowercase)
 
 		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
 			scheme.name))
+
+		# Auto-upload BOQ Excel to ASTRI after successful generation
+		_if boq_file_path _isnt _unset _andif boq_file_path <> ""
+		_then
+			_self.upload_boq_to_astri(boq_file_path)
+		_endif
 
 	_when error
 		write("LOG: Error generating BoQ as Excel:", errCond.report_contents_string)

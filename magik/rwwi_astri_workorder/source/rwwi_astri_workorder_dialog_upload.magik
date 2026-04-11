@@ -178,20 +178,102 @@ _method rwwi_astri_workorder_dialog.upload_kmz_to_astri(_optional file_path)
 _endmethod
 $
 
-# BOQ upload — reserved for future implementation
-#
-#_pragma(classify_level=basic, topic={astri_integration})
-#_method rwwi_astri_workorder_dialog.upload_boq_to_astri(_optional file_path)
-#	_local path << file_path
-#	_if path _is _unset _orif path = "" _then path << .last_boq_path _endif
-#	_if path _is _unset _orif path = "" _then path << _self.choose_boq_file() _endif
-#	_if path _is _unset _orif path = "" _then _return _endif
-#	# TODO: implement BOQ upload logic (same pattern as upload_kmz_to_astri)
-#_endmethod
-#$
-#
-#_pragma(classify_level=basic, topic={astri_integration})
-#_method rwwi_astri_workorder_dialog.choose_boq_file()
-#	# TODO: open file chooser for BOQ Excel selection
-#_endmethod
-#$
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.upload_boq_to_astri(file_path)
+	## Upload a BOQ Excel file to the ASTRI document API automatically.
+	## Called after generate_boq_excel() completes successfully.
+	## Uses type_name = "network_design" for all BOQ uploads.
+	##
+	## Parameters:
+	##   file_path - absolute path to .xlsx BOQ file
+
+	_if file_path _is _unset _orif file_path = ""
+	_then
+		_self.log_info("BOQ upload skipped: no file path provided")
+		_return
+	_endif
+
+	_if .selected_wo _is _unset
+	_then
+		_self.log_info("BOQ upload skipped: no work order selected")
+		_return
+	_endif
+
+	_local wo << .selected_wo
+	_local type_name << "network_design"
+	_local infra_type   << wo[:infrastructure_type].default("cluster").lowercase
+	_local cluster_code << _unset
+	_local osp_route    << _unset
+	_local olt_name     << _unset
+	_local olt_site_name << _unset
+
+	_if infra_type = "cluster"
+	_then
+		cluster_code  << wo[:infra_code]
+		olt_name << olt_site_name << wo[:olt_name]
+	_elif infra_type = "subfeeder"
+	_then
+		cluster_code  << wo[:infra_code]
+		olt_name << olt_site_name << wo[:olt_name]
+	_elif infra_type = "feeder"
+	_then
+		osp_route    << wo[:infra_name]
+		olt_name << olt_site_name << wo[:olt_name]
+	_endif
+
+	_self.log_info("")
+	_self.log_info("="*55)
+	_self.log_info("UPLOADING BOQ TO ASTRI")
+	_self.log_info("="*55)
+	_self.log_info(write_string("  File:         ", file_path))
+	_self.log_info(write_string("  Type:         ", type_name))
+	_self.log_info(write_string("  Infra Code:   ", cluster_code.default(osp_route.default(olt_name.default("(none)")))))
+	_self.log_info("-"*55)
+
+	_try _with errCond
+		_local xml_result << astri_upload_document(
+			file_path,
+			type_name,
+			cluster_code,
+			osp_route,
+			olt_name,
+			olt_site_name)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.log_info("ERROR: No response from BOQ upload API")
+			_return
+		_endif
+
+		# Parse XML response
+		_local xml_doc      << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local success      << success_elem _isnt _unset _andif
+		                       success_elem.xml_result = "true"
+
+		_if success
+		_then
+			_local msg_elem << xml_doc.element_matching_name(:message)
+			_local msg << _if msg_elem _isnt _unset
+			              _then >> msg_elem.xml_result
+			              _else >> "Upload completed"
+			              _endif
+			_self.log_success("BOQ UPLOAD SUCCESSFUL")
+			_self.log_info(write_string("  Response: ", msg.slice(1, msg.size.min(200))))
+			_self.log_info("="*55)
+		_else
+			_local err_elem << xml_doc.element_matching_name(:error)
+			_local err_msg  << _if err_elem _isnt _unset
+			                   _then >> err_elem.xml_result
+			                   _else >> "Unknown error"
+			                   _endif
+			_self.log_info(write_string("ERROR: BOQ upload failed: ", err_msg))
+			_self.log_info("="*55)
+		_endif
+
+	_when error
+		_self.log_info(write_string("EXCEPTION in BOQ upload: ", errCond.report_contents_string))
+		_self.log_info("="*55)
+	_endtry
+_endmethod
+$
