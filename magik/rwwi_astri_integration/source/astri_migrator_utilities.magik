@@ -463,9 +463,9 @@ _private _method astri_design_migrator.scan_olt_figure_eight(location, radius)
 			_loop
 				_if eq.source_collection.name _is :figure_eight
 				_then
-					_return _true, _true, el
+					_return _true, _true, el, eq
 				_else 
-					_return _true, _false, el
+					_return _true, _false, el, _unset 
 				_endif
 			_endloop
 		_endif
@@ -473,7 +473,7 @@ _private _method astri_design_migrator.scan_olt_figure_eight(location, radius)
 	
 	# Found existing pole - return nearest one
 	#_local nearest_pole << poles.an_element()
-	_return _false, _false, _unset 
+	_return _false, _false, _unset, _unset  
 	
 _endmethod
 $
@@ -515,9 +515,9 @@ _private _method astri_design_migrator.scan_pole_splice(location, radius)
 				_endif
 				_if found_splice _andif eq.source_collection.name _is :figure_eight
 				_then
-					_return _true, _true, el
+					_return _true, _true, el, eq
 				_else 
-					_return _true, _false, el
+					_return _true, _false, el, _unset 
 				_endif
 			_endloop
 		_endif
@@ -525,7 +525,7 @@ _private _method astri_design_migrator.scan_pole_splice(location, radius)
 	
 	# Found existing pole - return nearest one
 	#_local nearest_pole << poles.an_element()
-	_return _false, _false, _unset 
+	_return _false, _false, _unset, _unset  
 	
 _endmethod
 $

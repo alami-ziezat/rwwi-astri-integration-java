@@ -73,63 +73,56 @@ _private _method astri_design_migrator.create_t_wey(pm)
 		# Step 2: Parse original point geometry from KML coordinates
 		_local original_location << _self.parse_point_geometry(pm[:coord])
 
-		# Step 3: Build search buffer (500cm = 5m radius) around original location
-		_local isFound? << _false
-		_local pp << original_location
-		_local buff << original_location.buffer(500)  # 5m radius in cm
-		buff.world << .database.world
-
-		# Step 3.5: Skip if existing T-Wey or UUB already present within 500cm radius
-		_local existing_tweys << .poi_col.select(predicate.interacts(:location, {buff}))
-		_if existing_tweys.size > 0 
-		_then
-			#_local ex_tw << existing_tweys.an_element()
-			_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
-			pp << pseudo_point.new(new_coord)
-			pp.world << .database.world
-			#write("    >> MOVE: Existing T-Wey found nearby (", pp.a_coord(), "): ")
-			isFound? << _true
-			#_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
-			#.stats[:t_weys_skipped] +<< 1
-			#_return
-		_endif
-
-		_local existing_uubs << .uub_col.select(predicate.interacts(:location, {buff}))
-		_if existing_uubs.size > 0
-		_then
-			_local ex_uub << existing_uubs.an_element()
-			_local ex_uub_name << ex_uub.perform(:label).default("(unnamed)")
-			_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
-			pp << pseudo_point.new(new_coord)
-			pp.world << .database.world
-			#write("    >> MOVE: Existing UUB/Handhole found nearby (", existing_uubs.size, "): ", ex_uub_name)
-			isFound? << _true
-			#_if .stats[:t_weys_skipped] _is _unset _then .stats[:t_weys_skipped] << 0 _endif
-			#.stats[:t_weys_skipped] +<< 1
-			#_return
-		_endif
-		#write(" >> isSame? : ",isSame?, " ext t-weys: ",existing_tweys.size, " ext uubs: ", existing_uubs.size)
-
-		# Step 4: Search for nearest underground route within buffer
-		_local pred << predicate.interacts(:route, {buff})
-		_local ug_routes << .ug_route_col.select(pred)
-
 		_local final_location << _unset
-		_if ug_routes.size > 0 _andif _not isFound?
+		_if .construction_status = "Proposed"
 		_then
-			# Found underground route - snap to nearest point on it
-			_local ugr << ug_routes.an_element()
-			_local pc << pseudo_chain.new(ugr.route)
-			pc.world << .database.world
-			_local snapped_coord << pc.segpoint_near(pp)
-
-			_local snapped_point << pseudo_point.new(snapped_coord)
-			snapped_point.world << .database.world
-			final_location << snapped_point
+			# Proposed: skip duplicate check and route snapping - use original coordinate directly
+			final_location << original_location
 		_else
-			# No underground route found within radius - use original location
-			final_location << pp
-			#write("    >> WARNING T-WEY: No underground route found within 5m, using original location")
+			# Step 3: Build search buffer (500cm = 5m radius) around original location
+			_local isFound? << _false
+			_local pp << original_location
+			_local buff << original_location.buffer(500)  # 5m radius in cm
+			buff.world << .database.world
+
+			# Step 3.5: Skip if existing T-Wey or UUB already present within 500cm radius
+			_local existing_tweys << .poi_col.select(predicate.interacts(:location, {buff}))
+			_if existing_tweys.size > 0
+			_then
+				_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
+				pp << pseudo_point.new(new_coord)
+				pp.world << .database.world
+				isFound? << _true
+			_endif
+
+			_local existing_uubs << .uub_col.select(predicate.interacts(:location, {buff}))
+			_if existing_uubs.size > 0
+			_then
+				_local new_coord << coordinate.new(original_location.x + 500, original_location.y - 500)
+				pp << pseudo_point.new(new_coord)
+				pp.world << .database.world
+				isFound? << _true
+			_endif
+
+			# Step 4: Search for nearest underground route within buffer
+			_local pred << predicate.interacts(:route, {buff})
+			_local ug_routes << .ug_route_col.select(pred)
+
+			_if ug_routes.size > 0 _andif _not isFound?
+			_then
+				# Found underground route - snap to nearest point on it
+				_local ugr << ug_routes.an_element()
+				_local pc << pseudo_chain.new(ugr.route)
+				pc.world << .database.world
+				_local snapped_coord << pc.segpoint_near(pp)
+
+				_local snapped_point << pseudo_point.new(snapped_coord)
+				snapped_point.world << .database.world
+				final_location << snapped_point
+			_else
+				# No underground route found within radius - use current location
+				final_location << pp
+			_endif
 		_endif
 		# Step 5: Insert into point_of_interest collection
 		# notes is a dd_join_field and cannot be set via record_transaction

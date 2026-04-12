@@ -51,9 +51,10 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 
 		_if use_local_file?
 		_then
-			# --- Validate file name matches <INFRA_TYPE>_<INFRA_CODE> ---
-			_local infra_code_val << wo[:infra_code].default("")
-			_local expected_token << (infra_type + "_" + infra_code_val).uppercase
+			# --- Validate file name matches <INFRA_TYPE>_<INFRA_CODE> or <INFRA_TYPE>_<UUID> ---
+			_local infra_code_val  << wo[:infra_code].default("")
+			_local expected_token  << (infra_type + "_" + infra_code_val).uppercase
+			_local uuid_token      << (infra_type + "_" + kmz_uuid).uppercase
 
 			# Extract just the file name from the full path (find last \ or /)
 			_local last_sep << 0
@@ -67,44 +68,80 @@ _method rwwi_astri_workorder_dialog.migrate_to_design()
 			_endloop
 			_local file_name << local_kmz_path.subseq(last_sep + 1)
 
-			# --- Validation 1: file must be .kml ---
-			_if file_name.uppercase.index_of_seq(".KML") _is _unset
+			# --- Validation 1: file must be .kmz ---
+			_if file_name.uppercase.index_of_seq(".KMZ") _is _unset
 			_then
-				_self.log_error("Invalid file format: " + file_name + " (must be .kml)")
+				_self.log_error("Invalid file format: " + file_name + " (must be .kmz)")
 				_self.user_error(write_string(
 					"Invalid file format.", %newline,
 					%newline,
 					"File name : ", file_name, %newline,
-					"Required  : KML format (.kml)", %newline,
+					"Required  : KMZ format (.kmz)", %newline,
 					%newline,
-					"Please select a .kml file."))
+					"Please select a .kmz file."))
 				_return
 			_endif
 
-			# --- Validation 2: file name must contain INFRA_TYPE_INFRA_CODE ---
-			_if file_name.uppercase.index_of_seq(expected_token) _is _unset
+			# --- Validation 2: file name must contain INFRA_TYPE_INFRA_CODE or INFRA_TYPE_UUID ---
+			_local file_name_uc << file_name.uppercase
+			_local matched_token << _if file_name_uc.index_of_seq(expected_token) _isnt _unset
+			                        _then >> expected_token
+			                        _elif file_name_uc.index_of_seq(uuid_token) _isnt _unset
+			                        _then >> uuid_token
+			                        _else >> _unset
+			                        _endif
+			_if matched_token _is _unset
 			_then
-				_self.log_error("Local KML file name mismatch: " + file_name +
-				                " does not contain " + expected_token)
+				_self.log_error("Local KMZ file name mismatch: " + file_name)
 				_self.user_error(write_string(
 					"The selected file does not match the selected work order.", %newline,
 					%newline,
 					"File name           : ", file_name, %newline,
 					"Expected to contain : ", expected_token, %newline,
+					"            or      : ", uuid_token, %newline,
 					%newline,
-					"Please select a KML file whose name contains:", %newline,
-					"  ", expected_token))
+					"Please select a KMZ file whose name contains one of the above."))
 				_return
 			_endif
 
-			# --- Local file path provided: skip API download ---
-			_self.log_info("Step 1: Using local KML file (API download skipped)")
-			_self.log_info("  Local file: " + local_kmz_path)
+			# --- Step 1: Extract KML from KMZ using Java helper ---
+			_self.log_info("Step 1: Using local KMZ file (API download skipped)")
+			_self.log_info("  Local KMZ : " + local_kmz_path)
 			_self.log_info("  File name : " + file_name)
-			_self.log_info("  Validated : " + expected_token + " found in file name")
-			write("Using local KML file:", local_kmz_path)
-			kml_file_path << local_kmz_path
-			_self.log_success("Local KML file accepted and validated")
+			_self.log_info("  Validated : " + matched_token + " found in file name")
+
+			_local extract_dir << system.getenv("TEMP").default("C:\temp")
+			_self.log_info("  Extracting KML to: " + extract_dir)
+			write("Extracting KMZ to KML:", local_kmz_path)
+
+			_local extract_result << astri_extract_kmz_to_kml(local_kmz_path, extract_dir)
+			_if extract_result _is _unset _orif extract_result = ""
+			_then
+				_self.log_error("Failed to extract KML from KMZ")
+				_self.user_error("Failed to extract KML from KMZ file")
+				_return
+			_endif
+
+			_local extract_doc << simple_xml.read_element_string(extract_result)
+			_local extract_success << extract_doc.element_matching_name(:success)
+			_local extract_kml_elem << extract_doc.element_matching_name(:kml_file_path)
+
+			_if extract_success _is _unset _orif
+			    extract_success.xml_result <> "true" _orif
+			    extract_kml_elem _is _unset
+			_then
+				_local extract_err << extract_doc.element_matching_name(:error)
+				_local extract_err_msg << _if extract_err _isnt _unset
+				                          _then >> extract_err.xml_result
+				                          _else >> "Unknown extraction error"
+				                          _endif
+				_self.log_error("KMZ extraction failed: " + extract_err_msg)
+				_self.user_error(write_string("Failed to extract KML from KMZ:", %newline, extract_err_msg))
+				_return
+			_endif
+
+			kml_file_path << extract_kml_elem.xml_result
+			_self.log_success("KML extracted from KMZ: " + kml_file_path)
 			_self.log_info("")
 		_else
 			# --- No local path: download from ASTRI API ---

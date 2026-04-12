@@ -225,7 +225,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
 		:image, {:browse, :ui_resources},
 		:model, _self,
 		:selector, :browse_kmz|()|,
-		:tooltip, "Browse for local KMZ/KML file")
+		:tooltip, "Browse for local KMZ file")
 
 	.items[:local_kmz_path] << sw_text_item.new(a_toolbar,
 		:model, _self,
@@ -311,11 +311,12 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.browse_kmz()
-	## Open file dialog to select a local KMZ or KML file.
+	## Open file dialog to select a local KMZ file.
 	## Selected path is stored in the local_kmz_path text field.
+	## The KMZ will be extracted to KML automatically before migration.
 
 	_local fd << file_dialog.new(_self, :ok_kmz|()|)
-	fd.filter << {"KML files (*.kml)", "*.kml"}
+	fd.filter << {"KMZ files (*.kmz)", "*.kmz"}
 
 	_local current_path << .items[:local_kmz_path].value.default("")
 	_if current_path <> ""
