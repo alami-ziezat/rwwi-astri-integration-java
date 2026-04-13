@@ -1,0 +1,248 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## ASTRI Work Order Dialog - Donation Work Order Methods
+## Handles fetching donation values for the loaded WO list and for BOQ generation.
+##
+## Two entry points:
+##   1. get_donation_work_orders_for_list() - button action, populates all WOs in wo_cache
+##   2. fetch_donation_value_for_wo(wo, infra_type) - private helper for BOQ auto-fetch
+
+# =============================================================================
+# Button Action: Get Donation WO (list-level)
+# =============================================================================
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.get_donation_work_orders_for_list()
+	## Fetch donation values for ALL work orders in the current loaded list.
+	## Calls the donation API once and matches results against every entry in wo_cache.
+	## Stores donation_value in each matched WO property_list.
+	## Also updates selected_wo if one is currently selected.
+	##
+	## Called by the "Get Donation WO" button (beside Apply Filters).
+	## Disabled for feeder infrastructure type.
+
+	_if .wo_cache _is _unset _orif .wo_cache.empty?
+	_then
+		_self.user_info("No work orders loaded. Apply filters first.")
+		_return
+	_endif
+
+	_local infra_type << .filters[:infrastructure_type].default("cluster").lowercase
+	_if infra_type = "feeder"
+	_then
+		_self.user_info("Donation WO is not applicable for Feeder infrastructure.")
+		_return
+	_endif
+
+	# Donation field to read based on infra_type
+	_local donation_field << _if infra_type = "cluster"
+	                         _then >> "target_cluster_final_donation_value"
+	                         _else >> "target_cluster_subfeeder_donation_value"
+	                         _endif
+
+	_self.log_separator()
+	_self.log_info("FETCHING DONATION VALUES FOR ALL WORK ORDERS")
+	_self.log_separator()
+	_self.log_info("Infrastructure type: " + infra_type)
+	_self.log_info("Donation field:      " + donation_field)
+	_self.log_info("")
+
+	# Call API once with standard filters — no cluster code, get all valid donations
+	_local filters << property_list.new_with(
+		:assigned_vendor_name, "--not internal",
+		:latest_status_name,   "--not cancelled",
+		:permit_status,        "DONATION APPROVED")
+
+	_local xml_response << astri_get_donation_work_orders(500, 0, filters)
+
+	_if xml_response _is _unset _orif xml_response = ""
+	_then
+		_self.log_error("Empty response from donation API.")
+		_return
+	_endif
+
+	_try _with errCond
+		_local xml_obj   << simple_xml.read_string(xml_response)
+		_local data_node << simple_xml.element_named(xml_obj, "data")
+
+		_if data_node _is _unset
+		_then
+			_local err_node << simple_xml.element_named(xml_obj, "error")
+			_local err_msg  << _if err_node _isnt _unset
+			                   _then >> err_node.xml_contents.first.default("unknown error")
+			                   _else >> "no data node in response"
+			                   _endif
+			_self.log_error("Donation API error: " + err_msg)
+			_return
+		_endif
+
+		# Build two lookup tables:
+		#   by_wo_number    : wo_number -> donation_value  (primary match)
+		#   by_cluster_code : cluster_code -> donation_value  (fallback)
+		_local by_wo_number    << equality_hash_table.new()
+		_local by_cluster_code << equality_hash_table.new()
+
+		_for wo_node _over data_node.xml_contents.fast_elements()
+		_loop
+			_local num_node << simple_xml.element_named(wo_node, "number")
+			_local val_node << simple_xml.element_named(wo_node, donation_field)
+			_local cod_node << simple_xml.element_named(wo_node, "target_cluster_code")
+
+			_if val_node _is _unset _then _continue _endif
+			_local val << val_node.xml_contents.first.default("")
+
+			_if num_node _isnt _unset
+			_then
+				by_wo_number[num_node.xml_contents.first.default("")] << val
+			_endif
+			_if cod_node _isnt _unset
+			_then
+				by_cluster_code[cod_node.xml_contents.first.default("")] << val
+			_endif
+		_endloop
+
+		_self.log_info("Donation records from API: " +
+		               data_node.xml_contents.size.write_string)
+		_self.log_info("")
+
+		# Match donation values to every WO in the loaded cache
+		_local matched   << 0
+		_local unmatched << 0
+
+		_for cache_key _over .wo_cache.keys()
+		_loop
+			_local wo  << .wo_cache[cache_key]
+			_local val << by_wo_number[wo[:wo_number].default("")]
+
+			_if val _is _unset
+			_then
+				# Fallback: match by infra_code (cluster/subfeeder code)
+				val << by_cluster_code[wo[:infra_code].default("")]
+			_endif
+
+			_if val _isnt _unset
+			_then
+				wo[:donation_value] << val
+				matched +<< 1
+			_else
+				unmatched +<< 1
+			_endif
+		_endloop
+
+		# Propagate to selected_wo if currently selected
+		_if .selected_wo _isnt _unset
+		_then
+			_local sel_key << .selected_wo[:infra_code].default("").as_symbol()
+			_local cached  << .wo_cache[sel_key]
+			_if cached _isnt _unset _andif cached[:donation_value] _isnt _unset
+			_then
+				.selected_wo[:donation_value] << cached[:donation_value]
+			_endif
+		_endif
+
+		_self.log_separator()
+		_self.log_success("DONATION FETCH COMPLETE")
+		_self.log_separator()
+		_self.log_info("Matched:   " + matched.write_string)
+		_self.log_info("Unmatched: " + unmatched.write_string)
+		_self.log_separator()
+
+		# Refresh the table so the Donation column shows the new values.
+		# workorder_list_data() preserves donation values from wo_cache on rebuild.
+		_self.changed(:workorder_list, :renew)
+
+	_when error
+		_self.log_error("Failed to process donation response: " +
+		                errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+# =============================================================================
+# Private Helper: Fetch donation value for a single WO (used by BOQ auto-fetch)
+# =============================================================================
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, infra_type)
+	## Fetch the donation value for a single work order.
+	## Calls the API with target_cluster_code set to wo[:infra_code] to narrow results.
+	## Matches by wo_number; falls back to first result.
+	##
+	## Parameters:
+	##   wo        - property_list: the selected work order
+	##   infra_type - string: "cluster" or "subfeeder"
+	##
+	## Returns: donation value string, or _unset if not found / on error.
+
+	_local filters << property_list.new_with(
+		:assigned_vendor_name, "--not internal",
+		:target_cluster_code,  wo[:infra_code].default(""),
+		:latest_status_name,   "--not cancelled",
+		:permit_status,        "DONATION APPROVED")
+
+	_local donation_field << _if infra_type = "cluster"
+	                         _then >> "target_cluster_final_donation_value"
+	                         _else >> "target_cluster_subfeeder_donation_value"
+	                         _endif
+
+	_local xml_response << astri_get_donation_work_orders(100, 0, filters)
+
+	_if xml_response _is _unset _orif xml_response = ""
+	_then >> _unset
+	_endif
+
+	_try
+		_local xml_obj      << simple_xml.read_string(xml_response)
+		_local success_node << simple_xml.element_named(xml_obj, "success")
+
+		_if success_node _is _unset _orif
+		    success_node.xml_contents.first <> "true"
+		_then >> _unset
+		_endif
+
+		_local data_node << simple_xml.element_named(xml_obj, "data")
+		_if data_node _is _unset _orif data_node.xml_contents.empty?
+		_then >> _unset
+		_endif
+
+		_local wo_number     << wo[:wo_number].default("")
+		_local matched_value << _unset
+
+		# Search by WO number (primary)
+		_for wo_node _over data_node.xml_contents.fast_elements()
+		_loop
+			_local num_node << simple_xml.element_named(wo_node, "number")
+			_if num_node _isnt _unset _andif
+			    num_node.xml_contents.first = wo_number
+			_then
+				_local val_node << simple_xml.element_named(wo_node, donation_field)
+				_if val_node _isnt _unset
+				_then
+					matched_value << val_node.xml_contents.first
+					_leave
+				_endif
+			_endif
+		_endloop
+
+		# Fallback: use first result
+		_if matched_value _is _unset
+		_then
+			_local val_node << simple_xml.element_named(
+			                       data_node.xml_contents.first, donation_field)
+			_if val_node _isnt _unset
+			_then
+				matched_value << val_node.xml_contents.first
+			_endif
+		_endif
+
+		>> matched_value
+
+	_when error
+		_self.log_error("Donation single-fetch failed: " +
+		                condition.report_contents_string)
+		>> _unset
+	_endtry
+_endmethod
+$

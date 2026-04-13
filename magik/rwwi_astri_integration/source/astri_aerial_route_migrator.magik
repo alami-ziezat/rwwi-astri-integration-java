@@ -81,7 +81,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 		_local fb_c << m_cbl
 		_local s_sp << _unset
 		_local s_cd << _unset
-
+		
 		# Map fiber count to spec_id and STF code
 		_if m_cbl = "12"
 		_then

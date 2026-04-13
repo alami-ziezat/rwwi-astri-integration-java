@@ -2983,7 +2983,7 @@ $
 
 
 _global create_boq <<
-_proc(design, infra_type)
+_proc(design, infra_type, _optional donation_value)
 
 	#rwwi_astri_workorder.show_messages("test")
 
@@ -3795,18 +3795,37 @@ _proc(design, infra_type)
 #		_endif
 
 		Cell_type << Sheet1.Range("O4")
-		
-		_if ug _is _true _and ae _is _false 
+
+		_if ug _is _true _and ae _is _false
 		_then
 			Cell_type.value << "Underground"
 		_elif ae _is _true _and ug _is _false
-		_then 
+		_then
 			Cell_type.value << "Aerial"
 		_else
-			Cell_type.value << "Aerial & Underground"	
+			Cell_type.value << "Aerial & Underground"
 		_endif
-		
-		
+
+
+	_endif
+
+	# Write RT/RW Permit donation values into BoQ NRO Cluster sheet
+	# D204 = qty material (always 1), E204 = donation value (service qty)
+	# Only written when donation_value is provided and infra_type is cluster or subfeeder
+	_if donation_value _isnt _unset _andif donation_value <> "" _andif
+	    (infra_type = "cluster" _orif infra_type = "subfeeder")
+	_then
+		_local donation_numeric << donation_value.as_number()
+		_if donation_numeric _isnt _unset
+		_then
+			Sheet1.Range("D204").value << 1
+			Sheet1.Range("E204").value << donation_numeric
+			write("LOG: RT/RW Permit -> Sheet1 D204=1, E204=", donation_numeric)
+		_else
+			write("LOG: RT/RW Permit skipped (Excel) — donation_value non-numeric:", donation_value)
+		_endif
+	_else
+		write("LOG: RT/RW Permit skipped (Excel) — no donation_value or feeder infra_type")
 	_endif
 
 	# Get user home directory

@@ -200,7 +200,7 @@ _method rwwi_astri_workorder_dialog.upload_boq_to_astri(file_path)
 	_endif
 
 	_local wo << .selected_wo
-	_local type_name << "network_design"
+	_local type_name << "build_of_quantity_as_plan_drawing"
 	_local infra_type   << wo[:infrastructure_type].default("cluster").lowercase
 	_local cluster_code << _unset
 	_local osp_route    << _unset

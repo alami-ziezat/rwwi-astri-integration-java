@@ -36,9 +36,27 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 			_return
 		_endif
 
+		# Ensure donation value is available — auto-fetch if not already stored
+		_local infra_type_for_donation << _self.get_infra_type_from_wo(wo)
+		_if infra_type_for_donation <> "feeder" _andif
+		    (wo[:donation_value] _is _unset _orif wo[:donation_value] = "")
+		_then
+			write("Auto-fetching donation value for Excel BOQ...")
+			_local d_val << _self.fetch_donation_value_for_wo(wo, infra_type_for_donation)
+			_if d_val _isnt _unset
+			_then
+				wo[:donation_value] << d_val
+				write("Donation value auto-fetched:", d_val)
+			_else
+				write("Donation value unavailable — RT/RW Permit will be skipped")
+			_endif
+		_endif
+
 		# Call the global create_boq procedure (returns saved file path)
 		write("Calling create_boq procedure...")
-		_local boq_file_path << create_boq(scheme, wo[:infrastructure_type].default("cluster").lowercase)
+		_local boq_file_path << create_boq(scheme,
+			wo[:infrastructure_type].default("cluster").lowercase,
+			wo[:donation_value])
 
 		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
 			scheme.name))
@@ -106,6 +124,21 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 		# Determine infrastructure type from work order category
 		_local infra_type << _self.get_infra_type_from_wo(wo)
 
+		# Ensure donation value is available — auto-fetch if not already stored
+		_if infra_type <> "feeder" _andif
+		    (wo[:donation_value] _is _unset _orif wo[:donation_value] = "")
+		_then
+			_self.log_info("Step 1b: Donation value not cached — auto-fetching...")
+			_local d_val << _self.fetch_donation_value_for_wo(wo, infra_type)
+			_if d_val _isnt _unset
+			_then
+				wo[:donation_value] << d_val
+				_self.log_success("Donation value auto-fetched: " + d_val.write_string)
+			_else
+				_self.log_warning("Donation value unavailable — RT/RW Permit will be skipped")
+			_endif
+		_endif
+
 		# Get KMZ UUID from work order (from PostgreSQL database)
 		_local kmz_uuid << wo[:kmz_uuid].default("")
 
@@ -140,11 +173,12 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			:vendor_name, wo[:vendor_name].default(_unset),
 			:subcont_vendor_name, wo[:subcont_vendor].default(_unset),
 			:remarks, "Service",                    # Default
-			:phase, "drm",               # Default
+			:phase, "drm",                          # Default
 			:area, wo[:area].default(_unset),
 			:area_plant_code, wo[:area_plant_code].default(_unset),
 			:override_price_material, _unset,       # Optional
-			:override_price_service, _unset         # Optional
+			:override_price_service, _unset,        # Optional
+			:donation_value, wo[:donation_value]    # _unset if not available
 		)
 
 		_self.log_info("Step 2: Preparing BOQ parameters...")

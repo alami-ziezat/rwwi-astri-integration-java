@@ -787,6 +787,16 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:object, "Pole",
 			:name, "Buldog grip",
 			:material_slot, :both
+		),
+
+		# RT/RW Permit — donation-based; injected at end of generate(), not via catalog loop
+		# qty_material = 1 (fixed), qty_service = donation_value (from boq_params)
+		# Generated ONLY when boq_params[:donation_value] is present and numeric
+		"500002155", property_list.new_with(
+			:code,          "500002155",
+			:object,        "other",
+			:name,          "RT/RW Permit",
+			:material_slot, :both
 		)
 	),
 	:public
@@ -957,6 +967,36 @@ _method rwwi_astri_boq_generator.generate()
 
 		# Add cable-based services (Project Management and Survey & Design)
 		_self.add_cable_based_services(result)
+
+		# RT/RW Permit: only if donation_value is present and numeric.
+		# qty_material = 1 (fixed), qty_service = donation_value.
+		# Injected directly — bypasses catalog loop intentionally.
+		_local donation_value << .boq_params[:donation_value]
+		_if donation_value _isnt _unset _andif donation_value <> ""
+		_then
+			_local donation_numeric << donation_value.as_number()
+			_if donation_numeric _isnt _unset
+			_then
+				result["500002155"] << property_list.new_with(
+					:equipment_name,          "500002155",
+					:description,             "RT/RW Permit",
+					:quantity_material,       1,
+					:quantity_service,        donation_numeric,
+					:vendor_name,             .boq_params[:vendor_name].default(""),
+					:subcont_vendor_name,     .boq_params[:subcont_vendor_name].default(""),
+					:remarks,                 .boq_params[:remarks].default("Service"),
+					:phase,                   .boq_params[:phase].default("drm"),
+					:area,                    .boq_params[:area].default(""),
+					:area_plant_code,         .boq_params[:area_plant_code].default(""),
+					:override_price_material, _unset,
+					:override_price_service,  _unset)
+				write("LOG: RT/RW Permit added — donation_value:", donation_numeric)
+			_else
+				write("LOG: RT/RW Permit skipped — donation_value is non-numeric:", donation_value)
+			_endif
+		_else
+			write("LOG: RT/RW Permit skipped — no donation_value in boq_params")
+		_endif
 
 		write("LOG: BoQ generation complete. Total item types:", result.size)
 

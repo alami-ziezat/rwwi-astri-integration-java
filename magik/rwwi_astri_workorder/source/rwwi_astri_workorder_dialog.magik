@@ -68,10 +68,12 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:model, _self)
 
 	# Create outer container with flexible row sizing
-	# 8 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed), Toolbar4/Upload (fixed),
-	#         Table (flexible), Text Window (flexible), Detail Panel (fixed), Progress Footer (fixed)
+	# 8 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed),
+	#         Table (flexible), Text Window (flexible),
+	#         Bottom Action Toolbar (fixed), Bottom Upload+KML Toolbar (fixed),
+	#         Progress Footer (fixed)
 	.items[:outer] << outer << sw_container.new(top_c, 8, 1,
-		:row_resize_values, {0, 0, 0, 0, 1, 1, 0, 0})
+		:row_resize_values, {0, 0, 0, 1, 1, 0, 0, 0})
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
@@ -80,17 +82,17 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 	# Build local KMZ file browser toolbar
 	_self.build_toolbar3(outer)
 
-	# Build upload toolbar
-	_self.build_toolbar4(outer)
-
 	# Build work order table
 	_self.build_table(outer)
 
 	# Build text window for process logs and statistics
 	_self.build_text_window(outer)
 
-	# Build detail panel (buttons only)
-	_self.build_detail_panel(outer)
+	# Build bottom action toolbar (primary WO actions)
+	_self.build_bottom_toolbar1(outer)
+
+	# Build bottom upload+KML toolbar (upload settings + Export APD to KML)
+	_self.build_bottom_toolbar2(outer)
 
 	# Build progress footer (non-editable status line)
 	_self.build_progress_footer(outer)
@@ -188,7 +190,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
 		:model, _self,
 		:display_length, 5,
 		:editable?, _false)
-	.items[:filter_limit].text_items << {"10", "25", "50", "100", "200"}
+	.items[:filter_limit].text_items << {"10", "25", "50", "75", "100"}
 	.items[:filter_limit].value << "50"
 
 	sw_label_item.new(pagination_toolbar, "  Offset:  ")
@@ -203,6 +205,13 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
 		:model, _self,
 		:selector, :apply_filters|()|,
 		:tooltip, "Apply current filters")
+
+	.items[:get_donation_btn] << sw_button_item.new(pagination_toolbar,
+		:label, "Get Donation WO",
+		:model, _self,
+		:selector, :get_donation_work_orders_for_list|()|,
+		:tooltip, "Fetch donation values for all loaded work orders (cluster/subfeeder only)")
+	.items[:get_donation_btn].enabled? << _false
 _endmethod
 $
 
@@ -249,10 +258,10 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
 _endmethod
 $
 
-_private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
-	## Build upload toolbar for sending KMZ documents to the ASTRI Document API.
-	## Contains: Upload Type dropdown, Upload KMZ button, Auto-upload toggle.
-	## BOQ upload buttons are reserved for future implementation.
+_private _method rwwi_astri_workorder_dialog.build_bottom_toolbar2(parent)
+	## Bottom toolbar 2 — upload settings and KML export.
+	## Contains: Upload Type dropdown, Upload KMZ, Auto-upload toggle | Export APD to KML
+	## (Previously split between build_toolbar4 at the top and build_detail_panel at the bottom)
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type, :container,
@@ -261,9 +270,9 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 
 	a_toolbar << toolbar_con.create_toolbar()
 
+	# --- Upload settings ---
 	sw_label_item.new(a_toolbar, "  Upload:  ")
 
-	# Document type dropdown — allows operator to override auto-resolved type_name
 	sw_label_item.new(a_toolbar, "Type:  ")
 	.items[:upload_type_name] << sw_text_item.new(a_toolbar,
 		:model, _self,
@@ -284,21 +293,30 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 		"compiled_abd_feeder_kmz"}
 	.items[:upload_type_name].value << "(auto)"
 
-	# Upload KMZ button
 	.items[:upload_kmz_btn] << sw_button_item.new(a_toolbar,
 		:label, "Upload KMZ",
 		:model, _self,
 		:selector, :upload_kmz|()|,
 		:tooltip, "Upload last exported KMZ to ASTRI Document API")
+	.items[:upload_kmz_btn].enabled? << _false
 
-	# Auto-upload toggle — when On, KMZ is uploaded immediately after every export
 	sw_label_item.new(a_toolbar, "  Auto-upload:  ")
 	.items[:auto_upload_kmz] << sw_text_item.new(a_toolbar,
 		:model, _self,
 		:display_length, 5,
 		:editable?, _false)
 	.items[:auto_upload_kmz].text_items << {"Off", "On"}
-	.items[:auto_upload_kmz].value << "Off"
+	.items[:auto_upload_kmz].value << "On"
+
+	# --- KML export (moved from detail panel) ---
+	sw_label_item.new(a_toolbar, "    ")
+
+	.items[:export_kml_btn] << sw_button_item.new(a_toolbar,
+		:label, "Export APD to KML",
+		:model, _self,
+		:selector, :export_smallworld_kml|()|,
+		:tooltip, "Export Smallworld APD design to KML file")
+	.items[:export_kml_btn].enabled? << _false
 _endmethod
 $
 
@@ -368,18 +386,18 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 		:min_height, 300)
 
 	# Set column labels
+	# Col:  1     2            3             4       5        6           7         8           9       10                11         12          13            14
 	.items[:table].set_column_labels({
-		"No", "WO Number", "Infra Code", "Name",
-		"Category", "Status", "Topology", "Vendor", "Area", "Area Plant Code", "Created", "KMZ UUID", "KML Source"})
+		"No", "WO Number", "Infra Code", "Name", "Status", "Topology", "Vendor", "Donation", "Area", "Area Plant Code", "Created", "KMZ UUID", "KML Source", "Category"})
 
 	# Set column resize values (relative widths)
-	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1.5, 1, 1, 2.5, 1.5, 1, 1, 1, 0.8}
+	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1, 1, 2.5, 1.5, 1.5, 1, 1, 1, 0.8, 1.5}
 
 	# Enable column filtering
 	.items[:table].enable_column_filter(2, _true)  # WO Number
 	.items[:table].enable_column_filter(3, _true)  # Infra Code
 	.items[:table].enable_column_filter(4, _true)  # Name
-	.items[:table].enable_column_filter(6, _true)  # Status
+	.items[:table].enable_column_filter(5, _true)  # Status
 
 	# Enable sorting after columns are configured
 	.items[:table].enable_sort? << _true
@@ -445,53 +463,52 @@ _method rwwi_astri_workorder_dialog.set_progress(status_msg, _optional done_msg)
 _endmethod
 $
 
-_private _method rwwi_astri_workorder_dialog.build_detail_panel(parent)
-	## Build detail panel with action buttons only
-	## Work order details are now shown in the text window above
+_private _method rwwi_astri_workorder_dialog.build_bottom_toolbar1(parent)
+	## Bottom toolbar 1 — primary work order action buttons.
+	## Contains: Download Source KMZ | Migrate as SW APD | Migrate as SW ABD |
+	##           Export BoQ into Excel | Upload BoQ to ASTRI
 
-	# Action buttons container - single row with horizontal layout
-	button_con << sw_container.new(parent, 1, _unset,
-		:outer_spacing, 5,
-		:col_spacing, 10)
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
 
-	# Removed "View Details" button - details now show automatically on row selection
+	a_toolbar << toolbar_con.create_toolbar()
 
-	.items[:kmz_btn] << sw_button_item.new(button_con,
-		:label, "Download KMZ",
+	.items[:kmz_btn] << sw_button_item.new(a_toolbar,
+		:label, "Download Source KMZ",
 		:model, _self,
-		:selector, :download_kmz|()|)
+		:selector, :download_kmz|()|,
+		:tooltip, "Download KMZ from ASTRI API")
 	.items[:kmz_btn].enabled? << _false
 
-	.items[:migrate_design_btn] << sw_button_item.new(button_con,
-		:label, "Migrate to Design",
+	.items[:migrate_design_btn] << sw_button_item.new(a_toolbar,
+		:label, "Migrate as SW APD",
 		:model, _self,
-		:selector, :migrate_to_design|()|)
+		:selector, :migrate_to_design|()|,
+		:tooltip, "Migrate APD KMZ into Smallworld design")
 	.items[:migrate_design_btn].enabled? << _false
 
-	.items[:migrate_existing_btn] << sw_button_item.new(button_con,
-		:label, "Migrate Existing (ABD)",
+	.items[:migrate_existing_btn] << sw_button_item.new(a_toolbar,
+		:label, "Migrate as SW ABD",
 		:model, _self,
-		:selector, :migrate_existing|()|)
+		:selector, :migrate_existing|()|,
+		:tooltip, "Migrate existing ABD KMZ into Smallworld design")
 	.items[:migrate_existing_btn].enabled? << _false
 
-	.items[:boq_excel_btn] << sw_button_item.new(button_con,
-		:label, "Generate BoQ as Excel",
+	.items[:boq_excel_btn] << sw_button_item.new(a_toolbar,
+		:label, "Export BoQ into Excel",
 		:model, _self,
-		:selector, :generate_boq_excel|()|)
+		:selector, :generate_boq_excel|()|,
+		:tooltip, "Generate Bill of Quantities as Excel file")
 	.items[:boq_excel_btn].enabled? << _false
 
-	.items[:boq_json_btn] << sw_button_item.new(button_con,
-		:label, "Generate BoQ as JSON",
+	.items[:boq_json_btn] << sw_button_item.new(a_toolbar,
+		:label, "Upload BoQ to ASTRI",
 		:model, _self,
-		:selector, :generate_boq_json|()|)
+		:selector, :generate_boq_json|()|,
+		:tooltip, "Generate BoQ and upload items to ASTRI API")
 	.items[:boq_json_btn].enabled? << _false
-
-	# NEW: Export KML button
-	.items[:export_kml_btn] << sw_button_item.new(button_con,
-		:label, "Export Smallworld KML",
-		:model, _self,
-		:selector, :export_smallworld_kml|()|)
-	.items[:export_kml_btn].enabled? << _false
 _endmethod
 $
 
@@ -574,6 +591,20 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 	## Populate table with work order data using sw_table methods
 
 	_try
+		# Preserve any donation values already fetched from previous load
+		# so they survive a table refresh triggered by "Get Donation WO"
+		_local saved_donations << equality_hash_table.new()
+		_if .wo_cache _isnt _unset
+		_then
+			_for k, v _over .wo_cache.fast_keys_and_elements()
+			_loop
+				_if v[:donation_value] _isnt _unset
+				_then
+					saved_donations[k] << v[:donation_value]
+				_endif
+			_endloop
+		_endif
+
 		# Clear cache before populating new data
 		.wo_cache.empty()
 
@@ -590,28 +621,39 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		_endif
 
 		# Populate table using sw_table methods
+		# Column layout:
+		# 1:No  2:WO Number  3:Infra Code  4:Name  5:Status  6:Topology  7:Vendor
+		# 8:Donation  9:Area  10:Area Plant Code  11:Created  12:KMZ UUID  13:KML Source  14:Category
 		_local row << 0
 		_for wo _over workorders.fast_elements()
 		_loop
 			row +<< 1
-			_local wo_number << wo[:wo_number].default("")
+			_local wo_number  << wo[:wo_number].default("")
 			_local infra_code << wo[:infra_code].default("")
 			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
 
+			# Restore donation value if previously fetched for this infra code
+			_local saved_d << saved_donations[infra_code.as_symbol()]
+			_if saved_d _isnt _unset
+			_then
+				wo[:donation_value] << saved_d
+			_endif
+
 			# Add cells to table
-			.items[:table].add_label(row, 1, row.write_string)
-			.items[:table].add_label(row, 2, wo_number)
-			.items[:table].add_label(row, 3, infra_code)
-			.items[:table].add_label(row, 4, wo[:infra_name].default(""))
-			.items[:table].add_label(row, 5, wo[:category].default(""))
-			.items[:table].add_label(row, 6, wo[:status].default(""))
-			.items[:table].add_label(row, 7, wo[:topology].default(""))
-			.items[:table].add_label(row, 8, wo[:vendor].default(""))
-			.items[:table].add_label(row, 9, wo[:area].default(""))
+			.items[:table].add_label(row, 1,  row.write_string)
+			.items[:table].add_label(row, 2,  wo_number)
+			.items[:table].add_label(row, 3,  infra_code)
+			.items[:table].add_label(row, 4,  wo[:infra_name].default(""))
+			.items[:table].add_label(row, 5,  wo[:status].default(""))
+			.items[:table].add_label(row, 6,  wo[:topology].default(""))
+			.items[:table].add_label(row, 7,  wo[:vendor].default(""))
+			.items[:table].add_label(row, 8,  wo[:donation_value].default(""))
+			.items[:table].add_label(row, 9,  wo[:area].default(""))
 			.items[:table].add_label(row, 10, wo[:area_plant_code].default(""))
 			.items[:table].add_label(row, 11, wo[:created_at].default(""))
 			.items[:table].add_label(row, 12, wo[:kmz_uuid].default(""))
 			.items[:table].add_label(row, 13, wo[:kmz_source].default(""))
+			.items[:table].add_label(row, 14, wo[:category].default(""))
 
 			# Store work order data in cache by infra_code as symbol (unique identifier)
 			# This ensures correct lookup even after table sorting
@@ -624,6 +666,9 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 	_when error
 		write("ERROR in workorder_list_data:", condition.report_contents_string)
 	_endtry
+
+	# Refresh donation button state after list is (re)loaded
+	_self.update_donation_button_state()
 _endmethod
 $
 
@@ -694,6 +739,9 @@ _method rwwi_astri_workorder_dialog.apply_filters()
 
 	# Refresh data with new filters
 	_self.refresh_data()
+
+	# Refresh donation button state after filter change
+	_self.update_donation_button_state()
 _endmethod
 $
 
@@ -809,13 +857,14 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 
 	_if wo _is _unset
 	_then
-		# Disable all buttons but don't clear log (preserve process results)
+		# Disable all selection-dependent buttons (preserve log)
 		.items[:kmz_btn].enabled? << _false
 		.items[:migrate_design_btn].enabled? << _false
 		.items[:migrate_existing_btn].enabled? << _false
 		.items[:boq_excel_btn].enabled? << _false
 		.items[:boq_json_btn].enabled? << _false
 		.items[:export_kml_btn].enabled? << _false
+		.items[:upload_kmz_btn].enabled? << _false
 	_else
 		# Display comprehensive work order details in text window WITHOUT clearing previous logs
 		# This preserves process execution results while showing current selection
@@ -917,6 +966,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		_self.log_info(msg)
 
 		# Enable buttons based on work order state
+		.items[:upload_kmz_btn].enabled? << _true
 		.items[:kmz_btn].enabled? << has_kmz
 		.items[:migrate_design_btn].enabled? << has_kmz
 
@@ -929,6 +979,20 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:boq_json_btn].enabled? << has_project _and has_design
 		.items[:export_kml_btn].enabled? << has_project _and has_design
 	_endif
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.update_donation_button_state()
+	## Enable the "Get Donation WO" button only when the loaded list is not
+	## empty AND the current infrastructure type filter is not "feeder".
+	## Called at the end of workorder_list_data() and apply_filters().
+
+	_if .items[:get_donation_btn] _is _unset _then _return _endif
+
+	_local has_list   << .wo_cache _isnt _unset _andif _not .wo_cache.empty?
+	_local not_feeder << .filters[:infrastructure_type].default("cluster") <> "feeder"
+	.items[:get_donation_btn].enabled? << has_list _and not_feeder
 _endmethod
 $
 
