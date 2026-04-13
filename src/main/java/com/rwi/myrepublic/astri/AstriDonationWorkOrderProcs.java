@@ -99,6 +99,7 @@ public class AstriDonationWorkOrderProcs {
         String[] KNOWN_KEYS = {
             "assigned_vendor_name",
             "target_cluster_code",
+            "target_subfeeder_code",
             "latest_status_name",
             "permit_status",
             "target_cluster_name"

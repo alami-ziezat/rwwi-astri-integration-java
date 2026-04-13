@@ -990,7 +990,7 @@ _method rwwi_astri_boq_generator.generate()
 					:area_plant_code,         .boq_params[:area_plant_code].default(""),
 					:override_price_material, _unset,
 					:override_price_service,  _unset)
-				write("LOG: RT/RW Permit added — donation_value:", donation_numeric)
+				#write("LOG: RT/RW Permit added — donation_value:", donation_numeric)
 			_else
 				write("LOG: RT/RW Permit skipped — donation_value is non-numeric:", donation_value)
 			_endif
@@ -1270,13 +1270,13 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
 		_if total_length > 0
 		_then
 			_self.add_to_boq_result(result, "200001033", total_length)
-			write("LOG: Sling wire total:", total_length, "m (", lengths_by_ring.size, "ring groups)")
+			#write("LOG: Sling wire total:", total_length, "m (", lengths_by_ring.size, "ring groups)")
 		_endif
 
 		_if total_buldog > 0
 		_then
 			_self.add_to_boq_result(result, "200000172", total_buldog)
-			write("LOG: Buldog grip total:", total_buldog, "(sum of ROUND(group_qty/40*6) per ring)")
+			#write("LOG: Buldog grip total:", total_buldog, "(sum of ROUND(group_qty/40*6) per ring)")
 		_endif
 
 	_when error
@@ -1309,7 +1309,7 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 	_local fdt_codes << {"200001039", "200001040", "200001041", "200001042", "200001043", "200001044"}
 
 	_try _with errCond
-		write("LOG: Processing sheath_with_loc cables (route_sectors + Excel formula approach)...")
+		#write("LOG: Processing sheath_with_loc cables (route_sectors + Excel formula approach)...")
 
 		# ---- Phase 1: count FAT and FDT per ring_name from change_set ----
 		_local fat_by_ring << equality_hash_table.new()   # ring -> count
@@ -1440,10 +1440,10 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				_local slack    << (fat_cnt + fdt_cnt) * 20
 
 				_local qty << ((base_len.ceiling + slack) * 1.05).ceiling
-				write("LOG: SWL code:", code, "|group:", sub_key,
-				      "|base:", base_len, "m |base_ceiled:", base_len.ceiling,
-				      "|FAT:", fat_cnt, "|FDT:", fdt_cnt,
-				      "|slack:", slack, "m -> qty:", qty)
+				#write("LOG: SWL code:", code, "|group:", sub_key,
+				#      "|base:", base_len, "m |base_ceiled:", base_len.ceiling,
+				#      "|FAT:", fat_cnt, "|FDT:", fdt_cnt,
+				#      "|slack:", slack, "m -> qty:", qty)
 				code_total +<< qty
 			_endloop
 			total_by_code[code] << code_total
@@ -1452,11 +1452,11 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 		# Add final quantities to BOQ result
 		_for code, qty _over total_by_code.fast_keys_and_elements()
 		_loop
-			write("LOG: SWL code:", code, "| total BOQ qty:", qty, "m")
+			#write("LOG: SWL code:", code, "| total BOQ qty:", qty, "m")
 			_self.add_to_boq_result(result, code, qty)
 		_endloop
 
-		write("LOG: Processed", swl_count, "sheath_with_loc records,", groups_by_code.size, "unique codes")
+		#write("LOG: Processed", swl_count, "sheath_with_loc records,", groups_by_code.size, "unique codes")
 	_when error
 		write("LOG: ERROR processing sheath_with_loc:", errCond.report_contents_string)
 	_endtry
