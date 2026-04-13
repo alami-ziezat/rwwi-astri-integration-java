@@ -82,8 +82,8 @@ _method rwwi_astri_workorder_dialog.get_donation_work_orders_for_list()
 	_self.log_separator()
 	_self.log_success("DONATION FETCH COMPLETE")
 	_self.log_separator()
-	_self.log_info("Matched:   " + matched.write_string)
-	_self.log_info("Unmatched: " + unmatched.write_string)
+	_self.log_info("Donation:   " + matched.write_string)
+	_self.log_info("Not Donation: " + unmatched.write_string)
 	_self.log_separator()
 
 	# Refresh the table so the Donation column shows the new values.
@@ -118,29 +118,18 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 	                         _else >> :target_cluster_subfeeder_donation_value
 	                         _endif
 
-	_local xml_response << astri_get_donation_work_orders(100, 0, filters)
+	_local json_response << astri_get_donation_work_orders(100, 0, filters)
 
-	_if xml_response _is _unset _orif xml_response = ""
+	_if json_response _is _unset _orif json_response = ""
 	_then >> _unset
 	_endif
 
 	_try
-		_local xml_root     << simple_xml.read_element_string(xml_response)
-		_local success_elem << xml_root.element_matching_name(:success)
+		_local json_obj << json_parser.parse(json_response)
+		_local data     << json_obj[:data]
 
-		_if success_elem _is _unset _orif
-		    success_elem.xml_result <> "true"
-		_then >> _unset
-		_endif
-
-		_local data_node << xml_root.element_matching_name(:data)
-		_if data_node _is _unset
-		_then >> _unset
-		_endif
-
-		# Grab the first workorder element for fallback use
-		_local first_wo_elem << data_node.element_matching_name(:workorder)
-		_if first_wo_elem _is _unset
+		# API always returns success:true — empty data means not found
+		_if data _is _unset _orif data.size = 0
 		_then >> _unset
 		_endif
 
@@ -148,29 +137,25 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 		_local matched_value << _unset
 
 		# Search by WO number (primary)
-		_for wo_elem _over data_node.elements_matching_name(:workorder)
+		_for entry _over data.fast_elements()
 		_loop
-			_local num_elem << wo_elem.element_matching_name(:number)
-			_if num_elem _isnt _unset _andif
-			    num_elem.xml_result = wo_number
+			_if entry[:number].default("") = wo_number
 			_then
-				_local val_elem << wo_elem.element_matching_name(donation_field)
-				_if val_elem _isnt _unset
-				_then
-					matched_value << val_elem.xml_result
-					_leave
-				_endif
+				matched_value << entry[donation_field]
+				_leave
 			_endif
 		_endloop
 
 		# Fallback: use first result
 		_if matched_value _is _unset
 		_then
-			_local val_elem << first_wo_elem.element_matching_name(donation_field)
-			_if val_elem _isnt _unset
-			_then
-				matched_value << val_elem.xml_result
-			_endif
+			matched_value << data[1][donation_field]
+		_endif
+
+		# Normalise to string (API returns numeric or string depending on field)
+		_if matched_value _isnt _unset
+		_then
+			matched_value << matched_value.write_string
 		_endif
 
 		>> matched_value

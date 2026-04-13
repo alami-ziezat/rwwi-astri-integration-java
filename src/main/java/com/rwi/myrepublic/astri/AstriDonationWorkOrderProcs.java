@@ -66,16 +66,14 @@ public class AstriDonationWorkOrderProcs {
             System.err.println("ERROR in getDonationWorkOrders: " + e.getMessage());
             e.printStackTrace();
 
-            String errorXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<response>\n"
-                + "  <success>false</success>\n"
-                + "  <error>" + escapeXml(e.getMessage()) + "</error>\n"
-                + "</response>";
+            String errorJson = "{\"success\":false,\"count\":0,\"count_all\":0,"
+                + "\"data\":[],"
+                + "\"error\":\"" + escapeJson(e.getMessage()) + "\"}";
 
             try {
-                return MagikInteropUtils.toMagikString(errorXml);
+                return MagikInteropUtils.toMagikString(errorJson);
             } catch (Exception e2) {
-                return errorXml;
+                return errorJson;
             }
         } finally {
             if (client != null) {
@@ -170,15 +168,6 @@ public class AstriDonationWorkOrderProcs {
         } catch (Exception e) {
             return obj.toString();
         }
-    }
-
-    private static String escapeXml(String str) {
-        if (str == null) return "";
-        return str.replace("&", "&amp;")
-                  .replace("<", "&lt;")
-                  .replace(">", "&gt;")
-                  .replace("\"", "&quot;")
-                  .replace("'", "&apos;");
     }
 
     private static String escapeJson(String str) {
