@@ -127,39 +127,15 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 	_try
 		_local json_obj << json_parser.parse(json_response)
 		_local data     << json_obj[:data]
-
+		
 		# API always returns success:true — empty data means not found
 		_if data _is _unset _orif data.size = 0
 		_then >> _unset
 		_endif
 
-		_local wo_number     << wo[:wo_number].default("")
-		_local matched_value << _unset
-
-		# Search by WO number (primary)
-		_for entry _over data.fast_elements()
-		_loop
-			_if entry[:number].default("") = wo_number
-			_then
-				matched_value << entry[donation_field]
-				_leave
-			_endif
-		_endloop
-
-		# Fallback: use first result
-		_if matched_value _is _unset
-		_then
-			matched_value << data[1][donation_field]
-		_endif
-
-		# Normalise to string (API returns numeric or string depending on field)
-		_if matched_value _isnt _unset
-		_then
-			matched_value << matched_value.write_string
-		_endif
+		_local matched_value << data[1][donation_field].write_string
 
 		>> matched_value
-
 	_when error
 		_self.log_error("Donation single-fetch failed: " +
 		                condition.report_contents_string)

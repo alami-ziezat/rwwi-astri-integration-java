@@ -11,14 +11,15 @@ $
 
 def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 {
-	{:engine,        _unset, :writable},    # Engine instance
-	{:items,         _unset, :writable},    # UI components cache
-	{:owner,         _unset, :writable},    # Parent plugin
-	{:filters,       _unset, :writable},    # Current filter values
-	{:selected_wo,   _unset, :writable},    # Currently selected work order
-	{:wo_cache,      _unset, :writable},    # Cache to store work orders by row number
-	{:last_kmz_path, _unset, :writable},    # Path of most recently exported KMZ
-	{:last_boq_path, _unset, :writable}     # Path of most recently saved BOQ document
+	{:engine,           _unset, :writable},    # Engine instance
+	{:items,            _unset, :writable},    # UI components cache
+	{:owner,            _unset, :writable},    # Parent plugin
+	{:filters,          _unset, :writable},    # Current filter values
+	{:selected_wo,      _unset, :writable},    # Currently selected work order
+	{:wo_cache,         _unset, :writable},    # Cache to store work orders by row number
+	{:last_kmz_path,    _unset, :writable},    # Path of most recently exported KMZ
+	{:last_boq_path,    _unset, :writable},    # Path of most recently saved BOQ document
+	{:last_excel_path,  _unset, :writable}     # Path of manually selected Excel file for upload
 }, :model)
 $
 
@@ -68,12 +69,12 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:model, _self)
 
 	# Create outer container with flexible row sizing
-	# 8 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed),
+	# 9 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed),
 	#         Table (flexible), Text Window (flexible),
 	#         Bottom Action Toolbar (fixed), Bottom Upload+KML Toolbar (fixed),
-	#         Progress Footer (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 8, 1,
-		:row_resize_values, {0, 0, 0, 1, 1, 0, 0, 0})
+	#         Bottom BOQ+Excel Toolbar (fixed), Progress Footer (fixed)
+	.items[:outer] << outer << sw_container.new(top_c, 9, 1,
+		:row_resize_values, {0, 0, 0, 1, 1, 0, 0, 0, 0})
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
@@ -93,6 +94,9 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 
 	# Build bottom upload+KML toolbar (upload settings + Export APD to KML)
 	_self.build_bottom_toolbar2(outer)
+
+	# Build BOQ + Excel file browser toolbar (above progress footer)
+	_self.build_bottom_toolbar3(outer)
 
 	# Build progress footer (non-editable status line)
 	_self.build_progress_footer(outer)
@@ -260,8 +264,7 @@ $
 
 _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar2(parent)
 	## Bottom toolbar 2 — upload settings and KML export.
-	## Contains: Upload Type dropdown, Upload KMZ, Auto-upload toggle | Export APD to KML
-	## (Previously split between build_toolbar4 at the top and build_detail_panel at the bottom)
+	## Contains: Auto-upload KMZ toggle | Type dropdown | Upload KMZ | Export APD to KML
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type, :container,
@@ -270,10 +273,25 @@ _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar2(parent)
 
 	a_toolbar << toolbar_con.create_toolbar()
 
-	# --- Upload settings ---
-	sw_label_item.new(a_toolbar, "  Upload:  ")
+	# --- Auto-upload KMZ toggle (first) ---
+	sw_label_item.new(a_toolbar, "  Auto-upload KMZ:  ")
+	.items[:auto_upload_kmz] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 5,
+		:editable?, _false)
+	.items[:auto_upload_kmz].text_items << {"Off", "On"}
+	.items[:auto_upload_kmz].value << "On"
 
-	sw_label_item.new(a_toolbar, "Type:  ")
+	# --- KML export ---
+	.items[:export_kml_btn] << sw_button_item.new(a_toolbar,
+		:label, "Export APD to KML",
+		:model, _self,
+		:selector, :export_smallworld_kml|()|,
+		:tooltip, "Export Smallworld APD design to KML file")
+	.items[:export_kml_btn].enabled? << _false
+
+	# --- Upload type dropdown ---
+	sw_label_item.new(a_toolbar, "  Type:  ")
 	.items[:upload_type_name] << sw_text_item.new(a_toolbar,
 		:model, _self,
 		:display_length, 30,
@@ -293,30 +311,13 @@ _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar2(parent)
 		"compiled_abd_feeder_kmz"}
 	.items[:upload_type_name].value << "(auto)"
 
+	# --- Upload KMZ button ---
 	.items[:upload_kmz_btn] << sw_button_item.new(a_toolbar,
 		:label, "Upload KMZ",
 		:model, _self,
 		:selector, :upload_kmz|()|,
 		:tooltip, "Upload last exported KMZ to ASTRI Document API")
 	.items[:upload_kmz_btn].enabled? << _false
-
-	sw_label_item.new(a_toolbar, "  Auto-upload:  ")
-	.items[:auto_upload_kmz] << sw_text_item.new(a_toolbar,
-		:model, _self,
-		:display_length, 5,
-		:editable?, _false)
-	.items[:auto_upload_kmz].text_items << {"Off", "On"}
-	.items[:auto_upload_kmz].value << "On"
-
-	# --- KML export (moved from detail panel) ---
-	sw_label_item.new(a_toolbar, "    ")
-
-	.items[:export_kml_btn] << sw_button_item.new(a_toolbar,
-		:label, "Export APD to KML",
-		:model, _self,
-		:selector, :export_smallworld_kml|()|,
-		:tooltip, "Export Smallworld APD design to KML file")
-	.items[:export_kml_btn].enabled? << _false
 _endmethod
 $
 
@@ -324,6 +325,72 @@ _pragma(classify_level=basic, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.upload_kmz()
 	## Button handler for "Upload KMZ" — delegates to upload_kmz_to_astri
 	_self.upload_kmz_to_astri(.last_kmz_path)
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_bottom_toolbar3(parent)
+	## Bottom toolbar 3 — BOQ export/upload and Excel file browser.
+	## Contains: Upload BoQ to ASTRI | Auto-upload Excel | Export BoQ into Excel |
+	##           Browse Excel | path field | Upload Excel
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
+
+	a_toolbar << toolbar_con.create_toolbar()
+
+	# --- Upload BoQ to ASTRI (first) ---
+	sw_label_item.new(a_toolbar, "  ")
+
+	.items[:boq_json_btn] << sw_button_item.new(a_toolbar,
+		:label, "Upload BoQ to ASTRI",
+		:model, _self,
+		:selector, :generate_boq_json|()|,
+		:tooltip, "Generate BoQ and upload items to ASTRI API")
+	.items[:boq_json_btn].enabled? << _false
+
+	# --- Auto-upload Excel toggle ---
+	sw_label_item.new(a_toolbar, "  Auto-upload Excel:  ")
+	.items[:auto_upload_excel] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 5,
+		:editable?, _false)
+	.items[:auto_upload_excel].text_items << {"Off", "On"}
+	.items[:auto_upload_excel].value << "Off"
+
+	# --- Export BoQ into Excel ---
+	sw_label_item.new(a_toolbar, "  ")
+
+	.items[:boq_excel_btn] << sw_button_item.new(a_toolbar,
+		:label, "Export BoQ into Excel",
+		:model, _self,
+		:selector, :generate_boq_excel|()|,
+		:tooltip, "Generate Bill of Quantities as Excel file")
+	.items[:boq_excel_btn].enabled? << _false
+
+	# --- Browse Excel + path field ---
+	sw_label_item.new(a_toolbar, "  ")
+
+	.items[:browse_excel_btn] << sw_button_item.new(a_toolbar,
+		:label, "Browse Excel",
+		:model, _self,
+		:selector, :browse_excel|()|,
+		:tooltip, "Select a local Excel file for upload")
+
+	.items[:local_excel_path] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 35,
+		:editable?, _true)
+	.items[:local_excel_path].value << ""
+
+	# --- Upload Excel ---
+	.items[:upload_excel_btn] << sw_button_item.new(a_toolbar,
+		:label, "Upload Excel",
+		:model, _self,
+		:selector, :upload_excel|()|,
+		:tooltip, "Upload selected Excel file to ASTRI Document API")
+	.items[:upload_excel_btn].enabled? << _false
 _endmethod
 $
 
@@ -363,6 +430,52 @@ _method rwwi_astri_workorder_dialog.clear_local_kmz()
 
 	.items[:local_kmz_path].value << ""
 	write("Local KMZ path cleared - will use API download")
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.browse_excel()
+	## Open file dialog to select a local Excel (.xlsx) file.
+	## Selected path is stored in the local_excel_path text field.
+
+	_local fd << file_dialog.new(_self, :ok_excel|()|)
+	fd.filter << {"Excel files (*.xlsx)", "*.xlsx"}
+
+	_local current_path << .items[:local_excel_path].value.default("")
+	_if current_path <> ""
+	_then
+		fd.directory << current_path
+	_else
+		fd.directory << system.getenv("TEMP").default("C:\")
+	_endif
+
+	fd.activate()
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.ok_excel(path)
+	## Callback from file_dialog — store the selected Excel path.
+
+	.items[:local_excel_path].value << path
+	.last_excel_path << path
+	write("Local Excel path set: ", path)
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.upload_excel()
+	## Button handler for "Upload Excel" — uploads the browsed Excel file as BOQ.
+	## Only callable when a work order is selected (button is disabled otherwise).
+
+	_local path << .items[:local_excel_path].value.default("")
+	_if path = ""
+	_then
+		_self.user_error("No Excel file selected. Use Browse Excel to select a file first.")
+		_return
+	_endif
+
+	_self.upload_boq_to_astri(path)
 _endmethod
 $
 
@@ -465,8 +578,7 @@ $
 
 _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar1(parent)
 	## Bottom toolbar 1 — primary work order action buttons.
-	## Contains: Download Source KMZ | Migrate as SW APD | Migrate as SW ABD |
-	##           Export BoQ into Excel | Upload BoQ to ASTRI
+	## Contains: Download Source KMZ | Migrate as SW APD | Migrate as SW ABD
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type, :container,
@@ -495,20 +607,6 @@ _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar1(parent)
 		:selector, :migrate_existing|()|,
 		:tooltip, "Migrate existing ABD KMZ into Smallworld design")
 	.items[:migrate_existing_btn].enabled? << _false
-
-	.items[:boq_excel_btn] << sw_button_item.new(a_toolbar,
-		:label, "Export BoQ into Excel",
-		:model, _self,
-		:selector, :generate_boq_excel|()|,
-		:tooltip, "Generate Bill of Quantities as Excel file")
-	.items[:boq_excel_btn].enabled? << _false
-
-	.items[:boq_json_btn] << sw_button_item.new(a_toolbar,
-		:label, "Upload BoQ to ASTRI",
-		:model, _self,
-		:selector, :generate_boq_json|()|,
-		:tooltip, "Generate BoQ and upload items to ASTRI API")
-	.items[:boq_json_btn].enabled? << _false
 _endmethod
 $
 
@@ -865,6 +963,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 		.items[:boq_json_btn].enabled? << _false
 		.items[:export_kml_btn].enabled? << _false
 		.items[:upload_kmz_btn].enabled? << _false
+		.items[:upload_excel_btn].enabled? << _false
 	_else
 		# Display comprehensive work order details in text window WITHOUT clearing previous logs
 		# This preserves process execution results while showing current selection
@@ -967,6 +1066,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 
 		# Enable buttons based on work order state
 		.items[:upload_kmz_btn].enabled? << _true
+		.items[:upload_excel_btn].enabled? << _true
 		.items[:kmz_btn].enabled? << has_kmz
 		.items[:migrate_design_btn].enabled? << has_kmz
 

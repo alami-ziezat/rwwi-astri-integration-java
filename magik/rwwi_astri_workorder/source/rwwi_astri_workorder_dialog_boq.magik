@@ -48,7 +48,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 				wo[:donation_value] << d_val
 				write("Donation value auto-fetched:", d_val)
 			_else
-				write("Donation value unavailable — RT/RW Permit will be skipped")
+				write("Donation value unavailable - RT/RW Permit will be skipped")
 			_endif
 		_endif
 
@@ -61,10 +61,14 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
 			scheme.name))
 
-		# Auto-upload BOQ Excel to ASTRI after successful generation
+		# Auto-upload BOQ Excel to ASTRI after successful generation (only when toggle is On)
 		_if boq_file_path _isnt _unset _andif boq_file_path <> ""
 		_then
-			_self.upload_boq_to_astri(boq_file_path)
+			_if .items[:auto_upload_excel] _isnt _unset _andif
+			    .items[:auto_upload_excel].value = "On"
+			_then
+				_self.upload_boq_to_astri(boq_file_path)
+			_endif
 		_endif
 
 	_when error
