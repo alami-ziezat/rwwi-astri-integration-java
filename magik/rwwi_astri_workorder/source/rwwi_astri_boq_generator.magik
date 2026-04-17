@@ -992,10 +992,10 @@ _method rwwi_astri_boq_generator.generate()
 					:override_price_service,  _unset)
 				#write("LOG: RT/RW Permit added — donation_value:", donation_numeric)
 			_else
-				write("LOG: RT/RW Permit skipped — donation_value is non-numeric:", donation_value)
+				write("LOG: RT/RW Permit skipped - donation_value is non-numeric:", donation_value)
 			_endif
 		_else
-			write("LOG: RT/RW Permit skipped — no donation_value in boq_params")
+			write("LOG: RT/RW Permit skipped - no donation_value in boq_params")
 		_endif
 
 		write("LOG: BoQ generation complete. Total item types:", result.size)
@@ -1417,8 +1417,11 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 		_endloop
 
 		# ---- Phase 3: apply Excel formula per group, sum per code ----
-		# Formula: ROUNDUP(((base_length) + (fat_count + fdt_count) * 20) * 1.05, 0)
+		# Cluster formula:     ROUNDUP((CEILING(base_length) + (fat_count + fdt_count) * 20) * 1.05, 0)
+		# Non-cluster formula: ROUNDUP((CEILING(base_length) + ROUNDUP((base_length/400) + 1)) * 1.05, 0)
+		#   where slack = ROUNDUP((base_length/400) + 1) — fat/fdt counts ignored
 		_local total_by_code << equality_hash_table.new()
+		_local is_cluster << .infra_type = "cluster"
 
 		_for code, group_set _over groups_by_code.fast_keys_and_elements()
 		_loop
@@ -1428,24 +1431,31 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				_local group_key << write_string(code, "|", sub_key)
 				_local base_len  << lengths_by_group[group_key].default(0)
 
-				# FAT keyed by ring|ltype (sub_key is already "ring|ltype")
-				_local fat_cnt  << fat_by_ring[sub_key].default(0)
-				# FDT keyed by ring only - extract ring from sub_key ("ring|ltype")
-				_local sep_pos  << sub_key.index_of(%|)
-				_local grp_ring << _if sep_pos _isnt _unset
-				                   _then >> sub_key.slice(1, sep_pos - 1)
-				                   _else >> sub_key
-				                   _endif
-				_local fdt_cnt  << fdt_by_ring[grp_ring].default(0)
-				_local slack    << (fat_cnt + fdt_cnt) * 20
+				_local slack
+				_if is_cluster
+				_then
+					# Cluster: FAT keyed by ring|ltype, FDT keyed by ring only
+					_local fat_cnt << fat_by_ring[sub_key].default(0)
+					_local sep_pos << sub_key.index_of(%|)
+					_local grp_ring << _if sep_pos _isnt _unset
+					                   _then >> sub_key.slice(1, sep_pos - 1)
+					                   _else >> sub_key
+					                   _endif
+					_local fdt_cnt << fdt_by_ring[grp_ring].default(0)
+					slack << (fat_cnt + fdt_cnt) * 20
+				_else
+					# Non-cluster (subfeeder/feeder): ROUNDUP((base_length/400) + 1)
+					slack << ((base_len / 400.0) + 1).ceiling * 20
+				_endif
+
+				write("LOG: SWL group:", group_key, "| base_len:", base_len, "m | slack:", slack, "m")
 
 				_local qty << ((base_len.ceiling + slack) * 1.05).ceiling
 				#write("LOG: SWL code:", code, "|group:", sub_key,
-				#      "|base:", base_len, "m |base_ceiled:", base_len.ceiling,
-				#      "|FAT:", fat_cnt, "|FDT:", fdt_cnt,
-				#      "|slack:", slack, "m -> qty:", qty)
+				#      "|base:", base_len, "m |slack:", slack, "m -> qty:", qty)
 				code_total +<< qty
 			_endloop
+			write("LOG: SWL code:", code, "| total BOQ qty after formula:", code_total, "m")
 			total_by_code[code] << code_total
 		_endloop
 

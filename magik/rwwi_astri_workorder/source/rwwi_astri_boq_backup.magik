@@ -63,41 +63,41 @@ _proc()
 		_elif p.spec_id="Join Closure In-line 48 Core" 
 		_then
 			p3 << p3 + 1
-		_elif p.spec_id="Join Closure In-line 72 Core" 
-		_then
-			p4 << p4 + 1	
-
 		_elif p.spec_id="Join Closure In-line 96 Core" 
 		_then
-			p5 << p5 + 1
+			p4 << p4 + 1
 		_elif p.spec_id="Join Closure In-line 144 Core" 
 		_then
-			p6 << p6 + 1
+			p5 << p5 + 1
 		_elif p.spec_id="Join Closure In-line 288 Core" 
 		_then
-			p7 << p7 + 1
+			p6 << p6 + 1
 		_elif p.spec_id="Join Closure Dome 24 Core" 
 		_then
-			p8 << p8 + 1
+			p7 << p7 + 1
 		_elif p.spec_id="Join Closure Dome 36 Core" 
 		_then
-			p9 << p9 + 1
+			p8 << p8 + 1
 		_elif p.spec_id="Join Closure Dome 48 Core" 
 		_then
-			p10 << p10 + 1
+			p9 << p9 + 1
 		_elif p.spec_id="Join Closure Dome 72 Core" 
 		_then
-			p11 << p11 + 1
+			p10 << p10 + 1
 		_elif p.spec_id="Join Closure Dome 96 Core" 
 		_then
-			p12 << p12 + 1
+			p11 << p11 + 1
 		_elif p.spec_id="Join Closure Dome 144 Core" 
 		_then
-			p13 << p13 + 1
+			p12 << p12 + 1
 		_elif p.spec_id="Join Closure Dome 288 Core" 
 		_then
-			p14 << p14 + 1
-	
+			p13 << p13 + 1
+		_elif p.spec_id="Join Closure In-line 72 Core" 
+		_then
+			p14 << p14 + 1	
+			
+
 		_endif
 
 	_endloop
@@ -172,11 +172,7 @@ _proc()
 			    :jml,p13)
 	
 	pp_seq_r.add(a_values)
-	a_values << property_list.new_with(
-			    :id,"clr14",
-			    :jml,p14)
-	
-	pp_seq_r.add(a_values)
+
 
 >> pp_seq_r		
 _endproc
@@ -405,7 +401,6 @@ _proc()
 
 	_endloop
 
-	
 
 	>> p1
 	
@@ -1380,7 +1375,7 @@ _proc()
 			y << p.route_sectors()
 			yy << y.line_length
 			y_sec << yy/100
-			p2 << 	p2 + y_sec
+			p2 << 	p5 + y_sec
 			#p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
 
 		
@@ -1390,7 +1385,7 @@ _proc()
 			y << p.route_sectors()
 			yy << y.line_length
 			y_sec << yy/100
-			p3 << 	p3 + y_sec
+			p3 << 	p9 + y_sec
 		
 		_elif p.spec_id="SM G652D-ADSS 72C" 
 		_then
@@ -2986,105 +2981,6 @@ _proc ()
 _endproc
 $
 
-_global f_exist? <<
-_proc(fad)
-
-	exists? << system.file_exists?(fad)
-	_if exists?
-	_then
-		write("File is available.")
-		result <<  _true 
-	_else
-		write("File not found.")
-		result <<  _false 
-	_endif
-
-	
->> result		
-_endproc
-$
-
-_global datalake_jmlhp_by_cluster_code <<
-_proc(cluster_code)
-
-	write("  Input cluster_code: ", cluster_code)
-
-	_local db_conn << _unset
-	_local result   << 0
-
-	_protect
-		_try _with errCon
-			
-			# Step 1: Connect to PostgreSQL
-			_local is_connect?
-			(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
-			
-			_if _not is_connect?
-			_then
-				write("  ERROR: Failed to connect to POSTGRESQL_ASTRI_DB")
-				#result << "{\"success\":false,\"error\":\"Failed to connect to PostgreSQL\"}"
-				_return
-			_endif
-			write("  Connected to POSTGRESQL_ASTRI_DB")
-
-			# Step 2: Look up cluster_id_stella for the given cluster_code_astri
-			_local sql_query << "SELECT cluster_hp FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1"
-			write("  Querying dim_cluster_stella_master_smallworld...")
-
-			_local recs << db_conn.sql_select(sql_query, cluster_code)
-			_local rec  << recs.get()
-			recs.close()
-
-			# Clean transaction state after SELECT
-			_try
-				db_conn.commit()
-			_when error
-				db_conn.rollback()
-			_endtry
-
-			_if rec _is _unset
-			_then
-				write("  ERROR: No record found for cluster_code_astri = ", cluster_code)
-				#result << "{\"success\":false,\"error\":\"Cluster not found: " + cluster_code + "\"}"
-				_return result
-			_else
-				write(rec)
-				_local jml_hp << rec.cluster_hp
-				_if jml_hp _is _unset 
-				_then
-					j << 0
-				_else
-					j << jml_hp
-				_endif
-				
-				result << j
-			_endif
-
-
-		_when error
-			write("  ERROR: ", errCon.report_contents_string)
-			#result << "{\"success\":false,\"error\":\"" + errCon.report_contents_string + "\"}"
-		_endtry
-
-	_protection
-		# Always close the DB connection on exit
-		_if db_conn _isnt _unset
-		_then
-			_try
-				db_conn.rollback()
-				db_conn.close()
-				extdb_java_acp.close_all()
-				write("  DB connection closed")
-			_when error
-				# Ignore cleanup errors
-			_endtry
-		_endif
-	_endprotect
-
-	>> result
-_endproc
-$
-
 
 _global create_boq <<
 _proc(design, infra_type, _optional donation_value)
@@ -3145,64 +3041,7 @@ _proc(design, infra_type, _optional donation_value)
 		nt << "Aerial & Underground"	
 	_endif
 
-	olt_nm << ""
-	#clr_nm << ""
-	_for i _over change_set.fast_elements()
-	_loop
-			
-		name <<   i.current_record.source_collection.name
-		_if name _is :sheath_with_loc _then
-			olt_nm << i.current_record.olt
-			sf_code << i.current_record.subfeeder_code
-			cl_code << i.current_record.cluster_code
-		_endif
-		
-	_endloop
-	
-	# Get user home directory
-	_local home_dir << system.getenv("USERPROFILE")  # Windows
-	_if home_dir _is _unset _orif home_dir = ""
-	_then
-		# Fallback to TEMP if USERPROFILE not available
-		home_dir << system.temp_directory_name
-	_endif
-
-	# Create sw_kml subdirectory path
-	_local output_dir << system.pathname_from_components("sw_boq", home_dir)
-
-	# Create directory if it doesn't exist
-	_if _not system.file_exists?(output_dir)
-	_then
-		_try
-			system.mkdir(output_dir)
-			write("Created BOQ output directory: ", output_dir)
-		_when error
-			write("WARNING: Could not create sw_kml directory, using temp instead")
-			output_dir << system.temp_directory_name
-		_endtry
-	_endif
-
-	#ex << Excel_Object.save_file( output_dir,"test.xls")
-	#ex << Excel_Object.save_as( "test.xlsx")
-
-	d << date_now()
-	days_number << d.day_of_month_number
-	months_number << d.month_number
-	years_number << d.year
-
-	_if months_number.write_string.size = 1
-	_then 
-		mth << "0"+months_number.write_string
-	_endif
-
-	_if days_number.write_string.size = 1
-	_then 
-		dys << "0"+days_number.write_string
-	_else	
-		dys << days_number
-	_endif
-
-	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
+	write(infra_type,nt)
 
 	_if infra_type ="cluster" _then
 		
@@ -3242,6 +3081,7 @@ _proc(design, infra_type, _optional donation_value)
 				:float_decimal_places,3)
 		
 		start << date_time_now()
+
 
 		nm_fdt << seq_fdt()
 
@@ -3566,15 +3406,9 @@ _proc(design, infra_type, _optional donation_value)
 		_endloop
 
 		hdp << get_count_hp()
-		write("hdp  :",hdp)
-		_if hdp = 0
-		_then
-			hdp << datalake_jmlhp_by_cluster_code(cl_code)
-			write(hdp)
-		_endif
-		
 		Cell_hdp << Sheet1.Range("O5")
 		Cell_hdp.value << hdp.write_string
+
 
 		Cell_olt << Sheet1.Range("O2")
 		Cell_olt.value << olt_nm.write_string
@@ -3664,86 +3498,72 @@ _proc(design, infra_type, _optional donation_value)
 		_for b _over clr.fast_elements()
 		_loop
 			_if b[:id]="clr1" _then
-				#"Join Closure In-line 24 Core"	
 				Cell_d55_name << Sheet.Range("C23")
 				Cell_d55_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr2" 
 			_then
-				#"Join Closure In-line 36 Core" 
 				Cell_d56_name << Sheet.Range("C24")
 				Cell_d56_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr3"
 			_then
-				# 48
 				Cell_d57_name << Sheet.Range("C25")
 				Cell_d57_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr4" 
 			_then
-				#72
 				Cell_d58_name << Sheet.Range("C26")
 				Cell_d58_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr5"
 			_then
-				#96
 				Cell_d59_name << Sheet.Range("C27")
 				Cell_d59_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr6" 
 			_then
-				#144
 				Cell_d60_name << Sheet.Range("C28")
 				Cell_d60_name.value << b[:jml].write_string
 				
 				
 			_elif b[:id]="clr7" 
 			_then
-				#"288"
 				Cell_d61_name << Sheet.Range("C29")
 				Cell_d61_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr8" 
 			_then
-				#"24" 
 				Cell_d62_name << Sheet.Range("C30")
 				Cell_d62_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr9"
 			_then
-				#36
 				Cell_d63_name << Sheet.Range("C31")
 				Cell_d63_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr10" 
 			_then
-				#48
 				Cell_d64_name << Sheet.Range("C32")
 				Cell_d64_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr11" 
 			_then
-				#72
 				Cell_d65_name << Sheet.Range("C33")
 				Cell_d65_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr12"
 			_then
-				#96
 				Cell_d66_name << Sheet.Range("C34")
 				Cell_d66_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr13"
 			_then
-				#144
 				Cell_d67_name << Sheet.Range("C35")
 				Cell_d67_name.value << b[:jml].write_string
 				
 			_elif b[:id]="clr14"
 			_then
-				#288
 				Cell_d68_name << Sheet.Range("C36")
 				Cell_d68_name.value << b[:jml].write_string
 			_endif
@@ -3975,19 +3795,23 @@ _proc(design, infra_type, _optional donation_value)
 #		_endif
 
 		Cell_type << Sheet1.Range("O4")
-		
-		_if ug _is _true _and ae _is _false 
+
+		_if ug _is _true _and ae _is _false
 		_then
 			Cell_type.value << "Underground"
 		_elif ae _is _true _and ug _is _false
-		_then 
+		_then
 			Cell_type.value << "Aerial"
 		_else
-			Cell_type.value << "Aerial & Underground"	
+			Cell_type.value << "Aerial & Underground"
 		_endif
-			
+
+
 	_endif
 
+	# Write RT/RW Permit donation values into BoQ NRO Cluster sheet
+	# D204 = qty material (always 1), E204 = donation value (service qty)
+	# Only written when donation_value is provided and infra_type is cluster or subfeeder
 	_if donation_value _isnt _unset _andif donation_value <> "" _andif
 	    (infra_type = "cluster" _orif infra_type = "subfeeder")
 	_then
@@ -3996,42 +3820,73 @@ _proc(design, infra_type, _optional donation_value)
 		_then
 			Sheet1.Range("D204").value << 1
 			Sheet1.Range("E204").value << donation_numeric
-	
+			write("LOG: RT/RW Permit -> Sheet1 D204=1, E204=", donation_numeric)
 		_else
-		
+			write("LOG: RT/RW Permit skipped (Excel) - donation_value non-numeric:", donation_value)
 		_endif
 	_else
-	
+		write("LOG: RT/RW Permit skipped (Excel) - no donation_value or feeder infra_type")
 	_endif
 
+	# Get user home directory
+	_local home_dir << system.getenv("USERPROFILE")  # Windows
+	_if home_dir _is _unset _orif home_dir = ""
+	_then
+		# Fallback to TEMP if USERPROFILE not available
+		home_dir << system.temp_directory_name
+	_endif
+
+	# Create sw_kml subdirectory path
+	_local output_dir << system.pathname_from_components("sw_boq", home_dir)
+
+	# Create directory if it doesn't exist
+	_if _not system.file_exists?(output_dir)
+	_then
+		_try
+			system.mkdir(output_dir)
+			write("Created BOQ output directory: ", output_dir)
+		_when error
+			write("WARNING: Could not create sw_kml directory, using temp instead")
+			output_dir << system.temp_directory_name
+		_endtry
+	_endif
+
+	#ex << Excel_Object.save_file( output_dir,"test.xls")
+	#ex << Excel_Object.save_as( "test.xlsx")
+
+	d << date_now()
+	days_number << d.day_of_month_number
+	months_number << d.month_number
+	years_number << d.year
+
+	_if months_number.write_string.size = 1
+	_then 
+		mth << "0"+months_number.write_string
+	_endif
+
+	_if days_number.write_string.size = 1
+	_then 
+		dys << "0"+days_number.write_string
+	_else	
+		dys << days_number
+	_endif
+
+	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
 	
 	_if infra_type ="cluster" _then
 		_if ug _is _true _and ae _is _false 
 		_then
 			ad << output_dir+"\BoQ_("+nama+"), ("+cl_code+"), ("+hari+") UG.xlsx"
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
-			
 			WorkBook.saveas(ad)
 
 		_elif ae _is _true _and ug _is _false
 		_then
 			ad << output_dir+"\BoQ_("+nama+"), ("+cl_code+"), ("+hari+") AE.xlsx"
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 		
 		_elif ae _is _true _and ug _is _true
 		_then 
 			ad << output_dir+"\BoQ_("+nama+"), ("+cl_code+"), ("+hari+") AE + UG.xlsx"
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 		_endif
 			
@@ -4043,32 +3898,16 @@ _proc(design, infra_type, _optional donation_value)
 		_if ug _is _true _and ae _is _false 
 		_then
 			ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+") SF UG.xlsx"
-		
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 
 		_elif ae _is _true _and ug _is _false
 		_then
 			ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+") SF AE.xlsx"
-			x_fl << f_exist?(ad)
-		
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 		
 		_elif ae _is _true _and ug _is _true
 		_then 
 			ad << output_dir+"\BoQ_("+nama+"), ("+sf_code+"), ("+hari+") SF AE + UG.xlsx"
-		
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 		_endif
 			
@@ -4079,38 +3918,26 @@ _proc(design, infra_type, _optional donation_value)
 		_if ug _is _true _and ae _is _false 
 		_then
 			ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+") UG.xlsx"
-		
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 
 		_elif ae _is _true _and ug _is _false
 		_then
 			ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+") AE.xlsx"
-		
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 		
 		_elif ae _is _true _and ug _is _true
 		_then 
 			ad << output_dir+"\BoQ_("+nama+"), ("+fd_code+"), ("+hari+") AE + UG.xlsx"
-		
-			_if system.file_exists?( ad )
-			_then
-				system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
-			_endif
 			WorkBook.saveas(ad)
 		_endif
 		
 	_endif
 	WorkBook.Release_Object ()
 	Excel_Object.Release_Object ()
+	>> ad   # return saved file path for auto-upload
 _endproc
 $
+
+
 
 

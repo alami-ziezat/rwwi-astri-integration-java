@@ -47,6 +47,13 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 			_then
 				wo[:donation_value] << d_val
 				write("Donation value auto-fetched:", d_val)
+				# Sync to wo_cache so table data source reflects the new value
+				_local cache_key << wo[:infra_code].default("").as_symbol()
+				_if .wo_cache[cache_key] _isnt _unset
+				_then
+					.wo_cache[cache_key][:donation_value] << d_val
+				_endif
+				_self.changed(:workorder_list, :renew)
 			_else
 				write("Donation value unavailable - RT/RW Permit will be skipped")
 			_endif
@@ -138,6 +145,13 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			_then
 				wo[:donation_value] << d_val
 				_self.log_success("Donation value auto-fetched: " + d_val.write_string)
+				# Sync to wo_cache so table data source reflects the new value
+				_local cache_key << wo[:infra_code].default("").as_symbol()
+				_if .wo_cache[cache_key] _isnt _unset
+				_then
+					.wo_cache[cache_key][:donation_value] << d_val
+				_endif
+				_self.changed(:workorder_list, :renew)
 			_else
 				_self.log_warning("Donation value unavailable — RT/RW Permit will be skipped")
 			_endif

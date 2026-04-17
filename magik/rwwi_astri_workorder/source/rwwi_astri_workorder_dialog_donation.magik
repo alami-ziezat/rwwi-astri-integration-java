@@ -56,7 +56,7 @@ _method rwwi_astri_workorder_dialog.get_donation_work_orders_for_list()
 		_self.log_info(write_string("[", idx, "/", .wo_cache.size, "] ", infra_code))
 
 		_local val << _self.fetch_donation_value_for_wo(wo, infra_type)
-
+		write("Value fetched: " + val.write_string)
 		_if val _isnt _unset _andif val <> ""
 		_then
 			wo[:donation_value] << val
@@ -132,14 +132,13 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 		_if data _is _unset _orif data.size = 0
 		_then >> _unset
 		_endif
-
+		write("Donation API results found: " + data.size.write_string, "dontation_field: " + donation_field.write_string)
 		_local matched_value << data[1][donation_field].write_string
-
-		>> matched_value
+		_return matched_value
 	_when error
 		_self.log_error("Donation single-fetch failed: " +
 		                condition.report_contents_string)
-		>> _unset
+		_return _unset
 	_endtry
 _endmethod
 $
