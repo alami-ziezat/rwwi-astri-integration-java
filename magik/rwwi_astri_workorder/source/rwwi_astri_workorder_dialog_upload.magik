@@ -200,6 +200,17 @@ _method rwwi_astri_workorder_dialog.upload_boq_to_astri(file_path)
 	_endif
 
 	_local wo << .selected_wo
+	_local infra_code_check << wo[:infra_code].default("")
+	_if infra_code_check <> "" _andif
+	    file_path.write_string.index_of_seq(infra_code_check) _is _unset
+	_then
+		_self.log_warning(write_string(
+			"BOQ upload skipped: file path does not contain infra code '",
+			infra_code_check, "'", %newline,
+			"  File: ", file_path))
+		_return
+	_endif
+
 	_local type_name << "build_of_quantity_as_plan_drawing"
 	_local infra_type   << wo[:infrastructure_type].default("cluster").lowercase
 	_local cluster_code << _unset

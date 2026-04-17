@@ -3822,10 +3822,10 @@ _proc(design, infra_type, _optional donation_value)
 			Sheet1.Range("E204").value << donation_numeric
 			write("LOG: RT/RW Permit -> Sheet1 D204=1, E204=", donation_numeric)
 		_else
-			write("LOG: RT/RW Permit skipped (Excel) — donation_value non-numeric:", donation_value)
+			write("LOG: RT/RW Permit skipped (Excel) - donation_value non-numeric:", donation_value)
 		_endif
 	_else
-		write("LOG: RT/RW Permit skipped (Excel) — no donation_value or feeder infra_type")
+		write("LOG: RT/RW Permit skipped (Excel) - no donation_value or feeder infra_type")
 	_endif
 
 	# Get user home directory
