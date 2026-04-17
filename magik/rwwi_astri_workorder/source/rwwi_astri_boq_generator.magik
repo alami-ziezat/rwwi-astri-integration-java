@@ -910,6 +910,13 @@ _method rwwi_astri_boq_generator.generate()
 				_continue
 			_endif
 
+			# For non-cluster: figure_eight (Cable Hanger) count is formula-based.
+			# Handled by add_figure_eight_non_cluster() after cable length is known.
+			_if .infra_type <> "cluster" _andif col_name _is :figure_eight
+			_then
+				_continue
+			_endif
+
 			# Only process Proposed objects
 			_if rec.responds_to?(:construction_status) _andif
 			    rec.construction_status <> "Proposed"
@@ -946,6 +953,12 @@ _method rwwi_astri_boq_generator.generate()
 
 		# Sum all sheath_with_loc lengths per code first, then apply 5% margin + ceiling once
 		_self.add_sheath_with_loc_to_result(result)
+
+		# For non-cluster: figure_eight (Cable Hanger 200000185) = ROUNDUP((cable_len/400)+1)
+		_if .infra_type <> "cluster"
+		_then
+			_self.add_figure_eight_non_cluster(result)
+		_endif
 
 		# Add fixed service items based on infrastructure type
 		_self.add_fixed_service_items(result)
@@ -1469,6 +1482,53 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 		#write("LOG: Processed", swl_count, "sheath_with_loc records,", groups_by_code.size, "unique codes")
 	_when error
 		write("LOG: ERROR processing sheath_with_loc:", errCond.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_private _method rwwi_astri_boq_generator.add_figure_eight_non_cluster(result)
+	## For subfeeder/feeder: add Cable Hanger (figure_eight, code 200000185)
+	## quantity using formula instead of object count.
+	##
+	## Formula: qty = ROUNDUP((total_cable_length / 400) + 1)
+	##   where total_cable_length = sum of all sheath_with_loc route_sectors lengths (cm->m)
+	##
+	## Parameters:
+	##   result - property_list to update
+
+	_try _with errCond
+		# Compute total cable length from all sheath_with_loc Proposed objects
+		_local total_cable_len << 0.0
+
+		_for rc _over .change_set.fast_elements()
+		_loop
+			_local rec << rc.current_record
+			_if rec _is _unset _then _continue _endif
+			_if rec.source_collection.name _isnt :sheath_with_loc _then _continue _endif
+			_if rec.responds_to?(:construction_status) _andif
+			    rec.construction_status <> "Proposed"
+			_then
+				_continue
+			_endif
+			_local seg << rec.route_sectors().line_length / 100
+			_if seg > 0 _then total_cable_len +<< seg _endif
+		_endloop
+
+		_if total_cable_len <= 0
+		_then
+			write("LOG: add_figure_eight_non_cluster: no cable length found, skipping")
+			_return
+		_endif
+
+		# ROUNDUP((total_cable_length / 400) + 1)
+		_local formula_qty << ((total_cable_len / 400.0) + 1).ceiling
+
+		_self.add_to_boq_result(result, "200000185", formula_qty)
+		write("LOG: Cable Hanger (200000185) non-cluster formula:",
+		      "ROUNDUP((", total_cable_len, "/400)+1) =", formula_qty)
+
+	_when error
+		write("LOG: ERROR in add_figure_eight_non_cluster:", errCond.report_contents_string)
 	_endtry
 _endmethod
 $
