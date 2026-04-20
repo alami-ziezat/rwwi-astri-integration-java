@@ -173,15 +173,15 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 		# Get infrastructure code from database result (already fetched from PostgreSQL)
 		_local infra_code << wo[:infra_code]
 		# Check if this infra_code should skip hardcoded value
-		_if _not _self.should_skip_boq_hardcode?(infra_code)
-		_then
+		#_if _not _self.should_skip_boq_hardcode?(infra_code)
+		#_then
 			# Use hardcoded value for testing BOQ (for codes NOT in skip list)
-			infra_code << "PLB006435"
-			write("Using hardcoded infra_code for BOQ testing:", infra_code)
-		_else
+		#	infra_code << "PLB006435"
+		#	write("Using hardcoded infra_code for BOQ testing:", infra_code)
+		#_else
 			# Use actual infra_code (for codes in skip list)
-			write("Using actual infra_code (in skip list):", infra_code)
-		_endif
+		#	write("Using actual infra_code (in skip list):", infra_code)
+		#_endif
 
 		# Build BOQ parameters from work order data
 
@@ -254,6 +254,19 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				_local qty_material << item[:quantity_material]
 				_local qty_service << item[:quantity_service]
 
+				# Determine effective vendor_name for Cable and Pole items:
+				# If the WO vendor_code is not in the MR vendor list, use "internal"
+				_local effective_vendor_name << item[:vendor_name].default("")
+				_local catalog_entry << rwwi_astri_boq_generator.MATERIAL_CATALOG[equipment_name]
+				_if catalog_entry _isnt _unset _andif
+				   (catalog_entry[:object] = "Cable" _orif catalog_entry[:object] = "Pole")
+				_then
+					_if _not _self.is_mr_vendor_code?(wo[:vendor_code].default(""))
+					_then
+						effective_vendor_name << "internal"
+					_endif
+				_endif
+
 				_try _with apiErrCond
 					# Call astri_add_boq_drm Java procedure (supports cluster, subfeeder, feeder)
 					write("Sending BOQ item:", equipment_name)
@@ -261,7 +274,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 					_local json_response << astri_add_boq_drm(
 						infra_type,                                    # infra_type ("cluster", "subfeeder", "feeder")
 						infra_code,                                    # infra_type_code
-						item[:vendor_name].default(""),                # vendor_name
+						effective_vendor_name,                         # vendor_name
 						item[:subcont_vendor_name].default(""),        # subcont_vendor_name
 						equipment_name,                                # equipment_name
 						item[:description].default(""),                # description
@@ -496,6 +509,17 @@ _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.is_mr_vendor_code?(vendor_code)
+	## Returns true if vendor_code is in MyRepublic's approved vendor list.
+	## Cable (sheath_with_loc) and Pole items from vendors NOT in this list
+	## are sent to ASTRI with vendor_name = "internal".
+	_local mr_codes << {"1000001465", "1000000650", "1000000623",
+	                    "1000002614", "1000002219", "1000001432", "1000001528"}
+	>> mr_codes.eq_includes?(vendor_code.default("").trim_spaces())
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
 _private _method rwwi_astri_workorder_dialog.should_skip_boq_hardcode?(infra_code)
 	## Check if infra_code should skip hardcoded BOQ value
 	## Returns true if infra_code is in the special list that should not use hardcoded value
@@ -509,7 +533,7 @@ _private _method rwwi_astri_workorder_dialog.should_skip_boq_hardcode?(infra_cod
 	# List of infrastructure codes that should NOT use hardcoded value
 	_local skip_list << rope.new_with("SBY002938", "PLB006436", "PLB006435", "JKT006806",
 	                                  "FSBY0069", "FPLB0113", "FJKT0275")
-
+	write("Checking if infra_code should skip hardcode:", infra_code)
 	# Normalize infra_code (trim whitespace and uppercase)
 	_local normalized_code << infra_code.default("").trim_spaces().uppercase
 	# Check if normalized code is in skip list using includes?()

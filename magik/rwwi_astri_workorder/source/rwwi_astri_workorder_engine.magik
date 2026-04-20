@@ -419,6 +419,7 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			pl[:status] << _self.get_xml_element_value(wo_elem, :latest_status_name)
 			pl[:vendor] << _self.get_xml_element_value(wo_elem, :assigned_vendor_label)
 			pl[:vendor_name] << _self.get_xml_element_value(wo_elem, :assigned_vendor_name)
+			pl[:vendor_code] << _self.get_xml_element_value(wo_elem, :assigned_vendor_sap_vendor_code)
 			pl[:subcont_vendor] << _self.get_xml_element_value(wo_elem, :assigned_subcont_vendor_name)
 			pl[:created_at] << _self.get_xml_element_value(wo_elem, :created_at)
 

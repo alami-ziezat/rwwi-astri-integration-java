@@ -1,0 +1,2675 @@
+{
+  "info": {
+    "_postman_id": "d4f58536-a892-4df5-bb36-43f89160b10e",
+    "name": "My Collection",
+    "description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "49198625",
+    "_collection_link": "https://go.postman.co/collection/49198625-d4f58536-a892-4df5-bb36-43f89160b10e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "ASTRI",
+      "item": [
+        {
+          "name": "Download document cluster",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{astriIP}}/{{documentDomain}}/cluster/download/2989eecc-3fd0-402c-bd81-99e02caa7ef5",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{documentDomain}}",
+                "cluster",
+                "download",
+                "2989eecc-3fd0-402c-bd81-99e02caa7ef5"
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "Download document cluster",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{astriIP}}/{{documentDomain}}/cluster/download/:uuid",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{documentDomain}}",
+                    "cluster",
+                    "download",
+                    ":uuid"
+                  ],
+                  "variable": [
+                    {
+                      "key": "uuid",
+                      "value": "4ea5751b-ba8b-4771-86df-1d0225fddc0f"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Date",
+                  "value": "Mon, 03 Nov 2025 16:58:05 GMT"
+                },
+                {
+                  "key": "Server",
+                  "value": "Apache/2.4.37 (Rocky Linux)"
+                },
+                {
+                  "key": "X-Powered-By",
+                  "value": "PHP/8.3.13"
+                },
+                {
+                  "key": "Content-Description",
+                  "value": "File Transfer"
+                },
+                {
+                  "key": "Content-Disposition",
+                  "value": "attachment;filename=\"as_built_drawing_kmz_PLB005952_20250322011705_ABD KMZ     Kuto Batu RW 03 dan 05DIST 270225.kmz\""
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "public"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "12360"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=5, max=100"
+                },
+                {
+                  "key": "Connection",
+                  "value": "Keep-Alive"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/octet-stream"
+                }
+              ],
+              "cookie": [],
+              "body": "PK\u0003\u0004\u0014\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000�����/\u0000\u0000ا\u0002\u0000\u0007\u0000\u0000\u0000doc.kml�}is\"I��g���Yk۵mA܇��\u001aURMit�������2J�UX#�\u0002����{��$��<�D\u0015�!��#<��+�=����~���7��G�_��&y��\roF���ݯo>^��5o�g���\u001f0\nF\u000e'���2�>�Z_�~m�\u001ezû��9�M[0�Ś��l��ݷ��w��ݠ׼\u0019�\u0007\u0003{ߦ���U��v�����_ys4�k1Bd�\u0003?���=\u0018�<������v���}o���ѹ8h\u001c�����m4\u001aǏ�Q�mw�ظ�G���mw� �?\u000f������\n��c�>�i�\u0015���x�A�Gc܃;�><�i|\u0019�~���du���x����<z��B\"OZ\t��}\u0018��4����뛿\u0005�4\u000e���x��M�TMJ\u0018�o�ۭ��x\u0017W7_z��\u0006��o:''�\u000f\u0017����7����o�>�W�>\\|¯>\u001d\u001c\\]\u0011 �\u000e\u001cֿ\u0018���{�����\u0003\u001c{;z�<�\t�tr~����\u0007�p����a��~�t�y0�����\u0006�7��v+>�v+v�t\u0017�\\o�f�{�KN�c`��%�\u001e���\u001e�X�ŎOO>�??98�\\w���ԗ��\u0001\u000b�0\u0003>�\u0006u|\u00100\u0000\rX�\u0000^W�\r�����o'k�\u0019\r�\u001e�K&�'V)Y�]���~be^ر��V���˦�p�\u0019/2�Y�t-��o����\b':�&�>�%W�?/K*y\u00125\u0015[�h��B�y�f-���s,j�L��A���ˠ�ez1�\u000f���Z̈́���h\u0018|��v�7��h��������s�\u0013�\f������\u000f�����$nl������$p\u0019&_�\u000f�\u0016n�\u0006�h�ǧ���\u0006$�\u0017�����\u000fûv+8_p�����]tg����`�p�Sp_����_�\u000e:ם��]`������7��\rZۍF{:�oOo�۟�#\u0016m�>�)�_����ފ��{6�\u0005�/�%d�M'\t�l8\u0007���\u0013��k��3ĆS�\u0007��\u0003�G\u001a�����\u0005R/��\u0012e�}ܻM�C<�x�)�>�<���\u001f��=_z]���\u0003㸷/�:p����a4m|\u0003Fh�7����o���t����ݛi4�_��i��p�m/���趷�}��ڭ�/=�֞K�H9/�<�Ę��瑧x�z&�L��I���=���><�]B�rM\u0007�ao��\b?=�\u0006�÷�\u0012xQ\u0006��O��~��,ޚ���!\u000eH�I'0�Ļ�\f�X������}�n��\u0004�Z8�}\u0001�_9�!+�j��#K!��\u001e��qa\u001a{\"?\u0007�=����\u0017��Әy\u001aWCcI8!�0��U\u0013؋�)�y�j\n{1\\9������^Nd\"�i�!5��A�CQ\u001b����\u000f�������h|�\u001d�[�>�r���8\u001e��%�A�nE\u0007�f\u0010^i�Q8,�U#�Ysɐ^@��$#\u0015�l�\u0004��Y�D���^�f�j���i�n\u0002U\u0012�UO���I^�nՓ�z��\b�2��9���ݷ�:�\u0011����|ӵ,�2QPc5�v��\u001bg�L\u001eƣV��{\u0007\u0016�d:�������e��y�\u001d��)�\\�Y$묁�O�\u0007_w\u001f\u001e'_\u001e�C��\u0011O�G�r���9?}\u0019P�C$�O����Ը�<�ՓXY�*�|Y9�|͏�\u001c�\u0016���T�d�����^<�\f�\u0019��7�\u0018#P\u0010B٧\u0014?\u0001�%���i��9�sqrYu���*�\u001b%���Q�\u0003v\u000bsS�腥�1]|n<�1�t\u0002�+��XK�L�+:�j��Q_�\r?���<Y\u001d>�c+r9�8&9\u000f�\u0019r�}F���͜Y}\u001a�\u0017Y��\u0018�'A{��N��|��b�/���=�d㘗,8�,��,�y����k\u0012\u000f\u0011��7��F�(�r��� �jqP����t�i��~�i刉.M+�2�O[��֞8�䲮A�L�����.ϭ��*�[ѩ�b3+gie�eG�i\u0015|b��'�g�ayj��V��2�-���\u0012y�\u00014���[�D\u0001\u0015��m���iŮ�.��H\u0010Df�\u0010�C�[o0�\u0007��ϭ$�im�#�t\tَ|m�c�\u001d��\u0012�����1��O$\u001dԮ&~�,�\u0005O8\u0014�t�\u000bt��f�a��$_v�Y--��P,��%�//�/.��PTL�ˠ�Xӝn�ɘ�Y/nWj\u0007R\u0014/���S,\u0013�0��u��j����X�e�uw<�5̪�_ZM���`\u0016}iL����CQ�D�/e�z2\u0016'�X�An��X��^&��X\"�ޏ\u0006��ِ�\u001d{���i,mس�cO����ˣ�\u001f��懭\u001e\u0007P\u001a���LC��}ۻ����\u001e��\u0003�i������0�K�.eׄ�q����ݚ�\u0016\u000e�\roq��%l��kJ�\u0018�#8\f����r��`4��O\u001fo�-�hjM\u0019�2Pũi��?������]ִZkA�2\u0014\u001cw\u0006\b�~���\u000e \u0010��!��T�&��0\u0016�Xa�b��N{�\u001fL��lr)�\u0011X!$���V��l�\u0018L��>Ӽ�\u0014�-Yj\b��ݚ�\u0010\u0011��C�H9����ٻ\u001e]���\u0007��8��\u0019\u0013ǞO�!�O����\u0001��k\u001c������I�a�\u001b���{\u001ca\u001f���'<��\u001a�$�n��{��\r��\u0000zQ�\u0012�(|\u0017�]�����\u0015��Ā���\u0018IGJ�L�4t#\u0004)��n�\u0016T��\u0006Bϝ�\r\u000fHqz�<>�滲yA\b������?�\u0013*\u001e9_��/F�q��)H���Awڍns��\u0002~՘\u0004o�_��%q����`������YB\u0011�6t�_)��h��P��\u0007��IY P�Cc��,Q,�\t�\u001e&kX�;�NG���$�\b�Gf$a�O\b���<\u0007\r��~d'���#�]�����`\u001d(\u0006��\u0018TGwڛ8:\u0011��/�̙�6xi�K\u0000��hw�����\u0002�rJ/�Sz�R_�\\�o�^\u0011c��B���Jܫ�b�\u0015$P\u0014\u0014>�\u0000lY^i���\u0017wc�zp\u0001\u0001��+Z��\u0013���V\u001cQ�Bq\u0004���^<�8J\u0005+��a%�s��\"�p\u0015U��;\tU�\u000f�\u000f�TŨ2֡JX�'g/Z\u0015���F�N��υ��\u0017_EU��NBU���*]-����\u0017G\u001d���t�U�Jn\u0007���R��T�\f|.T�ܨJ}�I�J�*�R\u0013:\tUi\u000fN@U\"��C�����#�\raU\u0015���F�I�ؕ�*;42�w\u0012��\u001f\\\u001fT%\u001a��J\u0011�Pe�v~��\nU�u����U���t��E�y�\u0004��_/\u000e��G���,��0tvQ1n\u0000-!n����x�yݸyQ\u0013/��+&^\u0011\u000bo�T\u0011MD`i�b�t�\f<\"h\b���&��!e�m�.\tS��t��;\tT�\u000f�\u000f�\u0012�\u0018%��X�\u0014\u0015��&Y\u0011�PFl\u0003�r���xIT%\u000b�t�ʾ����ڄ�h�-�g�q��/�%�\fQUU�\u001ce�kF�z��y�\u0000N�������\f\u0007�\u0007U\u0015/�rEm�*ŕ�v5����\t��K�*w�D��N\u0004U\u0001\u0003�@�\u0018�,\u000fT�\u001a\u001d��8�*O\"W*TmI�DN�ʲ����ܙ\u0013��;\tU�\u000f��[U�\u001a�a2\fV\u0000u\b\r\r��@�%�\u0013yA���_Է�\u0004�\u0002��K!���]K4s.\u0015�UG��dM��L���J0�7k\"�}��*�����*^�\u0015��\u0002\u0015@�(����P���&��/���Y\u0013\u0019�;\u0011U\u0005��_HW�j�����;T\u0011�|��\"\u0015�:k¤OX�\u0004Uy�%2�w\"�R\u001f\\\u001fTU�TE���\u0003�(\u0019.U�ʜ�W�Sa��n3\tUy�*2�w\"��o\u0001�U�T�\u0018'ơ�3�\u0000\\�\u0005���*�yQ�*wZE��N\nV�?�>�J\u0014\u0004%�J��\u0002�P�C\u000b0O6�S����ϽA�6zMA�l{`\u001e�\u000b����y���l2�\u0017�����զC�-.�f��\f~�{0�$���|�\u000b��)ʛ�GH�j�6ޟ7�uޞ\u001c6N��\u000e\u001b��2�Ů�k�s��l6O\u0017��mor3�?��p�Z��v+�͊DJ��sU&�f>�����\u0016\n�Io0�\u0007�MIb����1�+�W�Z���Qq��\\J�!`�����]����D5�J\u0013������1A\u0014e�+�7�9'�\u0012k���a�he�R.cUIi�oQp���1B��VH��a�2�����4>LP�8\\\"\u001a�@�0�\u001bH�.\n:\u0006�$��\u0017m\b�4�TƆ��+̠p�40C\r��4>�\u0018����sYe`ނq��\u0013��2�h&\u0004�\"�V\t����0��0�F�\u0014���HT��E��ca\u001e<�(܇�\u0014�\u001d\u001fF$8�T����#�\u001f �bqr0ά���a��\\���O�i���2!����\u0014�\u0013c\u000f \u0019<\u0018���5�\u0004\u0001'\u0007�\u001e�&0���#c�T\u0015�\t\u0001\u000f���:\u001f�(\u0015\u0016��\t\u0005U\nxTq\u0016���'\u0000r���m��Z\u0006���b�P@\u000b.�c6�5�T�7�\u0010,�-�WE~4�\u0005�Hf�O�1�qj�E&\f�@\u000e�ұQJR!� ԉd\"����O0,��I�y\u0019�Y���x�0��\u001a�\u000f��6\u0016�\u001aVĻ6���t�n랪�N�\b/��bMcɀ\u0010�:WlR5�|�\u0018#MR5\"����\u00079p��\u0005u�z�rq�I\tiR`��O���y��a�}�v�:���z��]bv\t��b��Yӱxo��T��v�����v(\u00039\r��\u0002$�J����\u001ee\u0012Ŋ��+i�{��l�R�3�Sƚ(���Gi�%�]��\\hU�㚕�$()A����y�YَkWF�nJk$�R��ĭ�c��v�7,�YlY�b*�6�_5\u0013\u0016\rF8�����\u001cwUB\u001ba��\b\b�\n,�{d\u001c0���sL-�:�%�{x\u0015�\\K]\u0007��^r�\\\u001d��\"�I\u0006=�\u001f�\\\u0019D�\u0004�O\n0;��A\u0006�\u0017\u0002�\u000e\u0003�S^\u0019�+�`�2�\u0016�+` �MB�6)^\rlp\u0001F�҉2�1��`�\u001b\nx\u00053�>�\f\np8C�Z�1�\u0019^�ZL��FF�\u001fA5\u0005W$�M�\u00021��`eF�\"�f���ꚪ=��r68\u0001`\u001d������\n�\\P`1���I���k��Gw\u0003��Z�Ym\u0013lf�.\u0001�U��<I�J�\u0004_�Y�!���!W'x��u�\u0014�u�2��A����P�ԅ����ְ�\u0006OJ\naS،��`�\u0001\u0010�\tL��|-��J��OAۼ��M\u0013�{�\u0016�JՈ�d�\u0016�)\u0004���B��\u001f���)�D����5�J�%,e��E�-\n0��zCT3M�f\u0012��{��-<&�(g�\t�����̀���\u0013Qi�p5\u0013M0�\f�M�i�\u0011�\\m\r�\b�r�%\u0013�Ԑ�+\u0013׆)�u�FD�>\u000e�\r���2s\u0006#��[���\u0012\f�*���\u0019��!\u0018����9�5�V��\t�g�\u0016Fm��mӀ�\fv�\u0001�]�5�\baMI0Fȕᢎ�͒\u00160��m��\u0003Q�\u000eQ>,'\u0018��\u001a\u0014b\u0015����\u0014�jfB(7<\rs\u001b��}\u0002&���l\u0011\\\u0000\u0001%\n\u0016;.�\b�Nj�&\u0016ؠ{ˤҘ\u0003�he���)�v�-\u0011�Y�W�x�*�\u0006�Z��@FK\bT��2V���\u001d1����\u0019;��Uq6c�+f�\u0005aQR\u0000\u0007�I�/��{|*t�!�w�?{���ư���א\u0010\u0018��\u0010�M���\r��|���\u0004��\u001c�]\u0017?Mص&$h���J�4��CU��E�$\u0002���\r�����t\u0006��q�\u001b�\u001d=\u000eo���G�,� T�\u001d_� ���o\u0010e\u001cP`O�\u0018��\u0004�Ĵ\u0001\\ʎ-\u0002\u000b�,%�E�\u0006q\u000b6\u001d8\u001f\\��\u001a0\u0017h����n��bj\u0001�D���3��c뚠j�0\u0003��u.l,�a�}�g����0ھH�v+�l3ƈ�V��D\u001e��F�8\u0003LJ���y9O��t\u0014\\W�gr�NC\u001c�2�0A%8�\u001a�Eb�8>r&�C\u0006�\u0005�k��%����[\u0004\u0015�D'S�\u0014�O\r�m��d\u0014\u0013(� 3p���\b��x*�\u0016����\f4�'\\@��Ć\u0011�]̏pgS�Z�8\u0001]��9\u001ap,\u0007�\u001a�\u0000%�4�H�\u0004�O���#�1\u000e+���\f\u0000\u001f������\t|\u000f�\t�����C�\u0003\u000e��Ɓ�}�$nn��$1d\u0011\u001eTɻ�da\u0018������k�DX�R,6L3N\u0005�q��Ց\u0019T��-�Wx��u_\u0007\u0016�\u0016�\u0005\nx�_�Q*11\u0006Y�\r�P(\bH\u001d��a�ll���\u0014$\u001c\u0010do\u0001sųd0_,�^\n��g��\u0005O;v6@�\u0016JG]�\u0000\u0002�\u0010����,0��d�3�ke\u0004�\u0010Fk\f\u0014ǒ�PEP\faE \u0000��\u001e0$>\n��1��F��\u0018h\u0016\u000e��\u0001O×0\n�\u0012\u0001�Y\u0000�\u0011\u0000��0\trB��Უ�s�\u001c���g���,�d���\u0005�@c�p+ U��s\t#��U\u0012\"�\u0012F\u0003k`�]������\n�(��72Z\u001d�.^7ҍ4�F�<jH\f\bs�~\u0014X���8����8l�\tR_����Ur�P�;э��f�F�\u0005%��=\u0000'�k-X<p\u0007\u001csXb��0�F`6a8�\u0003'�]�=���\u0002�3�9�5��E\u0006�V�u�\u0002\rh����\tR\u0019��\u0003 ��\r\u0006~�E\u0013NE�@�`�\u0010��a\u0018e�%q7LQ\u001c\u0006$�\u000b0��*T^n� \f\u0017���\b��?�\b�q��`~$��Ԃ��5 �\u0003k�@@\r�fEl\u0018\u0003��$�</�&��`*�܊�:P�`�F�b�*Z��5��೉\u001e\u0016� \u0012�kd�I��G8�h\u0018Hs\u0010\b\f�X��[�\u0017�2gU[�=08N�m����\u000e�A�r/\t��\u0014h��'\nl\u0006Z\u0015���'f\u001bd>��D}������ldA�p\\�ᑱ $f�\u0019T~q0\u001b�\u0017�\"\u0011�\f�\u001b�Ec�S\nd\fXȑ\u0004���F0�:�PI�9p!x��F�\u0004Z�9u�a��83�Z\u0003�\u0004h�xW�\u0018c����2\u0006\u0001%�bK\u0010�ˋ��5[�F�\u000b0�\u0017mf\u0005�\u00153j\"�Gbj0�O���Q\u0019\u0018�&Jl\u0016\u0002�\u000b�3�kx,��\u001c\u0014��\u000b�\f��\u00120\u0006l��O=�:�jC����\u0015�@�\u0001\u0000\u0017\u0018�`L)�V\u0017�fA�1�\u0017�\n#��F�Ѵ�fA�\u00194\u0015A�F��9���$�x�`�\u0002kE�\u000fp�\u001fԭ\\�,Xh�k���rL�\u0007\u0014\u000f�\r\u0003���\u0002e��\fT0�����\u0007� j�ׂ\u0002Ă��c\u0006=#��53.\u0000�A�\u0003}\b8�1EʱN\u0000&\u0016\u0015�q���0ʂq��8�<:J�\u0007=�A\u0019\u001a�.\f�(\u0004X���\u001a�'X�X\u0016���@���i�w\u0014E<H�q'\u0002,p�}\u0015�$\u001aK3\f\u001a�26ѠP�\u0006�5�\u0002 X� `\n��}\n�AP>\u001f%�K8\u0017�H�zL,<�Du\u0000��P����3V#)pe�rzO�7�i$`�,<O�\u001a;wqO\t\tv2��Ǚ\b-6:\u001f��\"�y\u0000��0��'�*�����Vam�q\r8�`�[�Xq\u0002�\u001d�Z1�NJ��#B9�E�\u0016�s��sq�\u0005\u0004`���&(G�\u0002,[��\u0004\u0018�0(\"\u0007�\u0018�\u0011��_�\u0014՞�o�ZO���z����S�\ta��-$l��L��:]\u0015d����4�=]W\u0013�\f{�\u0012p_r\u0005\"hY\u0013�\"g�2���R�x�\u0002�5L��lN�� D�Xt>_E�\u0006ZqS'Z\u0005��1�{�:'�\u0004�\u0001��B�`Z�n�b�\u001c���c&�BbQU'b�!\u0002\u0016���챇/\u0005S�\u0010\u0013_'\u0000�F\u000b0��+)�E�0�R����s����)\u001c=�p��rA܍\u001ezC�v�7Q\u0002&n8]�:��;QoEUL�q/��sA��ߞ<;�\\�\u0016{���\nsG\u001e�������q��\u0006��\u0018���,\u000e2��z�\"�)�%�˕�\u0001�8�\u000f�*\u0005[Bc�W-�1c�1�\u000e]\u0018\u0018�\u0012�e���\r��\u0001�`w8\f\f\u001cC�P�\u0010\u0004`x\r��\\\\�� OE*���=zC�,��.�\u0011xt&be�\f-&\\=�\u0016����S�1�\u0005\u0013\f�7!����\u0019���\u0001����\u00057\f���\r�\u0007�K�+Fc��\u0002��o���\u001e�\fp+\u0002��ؽq\u000e�\u0019���E�h��0�qC���(��X\u0010��U-#}�ެu�\u001b�Ebe_��\u001e\fJ\u0012\bK��T�U�u\u0010C��=��\u001dHV�fEV.���p�p~zxѹ���e!6\u0001�Hrj\u0012D�R��\u001auv���|��lɤ\u0013�\u001c1I=DY\u001cu�Y�����J\u0019b�s�~4\u001c�ﻃp@,!)A^&\b�r.�*�W$h9\u0017Z>�}��;O���Ӈ�Y�\u001el�C���ΰ{P�]'b��=}ޟ�\u001c\u001c^��!�ʖh\u0018���MMذ�`��3\u0006\u0014H�\f����.\u0011wA�jf�ei�����oD��=����\u0001\u0001Rv����[\u0003��]��˲��s��Eg���ی��\"ŀ\u0000����+\u0004��\u0006c\u001cv�521\u0001 �\u001d�Pp�=�\u0003\u0002��\f�a�a�\u0006vy�̴-S_\u0000vQP\u0007fFd\u0005�y\u0003\u0002�ݒ����n\r��\u001f8�]��j_\u0002x$\u0002\u001e�ag�]�}�g\u0014H�k�\u0007�\u0007^2�2tя\u0001/�\u001e5�\u000e<���EZ��]�f\u0014H���\u0007�\u0007�\u001a��YFH���\u000b\u0000�%��̸۬�̸��\u000eO�N:gk\\t��\u001d���\u0003�\u0003�\u0010\u0000��o���\nD��\u000eSĴ�٫������ÓƻÓ\u0013�A��\"\u0018̰�Y\u0000�8��\u0015~4�\u001f�\u001a�٫��C3K �&�\u001e{\u001e{k���\u0000Ͳ��3籠���L\u0005[����z�c��\u001c���\fqΫ)�(wu\u001c�\t@�z��^�3\u0001$<�<��`Ϥ��0��Dm��\u0004���Y��g�_��\t�\u001exŀ���o\u0006'ֳ;�<�'��ۇ���Y���í\u0010�Ҫ�\u0010n��j�6ܫԡ\r[H�^�l5�|\n��]���<�%�q\u000e��7!\r���+O<���f�I�����I0\u001e�� +3.C�7�E\u0018\u0015m��d��`�4N��ɞ\u001en�\"��p�\u0019��\u0003��)च�N\"�X�Y��_��+\u0004�\f�1\u0000\\�r�\u0005�눋{��\n�f5��N\u000f�g�p:uq��\u0003N\u0013�2;-h�\n2�5��z\u001ep�\u0000�um!`��\u0002Ni�LJä��M�����\u000b��V,b�1ȩ���q��\u001f�6\u0018!�l�\u0006��\u0001J\u000f�Bp\u0013Y�V�\b%'���,gU5`�)!������<My�\u0006�_�'4���*�\u0010L\bFq�#l�Y\"g����s�9k\\�v����4N?\u001e�\u001e�y��s\u00114f�Z\u00024�eú�s�����U�!�����qܹ�8�nP���\u0001Y\u0010�i�υ�\\a��\u00021��\u0002P�^�7je>\u0018��W\b~YK�#��+���\u000f7\u0007�\u0000xW��|�>�\u0004k�m���\u0003�\u0003�\u0010\u00003����_M�(�p�:#�&#���0���\u0001X\f�y�j��=�\u0002��n3F�B�D�\u001d\u001c^�_7:G����c�:��\"��\u0019�0K�W[�}�a�TW��|~�\u0007^��\u000b�qy��م*�N\u0018&�D\u0005MD4O�4����\u001c�̚�Tߕ?m��.ӄ�\u0002�����x��2���H\u0002b����V\n��v����]z�\u0011��lU�zO�-�\u0007��\u001fj��\u000f��D{|\n\u0011.��2�)S\u0007���\u001bT�Ŵ�F1��s��J\tVAkF-h�\u001d[�\u000e2cl\u0019Hҭ-G��ʎ\u0014�TQL���!cХ���Q4J\u0004f4�\u0005Rf��N_;��ܠ��\u000e5.���{��\u0016Q�l(U8���Hl)?Ȭ�p�3[�ߔ$�Dʂ�*�����\u001b������$#&ꌣ�\u0011\u0015d�k��]�̕�Ʈ&&��i1�{���+�\u0017j��\u001bLFW���ȭ�QΘ4�MA�ܐ�K��r�͘DQ�\u001azkD��\u000b\u001fCS�\\U�zYiK�!kVi@�z�\u0003�\u000eѲ��V=l��5�=HmIF�P�\u00185�44\u001c`V��I_暅!�kj��\u001d���\u0000\"�H=�\u0001�H�\u0002\u000f�iSA\u0003\b�v�\u001dNF�?:�{���wݿ�]=t�s�|������0�K�.��T�Q�G�?ۭ�o�P�2\u000e����RyM�\u001e#���KD��˴\u0007��]�xۋ�!��\u0000\u000b���\u0018\r�Ng_�~\u0018\u0013�`m\u001a�Q��\u001b�\u001d�_\u0000\u001d����/�.��n\u001f��4\ra ����\n\u00103�77v�\u001fL��i*��\u001f��H\u000e�ڭ�{7h�\u001d����jrf�UL\u0013\nR\u001f&1�!Fjw/A�¸���g�zt��\u001f��\u000e�0�=����\rҋ<\b\u0017�\u001dw���q͜\u0006\u0017����\u0018\u0017�\\h�rR\u0018!����R[N�w�[=�\u0016�Vi`�\u0019\u0017�\u0017B\nA�e2�F�Og��|\u0019'���l���[�ѹ���N}�X��h+3�F+�WS3\t�Yh&Yɤ�Ǘ��\u001fH@\u000f>\u000f��nj�l���j�7��Û�ng�R7�2�מ{�\u0015�[�8��m.+\u0000N\u000b�ห�)5w\u0011Lb\u000f8\u000f�\"�K� \u001b\u0001.m��\u0005\u0000'\\:�\u0015���e�R5���+��ḛ\u000b8��x\u0013���6Z#/Ӂ;z{��q�99��&\u001evŊ�3V�-�^]�G����4J�`�й�\u001ey�y�\u0015Qy$c�㺺�\u00153���B�������]1�e�5#��+��<�FP]���Q�wx��+\u0006���f�vu\u0005\u001e�\u001c�tT[Wf��Y������q��(uɥ���_\u0012�hF{s���\n¨��brO��Pf\u001b[JS�3z�y�%B/c+���j\n8.�u�\u0003�W��w�����+���{�:[3๚BN\u0010!ݒ\u0002��ЪLC�h���\u0011W\bq,k����\u0012\u001e7αc\\T��\u001b��\u001b��[�\u0014��6e}+�\u0015�2T,q9�e��4}�Ǜ�[b\u000ef�e\u0003Z��\\��r>�\u0014\"\\���\u0016\u0019���\u0007\\1�e\\.Hߴ�%����0�Tؤ�TS�'���I���\u0001[�yEƲ��\u0000\u0001�T�(�E�-�Jm{\u0015�(\u0019o���\u0007wЧ���f��j;[Xdζ\b�RS��JRa\f�Q�\u0005�\u000f�k�d�m�|Ř���`���p��o�\u0018#�E+N�WQ�I}���\u0018�2&W��\u0006�-�up�ц\u0002�v\u0004����[1���}\u0013k�l�;���8� �m���y�\u0015\u0002\u001c�\\�Y�h���B\f��U\u0005�J�O`�x+fPf�\u0004�Z!��\u00164,\n�Q�\u001c)u\u000b\u001a�՛�[1{2c6\u0005��v�=\"�9i���ˌO2����[1�e�&S'\u0017�D.\u0005w�\u0001��h���p��֤�[1�-�~����z���v�\u0012�8�b�\u0011�!�\u0003����\u0016�6ZcD�pI�[F���\u001ep\u0005\u0001���D׸c#h8\u0013���m�S&�(K�u�\u0007�\u0007\\b�I�\u0015��!���P\u0012�É��e�.y+\u001f3�+��e\\\u0011\bX�����FMR\r\u000f7\u00033���*���\u001ep\u001epe\u0004)\u0003��)�\f�\u0006�LJ��E�\u001aNz���ؒwF\u0017N�ڠ�R���\u0005�G���Z�U��V�[�\u001e���i2Vc�n����\u0004\\G�\u0006����2W츯��p+\u0000���^���\u0017�\u001a��=#*�\n�&}cT��B��f�;\u0003��)�(1�፳\nT��~��㭈n#$�z����\u000bԦj;K��iq�RWf ��Z9��b�-�J\u001d�q�\u001c��\u001b(�\u0010meV\u0012p��<ڊ�-c%A�e���wbݲ�5����.8ԗ\u0012x�\u0015�&SW�Dy(��L2\u0011Y��JS�*\u001d��t\u001eo��[�Uq^�U:F��\u000b�W�\f �����V,V�њ\fX��pc�D��\boe�J\u000e~�>�&=?;���+���Ve���\t?*%c\u000e~�:o�̝��w>\u001c]6�\u001d��x�y�\u0015�_�l�8��\u0015~Bj\u0007?��\n�\u0000_\u0007�\\6:o�j��^!�e�d鸮��sF'��m�[fH%ئ؇1=��.c�|�u���C�t\u001d�Jm�\u001c�ߧYz�\u0015[<�\u0001��&[\u0002�r����\u001e)s�. ��F�QWl\t!��\u0004���\n;�\\�=@]�\u000b\b��}oK\u000f�bpˣ����R�\u000e��\u0017��tm�B�e���4K��G�s['��6��w]�I�jT��.i�Ԇ���\n��\u001dRw/s�<k��Ƹt9oR\t����\u0018ҷ^�Rf�*\u001b��\u0018�q�碁U��N��}J��\u001d2.�\u0004\u0004�-;��sx\u001a��\u0015T�ڷ�Vf�h��ں}`6P�>�\u0019�BS�Ԯߖr���\r��J\u0018#Q�FÄ�`�I�z+Reݴ��f$5�\u0005��4&䇢;~/��;�\u0001_|\u0018��\u001e��I�l4m�\u001b��\u001b�\u0018��g���\u001f�����&b�~J��\t��\u0016�ߍg�i_��{W����~��\u0017�1�o��]\"��ޓj���[�O?�[��?-qs�f4ܕ��}ױ�����\u0002�\u0013\u000bW�Q�\u0015o�\u001a\u0015\u001d��\n�+�� �G\u000fC�\t�a��$y��\r���w���Ǜ^A^[\f�<E�\f�/I��|y\u0005_�V������R��)�ު�K\u0012yO�\u0018�;s\bԟ�\u0018�ˎ<�~\\�Ht��sG�\u0012}q���9���d#9;WPjX�H��֗�єl��|\u0011��r���%�\u001c��ȏ�\u001f��\u000b�\"\u0013�./�\u001f���Q0u\u0015��i\u0015��O��\u001f���\u0006�H)o�Y~�y#i�B����_\u00167��N�HL\u0012L��8�q!�����\u000fI��/�G���nx\u001e��q��䦃\u001b���^�P��M�E�^��/�\u0007揌�CՓ?���\u000fW�ZV<�2��� '��\u001f��v��\u0005A���0\"���]?�4�]bv\t��b��Y�i��\u001b\t��\"RT^S��\u0014�∸z��`4��O\u001fo{��5\u0004\u0013'$�1�?�����s\u0018�\u0013D\u001bÌ�X�\u001c�\u0018\u000e�\u000e��0��}�ۗ^\u0017�}�\u000f7k��0��%(���q��C���t�ɦ��3\u0013�\b��\u000b�\u000fǌ��;�x�),�Lj%U�����\u0014v�\u0011d��{x���GW���\u00010@@��1!+�\u001fU&`/p$��v��z>ƀ\u001b\r.6��A�iN�y��4�H\u0002�`�e�VW�hJr�O��O���\u000f��><N�<�(�B�Y��8�T{�Io\u0000\u000f����}J�C��\u000eĂrř�.&�\u0015��ʈQ�\u0017҈\\Q����D�8�\u0012�\u0005X���0\u0007�\u0004�-�l:\n�^6�ϯ��l^\u0010&��\u0013���x\u0018\rz�z�����\u00059��1��J�,��;��WH�Uٜ��6.�D���\u0004����I���\u001b���{\u001cM���\u0002�r�XN�ၹ\u001c8$��yv�ͦ���L��t0�zHs\rRmS׿\u001c:�\u0014�f_�M�^ͽޜ��\"Oy5�z5ﺄ�,�s5纄�,�s!��\u0019�����%���k�\f�g0z�0.��3�|�了�x�����4\u0013\"�ҩL\t��ś4�E�:\u0015�c�I\u0015\f�\u0002ܛ����D�|&_����\u001f�L)}��\u0005(k���YĖ��\u0000�L�P�jmt���̛|\t�Gg\u0007秝��k�L��J���%L�1�M0l\u001d6)'a��+嵇��f���Zk\u0015�e]��h�6\rS+SYv.ί��\u001bgG'��\u0006����\u0014�\u00195�2w�\u0015��m\b�\u0015�rcd���4\u001e�\u001e�U�Sf,J�ز��dn�RK%ͦ\bR\u0011\\Z�K��Jq�˜�m�\u0000ʈ�\u000e�\\���27,�5�!\u001e�\u001e�U\u00023�\b�\t`&�\u0014�\u0005�a�'LM��?��z\\z\\V���[�/ಶM5(U�)L�\r��\u0017׌\u0002>\u0002�Y-0�ಾ�\u001f*���r�e\u0005���v.�;o;Ǎε_���\u0016�,c�g�9k\u000bR�(��R��nu�N�s���\u0007�\u0007h�\u0000ͨ?c�Y[p\u001a�A�Ԥ@C�u�<�\u001e�\u001c���������v>x�z�V���q�\u0010���YW�\n�C�X]�\u0013�=B=B+Eh�M�R�ޗ\u0000����U,�\\�<zݸ��\\����tI%�\u000f�Ĝ5�(Q���\u0015-¬�R�ޏ�ί�������,\u0019�\u0019[S;��-,�Kx\u0017��0����\u0001\u0001����e��Lnz�\u0004,뻬B�v����&����VV���\u0019kAo{��q�a�\u001f\r��j|�h��_��\u0004��.�%��\u001e|�\u001bE���j�2z���oG�������d\u0001����5�\u0012mݗa�\u0017\u0002r�jb椦�Hɍ2�ۨ�\u000b%FJ&���~1TIx$�1F�ø�J\u0010��K�\f��hi��\rn�0\u0006�\nvBv�\u0004b���r��+7��[���\u000f��X�D��H�\u0019�\u001d���釽V2rM�\u000eUb��]ʮ\t����\u0013\u001d��5U{B��PE\u0019�\\(��nP��T�����br6�\"M0x\t\u0011�(!\t��bg��\u001eU�i-�\u001c�\u0017\u0002��'���L5AN\b`\t\u0002\u00165�w��IU�p���\\SԴ�_E��\u0001�(|\u000b7M\tQ�҉@/�Ê\u0012�\r=��Q�\u001eS�JC�MSI�(�-����:�E�`��|-K@N��#Dr�]�EHT�E\b�p�E ���\u001e��A�4�5�pz�.^9�G�<n��W���[��+#��.^������\u001dw_��\u0017�s�$�\u0004otc�u1\u001c�R��غfz)�[�ar\u000f���a�fzٺ��a��|/\u000fC)m�k���1{e�\u0010h}WPFK�\n��\u001c�Į�`GbSP����f��u\u0017\u0014\u001cl�ȑS�\nn(u�\u0002�\bN��JX�+n\u000bJK镶m\u0016�M��M�(��߫�,�E��zI�,s{��\u0014e�2��\u001e\u0003_����\u000b�j)mܷ\r�&�\u001f\t�}�f�\u0014����d�g���8���&\u0005̙��c#\u0016�m�\u000eF7��=<����\u001e���\u0001PK\u0001\u0002\u0000\u0000\u0014\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000�����/\u0000\u0000ا\u0002\u0000\u0007\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000doc.kmlPK\u0005\u0006\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u00005\u0000\u0000\u0000�/\u0000\u0000\u0000\u0000"
+            }
+          ]
+        },
+        {
+          "name": "Download document subfeeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{documentDomain}}/subfeeder/download/:documentUuid",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{documentDomain}}",
+                "subfeeder",
+                "download",
+                ":documentUuid"
+              ],
+              "variable": [
+                {
+                  "key": "documentUuid",
+                  "value": "994de2cd-27ef-424a-aaf2-741b98d9e857"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Download document feeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{documentDomain}}/feeder/download/:documentUuid",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{documentDomain}}",
+                "feeder",
+                "download",
+                ":documentUuid"
+              ],
+              "variable": [
+                {
+                  "key": "documentUuid",
+                  "value": "994de2cd-27ef-424a-aaf2-741b98d9e857"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Download document OLT site",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{documentDomain}}/olt/site/download/:documentUuid",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{documentDomain}}",
+                "olt",
+                "site",
+                "download",
+                ":documentUuid"
+              ],
+              "variable": [
+                {
+                  "key": "documentUuid",
+                  "value": "994de2cd-27ef-424a-aaf2-741b98d9e857"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "upload doc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "uuid": "5ef9e192-2979-47b7-8c68-90048f75ee58",
+                  "src": "/C:/Users/user/sw_kml/WO_ALL_2025_DOCU_16_57768.kmz"
+                },
+                {
+                  "key": "type_name",
+                  "value": "as_plan_drawing_kmz",
+                  "type": "text",
+                  "uuid": "8d02c011-7202-4584-ab74-c486f7bb5b70"
+                },
+                {
+                  "key": "filename",
+                  "value": "BKS003721.kmz",
+                  "type": "text",
+                  "uuid": "02f38cb7-51c7-4bbc-b6f6-ea4fb023e910"
+                },
+                {
+                  "key": "cluster_code",
+                  "value": "BKS003721",
+                  "type": "text",
+                  "uuid": "08c6292b-33b3-4a80-83b6-0034cd74fbbd"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{documentDomain}}/add/multipart",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{documentDomain}}",
+                "add",
+                "multipart"
+              ],
+              "query": [
+                {
+                  "key": "type_name",
+                  "value": "as_plan_drawing_kmz",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "filename",
+                  "value": "BKS003721.kmz",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "file",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "cluster_code",
+                  "value": "BKS003721",
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Workorder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/work-order/cluster/boq/simple/list/all/:limit/:offset?latest_status_name=in_progress&category_name=cluster_boq&target_cluster_code=--not null&target_cluster_topology=--not HRB",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "work-order",
+                "cluster",
+                "boq",
+                "simple",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "latest_status_name",
+                  "value": "in_progress"
+                },
+                {
+                  "key": "category_name",
+                  "value": "cluster_boq"
+                },
+                {
+                  "key": "target_cluster_code",
+                  "value": "--not null"
+                },
+                {
+                  "key": "target_cluster_topology",
+                  "value": "--not HRB"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Workorder Donation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/work-order/cluster/boq/simple/list/all/:limit/:offset?latest_status_name=in_progress&category_name=cluster_boq&target_cluster_code=--not null&target_cluster_topology=--not HRB",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "work-order",
+                "cluster",
+                "boq",
+                "simple",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "latest_status_name",
+                  "value": "in_progress"
+                },
+                {
+                  "key": "category_name",
+                  "value": "cluster_boq"
+                },
+                {
+                  "key": "target_cluster_code",
+                  "value": "--not null"
+                },
+                {
+                  "key": "target_cluster_topology",
+                  "value": "--not HRB"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Workorder Copy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/work-order/cluster/boq/simple/list/all/:limit/:offset?latest_status_name=in_progress&category_name=cluster_boq&target_cluster_code=--not null&target_cluster_topology=--not HRB",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "work-order",
+                "cluster",
+                "boq",
+                "simple",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "latest_status_name",
+                  "value": "in_progress"
+                },
+                {
+                  "key": "category_name",
+                  "value": "cluster_boq"
+                },
+                {
+                  "key": "target_cluster_code",
+                  "value": "--not null"
+                },
+                {
+                  "key": "target_cluster_topology",
+                  "value": "--not HRB"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Workorder Subfeeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/work-order/subfeeder/boq/simple/list/all/:limit/:offset?latest_status_name=in_progress&category_name=cluster_boq&target_subfeeder_code=--not null",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "work-order",
+                "subfeeder",
+                "boq",
+                "simple",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "latest_status_name",
+                  "value": "in_progress"
+                },
+                {
+                  "key": "category_name",
+                  "value": "cluster_boq"
+                },
+                {
+                  "key": "target_subfeeder_code",
+                  "value": "--not null"
+                },
+                {
+                  "key": "target_subfeeder_topology",
+                  "value": "--not HRB",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Workorder Feeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/work-order/feeder/boq/simple/list/all/:limit/:offset?target_feeder_code=FSBY0069",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "work-order",
+                "feeder",
+                "boq",
+                "simple",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "latest_status_name",
+                  "value": "in_progress",
+                  "disabled": true
+                },
+                {
+                  "key": "category_name",
+                  "value": "cluster_boq",
+                  "disabled": true
+                },
+                {
+                  "key": "target_osp_route_area",
+                  "value": "PALEMBANG",
+                  "disabled": true
+                },
+                {
+                  "key": "target_osp_route_olt_hostname",
+                  "value": "--not null",
+                  "disabled": true
+                },
+                {
+                  "key": "target_feeder_code",
+                  "value": "FSBY0069"
+                },
+                {
+                  "key": "target_feeder_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Vendor list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/vendor/list/all/:limit/:offset?name=telkom_akses,_pt",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "vendor",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "telkom_akses,_pt"
+                },
+                {
+                  "key": "label",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "disabled": true
+                },
+                {
+                  "key": "sap_vendor_code",
+                  "value": null,
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Price List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/device/price/list/all",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "device",
+                "price",
+                "list",
+                "all"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "Price List",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/v4/device/price/list/all/:limit/:offset?vendor_name=telkom_akses,_pt&project_type=CLUSTER&valid_date_end=>=2025-11-24",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "v4",
+                    "device",
+                    "price",
+                    "list",
+                    "all",
+                    ":limit",
+                    ":offset"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": "telkom_akses,_pt"
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER"
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": ">=2025-11-24"
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Date",
+                  "value": "Mon, 24 Nov 2025 14:42:01 GMT"
+                },
+                {
+                  "key": "Server",
+                  "value": "Apache/2.4.37 (Rocky Linux)"
+                },
+                {
+                  "key": "X-Powered-By",
+                  "value": "PHP/8.3.13"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "918"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=5, max=100"
+                },
+                {
+                  "key": "Connection",
+                  "value": "Keep-Alive"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "text/html;charset=UTF-8"
+                }
+              ],
+              "cookie": [],
+              "body": "<html>\n    <head>\n        <title>Page Not Found</title>\n        <style>\n            body{\n                margin:0;\n                padding:30px;\n                font:12px/1.5 Helvetica,Arial,Verdana,sans-serif;\n            }\n            h1{\n                margin:0;\n                font-size:48px;\n                font-weight:normal;\n                line-height:48px;\n            }\n            strong{\n                display:inline-block;\n                width:65px;\n            }\n        </style>\n    </head>\n    <body>\n        <h1>Page Not Found</h1>\n        <p>\n            The page you are looking for could not be found. Check the address bar\n            to ensure your URL is spelled correctly. If all else fails, you can\n            visit our home page at the link below.\n        </p>\n        <a href='http://smallworld:Smallworld@2025!@172.17.75.22/astri-api-v2/'>Visit the Home Page</a>\n    </body>\n</html>"
+            }
+          ]
+        },
+        {
+          "name": "BoQ Subfeeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"subfeeder_code\": \"TGR005301\",\r\n    \"vendor_name\": \"sapta_meta_digital\",\r\n    \"subcont_vendor_name\": \"\",\r\n    \"equipment_name\": \"200001038\",\r\n    \"description\": \"FO core type SM G.652.D-ADSS 48 cores\",\r\n    \"quantity_material\": 3840.00,\r\n    \"quantity_service\": 0.00,\r\n    \"remarks\": \"Service\",\r\n    \"phase\": \"drm\",\r\n    \"area\": \"TANGERANG\",\r\n    \"area_plant_code\": \"3108\",\r\n    \"override_price_material\": 0.0,\r\n    \"override_price_service\": null\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add/subfeeder",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "osp",
+                "cluster",
+                "boq",
+                "add",
+                "subfeeder"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "BoQ",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "osp",
+                    "cluster",
+                    "boq",
+                    "add"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": "= 2025-10-17",
+                      "description": "->= 2025-10-17",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER",
+                      "description": "ALL, CLUSTER",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": null,
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "BoQ Cluster",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "osp",
+                "cluster",
+                "boq",
+                "add"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "BoQ",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "osp",
+                    "cluster",
+                    "boq",
+                    "add"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": "= 2025-10-17",
+                      "description": "->= 2025-10-17",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER",
+                      "description": "ALL, CLUSTER",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": null,
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "GET Core Feeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n\t\"transport_feeder_code\": \"FPLB0073\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/device/connection/list/all/:limit/:offset",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "device",
+                "connection",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "48"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "BoQ",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "osp",
+                    "cluster",
+                    "boq",
+                    "add"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": "= 2025-10-17",
+                      "description": "->= 2025-10-17",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER",
+                      "description": "ALL, CLUSTER",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": null,
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "GET Core Subfeeder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"transport_subfeeder_code\": \"PLB005917\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/device/connection/list/all/:limit/:offset",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "device",
+                "connection",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "48"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "BoQ",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "osp",
+                    "cluster",
+                    "boq",
+                    "add"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": "= 2025-10-17",
+                      "description": "->= 2025-10-17",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER",
+                      "description": "ALL, CLUSTER",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": null,
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "GET Feeder List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"feeder_code\": \"FPLB0073\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/osp/survey/route/list/all/:limit/:offset",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "osp",
+                "survey",
+                "route",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "48"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "BoQ",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "osp",
+                    "cluster",
+                    "boq",
+                    "add"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": "= 2025-10-17",
+                      "description": "->= 2025-10-17",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER",
+                      "description": "ALL, CLUSTER",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": null,
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "Add core",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"work_order_number\": \"\",\r\n  \"source_device_name\": \"\",\r\n  \"source_device_hardware_type\": \"\",\r\n  \"source_device_port_name\": \"\",\r\n  \"source_device_port_type\": \"\",\r\n  \"source_device_remarks\": \"\",\r\n  \"source_device_capacity\": \"144\",\r\n  \"source_device_capacity_measurement\": \"\",\r\n  \"transport_name\": \"\",\r\n  \"transport_hardware_type\": \"\",\r\n  \"transport_capacity\": \"144\",\r\n  \"transport_capacity_measurement\": \"\",\r\n  \"destination_device_name\": \"\",\r\n  \"destination_device_hardware_type\": \"\",\r\n  \"destination_device_port_name\": \"\",\r\n  \"destination_device_port_type\": \"\",\r\n  \"destination_device_remarks\": \"\",\r\n  \"destination_device_capacity\": \"96\",\r\n  \"destination_device_capacity_measurement\": \"\",\r\n  \"source_type\": \"OLT\",\r\n  \"source_code\": \"GPLB0012\",\r\n  \"source_tube_number\": \"12\",\r\n  \"source_core_number\": \"12\",\r\n  \"transport_code\": \"FPLB0002\",\r\n  \"transport_tube_number\": \"12\",\r\n  \"transport_core_number\": \"12\",\r\n  \"transport_status\": \"TAKEN\",\r\n  \"transport_remarks\": \"Test transport\",\r\n  \"closure_code\": \"\",\r\n  \"destination_type\": \"cluster\",\r\n  \"destination_code\": \"PLB005917\",\r\n  \"destination_tube_number\": \"1\",\r\n  \"destination_core_number\": \"6\",\r\n  \"verified_by_username\": \"test_user\",\r\n  \"verified_at\": \"2026-01-13 14:00:00\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/device/connection/add",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "device",
+                "connection",
+                "add"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": [
+            {
+              "name": "BoQ",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+                  "host": [
+                    "{{astriIP}}"
+                  ],
+                  "path": [
+                    "{{astriAPI}}",
+                    "osp",
+                    "cluster",
+                    "boq",
+                    "add"
+                  ],
+                  "query": [
+                    {
+                      "key": "vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "subcont_vendor_name",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valid_date_end",
+                      "value": "= 2025-10-17",
+                      "description": "->= 2025-10-17",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project_type",
+                      "value": "CLUSTER",
+                      "description": "ALL, CLUSTER",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "area",
+                      "value": null,
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": null,
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "BoQ Request params",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passAstri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userAstri}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n\t\"cluster_code\": \"TGR001833\",\r\n\t\"vendor_name\": \"fiberhome\",\r\n\t\"subcont_vendor_name\": null,\r\n\t\"equipment_name\": \"500001887\",\r\n\t\"description\": \"Project Management\",\r\n\t\"quantity_material\": 0,\r\n\t\"quantity_service\": 4469,\r\n\t\"remarks\": \"Service\",\r\n\t\"phase\": \"project_opname\",\r\n\t\"area\": \"KLATEN\",\r\n\t\"area_plant_code\": \"3151\",\r\n\t\"override_price_material\": null,\r\n\t\"override_price_service\": null\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{astriIP}}/{{astriAPI}}/osp/cluster/boq/add",
+              "host": [
+                "{{astriIP}}"
+              ],
+              "path": [
+                "{{astriAPI}}",
+                "osp",
+                "cluster",
+                "boq",
+                "add"
+              ],
+              "query": [
+                {
+                  "key": "vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "subcont_vendor_name",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "valid_date_end",
+                  "value": "= 2025-10-17",
+                  "description": "->= 2025-10-17",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "project_type",
+                  "value": "CLUSTER",
+                  "description": "ALL, CLUSTER",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+          },
+          "response": []
+        },
+        {
+          "name": "Design List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3002/astri-api-v2/v4/work-order/cluster/boq/simple/list/all/:limit/:offset? latest_status_name=in_progress&category_name=cluster_boq&target_cluster_code=--not null&target_cluster_topology=--not HRB",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3002",
+              "path": [
+                "astri-api-v2",
+                "v4",
+                "work-order",
+                "cluster",
+                "boq",
+                "simple",
+                "list",
+                "all",
+                ":limit",
+                ":offset"
+              ],
+              "query": [
+                {
+                  "key": " latest_status_name",
+                  "value": "in_progress"
+                },
+                {
+                  "key": "category_name",
+                  "value": "cluster_boq"
+                },
+                {
+                  "key": "target_cluster_code",
+                  "value": "--not null"
+                },
+                {
+                  "key": "target_cluster_topology",
+                  "value": "--not HRB"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getNisaToken",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{passNisa}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{userNisa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{nisaip}}/authentication/gettoken",
+              "host": [
+                "{{nisaip}}"
+              ],
+              "path": [
+                "authentication",
+                "gettoken"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getStellaToken",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Signature",
+                "value": "asdwewr123243",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n\"username\": \"stella.dev@myrepublic.net.id\",\r\n\"password\": \" 0f459740xd1cda994f8b44330c86e845\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{stellaip}}/api/v1/loginExternal",
+              "host": [
+                "{{stellaip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loginExternal"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "NISA",
+      "item": [
+        {
+          "name": "csrftoken",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://apinisa.oss.myrepublic.co.id/api/csrftoken",
+              "protocol": "https",
+              "host": [
+                "apinisa",
+                "oss",
+                "myrepublic",
+                "co",
+                "id"
+              ],
+              "path": [
+                "api",
+                "csrftoken"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n   \"userid\": \"fms.team\",\r\n    \"password\": \"1e2e535ee0b11d459df6735596b46b05\",\r\n    \"csrf\": \"rE61cQHU-AYRgeNRyi5_z7viWB9PFD6qcC_M\"\r\n\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://apinisa.oss.myrepublic.co.id/api/authentication/login",
+              "protocol": "https",
+              "host": [
+                "apinisa",
+                "oss",
+                "myrepublic",
+                "co",
+                "id"
+              ],
+              "path": [
+                "api",
+                "authentication",
+                "login"
+              ],
+              "query": [
+                {
+                  "key": "u\\",
+                  "value": null,
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Active cluster",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2RlIjoiZm1zLnRlYW0iLCJuYW1lIjoiRk1TIFRlYW0iLCJpYXQiOjE3NzI3MTI0MjAsImV4cCI6MTc3Mjc5ODgyMH0.v-xwwnBvoastdEsFoFHWKl1tyJ_sjOQ5NRUJ_IAuUhQ",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"cluster\": \"DPK0118.WCK.057\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://apinisa.oss.myrepublic.co.id/api/transaction/massproblem/active/cluster",
+              "protocol": "https",
+              "host": [
+                "apinisa",
+                "oss",
+                "myrepublic",
+                "co",
+                "id"
+              ],
+              "path": [
+                "api",
+                "transaction",
+                "massproblem",
+                "active",
+                "cluster"
+              ],
+              "query": [
+                {
+                  "key": "cluster",
+                  "value": "DPK0118.WCK.057",
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Active search cluster",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2RlIjoiZm1zLnRlYW0iLCJuYW1lIjoiRk1TIFRlYW0iLCJpYXQiOjE3NzI3MTI0MjAsImV4cCI6MTc3Mjc5ODgyMH0.v-xwwnBvoastdEsFoFHWKl1tyJ_sjOQ5NRUJ_IAuUhQ",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"cluster\": \"DPK0118.WCK.057\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://apinisa.oss.myrepublic.co.id/api/transaction/massproblem/active/cluster",
+              "protocol": "https",
+              "host": [
+                "apinisa",
+                "oss",
+                "myrepublic",
+                "co",
+                "id"
+              ],
+              "path": [
+                "api",
+                "transaction",
+                "massproblem",
+                "active",
+                "cluster"
+              ],
+              "query": [
+                {
+                  "key": "cluster",
+                  "value": "DPK0118.WCK.057",
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Post data",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Successful POST request\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              ""
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n\t\"name\": \"Add your name in the body\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": ""
+        },
+        "description": "This is a POST request, submitting data to an API via the request body. This request submits JSON data, and the data is reflected in the response.\n\nA successful POST request typically returns a `200 OK` or `201 Created` response code."
+      },
+      "response": []
+    },
+    {
+      "name": "New Request",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "astriDomain",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "userAstri",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "passAstri",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "astriLocal",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "astriIP",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "documentDomain",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "astriAPI",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "userNisa",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "nisaip",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "passNisa",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "stellaip",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
