@@ -1632,70 +1632,119 @@ _endmethod
 $
 
 _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
-	## Add pole accessories based on total pole count
-	## Adds 200000690 (Bahan Pondasi tiang) and 500001742 (Label Pole)
-	## with quantity equal to total number of poles
+	## Add pole accessories grouped by ring_name.
+	## Formulas involving percentage/multiplication are applied per group then summed,
+	## so ceiling/rounding is applied per FDT ring rather than on the grand total.
+	##
+	## Per-group formulas:
+	##   200000148 / 200000166 : ceiling(excl_7_2_5 * 0.2)   [excl. Pole 7-2.5 / 200002675]
+	##   200000145             : sum(ring_total - suspension_per_ring)
+	##   500001103             : sum(clamp_per_ring * 2)
+	##   200000290             : rounded(group_poles * 0.1)
+	## Flat formula (unaffected by grouping):
+	##   200000690             : total_poles (1:1)
 	##
 	## Parameters:
 	##   result - property_list to update with pole accessories
 
 	_try _with errCond
-		write("LOG: Calculating total pole count for accessories...")
+		write("LOG: Calculating pole accessories grouped by ring_name...")
 
-		# List of all pole material codes
 		_local pole_codes << {"200002675", "200001055", "200001183", "200000187", "200001181", "200000169"}
-		_local total_poles << 0
-		_local total_poles_excl_7_2_5 << 0  # excludes 200002675 (Pole 7-2.5)
 
-		# Count total poles from all pole material items
-		_for code _over pole_codes.fast_elements()
+		# Build a fast-lookup set of pole codes
+		_local pole_code_set << equality_hash_table.new()
+		_for c _over pole_codes.fast_elements()
 		_loop
-			_local item << result[code.as_symbol()]
-			_if item _isnt _unset
+			pole_code_set[c] << _true
+		_endloop
+
+		# Phase 1: count poles per ring_name from change_set
+		# poles_by_ring      : ring -> total pole count
+		# poles_excl_by_ring : ring -> pole count excluding 200002675 (Pole 7-2.5)
+		_local poles_by_ring      << equality_hash_table.new()
+		_local poles_excl_by_ring << equality_hash_table.new()
+
+		_for rc _over .change_set.fast_elements()
+		_loop
+			_local obj << rc.current_record
+			_if obj _is _unset _then _continue _endif
+			_if obj.responds_to?(:construction_status) _andif
+			    obj.construction_status <> "Proposed"
 			_then
-				_local qty << item[:quantity_material]
-				_if qty _isnt _unset
-				_then
-					total_poles +<< qty
-					_if code <> "200002675"
-					_then
-						total_poles_excl_7_2_5 +<< qty
-					_endif
-					write("LOG: Pole code", code, "has quantity:", qty)
-				_endif
+				_continue
+			_endif
+			_if _not obj.responds_to?(:stf_item_code) _then _continue _endif
+			_local obj_code << obj.stf_item_code
+			_if obj_code _is _unset _orif _not pole_code_set.includes_key?(obj_code)
+			_then
+				_continue
+			_endif
+
+			_local ring << "default"
+			_if obj.responds_to?(:ring_name) _andif obj.ring_name _isnt _unset
+			_then
+				ring << obj.ring_name.write_string
+			_endif
+
+			poles_by_ring[ring] << poles_by_ring[ring].default(0) + 1
+			_if obj_code <> "200002675"
+			_then
+				poles_excl_by_ring[ring] << poles_excl_by_ring[ring].default(0) + 1
 			_endif
 		_endloop
 
-		# If poles exist, add the accessories
+		# Phase 2: sum total poles (flat formula) and apply per-group formulas
+		_local total_poles        << 0
+		_local suspension_total   << 0  # 200000148, 200000166
+		_local clamp_total        << 0  # 200000145 = sum(ring_total - suspension_per_ring)
+		_local clamp_buaya_total  << 0  # 500001103 = sum(clamp_per_ring * 2)
+		_local label_cable_total  << 0  # 200000290
+
+		_for ring, ring_total _over poles_by_ring.fast_keys_and_elements()
+		_loop
+			_local excl_total        << poles_excl_by_ring[ring].default(0)
+			_local suspension_per_ring << (excl_total * 0.2).ceiling
+			_local clamp_per_ring      << ring_total - (excl_total * 0.2)
+
+			total_poles          +<< ring_total
+			suspension_total     +<< suspension_per_ring
+			clamp_total          +<< ring_total - suspension_per_ring
+			clamp_buaya_total    +<< clamp_per_ring * 2
+			label_cable_total    +<< (ring_total * 0.1).rounded
+
+			write("LOG: Ring:", ring, "| poles:", ring_total, "| excl_7_2_5:", excl_total,
+			      "| suspension:", suspension_per_ring, "| clamp:", clamp_per_ring)
+		_endloop
+
+		# Phase 3: add to BOQ
 		_if total_poles > 0
 		_then
-			_self.add_to_boq_result(result, "200000690", total_poles)  # Bahan Pondasi tiang -> auto-adds 500001742 (Label Pole)
-			write("LOG: Added pole accessories (1 material + 1 service pair) with total pole count:", total_poles)
+			# Bahan Pondasi tiang (200000690) - flat 1:1 total, auto-adds 500001742 (Label Pole)
+			_self.add_to_boq_result(result, "200000690", total_poles)
+			write("LOG: Added Bahan Pondasi tiang (200000690) with quantity:", total_poles)
 
-			# Suspension clamp (200000148) - 20% of poles excluding Pole 7-2.5 (200002675), ceiling
-			_local suspension_qty << (total_poles_excl_7_2_5 * 0.2).ceiling
-			_self.add_to_boq_result(result, "200000148", suspension_qty)
-			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_qty, "(20% of", total_poles_excl_7_2_5, "poles excl. 7-2.5)")
+			# Suspension clamp (200000148) - sum of ceiling(excl_7_2_5 * 0.2) per ring
+			_self.add_to_boq_result(result, "200000148", suspension_total)
+			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_total, "(sum of per-ring ceiling(excl_7_2_5 * 20%))")
 
-			# Steel clamp (200000166) - same quantity as Suspension clamp (200000148)
-			_self.add_to_boq_result(result, "200000166", suspension_qty)
-			write("LOG: Added Steel clamp (200000166) with quantity:", suspension_qty, "(same as Suspension clamp)")
+			# Steel clamp (200000166) - same as Suspension clamp
+			_self.add_to_boq_result(result, "200000166", suspension_total)
+			write("LOG: Added Steel clamp (200000166) with quantity:", suspension_total, "(same as Suspension clamp)")
 
-			# Label Cable on pole/in Handhole (200000290) - 10% of total poles, rounded, service only
-			_local label_cable_qty << (total_poles * 0.1).rounded
-			_self.add_to_boq_result(result, "200000290", label_cable_qty)
-			write("LOG: Added Label Cable (200000290) with quantity:", label_cable_qty, "(10% of", total_poles, "poles, rounded)")
+			# Pole clamp single (200000145) - sum of (ring_total - suspension_per_ring) per ring
+			_self.add_to_boq_result(result, "200000145", clamp_total)
+			write("LOG: Added Pole clamp single (200000145) with quantity:", clamp_total, "(sum of per-ring (poles - suspension))")
 
-			# Pole clamp single (200000145) - 80% of total poles, ceiling
-			_local pole_clamp_qty << total_poles - suspension_qty
-			_self.add_to_boq_result(result, "200000145", pole_clamp_qty)
-			write("LOG: Added Pole clamp single (200000145) with quantity:", pole_clamp_qty, "(total poles - suspension clamps)")
+			# Clamp buaya / Dead end Fittings (500001103) - sum of (clamp_per_ring * 2) per ring
+			_self.add_to_boq_result(result, "500001103", clamp_buaya_total.ceiling)
+			write("LOG: Added Clamp buaya (500001103) with quantity:", clamp_buaya_total, "(sum of clamp_per_ring * 2 per ring)")
 
-			# Clamp buaya / Dead end Fittings (500001103) - 2x Pole clamp single
-			_self.add_to_boq_result(result, "500001103", pole_clamp_qty * 2)
-			write("LOG: Added Clamp buaya (500001103) with quantity:", pole_clamp_qty * 2, "(2x Pole clamp single)")
+			# Label Cable on pole/in Handhole (200000290) - sum of rounded(poles * 0.1) per ring
+			_self.add_to_boq_result(result, "200000290", label_cable_total)
+			write("LOG: Added Label Cable (200000290) with quantity:", label_cable_total, "(sum of per-ring rounded(poles * 10%))")
 		_else
-			write("LOG: No poles found, skipping pole accessories")
+			write("LOG: No poles found in change_set, skipping pole accessories")
 		_endif
 
 	_when error
