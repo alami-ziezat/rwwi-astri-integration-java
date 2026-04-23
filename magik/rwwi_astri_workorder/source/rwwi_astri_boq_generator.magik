@@ -38,7 +38,8 @@ def_slotted_exemplar(:rwwi_astri_boq_generator,
 		{:change_set, _unset, :writable},          ## MIT scheme record change set
 		{:infra_type, _unset, :writable},          ## Infrastructure type filter (cluster, subfeeder, feeder)
 		{:boq_params, _unset, :writable},          ## BOQ parameters (cluster_code, vendor_name, etc.)
-		{:dataset, _unset, :writable}              ## GIS dataset (cached from gis_program_manager)
+		{:dataset, _unset, :writable},             ## GIS dataset (cached from gis_program_manager)
+		{:slack_fdt_cnt, 0, :writable}             ## Total (FDT × line_type) count from sheath_with_loc, used by 200001018 and 200001046
 	})
 $
 
@@ -130,6 +131,20 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:object, "FAT",
 			:name, "Testcomm OTDR & OPM FDT - FAT",
 			:material_slot, :service
+		),
+		# Micro Splitter 1:8 (qty = ceiling(total FAT / 8))
+		"200001046", property_list.new_with(
+			:code, "200001046",
+			:object, "FAT",
+			:name, "Micro Splitter 1:8",
+			:material_slot, :material
+		),
+		# Splitter 1:8 Modular (qty = ceiling(200001046 qty / 8))
+		"100000826", property_list.new_with(
+			:code, "100000826",
+			:object, "FAT",
+			:name, "Splitter 1:8 (Modular)",
+			:material_slot, :material
 		),
 
 		# FDT Types - Material
@@ -309,7 +324,7 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:code, "200000690",
 			:object, "Pole",
 			:name, "Bahan Pondasi tiang",
-			:material_slot, :material,
+			:material_slot, :both,
 			:service_pair, "500001742"
 		),
 		"500001742", property_list.new_with(
@@ -757,6 +772,14 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :both
 		),
 
+		# Steel clamp for Pole (qty = same as Suspension clamp 200000148 = total Pole * 20%, ceiling)
+		"200000166", property_list.new_with(
+			:code, "200000166",
+			:object, "Pole",
+			:name, "Steel clamp",
+			:material_slot, :both
+		),
+
 		# Plate belt 20mm for FAT (qty = total FAT * 4), fills both material and service slots
 		"200000149", property_list.new_with(
 			:code, "200000149",
@@ -787,6 +810,14 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:object, "Pole",
 			:name, "Buldog grip",
 			:material_slot, :both
+		),
+
+		# Label Cable on pole / in Handhole (qty = 10% of total Pole, rounded, service only)
+		"200000290", property_list.new_with(
+			:code, "200000290",
+			:object, "Pole/Handhole",
+			:name, "Label Cable (on pole, in Handhole)",
+			:material_slot, :service
 		),
 
 		# RT/RW Permit — donation-based; injected at end of generate(), not via catalog loop
@@ -1275,7 +1306,7 @@ _private _method rwwi_astri_boq_generator.add_sling_wire_to_result(result)
 		_for ring, raw_len _over lengths_by_ring.fast_keys_and_elements()
 		_loop
 			_local group_qty   << (raw_len.ceiling * 1.05).ceiling
-			_local buldog_qty  << (group_qty / 40.0 * 6).rounded
+			_local buldog_qty  << ((raw_len * 1.05 * 6) / 40.0).rounded
 			total_length +<< group_qty
 			total_buldog +<< buldog_qty
 		_endloop
@@ -1444,7 +1475,9 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 				_local group_key << write_string(code, "|", sub_key)
 				_local base_len  << lengths_by_group[group_key].default(0)
 
-				_local slack
+				_local slack_length
+				_local slack_fdt_cnt
+				_local slack_cnt
 				_if is_cluster
 				_then
 					# Cluster: FAT keyed by ring|ltype, FDT keyed by ring only
@@ -1455,17 +1488,19 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 					                   _else >> sub_key
 					                   _endif
 					_local fdt_cnt << fdt_by_ring[grp_ring].default(0)
-					slack << (fat_cnt + fdt_cnt) * 20
+					slack_fdt_cnt << fdt_cnt
+					slack_cnt << fat_cnt + fdt_cnt
+					slack_length << slack_cnt * 20
 				_else
 					# Non-cluster (subfeeder/feeder): ROUNDUP((base_length/400) + 1)
-					slack << ((base_len / 400.0) + 1).ceiling * 20
+					slack_length << ((base_len / 400.0) + 1).ceiling * 20
 				_endif
 
-				write("LOG: SWL group:", group_key, "| base_len:", base_len, "m | slack:", slack, "m")
+				write("LOG: SWL group:", group_key, "| base_len:", base_len, "m | slack:", slack_length, "m")
 
-				_local qty << ((base_len.ceiling + slack) * 1.05).ceiling
+				_local qty << ((base_len.ceiling + slack_length) * 1.05).ceiling
 				#write("LOG: SWL code:", code, "|group:", sub_key,
-				#      "|base:", base_len, "m |slack:", slack, "m -> qty:", qty)
+				#      "|base:", base_len, "m |slack:", slack_length, "m -> qty:", qty)
 				code_total +<< qty
 			_endloop
 			write("LOG: SWL code:", code, "| total BOQ qty after formula:", code_total, "m")
@@ -1478,6 +1513,29 @@ _private _method rwwi_astri_boq_generator.add_sheath_with_loc_to_result(result)
 			#write("LOG: SWL code:", code, "| total BOQ qty:", qty, "m")
 			_self.add_to_boq_result(result, code, qty)
 		_endloop
+
+		# Compute slack_fdt_cnt = sum of fdt_by_ring[ring] for each unique (ring|ltype) group
+		# across all cable codes — counts (FDT × line_type) combinations, not just FDT objects.
+		_local unique_ring_ltype << equality_hash_table.new()
+		_for code, group_set _over groups_by_code.fast_keys_and_elements()
+		_loop
+			_for sub_key _over group_set.fast_keys()
+			_loop
+				unique_ring_ltype[sub_key] << _true
+			_endloop
+		_endloop
+		_local total_slack_fdt << 0
+		_for sub_key _over unique_ring_ltype.fast_keys()
+		_loop
+			_local sep_pos << sub_key.index_of(%|)
+			_local grp_ring << _if sep_pos _isnt _unset
+			                   _then >> sub_key.slice(1, sep_pos - 1)
+			                   _else >> sub_key
+			                   _endif
+			total_slack_fdt +<< fdt_by_ring[grp_ring].default(0)
+		_endloop
+		.slack_fdt_cnt << total_slack_fdt
+		write("LOG: slack_fdt_cnt (FDT x line_type combinations):", .slack_fdt_cnt)
 
 		#write("LOG: Processed", swl_count, "sheath_with_loc records,", groups_by_code.size, "unique codes")
 	_when error
@@ -1587,6 +1645,7 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 		# List of all pole material codes
 		_local pole_codes << {"200002675", "200001055", "200001183", "200000187", "200001181", "200000169"}
 		_local total_poles << 0
+		_local total_poles_excl_7_2_5 << 0  # excludes 200002675 (Pole 7-2.5)
 
 		# Count total poles from all pole material items
 		_for code _over pole_codes.fast_elements()
@@ -1598,6 +1657,10 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 				_if qty _isnt _unset
 				_then
 					total_poles +<< qty
+					_if code <> "200002675"
+					_then
+						total_poles_excl_7_2_5 +<< qty
+					_endif
 					write("LOG: Pole code", code, "has quantity:", qty)
 				_endif
 			_endif
@@ -1609,15 +1672,24 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 			_self.add_to_boq_result(result, "200000690", total_poles)  # Bahan Pondasi tiang -> auto-adds 500001742 (Label Pole)
 			write("LOG: Added pole accessories (1 material + 1 service pair) with total pole count:", total_poles)
 
-			# Suspension clamp (200000148) - 20% of total poles, ceiling
-			_local suspension_qty << (total_poles * 0.2).ceiling
+			# Suspension clamp (200000148) - 20% of poles excluding Pole 7-2.5 (200002675), ceiling
+			_local suspension_qty << (total_poles_excl_7_2_5 * 0.2).ceiling
 			_self.add_to_boq_result(result, "200000148", suspension_qty)
-			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_qty, "(20% of", total_poles, "poles)")
+			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_qty, "(20% of", total_poles_excl_7_2_5, "poles excl. 7-2.5)")
+
+			# Steel clamp (200000166) - same quantity as Suspension clamp (200000148)
+			_self.add_to_boq_result(result, "200000166", suspension_qty)
+			write("LOG: Added Steel clamp (200000166) with quantity:", suspension_qty, "(same as Suspension clamp)")
+
+			# Label Cable on pole/in Handhole (200000290) - 10% of total poles, rounded, service only
+			_local label_cable_qty << (total_poles * 0.1).rounded
+			_self.add_to_boq_result(result, "200000290", label_cable_qty)
+			write("LOG: Added Label Cable (200000290) with quantity:", label_cable_qty, "(10% of", total_poles, "poles, rounded)")
 
 			# Pole clamp single (200000145) - 80% of total poles, ceiling
-			_local pole_clamp_qty << (total_poles * 0.8).ceiling
+			_local pole_clamp_qty << total_poles - suspension_qty
 			_self.add_to_boq_result(result, "200000145", pole_clamp_qty)
-			write("LOG: Added Pole clamp single (200000145) with quantity:", pole_clamp_qty, "(80% of", total_poles, "poles)")
+			write("LOG: Added Pole clamp single (200000145) with quantity:", pole_clamp_qty, "(total poles - suspension clamps)")
 
 			# Clamp buaya / Dead end Fittings (500001103) - 2x Pole clamp single
 			_self.add_to_boq_result(result, "500001103", pole_clamp_qty * 2)
@@ -1665,8 +1737,8 @@ _private _method rwwi_astri_boq_generator.add_fdt_accessories(result)
 		_if total_fdts > 0
 		_then
 			_self.add_to_boq_result(result, "200000273", total_fdts)         # Label FDT
-			_self.add_to_boq_result(result, "200001018", total_fdts * 2)     # Flexible 3/4 inch (2 per FDT)
-			write("LOG: Added FDT accessories with total FDT count:", total_fdts)
+			_self.add_to_boq_result(result, "200001018", .slack_fdt_cnt * 2)     # Flexible 3/4 inch = total (FDT x line_type) combinations
+			write("LOG: Added FDT accessories - Label FDT:", total_fdts, "| Flexible 3/4 inch (200001018):", .slack_fdt_cnt * 2, "(slack_fdt_cnt * 2)")
 		_else
 			write("LOG: No FDTs found, skipping FDT accessories")
 		_endif
@@ -1765,6 +1837,17 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 			_local plate_belt_qty << (total_fdts + total_fats) * 4
 			_self.add_to_boq_result(result, "200000149", plate_belt_qty)
 			write("LOG: Added Plate belt 20mm (200000149) with quantity:", plate_belt_qty, "(FDTs:", total_fdts, "+ FATs:", total_fats, "x4)")
+
+			# Micro Splitter 1:8 (200001046) - ((total_fats * 2) + slack_fdt_cnt) / 8, rounded
+			# slack_fdt_cnt = total (FDT x line_type) combinations from sheath_with_loc
+			_local micro_splitter_qty << (((total_fats * 2) + .slack_fdt_cnt) / 8).ceiling
+			_self.add_to_boq_result(result, "200001046", micro_splitter_qty)
+			write("LOG: Added Micro Splitter 1:8 (200001046) with quantity:", micro_splitter_qty, "((FATs:", total_fats, "x2 + slack_fdt_cnt:", .slack_fdt_cnt, ") / 8, rounded)")
+
+			# Splitter 1:8 Modular (100000826) - ceiling(200001046 qty / 8)
+			_local splitter_modular_qty << (micro_splitter_qty / 8).ceiling + total_fdts - 1
+			_self.add_to_boq_result(result, "100000826", splitter_modular_qty)
+			write("LOG: Added Splitter 1:8 Modular (100000826) with quantity:", splitter_modular_qty, "(ceiling of", micro_splitter_qty, "/ 8)")
 
 			write("LOG: Added FAT accessories with total FAT count:", total_fats)
 		_else

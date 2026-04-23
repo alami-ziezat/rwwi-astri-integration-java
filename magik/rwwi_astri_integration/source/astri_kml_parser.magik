@@ -511,8 +511,10 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 
 	# PRIORITY 1: LineString with "sw" in name
 	_local l_name_lc << pl[:name].lowercase
+	_local l_parent_line << pl[:parent].lowercase
 	_if pl[:type] = "line" _andif
-	    l_name_lc.index_of_seq("sw") _isnt _unset
+	    ( l_name_lc.index_of_seq("sw") _isnt _unset _orif 
+		l_parent_line.index_of_seq("sling wire") _isnt _unset )
 	_then
 		_return "sling_wire"
 	_endif
@@ -520,7 +522,6 @@ _private _method astri_kml_parser.detect_network_type(placemark_element, pl)
 	# PRIORITY 1.5: Line types based on parent folder
 	_if pl[:type] = "line"
 	_then
-		_local l_parent_line << pl[:parent].lowercase
 		_if l_parent_line.index_of_seq("tali pancing") _isnt _unset
 		_then
 			_return "tali_pancing"
@@ -848,8 +849,7 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_endif
 	_local filename_lc << icon_filename.lowercase 
 
-	# Map icon filenames to network types
-
+	
 	_if filename_lc.index_of_seq("placemark_circle") _isnt _unset _orif 
 		p_name_lc.index_of_seq("pole") _isnt _unset 
 	_then 
@@ -887,13 +887,11 @@ _private _method astri_kml_parser.map_icon_to_network_type(icon_filename, _optio
 	_then
 		_return "t_wey"
 
-	_elif filename_lc.index_of_seq("square") _isnt _unset
+	_elif filename_lc.index_of_seq("square") _isnt _unset _orif 
+		filename_lc.index_of_seq("grn-blank") _isnt _unset
 	_then
+		# Map icon filenames to network types
 		_return "handhole"
-
-	_elif filename_lc.index_of_seq("grn-blank") _isnt _unset
-	_then
-		_return "handhole"  # Pedestal handhole
 	_elif filename_lc.index_of_seq("ylw-pushpin") _isnt _unset _orif 
 		p_name_lc.index_of_seq("boundary fat") _isnt _unset
 	_then

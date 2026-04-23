@@ -259,7 +259,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				_local effective_vendor_name << item[:vendor_name].default("")
 				_local catalog_entry << rwwi_astri_boq_generator.MATERIAL_CATALOG[equipment_name]
 				_if catalog_entry _isnt _unset _andif
-				   (catalog_entry[:object] = "Cable" _orif catalog_entry[:object] = "Pole")
+				   (catalog_entry[:object] = "Cable" _orif catalog_entry[:object] = "Pole") _andif 
+				   catalog_entry[:material_slot] _is :material
 				_then
 					_if _not _self.is_mr_vendor_code?(wo[:vendor_code].default(""))
 					_then

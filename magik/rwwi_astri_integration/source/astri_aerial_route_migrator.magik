@@ -50,7 +50,7 @@ _private _method astri_design_migrator.create_aerial_route(pm)
 				_leave
 			_endif
 		_endloop
-	
+
 		_if _not is_cable? _andif (folders.uppercase.index_of_seq("SLING WIRE") _isnt _unset _orif 
 			name_upper.index_of_seq("SW") _isnt _unset _orif 
 		    _self.is_sling_wire?(pm))
