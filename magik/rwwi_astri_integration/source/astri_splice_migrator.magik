@@ -72,34 +72,34 @@ _private _method astri_design_migrator.create_sheath_splice_aerial(pm)
 			core_count << _self.match_core(pm[:name])
 			_if core_count = "24"
 			_then
-				sp << "Join Closure Dome 24 Core"
+				sp << "Join Closure In-line 24 Core"
 				st_cd << "200000180"
 			_elif core_count = "36"
 			_then
-				sp << "Join Closure Dome 36 Core"
+				sp << "Join Closure In-line 36 Core"
 				st_cd << "200001049"
 			_elif core_count = "48"
 			_then
-				sp << "Join Closure Dome 48 Core"
+				sp << "Join Closure In-line 48 Core"
 				st_cd << "200000164"
 			_elif core_count = "72"
 			_then
-				sp << "Join Closure Dome 72 Core"
+				sp << "Join Closure In-line 72 Core"
 				st_cd << "200000159"
 			_elif core_count = "96"
 			_then
-				sp << "Join Closure Dome 96 Core"
+				sp << "Join Closure In-line 96 Core"
 				st_cd << "200000176"
 			_elif core_count = "144"
 			_then
-				sp << "Join Closure Dome 144 Core"
+				sp << "Join Closure In-line 144 Core"
 				st_cd << "200000158"
 			_elif core_count = "288"
 			_then
-				sp << "Join Closure Dome 288 Core"
+				sp << "Join Closure In-line 288 Core"
 				st_cd << "200000156"
 			_else
-				sp << "Join Closure Dome 48 Core"
+				sp << "Join Closure In-line 48 Core"
 				st_cd << "200000164"
 			_endif
 			c_spl << 0

@@ -21,7 +21,8 @@ def_slotted_exemplar(:rwwi_nisa_dialog,
 	{:selected_cluster, _unset, :writable},   # Currently selected cluster pl
 	{:database,         _unset},              # GIS database (gis_program_manager.databases[:gis])
 	{:view,             _unset},              # ACE view (gis_program_manager.ace_view)
-	{:cs_transform,     _unset}               # WGS84 -> local CS transform (built once, reused)
+	{:cs_transform,     _unset},              # WGS84 -> local CS transform (built once, reused)
+	{:search_mode,      _unset, :writable}    # :cluster_code (default) or :area
 }, :model)
 $
 
@@ -41,6 +42,7 @@ _private _method rwwi_nisa_dialog.init(owner)
 	.cluster_cache << equality_hash_table.new()
 	.result_rows   << rope.new()
 	.outage_cache  << equality_hash_table.new()
+	.search_mode   << :area
 
 	_self.add_dependent(.owner)
 	>> _super.init()
@@ -88,7 +90,14 @@ _private _method rwwi_nisa_dialog.build_toolbar(parent)
 
 	tb << toolbar_con.create_toolbar()
 
-	sw_label_item.new(tb, "  Cluster Code: ")
+	sw_label_item.new(tb, "  Search by: ")
+	.items[:mode_selector] << sw_text_item.new(tb,
+		:model,           _self,
+		:display_length,  14,
+		:editable?,       _false,
+		:change_selector, {:|mode_changed()|})
+	.items[:mode_selector].text_items << {"Cluster Code", "Area"}
+	.items[:mode_selector].value      << "Area"
 
 	.items[:search_field] << sw_text_item.new(tb,
 		:model,          _self,
@@ -157,14 +166,15 @@ _private _method rwwi_nisa_dialog.build_table(parent)
 		:min_height,                   250)
 
 	.items[:table].set_column_labels({
-		"#", "Cluster Code", "Stella ID", "OLT Code", "FDT Code",
+		"#", "MP No", "Cluster Code", "Stella ID", "OLT Code", "FDT Code",
 		"OLT Hostname", "Homepass", "Outage Status"})
 
-	.items[:table].col_resize_values << {0, 2, 1.5, 1.5, 1.5, 2, 1, 1}
+	.items[:table].col_resize_values << {0, 1.5, 2, 1.5, 1.5, 1.5, 2, 1, 1}
 
-	.items[:table].enable_column_filter(2, _true)   # Cluster Code
-	.items[:table].enable_column_filter(3, _true)   # Stella ID
-	.items[:table].enable_column_filter(4, _true)   # OLT Code
+	.items[:table].enable_column_filter(2, _true)   # MP No
+	.items[:table].enable_column_filter(3, _true)   # Cluster Code
+	.items[:table].enable_column_filter(4, _true)   # Stella ID
+	.items[:table].enable_column_filter(5, _true)   # OLT Code
 	.items[:table].enable_sort? << _true
 _endmethod
 $
@@ -188,17 +198,30 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.search_clusters()
-	## Query PostgreSQL dim_cluster_stella_master_smallworld
-	## by the value in the search field (ILIKE match on cluster_code).
+	## Dispatch to cluster-code or area search based on current mode.
 
-	_local search_term << .items[:search_field].value.default("").trim_spaces()
+	_local term << .items[:search_field].value.default("").trim_spaces()
 
-	_if search_term.size < 3
+	_if term.size < 3
 	_then
 		_self.log_separator()
 		_self.show_alert("Please enter at least 3 characters to search.")
 		_return
 	_endif
+
+	_if .search_mode _is :area
+	_then
+		_self.search_by_area(term)
+	_else
+		_self.search_by_cluster_code(term)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.search_by_cluster_code(search_term)
+	## Query PostgreSQL dim_cluster_stella_master_smallworld
+	## by the value in the search field (ILIKE match on cluster_code).
 
 	_self.log_separator()
 	_self.log_info("Searching clusters: '" + search_term + "'")
@@ -244,7 +267,7 @@ _method rwwi_nisa_dialog.search_clusters()
 					:homepass_total,    rec.homepass_total.default("").write_string,
 					:zone_rwo,          _unset)
 
-				# Look up matching ftth!zone (Macro Cell) in the GIS database
+				# Zone lookup — non-fatal if GIS DB is unavailable
 				_try
 					_local zone_col << _self.database.collections[:ftth!zone]
 					_if zone_col _isnt _unset
@@ -254,7 +277,6 @@ _method rwwi_nisa_dialog.search_clusters()
 							predicate.eq(:cluster_code, cc)).an_element()
 					_endif
 				_when error
-					# Zone lookup failure is non-fatal — zone_rwo stays _unset
 				_endtry
 
 				.result_rows.add_last(pl)
@@ -271,10 +293,7 @@ _method rwwi_nisa_dialog.search_clusters()
 			.items[:count_label].value << write_string("  ", n, " clusters found  ")
 			_self.log_success(write_string("Found ", n, " clusters"))
 
-			# Refresh table
 			_self.changed(:cluster_list, :renew)
-
-			# Enable buttons
 			_self.manage_actions()
 
 		_when error
@@ -331,37 +350,39 @@ _method rwwi_nisa_dialog.cluster_list_data()
 			_local cc << pl[:cluster_code]
 
 			.items[:table].add_label(row, 1, row.write_string)
-			.items[:table].add_label(row, 2, cc)
-			.items[:table].add_label(row, 3, pl[:cluster_id_stella])
-			.items[:table].add_label(row, 4, pl[:olt_code])
-			.items[:table].add_label(row, 5, pl[:fdt_code])
-			.items[:table].add_label(row, 6, pl[:olt_hostname])
-			.items[:table].add_label(row, 7, pl[:homepass_total])
-			# Is Outage? column — traffic light icon + label
+			.items[:table].add_label(row, 2, pl[:mp_no].default(""))
+			.items[:table].add_label(row, 3, cc)
+			.items[:table].add_label(row, 4, pl[:cluster_id_stella])
+			.items[:table].add_label(row, 5, pl[:olt_code])
+			.items[:table].add_label(row, 6, pl[:fdt_code])
+			.items[:table].add_label(row, 7, pl[:olt_hostname])
+			.items[:table].add_label(row, 8, pl[:homepass_total])
+			# Outage Status column — traffic light icon + label
+			# In area mode use stella_id as cache key; in cluster_code mode use cluster_code
+			_local cache_key << _if .search_mode _is :area
+			                    _then >> pl[:cluster_id_stella].default(cc)
+			                    _else >> cc
+			                    _endif
 			_local icon_status
 			_local remark_status
-			_local cached_result << .outage_cache[cc]
+			_local cached_result << .outage_cache[cache_key]
 			_if cached_result _is _unset
 			_then
-				# Not yet checked
 				icon_status   << {:traffic_light_yellow, :ui_resources}
 				remark_status << " Unchecked"
 			_elif cached_result[:success] _is _true _andif cached_result[:data].size = 0
 			_then
-				# API success, no active mass problems
 				icon_status   << {:traffic_light_green, :ui_resources}
 				remark_status << " Active"
 			_elif cached_result[:success] _is _true _andif cached_result[:data].size > 0
 			_then
-				# API success, outage active
 				icon_status   << {:traffic_light_red, :ui_resources}
 				remark_status << write_string(" Outage (", cached_result[:data].size, " MP)")
 			_else
-				# API call failed or success=false
 				icon_status   << {:traffic_light_red, :ui_resources}
 				remark_status << " Error"
 			_endif
-			.items[:table].add_cell(row, 8, {}, {:image, icon_status}, {:label, remark_status})
+			.items[:table].add_cell(row, 9, {}, {:image, icon_status}, {:label, remark_status})
 			# lat/lon not displayed but remain in pl[:lat] / pl[:lon] for map rendering
 			
 			.cluster_cache[row] << pl
@@ -726,19 +747,35 @@ _method rwwi_nisa_dialog.records
 	##   :cluster_pl   - original cluster property_list from result_rows
 	##   :outage_data  - cached outage result property_list
 
-	_local result << rope.new()
-	_local xf     << _self.coord_xform()
+	_local result        << rope.new()
+	_local xf            << _self.coord_xform()
+	_local seen_clusters << equality_hash_table.new()
 
 	_for pl _over .result_rows.fast_elements()
 	_loop
-		_local cc     << pl[:cluster_code]
-		_local cached << .outage_cache[cc]
+		_local cc        << pl[:cluster_code]
+		_local cache_key << _if .search_mode _is :area
+		                    _then >> pl[:cluster_id_stella].default(cc)
+		                    _else >> cc
+		                    _endif
+		_local cached << .outage_cache[cache_key]
 
-		# Only include clusters with active outage (red icon)
-		_if cached _is _unset _orif
-		    _not (cached[:success] _is _true _andif cached[:data].size > 0)
+		# Use stella_id as dedup key in area mode (cluster_code may be empty)
+		_local dedup_key << _if .search_mode _is :area
+		                    _then >> pl[:cluster_id_stella].default(cc)
+		                    _else >> cc
+		                    _endif
+		_if seen_clusters[dedup_key] _isnt _unset _then _continue _endif
+
+		# In area mode all results come from the NISA outage API — always include if lat/lon present.
+		# In cluster_code mode only include clusters confirmed as active outage in the cache.
+		_if .search_mode _isnt :area
 		_then
-			_continue
+			_if cached _is _unset _orif
+			    _not (cached[:success] _is _true _andif cached[:data].size > 0)
+			_then
+				_continue
+			_endif
 		_endif
 
 		_local lat_str << pl[:lat].default("")
@@ -757,8 +794,8 @@ _method rwwi_nisa_dialog.records
 				:pseudo_point, pp,
 				:cluster_pl,   pl,
 				:outage_data,  cached))
+			seen_clusters[dedup_key] << _true
 		_when error
-			# Skip clusters with bad coordinates
 		_endtry
 	_endloop
 
@@ -808,16 +845,21 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.outage_tooltip_for(cluster_code)
 	## Build tooltip string from stored NISA API result.
-	## Shows cluster header + active mass problem details if any.
+	## Shows cluster header + all active mass problems with their sites.
+	## In area mode, sites are filtered to only those matching this cluster's stella ID.
+	## In cluster_code mode (sites have no clusterid), all sites are shown.
 	##
 	## Returns a multi-line string.
 
-	_local pl << _unset
+	# Find first result row for this cluster (provides DB fields + stella_id)
+	_local pl        << _unset
+	_local stella_id << _unset
 	_for row_pl _over .result_rows.fast_elements()
 	_loop
 		_if row_pl[:cluster_code] = cluster_code
 		_then
-			pl << row_pl
+			pl        << row_pl
+			stella_id << row_pl[:cluster_id_stella]
 			_leave
 		_endif
 	_endloop
@@ -825,43 +867,76 @@ _method rwwi_nisa_dialog.outage_tooltip_for(cluster_code)
 	_local lines << rope.new()
 	_if pl _isnt _unset
 	_then
-		lines.add_last(write_string("Cluster : ", cluster_code))
-		lines.add_last(write_string("OLT     : ", pl[:olt_code]))
-		lines.add_last(write_string("FDT     : ", pl[:fdt_code]))
+		lines.add_last(write_string("-- ASTRI INFORMATION --"))
+		lines.add_last(write_string("Cluster Code: ", cluster_code))
+		lines.add_last(write_string("OLT Code: ", pl[:olt_code]))
+		lines.add_last(write_string("FDT Code: ", pl[:fdt_code]))
 		lines.add_last(write_string("Homepass: ", pl[:homepass_total]))
 	_else
-		lines.add_last(write_string("Cluster : ", cluster_code))
+		lines.add_last(write_string("Cluster Code: ", cluster_code))
 	_endif
 
-	_local result << .outage_cache[cluster_code]
+	# In area mode use stella_id as cache key; in cluster_code mode use cluster_code
+	_local cache_key << _if .search_mode _is :area _andif stella_id _isnt _unset
+	                    _then >> stella_id
+	                    _else >> cluster_code
+	                    _endif
+	_local result << .outage_cache[cache_key]
 	_if result _isnt _unset _andif result[:data].size > 0
 	_then
-		lines.add_last("-- MASS PROBLEM ACTIVE --")
-		_local first_mp << result[:data][1]
-		lines.add_last(write_string("MP No   : ", first_mp[:mp_no]))
-		lines.add_last(write_string("Event   : ", first_mp[:event]))
-		lines.add_last(write_string("Area    : ", first_mp[:area]))
-		lines.add_last(write_string("Category: ", first_mp[:category]))
-		lines.add_last(write_string("Start   : ", first_mp[:start_date], " ", first_mp[:start_time]))
-		lines.add_last(write_string("ETA     : ", first_mp[:estimation]))
+		lines.add_last("   ")
+		lines.add_last(write_string("--  MASS PROBLEM ACTIVE --"))
 
-		# First site
-		_local sites << first_mp[:sites]
-		_if sites _isnt _unset _andif sites.size > 0
-		_then
-			_local s1 << sites[1]
-			_local site_str << write_string(s1[:cluster_name], " (", s1[:olt_name], ")")
-			_if sites.size > 1
-			_then site_str << site_str + write_string(" +", sites.size - 1, " more")
+		_for mp_pl _over result[:data].fast_elements()
+		_loop
+			lines.add_last(write_string("MP No: ", mp_pl[:mp_no]))
+			lines.add_last(write_string("Event: ", mp_pl[:event]))
+			lines.add_last(write_string("Area: ", mp_pl[:area]))
+			lines.add_last(write_string("Category: ", mp_pl[:category]))
+			lines.add_last(write_string("Start: ", mp_pl[:start_date], " ", mp_pl[:start_time]))
+			lines.add_last(write_string("ETA: ", mp_pl[:estimation]))
+
+			# Collect sites: in area mode filter by clusterid = stella_id;
+			# in cluster_code mode (site has no clusterid) include all sites
+			_local sites          << mp_pl[:sites]
+			_local filtered_sites << rope.new()
+			_if sites _isnt _unset
+			_then
+				_for site _over sites.fast_elements()
+				_loop
+					_local site_cid << site[:clusterid]
+					_if stella_id _is _unset _orif
+					    site_cid _is _unset _orif site_cid = "" _orif
+					    site_cid = stella_id
+					_then
+						filtered_sites.add_last(site)
+					_endif
+				_endloop
 			_endif
-			lines.add_last(write_string("Sites   : ", site_str))
-		_endif
 
-		# If more than 1 MP
-		_if result[:data].size > 1
-		_then
-			lines.add_last(write_string("(+", result[:data].size - 1, " more mass problems)"))
-		_endif
+			_if filtered_sites.size > 0
+			_then
+				# OLT/Cluster/ID are the same for all sites of this cluster in one MP — show once
+				_local first_site << filtered_sites[1]
+				lines.add_last(write_string("---- Sites Information: "))
+				lines.add_last(write_string("OLT Name: ", first_site[:olt_name]))
+				_local cid_str << first_site[:clusterid].default("")
+				_if cid_str <> ""
+				_then
+					lines.add_last(write_string("Cluster ID: ", cid_str))
+				_endif
+				lines.add_last(write_string("Cluster Name: ", first_site[:cluster_name]))
+				# Per-site: Frame / Slot / Port only
+				lines.add_last(write_string("Ports (", filtered_sites.size, "):"))
+				_for site _over filtered_sites.fast_elements()
+				_loop
+					lines.add_last(write_string("> ",
+						"  Frame:", site[:frame],
+						" Slot:", site[:slot],
+						" Port:", site[:port]))
+				_endloop
+			_endif
+		_endloop
 	_endif
 
 	# Join with newlines
@@ -890,7 +965,11 @@ _method rwwi_nisa_dialog.manage_actions()
 	_local has_outage << _false
 	_for pl _over .result_rows.fast_elements()
 	_loop
-		_local cached << .outage_cache[pl[:cluster_code]]
+		_local mk << _if .search_mode _is :area
+		             _then >> pl[:cluster_id_stella].default(pl[:cluster_code])
+		             _else >> pl[:cluster_code]
+		             _endif
+		_local cached << .outage_cache[mk]
 		_if cached _isnt _unset _andif
 		    cached[:success] _is _true _andif
 		    cached[:data].size > 0
@@ -900,7 +979,9 @@ _method rwwi_nisa_dialog.manage_actions()
 		_endif
 	_endloop
 
-	.items[:run_btn].enabled?       << has_results
+	# Check All Outages is only relevant in cluster_code mode — in area mode the
+	# outage cache is already pre-populated from the search API response.
+	.items[:run_btn].enabled?       << has_results _andif .search_mode _isnt :area
 	.items[:goto_btn].enabled?      << has_selection
 	.items[:highlight_btn].enabled? << has_outage
 _endmethod
@@ -953,5 +1034,389 @@ _method rwwi_nisa_dialog.clear_log()
 	_then
 		.items[:log].text << ""
 	_endif
+_endmethod
+$
+
+##
+## Search mode
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.mode_changed(selected_value)
+	## Handle mode dropdown change — sw_text_item passes the selected string.
+	## "Area" -> area mode; anything else -> cluster_code mode (default).
+
+	_if selected_value = "Area"
+	_then
+		.search_mode << :area
+	_else
+		.search_mode << :cluster_code
+	_endif
+	_self.reset()
+_endmethod
+$
+
+##
+## Area search
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.search_by_area(area_name)
+	## Area-mode search flow:
+	##   1. Call NISA area search API -> list of mass problems with sites
+	##   2. Collect unique clusterids from all sites
+	##   3. Query PostgreSQL for those clusters -> build db_lookup (clusterid -> DB pl)
+	##   4. Flat-expand: one result_row per site (MP fields + site fields + DB fields)
+	##   5. Sort result_rows by mp_no then cluster_code
+	##   6. Pre-populate outage_cache (no manual "Check All" needed in area mode)
+
+	_self.log_separator()
+	_self.log_info("Searching by area: '" + area_name + "'")
+
+	## Step 1: Call NISA area search API
+	_local json_result   << nisa_search_massproblem_by_area(area_name)
+	_local area_response << _self.parse_area_search_response(json_result)
+
+	_if _not area_response[:success]
+	_then
+		_self.log_error("NISA area search failed: " + area_response[:msg])
+		_return
+	_endif
+
+	_local mp_list << area_response[:data]
+	_self.log_info(write_string("NISA returned ", mp_list.size, " mass problems"))
+
+	## Step 2: Collect unique clusterids from all sites
+	_local clusterid_set << equality_hash_table.new()
+	_for mp_pl _over mp_list.fast_elements()
+	_loop
+		_for site_pl _over mp_pl[:sites].fast_elements()
+		_loop
+			_local cid << site_pl[:clusterid]
+			_if cid _isnt _unset _andif cid <> ""
+			_then
+				clusterid_set[cid] << _true
+			_endif
+		_endloop
+	_endloop
+
+	_if clusterid_set.empty?
+	_then
+		_self.log_warning("No cluster IDs found in NISA area response.")
+		_return
+	_endif
+
+	_self.log_info(write_string("Found ", clusterid_set.size, " unique cluster IDs from sites"))
+
+	## Step 3: Query DB -> build db_lookup (clusterid -> DB property_list)
+	_local db_lookup << equality_hash_table.new()
+	_local db_conn   << _unset
+	_protect
+		_try _with errCon
+
+			_local is_connect?
+			(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			_if _not is_connect?
+			_then
+				_self.log_error("Failed to connect to POSTGRESQL_ASTRI_DB")
+				_return
+			_endif
+
+			## Build safe IN clause — values from trusted NISA API, validated char-by-char
+			_local safe_parts << rope.new()
+			_for cid, dummy _over clusterid_set.fast_keys_and_elements()
+			_loop
+				_if _self.int!safe_cluster_id?(cid)
+				_then
+					safe_parts.add_last("'" + cid + "'")
+				_endif
+			_endloop
+
+			_if safe_parts.empty?
+			_then
+				_self.log_warning("No valid cluster IDs after safety check.")
+				_return
+			_endif
+
+			_local in_clause << ""
+			_for i _over 1.upto(safe_parts.size)
+			_loop
+				_if i > 1 _then in_clause << in_clause + ", " _endif
+				in_clause << in_clause + safe_parts[i]
+			_endloop
+
+			_local sql << write_string(
+				"SELECT cluster_id_stella, cluster_code_astri, olt_code, fdt_code, ",
+				"cluster_latitude, cluster_longitude, olt_hostname, homepass_total ",
+				"FROM smallworld.dim_cluster_stella_master_smallworld ",
+				"WHERE cluster_id_stella IN (", in_clause, ") ",
+				"ORDER BY cluster_code_astri")
+
+			_local recs << db_conn.sql_select(sql)
+			_loop
+				_local rec    << recs.get()
+				_if rec _is _unset _then _leave _endif
+				_local stella_id << rec.cluster_id_stella.default("").write_string
+				_local cc        << rec.cluster_code_astri.default("").write_string
+				_local db_pl << property_list.new_with(
+					:cluster_id_stella, stella_id,
+					:cluster_code,      cc,
+					:olt_code,          rec.olt_code.default("").write_string,
+					:fdt_code,          rec.fdt_code.default("").write_string,
+					:lat,               rec.cluster_latitude.default("").write_string,
+					:lon,               rec.cluster_longitude.default("").write_string,
+					:olt_hostname,      rec.olt_hostname.default("").write_string,
+					:homepass_total,    rec.homepass_total.default("").write_string,
+					:zone_rwo,          _unset)
+
+				# Zone lookup — non-fatal if GIS DB is unavailable
+				_try
+					_local zone_col << _self.database.collections[:ftth!zone]
+					_if zone_col _isnt _unset
+					_then
+						db_pl[:zone_rwo] << zone_col.select(
+							predicate.eq(:type, "Macro Cell") _and
+							predicate.eq(:cluster_code, cc)).an_element()
+					_endif
+				_when error
+				_endtry
+
+				db_lookup[stella_id] << db_pl
+			_endloop
+			recs.close()
+
+			_try
+				db_conn.commit()
+			_when error
+				db_conn.rollback()
+			_endtry
+
+		_when error
+			_self.log_error("Area search DB error: " + errCon.report_contents_string)
+		_endtry
+
+	_protection
+		_if db_conn _isnt _unset
+		_then
+			_try
+				db_conn.rollback()
+				db_conn.close()
+			_when error
+			_endtry
+		_endif
+	_endprotect
+
+	_self.log_info(write_string("Loaded ", db_lookup.size, " clusters from DB"))
+
+	## Step 4: Flat-expand all sites into result_rows (one row per site)
+	.result_rows.empty()
+	_for mp_pl _over mp_list.fast_elements()
+	_loop
+		_local mp_no    << mp_pl[:mp_no]
+		_local mp_event << mp_pl[:event]
+		_local mp_area  << mp_pl[:area]
+		_local mp_cat   << mp_pl[:category]
+		_local mp_sdate << mp_pl[:start_date]
+		_local mp_stime << mp_pl[:start_time]
+		_local mp_eta   << mp_pl[:estimation]
+
+		_for site_pl _over mp_pl[:sites].fast_elements()
+		_loop
+			_local cid   << site_pl[:clusterid]
+			_local db_pl << db_lookup[cid]
+			_if db_pl _is _unset _then _continue _endif
+
+			_local row_pl << property_list.new_with(
+				:mp_no,             mp_no,
+				:cluster_id_stella, db_pl[:cluster_id_stella],
+				:cluster_code,      db_pl[:cluster_code],
+				:olt_code,          db_pl[:olt_code],
+				:fdt_code,          db_pl[:fdt_code],
+				:lat,               db_pl[:lat],
+				:lon,               db_pl[:lon],
+				:olt_hostname,      db_pl[:olt_hostname],
+				:homepass_total,    db_pl[:homepass_total],
+				:zone_rwo,          db_pl[:zone_rwo],
+				:site_olt_name,     site_pl[:olt_name],
+				:site_cluster_name, site_pl[:cluster_name],
+				:frame,             site_pl[:frame],
+				:slot,              site_pl[:slot],
+				:port,              site_pl[:port])
+			.result_rows.add_last(row_pl)
+		_endloop
+	_endloop
+
+	## Step 5: Sort result_rows by mp_no then cluster_code (insertion sort)
+	_local sorted_rows << rope.new()
+	_for new_pl _over .result_rows.fast_elements()
+	_loop
+		_local new_mp    << new_pl[:mp_no].default("")
+		_local new_cc    << new_pl[:cluster_code].default("")
+		_local inserted? << _false
+		_for i _over 1.upto(sorted_rows.size)
+		_loop
+			_local cmp_mp << sorted_rows[i][:mp_no].default("")
+			_local cmp_cc << sorted_rows[i][:cluster_code].default("")
+			_if new_mp < cmp_mp _orif
+			    (new_mp = cmp_mp _andif new_cc < cmp_cc)
+			_then
+				sorted_rows.add_at(i, new_pl)
+				inserted? << _true
+				_leave
+			_endif
+		_endloop
+		_if _not inserted? _then sorted_rows.add_last(new_pl) _endif
+	_endloop
+	.result_rows << sorted_rows
+
+	## Step 6: Pre-populate outage_cache so icons appear immediately
+	_self.int!prepopulate_outage_cache(mp_list, db_lookup)
+
+	_local n << .result_rows.size
+	.items[:count_label].value << write_string("  ", n, " sites found  ")
+	_self.log_success(write_string("Found ", n, " sites via area '", area_name, "'"))
+	_self.changed(:cluster_list, :renew)
+	_self.manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.parse_area_search_response(json_string)
+	## Parse NISA area search response JSON.
+	## Same structure as parse_massproblem_response but sites also include :clusterid
+	## (the stella ID, e.g. "JKT.0123.JGO06.007") used to join back to the DB.
+
+	_local result << property_list.new()
+	result[:success] << _false
+	result[:msg]     << ""
+	result[:data]    << rope.new()
+
+	_if json_string _is _unset _orif json_string.empty?
+	_then
+		result[:msg] << "No response"
+		_return result
+	_endif
+
+	_try _with errCon
+		_local json_obj << json_parser.parse(json_string)
+		result[:success] << json_obj[:success].default(_false)
+		result[:msg]     << json_obj[:msg].default("").write_string
+
+		_local json_data << json_obj[:data]
+		_if json_data _is _unset _then _return result _endif
+
+		_local data_rope << rope.new()
+		_for mp_item _over json_data.fast_elements()
+		_loop
+			_local mp_pl << property_list.new()
+			mp_pl[:mp_no]      << mp_item[:mp_no].default("").write_string
+			mp_pl[:event]      << mp_item[:event].default("").write_string
+			mp_pl[:area]       << mp_item[:area].default("").write_string
+			mp_pl[:category]   << mp_item[:category].default("").write_string
+			mp_pl[:start_date] << mp_item[:start_date].default("").write_string
+			mp_pl[:start_time] << mp_item[:start_time].default("").write_string
+			mp_pl[:estimation] << mp_item[:estimation].default("").write_string
+
+			_local json_sites << mp_item[:sites]
+			_local sites_rope << rope.new()
+			_if json_sites _isnt _unset
+			_then
+				_for site_item _over json_sites.fast_elements()
+				_loop
+					_local site_pl << property_list.new()
+					site_pl[:olt_name]     << site_item[:olt_name].default("").write_string
+					site_pl[:cluster_name] << site_item[:cluster_name].default("").write_string
+					site_pl[:clusterid]    << site_item[:clusterid].default("").write_string
+					site_pl[:frame]        << site_item[:frame].default(0).write_string
+					site_pl[:slot]         << site_item[:slot].default(0).write_string
+					site_pl[:port]         << site_item[:port].default(0).write_string
+					sites_rope.add_last(site_pl)
+				_endloop
+			_endif
+
+			mp_pl[:sites] << sites_rope
+			data_rope.add_last(mp_pl)
+		_endloop
+		result[:data] << data_rope
+
+	_when error
+		result[:msg] << "Parse error: " + errCon.report_contents_string
+		_self.log_error("parse_area_search_response: " + errCon.report_contents_string)
+	_endtry
+
+	>> result
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.int!prepopulate_outage_cache(mp_list, db_lookup)
+	## Pre-populate outage_cache from area search results.
+	## Groups mass problems by cluster_code using db_lookup (clusterid -> DB pl).
+	## Each MP is added at most once per cluster (deduped by mp_no).
+	##
+	## Parameters:
+	##   mp_list   - Rope of parsed MP property_lists (from parse_area_search_response)
+	##   db_lookup - equality_hash_table: clusterid -> DB property_list (has :cluster_code)
+
+	# cache_entries:       cluster_code -> rope of matched MP property_lists (deduped)
+	# seen_mp_per_cluster: cluster_code -> equality_hash_table of mp_no -> _true
+	_local cache_entries       << equality_hash_table.new()
+	_local seen_mp_per_cluster << equality_hash_table.new()
+
+	_for mp_pl _over mp_list.fast_elements()
+	_loop
+		_local mp_no << mp_pl[:mp_no]
+		_for site_pl _over mp_pl[:sites].fast_elements()
+		_loop
+			_local cid      << site_pl[:clusterid]
+			_local db_pl    << db_lookup[cid]
+			_if db_pl _is _unset _then _continue _endif
+
+			# Area mode always uses stella_id as the outage_cache key
+			_local stella_id << db_pl[:cluster_id_stella]
+			_if stella_id _is _unset _orif stella_id = "" _then _continue _endif
+
+			# Init tracking structures for this cluster on first encounter
+			_if cache_entries[stella_id] _is _unset
+			_then
+				cache_entries[stella_id]       << rope.new()
+				seen_mp_per_cluster[stella_id] << equality_hash_table.new()
+			_endif
+
+			# Add each MP only once per cluster (same MP may have multiple sites in same cluster)
+			_if seen_mp_per_cluster[stella_id][mp_no] _is _unset
+			_then
+				cache_entries[stella_id].add_last(mp_pl)
+				seen_mp_per_cluster[stella_id][mp_no] << _true
+			_endif
+		_endloop
+	_endloop
+
+	# Populate outage_cache from accumulated entries
+	_for cc, matched_mps _over cache_entries.fast_keys_and_elements()
+	_loop
+		.outage_cache[cc] << property_list.new_with(
+			:success, _true,
+			:msg,     "area search",
+			:data,    matched_mps)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.int!safe_cluster_id?(id)
+	## Return _true if id contains only alphanumeric, '.', '-', '_'.
+	## Guards against unexpected characters in clusterid values from the NISA API.
+
+	_if id _is _unset _orif id = "" _then _return _false _endif
+	_for i _over 1.upto(id.size)
+	_loop
+		_local c << id[i]
+		_if _not (c.alphanumeric? _orif c = %. _orif c = %- _orif c = %_)
+		_then
+			_return _false
+		_endif
+	_endloop
+	>> _true
 _endmethod
 $

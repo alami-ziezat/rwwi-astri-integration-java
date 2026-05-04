@@ -74,6 +74,51 @@ public class NisaMassProblemProcs {
     }
 
     /**
+     * Search active mass problems by area name from the NISA API.
+     *
+     * Creates global Magik procedure: nisa_search_massproblem_by_area(area_name)
+     *
+     * Calls POST /transaction/massproblem/active/cluster/search with the area name.
+     * Response contains mass problems with sites that include "clusterid" (stella ID).
+     *
+     * @param proc      Magik proc object (always first parameter for @MagikProc)
+     * @param areaName  Area name to search (Magik string, e.g. "Tangerang")
+     * @return Raw JSON response string from NISA API (Magik string).
+     */
+    @MagikProc(@Name("nisa_search_massproblem_by_area"))
+    public static Object searchMassProblemByArea(Object proc, Object areaName) {
+        try {
+            System.out.println("====== NISA SEARCH MASSPROBLEM BY AREA - START ======");
+
+            String area = MagikInteropUtils.fromMagikString(areaName);
+            System.out.println("  Area: " + area);
+
+            if (area == null || area.trim().isEmpty()) {
+                throw new IllegalArgumentException("area_name must not be empty");
+            }
+
+            NisaMassProblemClient client = new NisaMassProblemClient();
+            String jsonResponse = client.searchMassProblemByArea(area.trim());
+
+            System.out.println("  Response length: " + (jsonResponse != null ? jsonResponse.length() : 0));
+            System.out.println("====== NISA SEARCH MASSPROBLEM BY AREA - END ======");
+
+            return MagikInteropUtils.toMagikString(jsonResponse);
+
+        } catch (Exception e) {
+            System.err.println("ERROR in nisa_search_massproblem_by_area: " + e.getMessage());
+            e.printStackTrace();
+
+            String errorJson = "{\"success\":false,\"error\":" + jsonEscape(e.getMessage()) + "}";
+            try {
+                return MagikInteropUtils.toMagikString(errorJson);
+            } catch (Exception e2) {
+                return errorJson;
+            }
+        }
+    }
+
+    /**
      * Wrap a string as a JSON string literal (with surrounding quotes and escaping).
      */
     private static String jsonEscape(String value) {

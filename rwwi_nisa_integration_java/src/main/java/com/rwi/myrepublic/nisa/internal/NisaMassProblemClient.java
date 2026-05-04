@@ -89,6 +89,55 @@ public class NisaMassProblemClient {
         return responseBody;
     }
 
+    /**
+     * Search active mass problems by area name.
+     *
+     * POST /transaction/massproblem/active/cluster/search
+     * Authorization: Bearer <muse_token>
+     * Content-Type: application/json
+     * Body: {"cluster":"<area>"}
+     *
+     * Response has the same mass-problem structure as getMassProblemActiveCluster,
+     * but each site also includes "clusterid" (the stella ID).
+     *
+     * @param area  Area name to search (e.g. "Tangerang")
+     * @return Raw JSON response body from the NISA API
+     * @throws Exception on auth failure or HTTP error
+     */
+    public String searchMassProblemByArea(String area) throws IOException, InterruptedException {
+        System.out.println("  [NisaMassProblemClient] Fetching auth token (area search)...");
+        String token = authClient.getToken();
+
+        String url  = config.getApiBaseUrl() + "/transaction/massproblem/active/cluster/search";
+        String body = "{\"cluster\":\"" + escapeJson(area) + "\"}";
+
+        System.out.println("  [NisaMassProblemClient] GET " + url);
+        System.out.println("  [NisaMassProblemClient] Body: " + body);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .timeout(Duration.ofMillis(config.getRequestTimeout()))
+            .method("GET", HttpRequest.BodyPublishers.ofString(body))
+            .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        int    statusCode   = response.statusCode();
+        String responseBody = response.body();
+
+        System.out.println("  [NisaMassProblemClient] Response status: " + statusCode);
+        System.out.println("  [NisaMassProblemClient] Response length: "
+            + (responseBody != null ? responseBody.length() : 0));
+
+        if (statusCode != 200) {
+            throw new IOException("NISA area search API returned HTTP " + statusCode
+                + " | Body: " + responseBody);
+        }
+
+        return responseBody;
+    }
+
     /** Escape special characters in JSON string values. */
     private String escapeJson(String value) {
         if (value == null) return "";

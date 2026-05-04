@@ -33,12 +33,12 @@ _pragma(classify_level=basic, topic={nisa_integration})
 rwwi_nisa_plugin.define_shared_constant(:render_priority, 150, :public)
 $
 
-_pragma(classify_level=basic, topic={nisa_integration})
+_pragma(classify_level=basic, topic={nisa_integration}) 
 rwwi_nisa_plugin.define_shared_constant(:text_style,
 	property_list.new_with(
-		:outage,  text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("bold", 8)),
-		:ok,      text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("plain", 8)),
-		:unknown, text_style.new_with_properties(:colour, colour.called(:black), :font,font.new_logical("plain", 8))),
+		:outage,  text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("bold", 10)),
+		:ok,      text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("plain", 10)),
+		:unknown, text_style.new_with_properties(:colour, colour.called(:black), :font,font.new_logical("plain", 10))),
 	:private)
 $
 
@@ -67,7 +67,7 @@ rwwi_nisa_plugin.define_shared_constant(:zone_fill_style,
 $
 
 _pragma(classify_level=basic, topic={nisa_integration})
-rwwi_nisa_plugin.define_shared_constant(:max_text_width, 200, :private)
+rwwi_nisa_plugin.define_shared_constant(:max_text_width, 380, :private)
 $
 
 ##
@@ -137,7 +137,6 @@ _method rwwi_nisa_plugin.sw_databus_data_available(data_type_name, data)
 	## Handle databus events.
 	## :current_document -> data is {doc, doc_gui}, unpacked via _scatter.
 
-	write("Data available on databus: ", data_type_name, " with data: ", data)
 	_if data_type_name _is :current_document
 	_then
 		(doc, doc_gui) << (_scatter data)
@@ -172,7 +171,7 @@ _method rwwi_nisa_plugin.note_change(who, what, data)
 	## :show_map    -> build geoms and enable rendering.
 	## :goto_request -> navigate map to the given cluster property_list.
 
-	write("NISA plugin note_change: ", what, " from ", who, " with data: ", data, " (current_doc=", .current_doc, ")")
+	#write("NISA plugin note_change: ", what, " from ", who, " with data: ", data, " (current_doc=", .current_doc, ")")
 	_if what _is :show_map
 	_then
 		_self.show_mode(data)
@@ -271,9 +270,9 @@ _method rwwi_nisa_plugin.build_rwo_cache()
 				.geoms.add_last(rec)
 			_endif
 		_endloop
-		write("NISA plugin: ", .geoms.size, " outage clusters for rendering")
+		#write("NISA plugin: ", .geoms.size, " outage clusters for rendering")
 	_when error
-		write("NISA plugin: build_rwo_cache error - ", errCon.report_contents_string)
+		#write("NISA plugin: build_rwo_cache error - ", errCon.report_contents_string)
 	_endtry
 _endmethod
 $
