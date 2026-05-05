@@ -1246,28 +1246,16 @@ _private _method rwwi_nisa_dialog.search_by_area(area_name)
 		_endloop
 	_endloop
 
-	## Step 5: Sort result_rows by mp_no then cluster_code (insertion sort)
-	_local sorted_rows << rope.new()
-	_for new_pl _over .result_rows.fast_elements()
+	## Step 5: Sort result_rows by mp_no then cluster_code
+	_local sort_proc << _proc(a, b)
+		>> a[:mp_no].default("") _cf b[:mp_no].default("")
+	_endproc
+	_local sorted_col << .result_rows.as_sorted_collection(sort_proc)
+	.result_rows.empty()
+	_for pl _over sorted_col.fast_elements()
 	_loop
-		_local new_mp    << new_pl[:mp_no].default("")
-		_local new_cc    << new_pl[:cluster_code].default("")
-		_local inserted? << _false
-		_for i _over 1.upto(sorted_rows.size)
-		_loop
-			_local cmp_mp << sorted_rows[i][:mp_no].default("")
-			_local cmp_cc << sorted_rows[i][:cluster_code].default("")
-			_if new_mp < cmp_mp _orif
-			    (new_mp = cmp_mp _andif new_cc < cmp_cc)
-			_then
-				sorted_rows.add_at(i, new_pl)
-				inserted? << _true
-				_leave
-			_endif
-		_endloop
-		_if _not inserted? _then sorted_rows.add_last(new_pl) _endif
+		.result_rows.add_last(pl)
 	_endloop
-	.result_rows << sorted_rows
 
 	## Step 6: Pre-populate outage_cache so icons appear immediately
 	_self.int!prepopulate_outage_cache(mp_list, db_lookup)
