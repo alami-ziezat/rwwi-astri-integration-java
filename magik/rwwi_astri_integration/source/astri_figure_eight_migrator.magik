@@ -281,7 +281,7 @@ _private _method astri_design_migrator.create_figure_eight_underground(pm)
 				_then
 					_for eq _over equipment_set.fast_elements()
 					_loop
-						_if eq.source_collection.name _is :figure_eight
+						_if eq _isnt _unset _andif eq.source_collection.name _is :figure_eight
 						_then
 							existing_fe << eq
 							_leave
