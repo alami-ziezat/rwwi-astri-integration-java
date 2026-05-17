@@ -136,9 +136,10 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 	wo_number << .selected_wo[:wo_number]
 	infra_type << .selected_wo[:infrastructure_type].default("cluster")
 	infra_code << .selected_wo[:infra_code].default("UNKNOWN")
+	infra_name << .selected_wo[:infra_name].default("UNKNOWN")
 
-	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type, " Code:", infra_code)
-	_self.log_info(write_string("Exporting KML for WO: ", wo_number, " Code: ", infra_code))
+	write("Exporting KML for WO:", wo_number, " Infrastructure:", infra_type, " Code:", infra_code, " Name:", infra_name)
+	_self.log_info(write_string("Exporting KML for WO: ", wo_number, " Code: ", infra_code, " Name: ", infra_name))
 
 	# Get project and design
 	_try _with errCond
@@ -164,8 +165,8 @@ _method rwwi_astri_workorder_dialog.export_smallworld_kml()
 		_endif
 
 		# Show file chooser dialog
-		# Sanitize WO number for filename (replace / with _)
-		safe_filename << wo_number.substitute_string("/", "_") + ".kmz"
+		# Build filename from infra_code + "-" + infra_name (sanitise path-unsafe chars)
+		safe_filename << (infra_code + "-" + infra_name).substitute_string("/", "_").substitute_string("\\", "_").substitute_string(" ", "_") + ".kmz"
 		output_file << _self.get_output_file_from_user(safe_filename)
 		_if output_file _is _unset
 		_then

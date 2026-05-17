@@ -1887,16 +1887,15 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 			_self.add_to_boq_result(result, "200000149", plate_belt_qty)
 			write("LOG: Added Plate belt 20mm (200000149) with quantity:", plate_belt_qty, "(FDTs:", total_fdts, "+ FATs:", total_fats, "x4)")
 
-			# Micro Splitter 1:8 (200001046) - ((total_fats * 2) + slack_fdt_cnt) / 8, rounded
-			# slack_fdt_cnt = total (FDT x line_type) combinations from sheath_with_loc
-			_local micro_splitter_qty << (((total_fats * 2) + .slack_fdt_cnt) / 8).ceiling
-			_self.add_to_boq_result(result, "200001046", micro_splitter_qty)
-			write("LOG: Added Micro Splitter 1:8 (200001046) with quantity:", micro_splitter_qty, "((FATs:", total_fats, "x2 + slack_fdt_cnt:", .slack_fdt_cnt, ") / 8, rounded)")
+			# Micro Splitter 1:8 (200001046) - temporarily disabled
+			# _local micro_splitter_qty << (((total_fats * 2) + .slack_fdt_cnt) / 8).ceiling
+			# _self.add_to_boq_result(result, "200001046", micro_splitter_qty)
+			# write("LOG: Added Micro Splitter 1:8 (200001046) with quantity:", micro_splitter_qty, "((FATs:", total_fats, "x2 + slack_fdt_cnt:", .slack_fdt_cnt, ") / 8, rounded)")
 
-			# Splitter 1:8 Modular (100000826) - ceiling(200001046 qty / 8)
-			_local splitter_modular_qty << (micro_splitter_qty / 8).ceiling + total_fdts - 1
-			_self.add_to_boq_result(result, "100000826", splitter_modular_qty)
-			write("LOG: Added Splitter 1:8 Modular (100000826) with quantity:", splitter_modular_qty, "(ceiling of", micro_splitter_qty, "/ 8)")
+			# Splitter 1:8 Modular (100000826) - temporarily disabled
+			# _local splitter_modular_qty << (micro_splitter_qty / 8).ceiling + total_fdts - 1
+			# _self.add_to_boq_result(result, "100000826", splitter_modular_qty)
+			# write("LOG: Added Splitter 1:8 Modular (100000826) with quantity:", splitter_modular_qty, "(ceiling of", micro_splitter_qty, "/ 8)")
 
 			write("LOG: Added FAT accessories with total FAT count:", total_fats)
 		_else
