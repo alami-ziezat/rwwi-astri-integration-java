@@ -1378,25 +1378,68 @@ _private _method astri_kml_parser.find_matching_subfolder_splice(folder_element,
 	# Check if folder name contains " - FDT" or " - Closure" pattern
 	_local splice_reference << _unset
 
-	# Pattern: "Line A - FDT 1" or "Line A - Closure 2"
-	_if folder_name_lc.index_of_seq(" - fdt") _isnt _unset
+	# Detect splice reference from LINE folder name.
+	# Supported patterns (all case-insensitive):
+	#   "LINE X - FDT N"   line first, dash separator
+	#   "LINE X FDT N"     line first, space separator
+	#   "FDT N LINE X"     fdt first, space separator
+	#   "FDT N - LINE X"   fdt first, dash separator
+	_local fn_lc << folder_name_lc
+
+	# FDT/Closure-first patterns: splice ref is the prefix before the LINE separator
+	_if fn_lc.index_of_seq("fdt ") = 1 _orif
+	    fn_lc.index_of_seq("closure ") = 1 _orif
+	    fn_lc.index_of_seq("joint closure ") = 1 _orif
+	    fn_lc.index_of_seq("join closure ") = 1
 	_then
-		# Extract everything after " - " to get "FDT 1", "FDT 2", etc.
-		_local dash_index << folder_name.index_of_seq(" - ")
-		_if dash_index _isnt _unset
+		# Separator is " - " (pattern 4) or " line " (pattern 3)
+		_local sep_pos << fn_lc.index_of_seq(" - ")
+		_if sep_pos _is _unset
 		_then
-			splice_reference << folder_name.slice(dash_index + 3, folder_name.size).trim_spaces()
+			sep_pos << fn_lc.index_of_seq(" line ")
+		_endif
+		_if sep_pos _isnt _unset
+		_then
+			splice_reference << folder_name.slice(1, sep_pos - 1).trim_spaces()
 		_endif
 
-	_elif folder_name_lc.index_of_seq(" - closure") _isnt _unset _orif
-	      folder_name_lc.index_of_seq(" - joint closure") _isnt _unset _orif
-	      folder_name_lc.index_of_seq(" - join closure") _isnt _unset
+	# LINE-first patterns: splice ref is the FDT/Closure suffix
+	_elif fn_lc.index_of_seq("line ") = 1
 	_then
-		# Extract everything after " - " to get "Closure 1", "Joint Closure 2", etc.
-		_local dash_index << folder_name.index_of_seq(" - ")
-		_if dash_index _isnt _unset
+		# Dash separator: "LINE X - FDT N" or "LINE X - CLOSURE N"
+		_if fn_lc.index_of_seq(" - fdt") _isnt _unset _orif
+		    fn_lc.index_of_seq(" - closure") _isnt _unset _orif
+		    fn_lc.index_of_seq(" - joint closure") _isnt _unset _orif
+		    fn_lc.index_of_seq(" - join closure") _isnt _unset
 		_then
-			splice_reference << folder_name.slice(dash_index + 3, folder_name.size).trim_spaces()
+			_local dash_pos << fn_lc.index_of_seq(" - ")
+			_if dash_pos _isnt _unset
+			_then
+				splice_reference << folder_name.slice(dash_pos + 3, folder_name.size).trim_spaces()
+			_endif
+
+		# Space separator: "LINE X FDT N"
+		_elif fn_lc.index_of_seq(" fdt ") _isnt _unset
+		_then
+			_local fdt_pos << fn_lc.index_of_seq(" fdt ")
+			splice_reference << folder_name.slice(fdt_pos + 1, folder_name.size).trim_spaces()
+
+		# Space separator: "LINE X JOINT CLOSURE N" (check longer match first)
+		_elif fn_lc.index_of_seq(" joint closure ") _isnt _unset
+		_then
+			_local cl_pos << fn_lc.index_of_seq(" joint closure ")
+			splice_reference << folder_name.slice(cl_pos + 1, folder_name.size).trim_spaces()
+
+		_elif fn_lc.index_of_seq(" join closure ") _isnt _unset
+		_then
+			_local cl_pos << fn_lc.index_of_seq(" join closure ")
+			splice_reference << folder_name.slice(cl_pos + 1, folder_name.size).trim_spaces()
+
+		# Space separator: "LINE X CLOSURE N"
+		_elif fn_lc.index_of_seq(" closure ") _isnt _unset
+		_then
+			_local cl_pos << fn_lc.index_of_seq(" closure ")
+			splice_reference << folder_name.slice(cl_pos + 1, folder_name.size).trim_spaces()
 		_endif
 	_endif
 
