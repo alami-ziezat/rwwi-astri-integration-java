@@ -1,0 +1,96 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## Schedule WO dialog handler
+## Inserts selected work order into smallworld.drm_scheduler_logs
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.schedule_wo()
+	## Button handler: validate then insert selected WO into drm_scheduler_logs.
+	## All fields are auto-populated from the selected row - no user input required.
+	##
+	## Validation blocks:
+	##   1. Smallworld project/design already exists for this WO number
+	##   2. A scheduler log record already exists for this infra_code
+
+	_if .selected_wo _is _unset
+	_then
+		_self.log_warning("No work order selected")
+		_return
+	_endif
+
+	_local wo         << .selected_wo
+	_local wo_number  << wo[:wo_number].default("")
+	_local infra_code << wo[:infra_code].default("")
+
+	# --- Validation 1: Smallworld design already exists ---
+	_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
+
+	_if has_design
+	_then
+		_self.show_alert(
+			write_string("Design already created for WO: ", wo_number,
+			             %newline, "Scheduling is blocked."))
+		_self.log_warning("Schedule blocked - design exists for: " + wo_number)
+		_return
+	_endif
+
+	_if has_project
+	_then
+		_self.show_alert(
+			write_string("Project exists but has no design yet for WO: ", wo_number,
+			             %newline, "Scheduling is blocked."))
+		_self.log_warning("Schedule blocked - project exists (no design) for: " + wo_number)
+		_return
+	_endif
+
+	# --- Validation 2: Already in scheduler log ---
+	_local existing_status << .engine.get_scheduler_log_status(infra_code)
+
+	_if existing_status _isnt _unset _andif existing_status <> ""
+	_then
+		_self.show_alert(
+			write_string("WO ", infra_code, " is already in the scheduler",
+			             %newline, "with status: ", existing_status,
+			             %newline, "Scheduling is blocked."))
+		_self.log_warning(
+			write_string("Schedule blocked - existing record for: ",
+			             infra_code, " (status: ", existing_status, ")"))
+		_return
+	_endif
+
+	# --- Build params from selected row (all auto-populated) ---
+	_local username    << system.getenv("USERNAME").default("unknown")
+	_local now_dt      << date_time.now()
+	_local topology    << wo[:topology].default("")
+	_local kmz_uuid    << wo[:kmz_uuid].default("")
+	_local description << topology + "|" + kmz_uuid
+
+	_local params << property_list.new_with(
+		:infra_code,         infra_code,
+		:name,               wo[:infra_name].default(""),
+		:infra_type,         .filters[:infrastructure_type].default(""),
+		:username,           username,
+		:scheduler_username, username,
+		:schedule_date,      now_dt.date.write_string,
+		:start_time,         now_dt.time.write_string,
+		:end_time,           "",
+		:status,             "scheduled",
+		:description,        description)
+
+	# --- Insert ---
+	_local ok? << .engine.insert_scheduler_log(params)
+
+	_if ok?
+	_then
+		_self.log_success(
+			write_string("WO scheduled: ", wo_number,
+			             " [", infra_code, "]",
+			             " desc=", description))
+	_else
+		_self.log_error("Failed to schedule WO: " + wo_number)
+	_endif
+_endmethod
+$

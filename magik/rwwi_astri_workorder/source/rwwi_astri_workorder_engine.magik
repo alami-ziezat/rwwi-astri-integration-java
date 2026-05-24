@@ -843,6 +843,123 @@ _method rwwi_astri_workorder_engine.close_db_connection()
 _endmethod
 $
 
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_engine.insert_scheduler_log(params)
+	## Insert WO record into smallworld.drm_scheduler_logs.
+	##
+	## Parameters:
+	##   params (property_list) - keys: :infra_code, :name, :infra_type,
+	##     :username, :scheduler_username, :schedule_date, :start_time,
+	##     :end_time, :status, :description
+	##
+	## Returns:
+	##   boolean - _true on success, _false on failure
+
+	_local sql << "INSERT INTO smallworld.drm_scheduler_logs " +
+		"(infra_code, name, infra_type, username, scheduler_username, " +
+		"schedule_date, start_time, end_time, status, description, " +
+		"created_at, updated_at) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+
+	_local conn << _unset
+
+	_try _with cond
+		_local is_connect?
+		(is_connect?, conn) << user:rwwi_external_ds_manager.open_connection_for(
+			"[POSTGRESQL_ASTRI_DB]")
+
+		_if _not is_connect?
+		_then
+			write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for scheduler insert")
+			_return _false
+		_endif
+
+		conn.sql_execute(sql,
+			params[:infra_code],
+			params[:name],
+			params[:infra_type],
+			params[:username],
+			params[:scheduler_username],
+			params[:schedule_date],
+			params[:start_time],
+			params[:end_time],
+			params[:status],
+			params[:description])
+
+		conn.commit()
+		extdb_java_acp.close_all()
+		write("Scheduler log inserted for infra_code:", params[:infra_code])
+		_return _true
+
+	_when error
+		write("ERROR in insert_scheduler_log():", cond.report_contents_string)
+		_try
+			_if conn _isnt _unset _then conn.rollback() _endif
+		_when error
+		_endtry
+		extdb_java_acp.close_all()
+		_return _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_scheduler_log_status(infra_code)
+	## Check if a scheduler log record already exists for the given infra_code.
+	##
+	## Parameters:
+	##   infra_code (string) - Infrastructure code to check
+	##
+	## Returns:
+	##   string - existing status value, or _unset if no record found
+
+	_local sql << "SELECT status FROM smallworld.drm_scheduler_logs " +
+		"WHERE infra_code = ? ORDER BY created_at DESC LIMIT 1"
+
+	_local conn << _unset
+
+	_try _with cond
+		_local is_connect?
+		(is_connect?, conn) << user:rwwi_external_ds_manager.open_connection_for(
+			"[POSTGRESQL_ASTRI_DB]")
+
+		_if _not is_connect?
+		_then
+			write("WARNING: Cannot connect to POSTGRESQL_ASTRI_DB for scheduler check")
+			_return _unset
+		_endif
+
+		_local recs << conn.sql_select(sql, infra_code)
+		_local rec  << recs.get()
+		recs.close()
+
+		_try
+			conn.commit()
+		_when error
+			conn.rollback()
+		_endtry
+
+		extdb_java_acp.close_all()
+
+		_if rec _isnt _unset
+		_then
+			_return rec.status.default("")
+		_endif
+
+		_return _unset
+
+	_when error
+		write("ERROR in get_scheduler_log_status():", cond.report_contents_string)
+		_try
+			_if conn _isnt _unset _then conn.rollback() _endif
+		_when error
+		_endtry
+		extdb_java_acp.close_all()
+		_return _unset
+	_endtry
+_endmethod
+$
+
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_engine.get_project_by_name(project_name)
 	## Get project by name from design admin
