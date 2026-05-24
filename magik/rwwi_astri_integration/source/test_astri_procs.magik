@@ -143,11 +143,12 @@ _global test_astri_kmz_download_subfeeder << _proc()
 
 	_try
 		# Replace with actual UUID
-		uuid << "example-subfeeder-uuid"
+		uuid << "ab9c881c-6ca2-4807-b0a2-190a45a1919d"
 
 		# Call the @MagikProc directly
-		xml_result << astri_download_subfeeder_kmz(uuid)
-
+		_local output_dir << system.getenv("TEMP").default("C:\\temp")
+		xml_result << astri_download_subfeeder_kmz(uuid, output_dir)
+		_return xml_result
 		#write("Response: ", xml_result)
 		#write("")
 
@@ -701,3 +702,5 @@ $
 ##
 ## Run all API tests:
 ##   test_all_astri_apis()
+
+

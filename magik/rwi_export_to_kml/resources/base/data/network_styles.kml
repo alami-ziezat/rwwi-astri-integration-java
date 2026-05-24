@@ -1187,7 +1187,7 @@
 	<Style id="pole_7m_4inch">
 		<IconStyle>
 			<color>ff00ff00</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1219,7 +1219,7 @@
 	<Style id="pole_7m_3inch">
 		<IconStyle>
 			<color>ffffff00</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1251,7 +1251,7 @@
 	<Style id="pole_7m_2_5inch">
 		<IconStyle>
 			<color>ffff00aa</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1283,7 +1283,7 @@
 	<Style id="pole_existing">
 		<IconStyle>
 			<color>ff000055</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1319,7 +1319,7 @@
 	<Style id="new_pole_7_2_5">
 		<IconStyle>
 			<color>ffaa00ff</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1351,7 +1351,7 @@
 	<Style id="new_pole_7_3">
 		<IconStyle>
 			<color>ffffff00</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1383,7 +1383,7 @@
 	<Style id="new_pole_7_4">
 		<IconStyle>
 			<color>ff00ff00</color>
-			<scale>1.0</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1415,7 +1415,7 @@
 	<Style id="new_pole_9_3">
 		<IconStyle>
 			<color>ff00aa00</color>
-			<scale>1.1</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>
@@ -1447,7 +1447,7 @@
 	<Style id="new_pole_9_4">
 		<IconStyle>
 			<color>ff55ff00</color>
-			<scale>1.1</scale>
+			<scale>1.2</scale>
 			<Icon>
 				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
 			</Icon>

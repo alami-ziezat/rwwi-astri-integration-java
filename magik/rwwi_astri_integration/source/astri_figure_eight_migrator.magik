@@ -48,11 +48,11 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_local folders << pm[:parent].default("")
 		_if _not _self.is_figure_eight?(pm)
 		_then
-			#write("  WARNING: Skipping - not a figure_eight: ", folders)
+			write("  WARNING: Skipping - not a figure_eight: ", folders)
 			_return
 		_endif
 
-		#write("  Processing figure_eight (aerial): ", pm[:name])
+		write("  Processing figure_eight (aerial): ", pm[:name])
 
 		# Step 1: Extract attributes from folders
 		_local segment_id << _self.match_segment(folders)
@@ -60,6 +60,8 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		# Step 2: Parse location
 		_local location << _self.parse_point_geometry(pm[:coord])
 		_local coord << location.coord
+
+		_local n_obj << _unset
 
 		_local pp << pseudo_point.new(coord)
 		pp.world << .database.world
@@ -77,13 +79,16 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			_return 
 		_endif
 
+		write(" >> Found sp: ", found_sp, ", ", found_fe, " obj: ", obj)
+
 		_local sh_loc << _unset		
 		_if found_sp _is _true
 		_then
-			write("    >> Found FE existing structure within 700cm: ", obj)
-			_local upd_trx << record_transaction.new_update(fe, property_list.new_with(:name, pm[:name]))
-			upd_trx.run()
-			_return 
+			write("    >> Found SP existing structure within 700cm: ", obj, " with FE: ", fe)
+			#_local upd_trx << record_transaction.new_update(fe, property_list.new_with(:name, pm[:name]))
+			#upd_trx.run()
+			#_return 
+			n_obj << obj
 		_else
 			# No pole found - create placeholder pole
 			#write("    >> Creating placeholder pole for slack")
@@ -166,14 +171,14 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 		_local l_result << l_rec_trans.run()
 
 		.stats[:figure_eights] +<< 1
-		#write("    [OK] Figure eight created: ", pm[:name], " (Type: Circle, Length: 20)")
+		write("    [OK] Figure eight created: ", pm[:name], " (Type: Circle, Length: 20)")
 
 		# Step 5: Associate to pole structure
 		_try
 			_if obj _isnt _unset
 			_then
 				l_result.associate_to_structure(obj)
-				#write("    >> Associated to structure: ", n_obj.telco_pole_tag)
+				write("    >> Associated to structure: ", n_obj.telco_pole_tag)
 			_endif
 		_when error
 			# Continue if association fails
@@ -185,7 +190,7 @@ _private _method astri_design_migrator.create_figure_eight_aerial(pm)
 			_if l_cable _isnt _unset
 			_then
 				l_cable.mcn!connect(l_result)
-				#write("    >> Connected to cable")
+				write("    >> Connected to cable")
 			_endif
 		_when error
 			# Continue if cable connection fails
