@@ -63,7 +63,7 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 
 	# --- Build params from selected row (all auto-populated) ---
 	_local username    << system.getenv("USERNAME").default("unknown")
-	_local now_dt      << date_time.now()
+
 	_local topology    << wo[:topology].default("")
 	_local kmz_uuid    << wo[:kmz_uuid].default("")
 	_local description << topology + "|" + kmz_uuid
@@ -74,9 +74,6 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 		:infra_type,         .filters[:infrastructure_type].default(""),
 		:username,           username,
 		:scheduler_username, username,
-		:schedule_date,      now_dt.date.write_string,
-		:start_time,         now_dt.time.write_string,
-		:end_time,           "",
 		:status,             "scheduled",
 		:description,        description)
 
@@ -94,3 +91,4 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 	_endif
 _endmethod
 $
+

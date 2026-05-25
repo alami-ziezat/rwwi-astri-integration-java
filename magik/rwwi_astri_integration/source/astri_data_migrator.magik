@@ -1696,3 +1696,632 @@ _private _method astri_data_migrator.migrate_to_sw_alternative(wo, placemarks, i
 	write("  [MIGRATED] Routes: ", stats[:aerial_routes], ", Poles: ", stats[:new_poles], ", Cable: ", stats[:sheath_length].rounded, "m")
 _endmethod
 $
+
+## ============================================================
+## SCHEDULED MIGRATION — drm_scheduler_logs → SW Design
+## Pattern mirrors migrate_<infra_type>_objects / process_<infra_type>_kml_migration
+## ============================================================
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_scheduled_objects()
+	## Run scheduled migrations for all infra types (cluster, subfeeder, feeder).
+	## Reads from smallworld.drm_scheduler_logs WHERE status='scheduled'.
+	## Status lifecycle: scheduled -> processing -> migrated / failed
+	##
+	## CLI usage:
+	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+	##   migrator.migrate_scheduled_objects()
+
+	_local start_time << date_time.now()
+	write("=================================================================")
+	write("=== SCHEDULED MIGRATION - ALL INFRA TYPES ===")
+	write("=================================================================")
+	write("")
+	write("Start time: ", start_time.write_string)
+	write("")
+
+	_local overall_stats << property_list.new_with(
+		:cluster_total, 0,   :cluster_migrated, 0,   :cluster_errors, 0,
+		:subfeeder_total, 0, :subfeeder_migrated, 0, :subfeeder_errors, 0,
+		:feeder_total, 0,    :feeder_migrated, 0,    :feeder_errors, 0)
+
+	# Phase 1: FEEDER
+	_try
+		write("PHASE 1/3: Starting FEEDER scheduled migration...")
+		write("")
+		_local s << _self.migrate_feeder_scheduled_objects()
+		overall_stats[:feeder_total]    << s[:total]
+		overall_stats[:feeder_migrated] << s[:migrated]
+		overall_stats[:feeder_errors]   << s[:errors]
+		write("PHASE 1/3: FEEDER completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 1/3 (FEEDER): ", condition.report_contents_string)
+		write("Continuing with next phase...")
+		write("")
+	_endtry
+
+	# Phase 2: SUBFEEDER
+	_try
+		write("PHASE 2/3: Starting SUBFEEDER scheduled migration...")
+		write("")
+		_local s << _self.migrate_subfeeder_scheduled_objects()
+		overall_stats[:subfeeder_total]    << s[:total]
+		overall_stats[:subfeeder_migrated] << s[:migrated]
+		overall_stats[:subfeeder_errors]   << s[:errors]
+		write("PHASE 2/3: SUBFEEDER completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 2/3 (SUBFEEDER): ", condition.report_contents_string)
+		write("Continuing with next phase...")
+		write("")
+	_endtry
+
+	# Phase 3: CLUSTER
+	_try
+		write("PHASE 3/3: Starting CLUSTER scheduled migration...")
+		write("")
+		_local s << _self.migrate_cluster_scheduled_objects()
+		overall_stats[:cluster_total]    << s[:total]
+		overall_stats[:cluster_migrated] << s[:migrated]
+		overall_stats[:cluster_errors]   << s[:errors]
+		write("PHASE 3/3: CLUSTER completed")
+		write("")
+	_when error
+		write("ERROR in PHASE 3/3 (CLUSTER): ", condition.report_contents_string)
+		write("")
+	_endtry
+
+	_local end_time << date_time.now()
+	_local duration << (end_time - start_time)
+
+	write("=================================================================")
+	write("=== SCHEDULED MIGRATION SUMMARY ===")
+	write("=================================================================")
+	write("")
+	write("CLUSTER:")
+	write("  Total:    ", overall_stats[:cluster_total])
+	write("  Migrated: ", overall_stats[:cluster_migrated])
+	write("  Errors:   ", overall_stats[:cluster_errors])
+	write("")
+	write("SUBFEEDER:")
+	write("  Total:    ", overall_stats[:subfeeder_total])
+	write("  Migrated: ", overall_stats[:subfeeder_migrated])
+	write("  Errors:   ", overall_stats[:subfeeder_errors])
+	write("")
+	write("FEEDER:")
+	write("  Total:    ", overall_stats[:feeder_total])
+	write("  Migrated: ", overall_stats[:feeder_migrated])
+	write("  Errors:   ", overall_stats[:feeder_errors])
+	write("")
+	write("GRAND TOTAL:")
+	write("  Total:    ", overall_stats[:cluster_total] + overall_stats[:subfeeder_total] + overall_stats[:feeder_total])
+	write("  Migrated: ", overall_stats[:cluster_migrated] + overall_stats[:subfeeder_migrated] + overall_stats[:feeder_migrated])
+	write("  Errors:   ", overall_stats[:cluster_errors] + overall_stats[:subfeeder_errors] + overall_stats[:feeder_errors])
+	write("")
+	write("Duration: ", duration.write_string)
+	write("=================================================================")
+
+	>> overall_stats
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method astri_data_migrator.migrate_cluster_scheduled_objects()
+	## Migrate CLUSTER scheduled records from drm_scheduler_logs to SW Design.
+	## Status: scheduled -> processing -> migrated/failed
+
+	_local start_time << date_time.now()
+	write("=== CLUSTER SCHEDULED Migration Started ===")
+
+	_local obj_stats << property_list.new_with(:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+
+	_try _with cond
+		_local scheduled << _self.get_scheduled_records("cluster")
+
+		_if scheduled.empty?
+		_then
+			write("No scheduled CLUSTER records found.")
+			>> obj_stats
+		_endif
+
+		_for rec _over scheduled.fast_elements()
+		_loop
+			_local infra_code << rec[:infra_code].default("")
+			write("")
+			write("Processing CLUSTER: ", infra_code)
+			obj_stats[:total] +<< 1
+
+			_if _self.process_cluster_scheduled_migration(rec, obj_stats)
+			_then
+				obj_stats[:migrated] +<< 1
+			_endif
+		_endloop
+
+		write("=== CLUSTER SCHEDULED Migration Complete ===")
+	_when error
+		write("ERROR: ", cond.report_contents_string)
+	_endtry
+
+	write("Duration: ", (date_time.now() - start_time).write_string)
+	>> obj_stats
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.process_cluster_scheduled_migration(rec, obj_stats)
+	_local infra_code  << rec[:infra_code].default("")
+	_local description << rec[:description].default("")
+
+	# Parse topology|kmz_uuid from description
+	_local pipe_pos     << description.index_of(%|)
+	_local topology_str << _if pipe_pos _isnt _unset _then >> description.subseq(1, pipe_pos - 1) _else >> "" _endif
+	_local kmz_uuid     << _if pipe_pos _isnt _unset _then >> description.subseq(pipe_pos + 1)   _else >> description _endif
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		write("  ERROR: No kmz_uuid in description for: ", infra_code)
+		_self.update_scheduled_status(infra_code, "cluster", "failed")
+		obj_stats[:errors] +<< 1
+		_return _false
+	_endif
+
+	_try _with cond
+		_self.update_scheduled_status(infra_code, "cluster", "processing")
+		obj_stats[:processed] +<< 1
+
+		_local output_dir << system.getenv("TEMP").default("C:\\temp")
+		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.update_scheduled_status(infra_code, "cluster", "failed")
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+		_local xml_doc      << simple_xml.read_element_string(xml_result)
+		_local kml_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if kml_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_path_elem.xml_result
+			_local parser        << astri_kml_parser.new(kml_file_path)
+			_local (placemarks, topology) << parser.parse()
+
+			_local wo << property_list.new_with(
+				:wo_number,           infra_code,
+				:infra_code,          infra_code,
+				:infra_name,          rec[:name].default(infra_code),
+				:topology,            topology_str,
+				:kmz_uuid,            kmz_uuid,
+				:infrastructure_type, "cluster",
+				:olt_label,           "",
+				:olt_name,            "",
+				:area,                "",
+				:area_plant_code,     "")
+
+			_self.migrate_to_sw_design(wo, placemarks, "cluster", topology)
+			_self.update_scheduled_status(infra_code, "cluster", "migrated")
+			_return _true
+		_else
+			_self.update_scheduled_status(infra_code, "cluster", "failed")
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+	_when error
+		write("  ERROR: ", cond.report_contents_string)
+		_self.update_scheduled_status(infra_code, "cluster", "failed")
+		obj_stats[:errors] +<< 1
+		_return _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method astri_data_migrator.migrate_subfeeder_scheduled_objects()
+	## Migrate SUBFEEDER scheduled records from drm_scheduler_logs to SW Design.
+	## Status: scheduled -> processing -> migrated/failed
+
+	_local start_time << date_time.now()
+	write("=== SUBFEEDER SCHEDULED Migration Started ===")
+
+	_local obj_stats << property_list.new_with(:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+
+	_try _with cond
+		_local scheduled << _self.get_scheduled_records("subfeeder")
+
+		_if scheduled.empty?
+		_then
+			write("No scheduled SUBFEEDER records found.")
+			>> obj_stats
+		_endif
+
+		_for rec _over scheduled.fast_elements()
+		_loop
+			_local infra_code << rec[:infra_code].default("")
+			write("")
+			write("Processing SUBFEEDER: ", infra_code)
+			obj_stats[:total] +<< 1
+
+			_if _self.process_subfeeder_scheduled_migration(rec, obj_stats)
+			_then
+				obj_stats[:migrated] +<< 1
+			_endif
+		_endloop
+
+		write("=== SUBFEEDER SCHEDULED Migration Complete ===")
+	_when error
+		write("ERROR: ", cond.report_contents_string)
+	_endtry
+
+	write("Duration: ", (date_time.now() - start_time).write_string)
+	>> obj_stats
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, obj_stats)
+	_local infra_code  << rec[:infra_code].default("")
+	_local description << rec[:description].default("")
+
+	_local pipe_pos     << description.index_of(%|)
+	_local topology_str << _if pipe_pos _isnt _unset _then >> description.subseq(1, pipe_pos - 1) _else >> "" _endif
+	_local kmz_uuid     << _if pipe_pos _isnt _unset _then >> description.subseq(pipe_pos + 1)   _else >> description _endif
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		write("  ERROR: No kmz_uuid in description for: ", infra_code)
+		_self.update_scheduled_status(infra_code, "subfeeder", "failed")
+		obj_stats[:errors] +<< 1
+		_return _false
+	_endif
+
+	_try _with cond
+		_self.update_scheduled_status(infra_code, "subfeeder", "processing")
+		obj_stats[:processed] +<< 1
+
+		_local output_dir << system.getenv("TEMP").default("C:\\temp")
+		_local xml_result << astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.update_scheduled_status(infra_code, "subfeeder", "failed")
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+		_local xml_doc       << simple_xml.read_element_string(xml_result)
+		_local kml_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if kml_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_path_elem.xml_result
+			_local parser        << astri_kml_parser.new(kml_file_path)
+			_local (placemarks, topology) << parser.parse()
+
+			_local wo << property_list.new_with(
+				:wo_number,           infra_code,
+				:infra_code,          infra_code,
+				:infra_name,          rec[:name].default(infra_code),
+				:topology,            topology_str,
+				:kmz_uuid,            kmz_uuid,
+				:infrastructure_type, "subfeeder",
+				:olt_label,           "",
+				:olt_name,            "",
+				:area,                "",
+				:area_plant_code,     "")
+
+			_self.migrate_to_sw_design(wo, placemarks, "subfeeder", topology)
+			_self.update_scheduled_status(infra_code, "subfeeder", "migrated")
+			_return _true
+		_else
+			_self.update_scheduled_status(infra_code, "subfeeder", "failed")
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+	_when error
+		write("  ERROR: ", cond.report_contents_string)
+		_self.update_scheduled_status(infra_code, "subfeeder", "failed")
+		obj_stats[:errors] +<< 1
+		_return _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method astri_data_migrator.migrate_feeder_scheduled_objects()
+	## Migrate FEEDER scheduled records from drm_scheduler_logs to SW Design.
+	## Status: scheduled -> processing -> migrated/failed
+
+	_local start_time << date_time.now()
+	write("=== FEEDER SCHEDULED Migration Started ===")
+
+	_local obj_stats << property_list.new_with(:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+
+	_try _with cond
+		_local scheduled << _self.get_scheduled_records("feeder")
+
+		_if scheduled.empty?
+		_then
+			write("No scheduled FEEDER records found.")
+			>> obj_stats
+		_endif
+
+		_for rec _over scheduled.fast_elements()
+		_loop
+			_local infra_code << rec[:infra_code].default("")
+			write("")
+			write("Processing FEEDER: ", infra_code)
+			obj_stats[:total] +<< 1
+
+			_if _self.process_feeder_scheduled_migration(rec, obj_stats)
+			_then
+				obj_stats[:migrated] +<< 1
+			_endif
+		_endloop
+
+		write("=== FEEDER SCHEDULED Migration Complete ===")
+	_when error
+		write("ERROR: ", cond.report_contents_string)
+	_endtry
+
+	write("Duration: ", (date_time.now() - start_time).write_string)
+	>> obj_stats
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj_stats)
+	_local infra_code  << rec[:infra_code].default("")
+	_local description << rec[:description].default("")
+
+	_local pipe_pos     << description.index_of(%|)
+	_local topology_str << _if pipe_pos _isnt _unset _then >> description.subseq(1, pipe_pos - 1) _else >> "" _endif
+	_local kmz_uuid     << _if pipe_pos _isnt _unset _then >> description.subseq(pipe_pos + 1)   _else >> description _endif
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		write("  ERROR: No kmz_uuid in description for: ", infra_code)
+		_self.update_scheduled_status(infra_code, "feeder", "failed")
+		obj_stats[:errors] +<< 1
+		_return _false
+	_endif
+
+	_try _with cond
+		_self.update_scheduled_status(infra_code, "feeder", "processing")
+		obj_stats[:processed] +<< 1
+
+		_local output_dir << system.getenv("TEMP").default("C:\\temp")
+		_local xml_result << astri_download_feeder_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			_self.update_scheduled_status(infra_code, "feeder", "failed")
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+		_local xml_doc       << simple_xml.read_element_string(xml_result)
+		_local kml_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if kml_path_elem _isnt _unset
+		_then
+			_local kml_file_path << kml_path_elem.xml_result
+			_local parser        << astri_kml_parser.new(kml_file_path)
+			_local (placemarks, topology) << parser.parse()
+
+			_local wo << property_list.new_with(
+				:wo_number,           infra_code,
+				:infra_code,          infra_code,
+				:infra_name,          rec[:name].default(infra_code),
+				:topology,            topology_str,
+				:kmz_uuid,            kmz_uuid,
+				:infrastructure_type, "feeder",
+				:olt_label,           "",
+				:olt_name,            "",
+				:area,                "",
+				:area_plant_code,     "")
+
+			_self.migrate_to_sw_design(wo, placemarks, "feeder", topology)
+			_self.update_scheduled_status(infra_code, "feeder", "migrated")
+			_return _true
+		_else
+			_self.update_scheduled_status(infra_code, "feeder", "failed")
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+	_when error
+		write("  ERROR: ", cond.report_contents_string)
+		_self.update_scheduled_status(infra_code, "feeder", "failed")
+		obj_stats[:errors] +<< 1
+		_return _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.migrate_to_sw_design(wo, placemarks, infra_type, _optional kml_topology)
+	## Migrate placemarks to a new Smallworld Design Manager project+design.
+	## Parallel to migrate_to_sw_alternative() but creates a new design
+	## instead of navigating to an existing alternative.
+
+	_local database   << .database
+	_local infra_code << wo[:infra_code].default("")
+	_local wo_number  << wo[:wo_number].default(infra_code)
+	_local infra_name << wo[:infra_name].default(infra_code)
+
+	# Trim to Design Manager 64-char limit
+	_if infra_name.size > 64
+	_then
+		infra_name << infra_name.subseq(infra_name.size - 64, 64)
+	_endif
+
+	wo[:infrastructure_type] << infra_type
+
+	# Resolve topology: WO field takes priority over KML-detected
+	_local final_topology << kml_topology
+	_local topology_str   << wo[:topology].default("")
+	_if topology_str _isnt _unset _andif topology_str <> ""
+	_then
+		_if topology_str = "AE"
+		_then
+			final_topology << :aerial
+		_elif topology_str = "UG"
+		_then
+			final_topology << :underground
+		_elif topology_str = "AE&UG"
+		_then
+			final_topology << :both
+		_endif
+	_endif
+
+	write("  migrate_to_sw_design: project=", wo_number, " design=", infra_name)
+	write("  Topology: ", final_topology.default(:unset),
+	      " (wo[:topology]: ", topology_str.default("unset"),
+	      ", KML detected: ", kml_topology.default(:unset), ")")
+
+	_local migrator << astri_design_migrator.new(database, wo)
+	migrator.migration_scope << "All"
+	_if final_topology _isnt _unset
+	_then
+		migrator.topology << final_topology
+	_endif
+
+	_local (project, scheme) << migrator.create_project_and_design(
+		placemarks, wo_number, infra_code, infra_name, infra_type)
+	write("  Project ID: ", project.id, "  Design ID: ", scheme.id)
+
+	_local stats << migrator.migrate_placemarks(placemarks)
+
+	_try _with commitErr
+		database.commit()
+		write("  Database committed OK")
+	_when error
+		write("  WARNING: Commit failed - ", commitErr.report_contents_string)
+	_endtry
+
+	write("  [MIGRATED] Routes: ", stats[:aerial_routes],
+	      " UG: ", stats[:underground_routes].default(0),
+	      ", Poles: ", stats[:new_poles],
+	      ", HP: ", stats[:demand_points],
+	      ", Cable: ", stats[:sheath_length].rounded, "m",
+	      ", Errors: ", stats[:errors])
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.get_scheduled_records(infra_type)
+	## Fetch all rows from drm_scheduler_logs with status='scheduled'
+	## for the given infra_type, ordered oldest-first.
+	##
+	## Returns: rope of property_lists
+
+	_local sql << "SELECT infra_code, name, infra_type, description, status, " +
+		"scheduler_username, schedule_date " +
+		"FROM smallworld.drm_scheduler_logs " +
+		"WHERE status = 'scheduled' AND infra_type = ? " +
+		"ORDER BY created_at ASC"
+
+	_local result << rope.new()
+
+	_try _with cond
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) <<
+				rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			_if _not is_connect?
+			_then
+				write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for scheduled fetch")
+				_return result
+			_endif
+		_endif
+
+		_local recs << .db_connection.sql_select(sql, infra_type)
+		_loop
+			_local rec << recs.get()
+			_if rec _is _unset _then _leave _endif
+			result.add(property_list.new_with(
+				:infra_code,         rec.infra_code.default(""),
+				:name,               rec.name.default(""),
+				:infra_type,         rec.infra_type.default(""),
+				:description,        rec.description.default(""),
+				:status,             rec.status.default(""),
+				:scheduler_username, rec.scheduler_username.default(""),
+				:schedule_date,      rec.schedule_date.default("")))
+		_endloop
+		recs.close()
+
+		_try
+			.db_connection.commit()
+		_when error
+			.db_connection.rollback()
+		_endtry
+		extdb_java_acp.close_all()
+		.db_connection << _unset
+
+		write("Fetched ", result.size, " scheduled ", infra_type, " record(s)")
+		_return result
+
+	_when error
+		write("ERROR in get_scheduled_records(): ", cond.report_contents_string)
+		_try
+			_if .db_connection _isnt _unset
+			_then
+				.db_connection.rollback()
+				extdb_java_acp.close_all()
+				.db_connection << _unset
+			_endif
+		_when error
+		_endtry
+		_return result
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.update_scheduled_status(infra_code, infra_type, new_status)
+	## UPDATE status and updated_at in drm_scheduler_logs.
+	## Targets rows matching infra_code + infra_type.
+
+	_local sql << "UPDATE smallworld.drm_scheduler_logs " +
+		"SET status = ?, updated_at = NOW() " +
+		"WHERE infra_code = ? AND infra_type = ?"
+
+	_try _with cond
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) <<
+				rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			_if _not is_connect?
+			_then
+				write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for status update")
+				_return
+			_endif
+		_endif
+
+		.db_connection.sql_modify(sql, new_status, infra_code, infra_type)
+		.db_connection.commit()
+		extdb_java_acp.close_all()
+		.db_connection << _unset
+		write("  Status -> ", new_status, " [", infra_code, " / ", infra_type, "]")
+
+	_when error
+		write("ERROR in update_scheduled_status(): ", cond.report_contents_string)
+		_try
+			_if .db_connection _isnt _unset
+			_then
+				.db_connection.rollback()
+				extdb_java_acp.close_all()
+				.db_connection << _unset
+			_endif
+		_when error
+		_endtry
+	_endtry
+_endmethod
+$

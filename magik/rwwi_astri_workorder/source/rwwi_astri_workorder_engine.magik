@@ -859,7 +859,7 @@ _method rwwi_astri_workorder_engine.insert_scheduler_log(params)
 		"(infra_code, name, infra_type, username, scheduler_username, " +
 		"schedule_date, start_time, end_time, status, description, " +
 		"created_at, updated_at) " +
-		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, NOW(), NOW())"
 
 	_local conn << _unset
 
@@ -874,15 +874,12 @@ _method rwwi_astri_workorder_engine.insert_scheduler_log(params)
 			_return _false
 		_endif
 
-		conn.sql_execute(sql,
+		conn.sql_modify(sql,
 			params[:infra_code],
 			params[:name],
 			params[:infra_type],
 			params[:username],
 			params[:scheduler_username],
-			params[:schedule_date],
-			params[:start_time],
-			params[:end_time],
 			params[:status],
 			params[:description])
 
