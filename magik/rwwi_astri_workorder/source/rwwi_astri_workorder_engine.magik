@@ -849,17 +849,16 @@ _method rwwi_astri_workorder_engine.insert_scheduler_log(params)
 	##
 	## Parameters:
 	##   params (property_list) - keys: :infra_code, :name, :infra_type,
-	##     :username, :scheduler_username, :schedule_date, :start_time,
-	##     :end_time, :status, :description
+	##     :username, :scheduler_username, :status, :topology, :kmz_uuid
 	##
 	## Returns:
 	##   boolean - _true on success, _false on failure
 
 	_local sql << "INSERT INTO smallworld.drm_scheduler_logs " +
 		"(infra_code, name, infra_type, username, scheduler_username, " +
-		"schedule_date, start_time, end_time, status, description, " +
+		"schedule_date, start_time, end_time, status, topology, uuid, " +
 		"created_at, updated_at) " +
-		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, NOW(), NOW())"
+		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, ?, NOW(), NOW())"
 
 	_local conn << _unset
 
@@ -881,7 +880,8 @@ _method rwwi_astri_workorder_engine.insert_scheduler_log(params)
 			params[:username],
 			params[:scheduler_username],
 			params[:status],
-			params[:description])
+			params[:topology],
+			params[:uuid])
 
 		conn.commit()
 		extdb_java_acp.close_all()

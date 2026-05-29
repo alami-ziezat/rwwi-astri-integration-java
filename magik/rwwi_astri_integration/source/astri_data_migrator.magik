@@ -1697,7 +1697,7 @@ _private _method astri_data_migrator.migrate_to_sw_alternative(wo, placemarks, i
 _endmethod
 $
 
-## ============================================================
+## zzzzzzzzzzzzzzzzzzzzzzzzzzzeeeeeee4============================================================
 ## SCHEDULED MIGRATION — drm_scheduler_logs → SW Design
 ## Pattern mirrors migrate_<infra_type>_objects / process_<infra_type>_kml_migration
 ## ============================================================
@@ -1850,17 +1850,13 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_cluster_scheduled_migration(rec, obj_stats)
-	_local infra_code  << rec[:infra_code].default("")
-	_local description << rec[:description].default("")
-
-	# Parse topology|kmz_uuid from description
-	_local pipe_pos     << description.index_of(%|)
-	_local topology_str << _if pipe_pos _isnt _unset _then >> description.subseq(1, pipe_pos - 1) _else >> "" _endif
-	_local kmz_uuid     << _if pipe_pos _isnt _unset _then >> description.subseq(pipe_pos + 1)   _else >> description _endif
+	_local infra_code   << rec[:infra_code].default("")
+	_local topology_str << rec[:topology].default("")
+	_local kmz_uuid     << rec[:uuid].default("")
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
-		write("  ERROR: No kmz_uuid in description for: ", infra_code)
+		write("  ERROR: No uuid for: ", infra_code)
 		_self.update_scheduled_status(infra_code, "cluster", "failed")
 		obj_stats[:errors] +<< 1
 		_return _false
@@ -1963,16 +1959,13 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, obj_stats)
-	_local infra_code  << rec[:infra_code].default("")
-	_local description << rec[:description].default("")
-
-	_local pipe_pos     << description.index_of(%|)
-	_local topology_str << _if pipe_pos _isnt _unset _then >> description.subseq(1, pipe_pos - 1) _else >> "" _endif
-	_local kmz_uuid     << _if pipe_pos _isnt _unset _then >> description.subseq(pipe_pos + 1)   _else >> description _endif
+	_local infra_code   << rec[:infra_code].default("")
+	_local topology_str << rec[:topology].default("")
+	_local kmz_uuid     << rec[:uuid].default("")
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
-		write("  ERROR: No kmz_uuid in description for: ", infra_code)
+		write("  ERROR: No uuid for: ", infra_code)
 		_self.update_scheduled_status(infra_code, "subfeeder", "failed")
 		obj_stats[:errors] +<< 1
 		_return _false
@@ -2075,16 +2068,13 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj_stats)
-	_local infra_code  << rec[:infra_code].default("")
-	_local description << rec[:description].default("")
-
-	_local pipe_pos     << description.index_of(%|)
-	_local topology_str << _if pipe_pos _isnt _unset _then >> description.subseq(1, pipe_pos - 1) _else >> "" _endif
-	_local kmz_uuid     << _if pipe_pos _isnt _unset _then >> description.subseq(pipe_pos + 1)   _else >> description _endif
+	_local infra_code   << rec[:infra_code].default("")
+	_local topology_str << rec[:topology].default("")
+	_local kmz_uuid     << rec[:uuid].default("")
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
-		write("  ERROR: No kmz_uuid in description for: ", infra_code)
+		write("  ERROR: No uuid for: ", infra_code)
 		_self.update_scheduled_status(infra_code, "feeder", "failed")
 		obj_stats[:errors] +<< 1
 		_return _false
@@ -2220,7 +2210,7 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 	##
 	## Returns: rope of property_lists
 
-	_local sql << "SELECT infra_code, name, infra_type, description, status, " +
+	_local sql << "SELECT infra_code, name, infra_type, topology, uuid, status, " +
 		"scheduler_username, schedule_date " +
 		"FROM smallworld.drm_scheduler_logs " +
 		"WHERE status = 'scheduled' AND infra_type = ? " +
@@ -2249,7 +2239,8 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 				:infra_code,         rec.infra_code.default(""),
 				:name,               rec.name.default(""),
 				:infra_type,         rec.infra_type.default(""),
-				:description,        rec.description.default(""),
+				:topology,           rec.topology.default(""),
+				:uuid,               rec.uuid.default(""),
 				:status,             rec.status.default(""),
 				:scheduler_username, rec.scheduler_username.default(""),
 				:schedule_date,      rec.schedule_date.default("")))

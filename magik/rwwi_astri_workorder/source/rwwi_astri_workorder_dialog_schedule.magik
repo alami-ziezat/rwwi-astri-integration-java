@@ -62,11 +62,10 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 	_endif
 
 	# --- Build params from selected row (all auto-populated) ---
-	_local username    << system.getenv("USERNAME").default("unknown")
+	_local username << gis_program_manager.cached_dataset(:gis).auth_view.current_user.name.default("unknown")
 
-	_local topology    << wo[:topology].default("")
-	_local kmz_uuid    << wo[:kmz_uuid].default("")
-	_local description << topology + "|" + kmz_uuid
+	_local topology << wo[:topology].default("")
+	_local uuid     << wo[:kmz_uuid].default("")
 
 	_local params << property_list.new_with(
 		:infra_code,         infra_code,
@@ -75,7 +74,8 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 		:username,           username,
 		:scheduler_username, username,
 		:status,             "scheduled",
-		:description,        description)
+		:topology,           topology,
+		:uuid,               uuid)
 
 	# --- Insert ---
 	_local ok? << .engine.insert_scheduler_log(params)
@@ -85,7 +85,7 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 		_self.log_success(
 			write_string("WO scheduled: ", wo_number,
 			             " [", infra_code, "]",
-			             " desc=", description))
+			             " topology=", topology, " uuid=", uuid))
 	_else
 		_self.log_error("Failed to schedule WO: " + wo_number)
 	_endif
