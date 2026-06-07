@@ -1,0 +1,51 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-18
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+#_package sw #mapani 
+#$
+
+animate << _proc()
+	_local mv, an, a
+	write("Starting animation demo")
+	grs <<smallworld_product.application(:wo_ws_stk_application)
+	mv << grs.plugin(:maps).current_map_view
+	an << map_animator.new(mv)
+	an.run()
+	write("Add a blinking animation")
+	a << map_blink_animation.new(mv, coordinate.new(683134.595,9122873.350))
+	an.add(a)
+	write("Wait and addd 2 more")
+	_thisthread.sleep(10)
+#	a << map_blink_animation.new(mv, coordinate.new(544672639,260971683))
+#	an.add(a)
+#	a << map_blink_animation.new(mv, coordinate.new(544570821,260922506))
+#	an.add(a)
+#	write("Add a car driving over a chain")
+#	ch << gis_program_manager.databases[:gis].collection(:sw_gis!chain).at({22010741,0,1118495})
+#	a << map_move_over_chain_animation.new(mv, ch)
+#	an.add(a)
+#	write("Wait and remove the car")
+#	_thisthread.sleep(2000)
+#	an.remove(a)
+#	write("Wait and add the car again")
+#	_thisthread.sleep(2000)
+#	an.add(a)
+	write("Wait........")
+	#map_animator.execute_stop()
+	_return an
+     _endproc
+$

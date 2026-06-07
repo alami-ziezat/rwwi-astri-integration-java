@@ -1,0 +1,154 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-18
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+_package sw #mapani
+$
+
+_pragma(classify_level=restricted, topic={demo})
+## Animation that blinks on the screen.
+def_slotted_exemplar(:map_blink_animation,
+	{
+		{:coord, _unset}
+	},
+	:map_animation_base)
+$
+
+_pragma(classify_level=restricted, topic={demo})
+map_blink_animation.define_shared_constant(:int!image_cache, rope.new(), :private)
+$
+
+
+_pragma(classify_level=restricted, topic={demo})
+_method map_blink_animation.new(map_view,  coord)
+	_return _clone.init(map_view, coord)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_blink_animation.init(map_view, coord)
+	.coord << coord
+	_return _super.init(map_view)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_blink_animation.image_cache
+	_local cache << _self.int!image_cache
+	_lock cache
+	      _if cache.empty?
+	      _then
+		      _self.fill_image_cache(cache)
+	      _endif 
+	_endlock
+	_return cache
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_blink_animation.base_pixel_box
+	_return pixel_bounding_box.new_with_size(0,0,40,40)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_blink_animation.fill_image_cache(p_cache)
+
+	_local pb << _self.base_pixel_box
+	_local pixel_midx << pb.width _div 2
+	_local pixel_midy << pb.height _div 2
+
+	# Note that the wash_pattern only works if the map view is
+	# setup to use Advanced Map Drawing.
+	outer_style << fill_style.new_with_properties(
+			       :wash_percent,
+			       50,
+			       :foreground_colour,
+			       colour.new_with_properties(:red,209,:green,227,:blue,255,:scale,255))
+	middle_style << fill_style.new_with_properties(:foreground_colour,
+						       colour.new_with_properties(:red,77,:green,144,:blue,254,:scale,255))
+	white_line_style << line_style.new_with_properties(
+				    :width, 1,
+				    :foreground_colour,
+				    colour.called(:white)) 
+	grey_line_style << line_style.new_with_properties(
+				   :width, 1,
+				   :foreground_colour,
+				   colour.new_with_properties(:red,141,:green,149,:blue,161,:scale,255))
+	_for i _over range(1,4)
+	_loop		
+		_local mem_cv << memory_canvas.new(pb.width, pb.height)
+		mem_cv.clear()
+		_local mini_radius << 7
+		_local radius_extra << i*i - i
+		_local radius << mini_radius + radius_extra
+		mem_cv.fill_ellipse(outer_style,
+				    pixel_midx-radius, pixel_midy-radius,
+				    pixel_midx+radius, pixel_midy+radius)
+		mem_cv.fill_ellipse( middle_style,
+				     pixel_midx-mini_radius, pixel_midy-mini_radius,
+				     pixel_midx+mini_radius, pixel_midy+mini_radius )
+		mem_cv.draw_circle( white_line_style,
+				    pixel_midx, pixel_midy, mini_radius-2)
+		mem_cv.draw_circle( grey_line_style,
+				    pixel_midx, pixel_midy, mini_radius-1)
+		mem_img << image.new_for_window(mem_cv, _false, mem_cv.width-1, mem_cv.height-1)
+		mem_img.clear()
+		mem_img.copy_from_canvas(1,1)
+		p_cache[i] << mem_img
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_blink_animation.draw()
+	## Draw on the mapview windows. Return 2 results
+	## 1: a list of pixel_bounding_boxes of the locations where
+	## self has drawn.
+	## the time to wait to be drawn again. Return _unset to stop
+	## and quit the animation.
+	i << .index + 1
+	_local tcoord << .coord.transformed(.map_view.window.transform)
+	_local pixel_coord << pixel_coordinate.new(tcoord.x.rounded, tcoord.y.rounded)
+	mem_img << _self.image_cache[i]
+	
+	pbox << _self.base_pixel_box
+	pbox << pixel_bounding_box.new_with_size(
+			(pixel_coord.x - (pbox.width  _div 2)),
+			(pixel_coord.y - (pbox.height _div 2)),
+			pbox.width, pbox.height)
+	_local gc << .map_view.window.create_graphics_context()
+	gc.override_retained? << _true 
+	gc.render_image(mem_img,
+			pbox.xmin,
+			pbox.ymin,
+			_true)
+	gc.dispose()
+
+	#move out and in. use .dir to control the direction.
+	_if .index > 2
+	_then
+		.dir << -1
+	_elif .index = 0
+	_then
+		.dir << 1
+	_endif
+	.index +<< .dir
+	
+	_return {pbox}, 0.2
+_endmethod
+$

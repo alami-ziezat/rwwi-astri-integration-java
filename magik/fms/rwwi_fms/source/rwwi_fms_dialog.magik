@@ -1,0 +1,940 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2024 Realworld Systems. All Rights Reserved. 
+# Author: yudo.ariyanto@gmail.com
+#							       
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwwi_fms_dialog)
+$
+
+
+def_slotted_exemplar(:rwwi_fms_dialog,
+     {
+	    {:widget_list, property_list.new()},
+	    {:items, _unset, :writable},
+	    {:record_list,rope.new()},
+	    {:owner, _unset},
+	    {:v, _unset, :writable},
+	    {:grs, _unset, :writable},
+	    {:interval, _unset},
+	    {:update_status, _unset},
+	    #{:info_box, _unset },
+	    {:timer, _unset},
+	    {:map_p, _unset},
+	    {:gv, _unset, :writable},
+	    {:app, _unset },
+	    {:an, _unset },
+	    {:mv, _unset },
+	    {:sel_record, _unset },
+	    {:info_box, _unset },
+	    {:c_window, _unset },
+	    {:lo_manager, _unset },
+	    {:list,      _unset, :writable}, 
+	    {:tree_item, _unset, :writable},
+	    {:engine,_unset}
+    },:engine_model)
+$
+
+
+_method rwwi_fms_dialog.c_window << window
+	## 
+	##
+	.c_window << window
+_endmethod
+$
+
+
+_method rwwi_fms_dialog.c_window
+	## 
+	##
+	>> .c_window
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.init(owner)
+	_super.init()
+	appl << smallworld_product.pni_application()
+	.app << appl
+	.gv << gis_program_manager.cached_dataset(:gis)
+	.map_p << .app.plugin(:map_plugin)
+	.lo_manager <<  mit_low_level_nf_manager.new(:signal_level_nf_manager,.app)
+	.v << gis_program_manager.cached_dataset(:gis)
+	.owner << owner
+	.grs << .owner.framework
+	#.engine << rwi_fms_engine.new(appl)
+	.items << property_list.new()
+	#.interval << an_interval.default(30)
+	.update_status << hash_table.new()
+	.info_box << rwi_fms_info_box.new(_self)
+	.mv << .map_p.current_map_view
+	.an << map_animator.new(.mv)
+	.list << rope.new()
+	_self.add_dependent(.owner)
+        >> _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.new(_optional owner) #, _optional an_interval)
+	## 
+	##
+	
+	>> _clone.init(owner)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.activate_in(a_frame)
+	## 
+	##
+
+	_self.title << "FMS"
+	# format button
+	# set button width to standard minimum button width
+	a_frame.resizable? << _true
+	a_frame.maximizable? << _true 
+	
+	# RC MAIN
+	# create outer rowcol, 5 rows and 1 columns, 
+	# use top_level style
+	
+	rc << rowcol.new(a_frame, 2, 1, :pixel,
+			 :style, :top_level, :default_row_alignment, :centre)
+
+
+	
+
+	# GROUP BOX 1  
+	# create grupbox nested 2 row 2 col
+	group_box2 << group_box.new( rc, "DATA FMS", :row, 1, :col, 1 )
+	gb_rc2 << rowcol.new( group_box2, 5, 1, :pixel, 
+			      :style, :group_box)
+	
+	.items[:tree_item] << tree_item.new(gb_rc2,
+					    :model,	_self,
+					    :allow_filtering?,	_false,
+					    :aspect,	:|tab_list|,
+					    :col,	1,
+					    :col_alignment,	:fill,
+					    :column_alignments,	{:left,:right,:center},
+					    :column_headings,        {"CircuitID", "Distance", "CableID", "Alseverity","Latitude ","Longitude"},
+					    :column_heading_ids,     {:ciscuitid, :dist, :cableid, :alseverity, :lat, :long},
+					    :column_headings_styled_strings, {{:bold, "CircuitID"}, {:bold, "Distance"}, {:bold, "CableID"}, {:bold, "Alseverity"}, {:bold, "Latitude"}, {:bold, "Longitude"}},
+					    :column_widths,	{125,125,180,100,150,150},
+					    :double_click_notifier,	:|tab_list_double_clicked()|,
+						:grid_lines?,	_true,
+						:stripes?,	_true,
+					    :height,	240,
+					    :mode,	:one,
+					    :row,2,
+					    :row_alignment,	:fill,
+					    :select_notifier,	:|list_selected()|,
+					    :width,	770 )
+	# BUTTON
+
+
+
+	button_rc << rowcol.new(rc, 1, _unset, :pixel, :row, 2, :col, 1,
+				:style, :button_box, :col_alignment, :right )
+
+	ti << .items[:ti] << toggle_item.new(button_rc,"Activate FMS ", :model, _self ,
+					       :change_selector, :activate_fms|()| ,
+					       :value, _false   )
+
+	.items[:bt_03] << button_item.new_safe( button_rc, "Refresh", _self, :|refresh()|, :min_width, 100 )
+	.items[:bt_04] << button_item.new_safe( button_rc, "Print Work Order", _self, :|do_snap()|, :min_width, 100 )
+	.items[:bt_05] << button_item.new_safe( button_rc, "Email", _self, :|do_snap()|, :min_width, 100 )
+	.items[:bt_05].enabled? << _false 
+
+	label_item.new(button_rc,"        Interval   :  ")
+
+	
+	
+	.items[:text_choice_item_01] << text_choice_item.new(button_rc,"",
+			:model,   _self,
+			:col,	1,
+			:col_alignment,	:centre,
+			:row,	1,
+			:row_alignment,	:top,
+			:items,	{{00,"1/4"},{0,"1/2"},{1,"1"},{2,"2"},{3,"5"}} )
+
+	label_item.new(button_rc," minute ")
+
+	.items[:bt_01] << button_item.new_safe(button_rc, "Run", _self, :|go()|, :property_aspect, :current_label,:col,1,:row,1)
+	.items[:bt_02] << button_item.new_safe(button_rc, "Stop", _self, :|stop()|, :property_aspect, :current_label)
+
+
+	# STATUS BAR
+	my_pane_map << property_list.new_with(
+			       :status_info, property_list.new_with(
+						     :width, 590, :style, :innie ))
+	.items[:status_bar] << status_bar.new(a_frame , my_pane_map)
+	_return _self
+
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={tree_item})
+_method rwwi_fms_dialog.activate_fms(enabled?)
+
+	d << .app.plugin(:rwi_fms_plugin)
+	_if enabled?
+	_then
+		write("true ")
+		.items[:bt_01].enabled? << _false
+		.items[:bt_02].enabled? << _false 
+		d.activate_fms(enabled?)
+		.map_p.current_map_view.render()
+	_else
+		write("false")
+		.items[:bt_01].enabled? << _true
+		.items[:bt_02].enabled? << _true
+		d.activate_fms(enabled?)
+		.map_p.current_map_view.render()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={tree_item})
+_method rwwi_fms_dialog.tab_list
+
+		>> .list
+
+_endmethod
+$
+
+_method rwwi_fms_dialog.go()
+
+   ## Begin the update alert
+
+	_if .items[:ti].value _is _true
+	_then 
+		.items[:ti].value << _false 
+		.items[:ti].enabled? << _false
+	_else
+		.items[:ti].enabled? << _false
+	_endif
+
+	
+	.items[:bt_01].enabled? << _false
+
+	_if .items[:text_choice_item_01].value = 00 _then 
+		.interval << 15
+	_elif .items[:text_choice_item_01].value = 0 _then 
+		.interval << 30
+	_elif .items[:text_choice_item_01].value = 1 _then
+		.interval << 60
+	_elif .items[:text_choice_item_01].value = 2 _then
+		.interval << 120
+	_elif .items[:text_choice_item_01].value = 3 _then
+		.interval << 60*5
+	_endif
+	
+	write(.Interval)
+   _if .timer _is _unset _then
+      the_proc << _proc(alert)
+			  alert.check_for_update()
+                  _endproc
+      .timer << timed_event.new(.interval,the_proc,_self)
+   _endif
+
+   _if .timer.return_status() _is :running _then
+      _return
+   _endif
+
+   .timer.go()
+
+_endmethod
+$
+
+_method rwwi_fms_dialog.stop()
+
+   ## Stop the update alert
+	.items[:ti].enabled? << _true
+	.items[:bt_01].enabled? <<  _true 
+	.an.stop()
+   _if .timer _is _unset _then
+      _return
+   _endif
+
+   	_self.clear_trace()
+	#	.current_doc.render()
+	_self.disconnect_all()
+
+   _if .timer.return_status() _is :stopped _then
+      _return
+   _endif
+
+   .timer.stop()
+
+_endmethod
+$
+
+_method rwwi_fms_dialog.check_for_update()
+
+#	_for r _over .an.fast_elements()
+#	_loop
+#		write(r)
+#	_endloop
+#
+#	.an.stop()
+	#_self.connect_to_fms()
+	_self.do_process_fms( _true )
+	#_self.clear_trace()
+
+	#_self.disconnect_all()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.clear_trace()
+	## 
+	## 
+	.lo_manager.clear()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.do_process_fms(enabled?)
+	## 
+	##
+
+	_self.run_engine( _thisthread.background_priority, :|int!do_process_fms()|,enabled?)
+	write("ok")
+
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.int!do_process_fms(enabled?)
+	## 
+	##
+
+	.an.stop()
+	_self.disconnect_all()
+	_self.connect_to_fms()
+	
+	.an << map_animator.new(.mv)
+	#.an.stop()
+	.an.run()
+	
+
+	#.map_p.current_map_view.render()
+	_dynamic !print_float_precision! << 16
+	_local mulai << date_time.now()
+	#_self.connect_to_fms()
+	#show(.gv,"<====>",.c_window)
+	_constant severity << "Critical"
+	
+	ip2 << .gv.collections[:input_parse2]
+	fms_p << .gv.collections[:fms_point]
+	m_shelf << .gv.collections[:mit_shelf]
+	ip2_critical << ip2.select(predicate.eq(:alseverity, severity))
+	
+	geom_fault << equality_geometry_set.new()
+	obj_fault << equality_geometry_set.new()
+
+	_for i_ip2 _over ip2_critical.fast_elements()
+	_loop
+		show("INPUT PARSE")
+		_local l_cid << i_ip2.circuitid.delimited_by(%.,%")
+		obj_cir << m_shelf.select(predicate.eq(:ne_name,l_cid[1]))
+		_if obj_cir.empty?
+		_then
+			_continue 
+		_endif
+		l_port << obj_cir.an_element().all_rme_port_components().select(
+										predicate.using(_proc (s)
+													_import l_cid
+													_return s.description = l_cid[2]
+												_endproc)).an_element()
+		l_dist << i_ip2.dist.write_string
+		(points,last_link, results)<< _self.get_fault_by_range(l_port,l_dist)
+		a << map_blink_animation.new(.mv,points[1])
+		.an.add(a)
+		geom_fault.add_all(points)
+		#.info_box.paint(enabled?, .c_window, points[1] , l_dist, i_ip2.reqid, last_link)
+		
+	_endloop
+
+	#	write ("E", " ... HOLA ")
+
+#	_endloop
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.get_fault_by_range(port, distance)
+	## 
+	## 
+	_dynamic !current_world! << .gv.world
+	
+	range << unit_value.new(distance.as_number(),:m)
+	#core << sheath_with_loc.get_all_in_fiber_pins()[port]
+	start_node << rope.new_with(port)#core)
+	params << property_list.new()
+	params[:cost_message] << :|fiber_length()|
+	params[:pseudo_link_message] <<	:|mit!split_link()|
+	params[:want_end_pseudos?] << _true
+	params[:max_cost] <<  stop_cost << range
+	(results, results_set) << .lo_manager.otdr_trace(start_node, stop_cost, _scatter params)
+	points << rope.new()
+	_for l_link _over results.fast_elements()
+	_loop
+		_if (l_node<<l_link.out_node).class_name _is :pseudo_node
+		_then
+			l_point << pseudo_point.new_for_world(l_node.coord,!current_world!)
+			points.add(l_point)
+			last_link << l_link
+		_endif
+	_endloop
+	_return points, last_link, results #, results_set#l_point
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.last_equipment(link)
+	## 
+	## 
+	_if (in_node << link.in_node).class_name _is :mit_pseudo_fiber_loc_pin
+	_then
+		gdc << in_node.sheath_pin.sheath_with_loc.get_downstream_connector()
+		_return _self.closest_equipment(gdc)
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.closest_equipment(equp)
+	## 
+	## 
+	_if equp.class_name _is :sheath_splice
+	_then
+		_return equp
+	_endif
+	_local parents << hash_table.new()
+#	equp.find_all_parent_records().map(_proc (p_rec)
+#						  _import parents
+#						  _return parents[p_rec.rwo_type]<<p_rec
+#					  _endproc)
+#	_if (mte << parents[:mit_terminal_enclosure]) _isnt _unset 
+#	_then
+#		_return mte
+#	_endif
+#	_if (building << parents[:building]) _isnt _unset 
+#	_then
+#		_return building
+#	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.sheath(ob,reqid)
+	write("sheath")
+	
+#	_dynamic !print_float_precision! << 16
+	v << gis_program_manager.cached_dataset(:gis)
+	tb << v.collection(:sheath_with_loc)
+	_local table_names << { "fms_cable_route:fms_cable_route", "fms_structure_point:fms_structure_point"}
+	#c_user << _self.mysql_connect()
+	(cek?, a_view, cn) << _unset #connect_mysql()
+
+	 _if cek?
+	 _then
+		 _for tab_name _over table_names.fast_elements()
+		 _loop
+			 _try _with ErrAddTables
+					
+				 cn.open_collection(tab_name.as_symbol(), a_view)
+			 _when error		
+			 _endtry
+		 _endloop
+	 _else
+		 extdb_java_acp.close_all()
+		 _return write("gagal")
+
+	 _endif
+
+	fms_structure_point << a_view.collections["fms_structure_point".as_symbol() ]
+	fms_cable_route << a_view.collections["fms_cable_route".as_symbol() ]
+	i << ob
+	
+	struktur << i.structures
+	_for st _over struktur.fast_elements()
+	_loop
+
+		#write(st.source.name.write_string)
+		_if st.source.name.write_string = "pole"
+		_then
+			l1  << st.get_equipment().an_element() #.name
+		
+			_if l1 _is _unset
+			_then
+				l1 << "POLE"
+			_else
+				loc_nm1  << l1.name
+				_if loc_nm1 _is _unset
+				_then
+					l1 << "POLE"
+				_else
+					l1  << l1.name
+			_endif 	
+		_endif
+		lo << st.location
+		w_conv << _self.convert_coord(lo.coord)
+		px << w_conv.x.write_string
+		py << w_conv.y.write_string
+		swobject << "Pole"
+		
+		_elif st.source.name.write_string = "mit_building_structure"
+		_then
+			s1 << st.building
+			l1  << s1.name #+"|"+get_room.identifier
+			lo << s1.location
+			w_conv << _self.convert_coord(lo.coord)
+			px << w_conv.x.write_string
+			py << w_conv.y.write_string
+			swobject << "Building"
+			
+		_elif st.source.name.write_string = "access_point"
+		_then
+			l1  << st.get_equipment().an_element()
+			lo << st.location
+			w_conv << _self.convert_coord(lo.coord)
+			px << w_conv.x.write_string
+			py << w_conv.y.write_string
+			swobject << "Access Point"
+
+		_elif st.source.name.write_string = "mit_terminal_enclosure"
+		_then
+			l1  << st.name #+"|"+get_room.identifier
+			lo << st.location
+			w_conv << _self.convert_coord(lo.coord)
+			px << w_conv.x.write_string
+			py << w_conv.y.write_string
+			swobject << "odc"
+			
+		_elif st.source.name.write_string = "uub"
+		_then
+			l1  << st.label #+"|"+get_room.identifier
+			_if l1 _is _unset
+			_then
+				l1 << st.type
+			_endif 
+			lo << st.location
+			w_conv << _self.convert_coord(lo.coord)
+			px << w_conv.x.write_string
+			py << w_conv.y.write_string
+			swobject << st.type
+
+		_elif st.source.name.write_string = "building"
+		_then
+			l1  << st.name #+"|"+get_room.identifier
+			lo << st.location
+			w_conv << _self.convert_coord(lo.coord)
+			px << w_conv.x.write_string
+			py << w_conv.y.write_string
+			swobject << "Building"
+
+		_else
+			_continue 
+		_endif
+
+		temp << _unset
+		temp << fms_structure_point.new_template_record()
+
+			temp.structureid << l1
+			temp.reqid << reqid
+			temp.cableid << i.name
+			temp.long << px
+			temp.lat << py
+			temp.swobject << swobject
+							
+			fms_structure_point.insert(temp )
+			a_view.commit()
+
+	_endloop
+	
+	sec << i.route_sectors()
+	h << 0
+
+	_for sec_i _over sec.fast_elements()
+	_loop
+		
+		h +<< 1
+		_dynamic !print_float_precision! << 16
+		p << sec_i.sectors.an_element()
+		w_conv << _self.convert_coord(p.coords.an_element())
+				px << w_conv.x.write_string
+				py << w_conv.y.write_string
+
+				temp << _unset
+				temp << fms_cable_route.new_template_record()
+
+					temp.cableid << i.name
+					temp.reqid << reqid
+					temp.sequence << h.write_string
+					temp.long << px
+					temp.lat << py
+					#temp.closest_odp << b
+							
+					fms_cable_route.insert(temp )
+					a_view.commit()
+
+		_if sec_i = sec.last
+		_then
+			h +<< 1
+			w_conv << _self.convert_coord(p.coords[2])
+				px << w_conv.x.write_string
+				py << w_conv.y.write_string
+
+					temp << _unset
+					temp << fms_cable_route.new_template_record()
+
+					temp.cableid << i.name
+					temp.reqid << reqid
+					temp.sequence << h.write_string
+					temp.long << px
+					temp.lat << py
+				
+							
+					fms_cable_route.insert(temp )
+					a_view.commit()
+
+					
+		_endif
+	_endloop
+
+	cn.close()
+_endmethod 
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.convert_coord(p_coord)
+	
+#	gv<< gis_program_manager.databases[:gis]
+#	cs1 <<gv.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+#	cs2 <<gv.collections[:sw_gis!coordinate_system].at(:world_miller_wgs84_cm)
+#	write(p_coord.y, "  in : ",p_coord.x)
+	gv<< gis_program_manager.databases[:gis]
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#cs1 <<gv.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	#cs2 <<gv.collections[:sw_gis!coordinate_system].at(:world_miller_wgs84_cm)
+
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+#	write(t)
+	t_coord << t.convert(p_coord)
+#	write("here")
+	>> t_coord
+_endmethod 
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.convert_coord2(p_coord)
+	
+#	gv<< gis_program_manager.databases[:gis]
+#	cs1 <<gv.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+#	cs2 <<gv.collections[:sw_gis!coordinate_system].at(:world_miller_wgs84_cm)
+#	write(p_coord.y, "  in : ",p_coord.x)
+	gv<< gis_program_manager.databases[:gis]
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#cs1 <<gv.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	#cs2 <<gv.collections[:sw_gis!coordinate_system].at(:world_miller_wgs84_cm)
+
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs2,cs1)
+#	write(t)
+	t_coord << t.convert(p_coord)
+#	write("here")
+	>> t_coord
+_endmethod 
+$
+
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.connect_to_fms()
+	## 
+	##
+	fms_tables << rope.new_with(:|input_parse2:input_parse2|,
+				    :|fms_point:fms_point|,
+				    :|fms_cable_route:fms_cable_route|,
+				    :|fms_structure_point:fms_structure_point|)
+	(cek?, c_user) << get_user_connection(:mysql_rest, :rest)
+	c_user.per_table_connection_parameters <<
+	hash_table.new_with(:input_parse2, hash_table.new_with(:no_primary_key_validation, _true),
+			     :fms_point, hash_table.new_with(:no_primary_key_validation, _true),
+
+			     :fms_cable_route, hash_table.new_with(:no_primary_key_validation, _true),
+			     :fms_structure_point, hash_table.new_with(:no_primary_key_validation, _true)
+		   )
+	_if cek?
+	_then
+		_for table _over fms_tables.fast_elements()
+		_loop
+			_try _with ErrAddTables
+				c_user.open_collection(table, .gv)
+			_when Error
+				condition.raise(:user_error, :string, ErrAddTables)
+			_endtry
+		_endloop
+	_else
+		extdb_java_acp.close_all()
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_dialog.disconnect_all()
+	## 
+	## 
+	extdb_java_acp.close_all()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={default_class})
+_method rwwi_fms_dialog.int!tab_list
+
+
+	_dynamic !print_float_precision! << 16
+	_local mulai << date_time.now()
+	#_self.connect_to_fms()
+	#show(.gv,"<====>",.c_window)
+	_constant severity << "Critical"
+	
+	ip2 << .gv.collections[:input_parse2]
+	fms_p << .gv.collections[:fms_point]
+	m_shelf << .gv.collections[:mit_shelf]
+	ip2_critical << ip2.select(predicate.eq(:alseverity, severity))
+	
+	geom_fault << equality_geometry_set.new()
+	obj_fault << equality_geometry_set.new()
+
+	regpel << hash_table.new()
+
+	_for i_ip2 _over ip2_critical.fast_elements()
+	_loop
+		show("INPUT PARSE")
+		_local l_cid << i_ip2.circuitid.delimited_by(%.,%")
+		obj_cir << m_shelf.select(predicate.eq(:ne_name,l_cid[1]))
+		_if obj_cir.empty?
+		_then
+			_continue 
+		_endif
+		l_port << obj_cir.an_element().all_rme_port_components().select(
+										predicate.using(_proc (s)
+													_import l_cid
+													_return s.description = l_cid[2]
+												_endproc)).an_element()
+		l_dist << i_ip2.dist.write_string
+		(points,last_link, results)<< _self.get_fault_by_range(l_port,l_dist)
+	
+		geom_fault.add_all(points)
+	#	print(points[1])
+		pa  << pseudo_point.new(points[1])	
+		pa.world << .gv.world
+
+		w_conv << _self.convert_coord(pa.coord)
+		px << w_conv.x.write_string
+		py << w_conv.y.write_string
+			write(px,"  :   ",py)
+		#.info_box.paint(enabled?, .c_window, points[1] , l_dist, i_ip2.reqid, last_link)
+
+		regpel[i_ip2.circuitid.as_symbol()] << hash_table.new_with(
+							       :circuitid, i_ip2.circuitid,
+							       :dist, i_ip2.dist,
+							       :cableid, i_ip2.cableid,
+							       :alseverity, i_ip2.alseverity,
+							       :lat, py,
+							       :long, px,
+							       :rec, i_ip2
+					    )
+
+	
+	_endloop
+	
+	_for key, val _over regpel.fast_keys_and_elements() 
+	_loop
+
+		vals << {}.new(6)
+		vals[1] << val[:circuitid]
+		vals[2] << val[:dist]
+		vals[3] << val[:cableid]
+		vals[4] << val[:alseverity]
+		vals[5] << val[:lat]
+		vals[6] << val[:long]
+		ds << display_tree.new(key,vals)
+		ds.styled_string << {:value,1,:tab,:value,2,:tab,:value,3,:tab,:value,4,:tab,:value,5,:tab,:value,6}
+		.list.add_last(ds)
+		
+	_endloop
+
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={default_class})
+_method rwwi_fms_dialog.tab_list_double_clicked(selection)
+	##
+	##
+
+	px << selection.value[6].as_number()
+	py << selection.value[5].as_number()
+	a_loc << coordinate.new(px,py)
+	w_conv << _self.convert_coord2(a_loc.coord)
+	pa  << pseudo_point.new(w_conv)	
+	pa.world << .gv.world
+
+	bb << bounding_box.new_enclosing(pa.bounds, 800)
+	.map_p.goto(bb) #pa.bounds)
+
+	_local l_point_style << line_style.new_with_properties(:foreground_colour,colour.new_with_properties(:red,0,:green,1,:blue,0),
+							       :width,8)
+	a_window     << .map_p.current_map_view.window
+	a_point_geom  << pa
+	pa.style_info << l_point_style
+	.map_p.draw_geometry(pa)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={default_class})
+_method rwwi_fms_dialog.list_selected(selection)
+	##
+	##
+	_if (sel << selection.an_element()) _isnt _unset 
+	_then
+		.sel_record << sel
+		.items[:status_bar].set_pane_text(:status_info, "".concatenation("Circuit ",sel.value[1]," selected: Double click the selected item to goto its vault area"))
+	_else
+		.sel_record << sel
+		.items[:status_bar].set_pane_text(:status_info, "")
+	_endif
+
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={default_class})
+_method rwwi_fms_dialog.refresh()
+	## 
+	##
+	.items[:status_bar].set_pane_text(:status_info, "Collecting FMS data from external database (Mysql)...")
+	.list.empty()
+	_self.connect_to_fms()
+	_self.int!tab_list
+	_self.clear_trace()
+	_self.changed(:tab_list, :refresh)
+	.items[:status_bar].set_pane_text(:status_info, "Done")
+_endmethod
+$
+
+_method rwwi_fms_dialog.wm_close()
+	## 
+	##
+	_self.disconnect_all()
+	_super.wm_close()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={default_class})
+_method rwwi_fms_dialog.do_snap()
+
+	_if (sel << .sel_record) _isnt _unset
+	_then
+		cr << sel.value[1]
+		cu << sel.value[2]
+		cw << sel.value[3]
+		cx << sel.value[4]
+	_endif
+	
+	#.map_p.goto(bb)
+
+	#gv << .acurrent_map_view
+	#gv << .map_p.map_view
+	gv << .map_p.current_map_view
+	gv.snapshot_w(gv)
+	
+	#.map_p.snapshot(.map_p.world_bounds)
+
+	
+	
+	_local wd
+	wd << ole_client.create_object("Word.Basic")
+	wd.AppShow()
+	a_path << system.working_directory + "\wo_report.docx"
+	write("path-",a_path)
+	wd.FileOpen(a_path)
+
+    	wd.EditFind("AREA")
+	wd.EditPaste(gv)
+
+
+	
+	newline<<character.newline.write_string
+	tab<<character.tab.write_string
+
+	# add the problem record
+	wd.EditFind("device_info")
+	o << internal_text_output_stream.new()
+	o.write(newline)
+	o.write( "                 WORK ORDER")
+	o.write(newline)
+	o.write(newline)
+	o.write(newline)
+	o.write( "Work Order Nomor :   CENT112233344")
+	o.write(newline)
+	o.write( "Petugas              :   Cent")
+	o.write( newline)
+	o.write( "Tanggal              :   ",date_time.now()) # 24/09/99 12:00)
+	o.write(newline)
+	o.write( "Circuit ID           :   ",cr)
+	o.write(newline)
+	o.write( "Distance             :   ",cu)
+	o.write(newline)
+	o.write( "Cable ID             :   ",cw)
+	o.write(newline)
+	o.write( "Alseverity           :   ",cx)
+	#o.write(newline)
+	#o.write( "Petugas              :   Cent")
+	#wd.EditPaste(str)
+	wd.insert(o.string)
+
+	wd.release_object()
+
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method map_view.snapshot_w()
+	##	
+	## Places a snapshot of the map_view on the Windows clipboard
+	##
+
+	_if  .window _isnt _unset _andif
+	     .window.realised?
+	_then
+		.window.copy_to_clipboard()
+	#	_self.show_alert( _self.message( :snapshot_done ) )
+	_endif 
+	
+_endmethod
+$

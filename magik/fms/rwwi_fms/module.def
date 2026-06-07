@@ -1,0 +1,6 @@
+rwwi_fms	1
+
+description
+	This module is used for processing rest data (mysql). it applies as Tooltip / Info box in map view.
+end
+

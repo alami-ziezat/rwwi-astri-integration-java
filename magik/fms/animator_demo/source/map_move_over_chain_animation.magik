@@ -1,0 +1,129 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-18
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+_package sw #mapani
+$
+
+
+_pragma(classify_level=restricted, topic={demo})
+def_slotted_exemplar(:map_move_over_chain_animation,
+	{
+		{:chain,_unset},
+		{:max_length, _unset}
+	}, :map_animation_base)
+$
+
+_pragma(classify_level=restricted, topic={demo})
+map_move_over_chain_animation.define_shared_variable(:int!image_cache,_unset,:private)
+
+
+_pragma(classify_level=restricted, topic={demo})
+_method map_move_over_chain_animation.new(map_view, chain)
+	_return _clone.init(map_view, chain)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_move_over_chain_animation.init(map_view,chain)
+	.chain << chain
+	.max_length << chain.line_length
+	_return _super.init(map_view)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_move_over_chain_animation.image
+	_lock _self
+	      _if _self.int!image_cache _is _unset
+	      _then
+		      _self.create_image_cache()
+	      _endif 
+	_endlock
+	_return _self.int!image_cache
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_move_over_chain_animation.create_image_cache()
+	ras << smallworld_product.get_raster_image(:car, _self.module_name)
+	(ras_width,ras_height) << ras.size()
+	mem_cv << memory_canvas.new(ras_width, ras_height)
+	mem_cv.clear()
+	mem_cv.render_raster(ras,0,0,_true)
+	mem_img << image.new_for_window(mem_cv, _false, mem_cv.width-1, mem_cv.height-1)
+	mem_img.clear()
+	mem_img.copy_from_canvas(1,1)
+	_self.int!image_cache << mem_img
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_move_over_chain_animation.figure_new_length()
+	# Use the view_scale of the map to adjust the next position on
+	# the chain.
+	new_length << .index + (.map_view.view_scale * .dir)
+	
+	# Move from left to right,
+	_if new_length > .max_length
+	_then
+		.dir << -1
+		new_length << .max_length
+	_elif new_length < 0
+	_then
+		.dir << 1
+		new_length << 0
+	_endif
+	_return new_length
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_move_over_chain_animation.current_pixel_coord(new_length)
+	_local coord << .chain.location_for_length(new_length)
+	_local tcoord << coord.transformed(.map_view.window.transform)
+	_return pixel_coordinate.new(tcoord.x.rounded, tcoord.y.rounded)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={demo})
+_method map_move_over_chain_animation.draw()
+	## Draw on the mapview windows. Return 2 results
+	## 1: a list of pixel_bounding_boxes of the locations where
+	## self has drawn.
+	## the time to wait to be drawn again. Return _unset to stop
+	## and quit the animation.
+	img << _self.image
+	new_length << _self.figure_new_length()
+	pcoord << _self.current_pixel_coord(new_length)
+
+	pb << pixel_bounding_box.new_with_size(pcoord.x - img.width,
+					       pcoord.y - img.height,
+					       img.width, img.height)
+
+	_local gc << .map_view.window.create_graphics_context()
+	gc.override_retained? << _true 
+	gc.render_image(img,
+			pb.xmin, pb.ymin,
+			_true)
+	gc.dispose()
+	
+	.index << new_length
+	
+	_return {pb}, 0.1
+_endmethod
+$

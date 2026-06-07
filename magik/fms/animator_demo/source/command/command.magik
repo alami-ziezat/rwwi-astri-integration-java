@@ -1,0 +1,57 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-21
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+_package mapani
+$
+
+_pragma(classify_level=basic, topic={demo})
+def_slotted_exemplar(:command,
+	{})
+$
+
+_pragma(classify_level=basic, topic={demo})
+_method command.new()
+	_return _clone
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={demo})
+_method command.add(ani)
+	_return add_command.new(ani)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={demo})
+_method command.remove(ani)
+	_return remove_command.new(ani)
+_endmethod
+$
+_pragma(classify_level=basic, topic={demo})
+_method command.run()
+	_return run_command.new()
+_endmethod
+$
+_pragma(classify_level=basic, topic={demo})
+_method command.stop()
+	_return stop_command.new()
+_endmethod
+$
+_pragma(classify_level=basic, topic={demo})
+_abstract _method command.execute(animator)
+	## Execute the action on the animator
+_endmethod
+$

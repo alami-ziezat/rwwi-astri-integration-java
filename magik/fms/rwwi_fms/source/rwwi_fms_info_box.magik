@@ -1,0 +1,91 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2024 Realworld Systems. All Rights Reserved. 
+#  yudo.ariyanto@gmail.com							       
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwwi_fms_info_box)
+$
+
+def_slotted_exemplar(:rwwi_fms_info_box,
+	{
+		{:engine, _unset }
+	},
+	:nf_start_flag_style)
+$
+
+rwwi_fms_info_box.define_shared_constant(:bluefill,fill_style.new_solid(colour.called(:red)),:private)
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_info_box.new(engine)
+	## 
+	## 
+	_return _clone.init(engine)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_info_box.init(engine)
+	## 
+	## 
+	.engine << engine
+	_return _self 
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_info_box.flag_and_symbol(x, y)
+	
+	(x1, x2, x3, x4) << ( x + 100, x + 100, x - 100, x - 100)
+	(y1, y2, y3, y4) << ( y-10, y -100, y - 100, y-10)
+	flag << pixel_coords_vector.new_with_xy(x,y,x1,y1,x2,y2,x3,y3,x4,y4, x,y)
+
+	_return (flag, _unset)
+_endmethod
+$
+_pragma(classify_level=basic, topic={fms}, usage={subclassable})
+_method rwwi_fms_info_box.paint( draw_undraw?, window, a_geometry, jarak, reqid, link)
+	##
+	## paints a start flag
+	#	write("kene")
+	_dynamic !print_float_precision! << 16
+	ok? << _false
+	_if window _is _unset _then _return ok? _endif
+	_if window.is_kind_of?(canvas_widget_stubs) _then _return ok? _endif
+	last_eq << .engine.last_equipment(link)
+
+	_if a_geometry.is_kind_of?(point_geometry_mixin) _then
+	
+		f << .engine.convert_coord(a_geometry.coord)
+	
+		pt << window.pixel_for(a_geometry.coord)
+		(x,y) << (pt.x,pt.y)
+
+		(flag, a_symbol) << _self.flag_and_symbol(x,y)
+		window.draw_line(_self.flagpole_style,flag)
+		window.fill_line(_self.bluefill,flag)
+
+		_if draw_undraw? _then	
+			window.draw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-85,y-45,"X Position :"+f.x.write_string,_unset ,_unset ,:top_left )
+			window.draw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-85,y-30,"Y Position :"+f.y.write_string,_unset ,_unset ,:top_left )
+		#	window.draw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-85,y-60,"Closest Device :"+last_eq.name,_unset ,_unset ,:top_left )
+			window.draw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-85,y-75,"Distance :"+jarak,_unset ,_unset ,:top_left )
+			window.draw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-85,y-90,"Req Id :"+reqid,_unset ,_unset ,:top_left )
+		_else		
+			window.undraw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-45,y-45,"x :"+f.x.write_string,_unset ,_unset ,:top_left )
+			window.undraw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-45,y-30,"y :"+f.y.write_string,_unset ,_unset ,:top_left )
+		#	window.undraw_text(text_style.new( colour.called(:blue),font.new_logical("plain",12),_false, _false, _true),x-45,y-45,"Closest Device : "+last_eq.name,_unset ,_unset ,:bottom_middle )
+			window.draw_line(_self.flagpole_style,flag)
+			window.fill_line(_self.bluefill,flag)
+		_endif
+		ok? << _true
+	_endif
+#	write("lanjut")
+	>> ok?
+_endmethod
+$

@@ -1,0 +1,317 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-18
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+_package sw #mapani
+$
+
+#remex(:map_animator)
+
+_pragma(classify_level=advanced)
+def_slotted_exemplar(:map_animator,
+	{{:map_view, _unset},
+	 {:anis,_unset},
+	 {:waits, _unset},
+	 {:pboxes, _unset},
+	 {:thr, _unset},
+	 {:bg_canvas, _unset},
+	 {:pauze?, _unset},
+	 {:command_queue, _unset}})
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.new(map_view)
+	_return _clone.init(map_view)
+_endmethod
+$
+_pragma(classify_level=advanced)
+_private _method map_animator.init(map_view)
+	.map_view << map_view
+	.anis << rope.new()
+	.waits << hash_table.new()
+	.pboxes << hash_table.new()
+	.pauze? << _false
+	.command_queue << atomic_queue.new(50)
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.add(ani)
+	_if .thr _is _unset _then condition.raise(:error,:string,"Not running") _endif 
+	.command_queue.put(mapani:command.add(ani))
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.remove(ani)
+	_if .thr _is _unset _then condition.raise(:error,:string,"Not running") _endif 
+	.command_queue.put(mapani:command.remove(ani))
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.run()
+	
+	.pauze? << _false
+	.thr << _proc(me)
+			me.run_in_background()
+		_endproc.fork_at(_thisthread.low_background_priority,
+				 _self )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_private _method map_animator.refresh_bg_canvas(width, height)
+	_if .bg_canvas _isnt _unset
+	_then
+		.bg_canvas.destroy()
+		.bg_canvas << _unset
+	_endif 
+	.bg_canvas << memory_canvas.new(width, height, _false)
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_private _method map_animator.set_background_image()
+	_local win << .map_view.window
+	_self.refresh_bg_canvas(win.width, win.height)
+	img << image.new_for_window(win,_false,win.width, win.height)
+	img.copy_from_canvas(1,1)
+	.bg_canvas.render_image(img,1,1,_false)
+	img.destroy()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method map_animator.run_in_background()
+	_self.set_background_image()
+	.map_view.add_dependent(_self)
+	_protect 
+		_self.command_loop()
+	_protection 
+		.map_view.remove_dependent(_self)
+	_endprotect 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method map_animator.command_loop()
+	_local command, stop?
+	_loop
+		command << .command_queue.get()
+		stop? << command.execute(_self)
+		_if stop? _then _leave _endif 
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method map_animator.execute_add(ani)	
+	.waits[ani] << _unset
+	.anis.add(ani)
+	_if .anis.size = 1
+	_then 
+		_self.do!run_in_background()
+	_endif
+	_return _false 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.execute_remove(ani)
+	_self.clear_background(ani)
+	.waits.remove_key(ani)
+	.anis.remove(ani)
+	_return _false 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.execute_run()
+	_self.do!run_in_background()
+	_return _false 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.execute_stop()
+	_self.clear_backgrounds()
+	_return _true 
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_private _method map_animator.wait()
+	_local min_wait << _self.get_minimal_wait_time()
+	_if (min_wait _isnt _unset) _andif (min_wait > 0)
+	_then
+		wait << (min_wait*1000).rounded
+		
+		_thisthread.yield_processor()
+		# Sleep fails occasionally. It just hangs and the process needs
+		# to be killen manually before the thread continues...
+		#_thisthread.sleep(wait)
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method map_animator.get_minimal_wait_time()
+	_local now << system.elapsed_seconds()
+	_local min_wait << _unset
+	_for i_ani, i_wait _over .waits.fast_keys_and_elements()
+	_loop
+		_if i_wait _is _unset _then _continue _endif 
+		wait_left << i_wait-now
+		min_wait << _if min_wait _is _unset
+			    _then >> wait_left
+			    _else >> min_wait.min(wait_left)
+			    _endif
+	_endloop
+	_return min_wait
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_private _method map_animator.do!run_in_background()
+	_if .pauze? _then _return _endif
+	_self.draw_animations()
+	_if .pauze? _then _return _endif
+	_self.wait()
+	_if .pauze? _then _return _endif
+	_self.undraw_animations_on_schedule()
+	_if .pauze? _then _return _endif
+	.command_queue.put(mapani:command.run())
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method map_animator.draw_animations()
+	_for i_ani _over .anis.fast_elements()
+	_loop
+		_if .waits[i_ani] _is _unset
+		_then
+			_lock _self 
+			      _if .pauze? _then _return _endif
+			      
+			      (pbs,wait) << i_ani.draw()
+			      _if wait _isnt _unset
+			      _then 
+				      .waits[i_ani] << system.elapsed_seconds()+wait
+				      .pboxes[i_ani] << pbs
+			      _else
+				      _self.remove(i_ani)
+			      _endif 
+			_endlock
+		_endif 
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method map_animator.undraw_animations_on_schedule()
+	_for i_ani _over .anis.fast_elements()
+	_loop
+		_lock _self 
+		      _if .pauze? _then _return _endif
+		      _if .waits[i_ani] _is _unset _then _continue _endif 
+		      _if (system.elapsed_seconds() >= .waits[i_ani])
+		      _then
+			      _self.clear_background(i_ani)
+		      _endif
+		_endlock
+	_endloop	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method map_animator.clear_backgrounds() 
+	_for i_ani _over .anis.fast_elements()
+	_loop
+		_self.clear_background(i_ani)
+	_endloop
+_endmethod
+$
+_pragma(classify_level=advanced)
+_private _method map_animator.clear_background(ani) 
+	.waits[ani] << _unset
+	pbs << .pboxes.remove_key(ani)
+	_if pbs _is _unset _then _return _endif 
+	_for i_pb _over pbs.fast_elements()
+	_loop
+		i << image.new_for_window(.bg_canvas,_false,i_pb.width,i_pb.height)
+		i.copy_from_canvas(i_pb.xmin,i_pb.ymin)
+		_local gc << .map_view.window.create_graphics_context()
+		gc.override_retained? << _true 
+		gc.render_image(i,i_pb.xmin,i_pb.ymin,_false)
+		gc.dispose()
+		i.destroy()	
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_private _method map_animator.pauze_rendering()
+	_if .pauze? _is _true _then _return _endif
+	
+	_lock _self
+	      .pauze? << _true
+	      _self.clear_backgrounds()
+	_endlock 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method map_animator.continue_rendering()
+	_lock _self 
+	      _self.set_background_image()
+	      .pauze? << _false
+	      .command_queue.put(mapani:command.run())
+	_endlock 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.stop()
+	_lock _self
+	      .pauze? << _true
+	      _self.clear_backgrounds()
+	      .command_queue.put(mapani:command.stop())
+	_endlock 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method map_animator.note_change(who,what)
+	_if what _is :ani_start_render
+	_then
+		# Map starts rendering. So we stop rendering
+		_self.pauze_rendering()
+	_elif what _is :ani_stop_render
+	_then
+		# Map has stopped rendering, so now our turn again.
+		_self.continue_rendering()
+	_endif 
+_endmethod
+$

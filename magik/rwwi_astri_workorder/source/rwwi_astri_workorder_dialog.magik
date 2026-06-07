@@ -508,12 +508,12 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 		:min_height, 300)
 
 	# Set column labels
-	# Col:  1     2            3             4       5        6           7         8           9       10                11         12          13            14
+	# Col:  1     2            3             4       5        6           7         8           9       10           11                12         13          14            15
 	.items[:table].set_column_labels({
-		"No", "WO Number", "Infra Code", "Name", "Status", "Topology", "Vendor", "Donation", "Area", "Area Plant Code", "Created", "KMZ UUID", "KML Source", "Category"})
+		"No", "WO Number", "Infra Code", "Name", "Status", "Topology", "Vendor", "Donation", "Area", "Homepass", "Area Plant Code", "Created", "KMZ UUID", "KML Source", "Category"})
 
 	# Set column resize values (relative widths)
-	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1, 1, 2.5, 1.5, 1.5, 1, 1, 1, 0.8, 1.5}
+	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1, 1, 2.5, 1.5, 1.5, 1, 1, 1, 1, 0.8, 1.5}
 
 	# Enable column filtering
 	.items[:table].enable_column_filter(2, _true)  # WO Number
@@ -756,11 +756,12 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			.items[:table].add_label(row, 7,  wo[:vendor].default(""))
 			.items[:table].add_label(row, 8,  wo[:donation_value].default(""))
 			.items[:table].add_label(row, 9,  wo[:area].default(""))
-			.items[:table].add_label(row, 10, wo[:area_plant_code].default(""))
-			.items[:table].add_label(row, 11, wo[:created_at].default(""))
-			.items[:table].add_label(row, 12, wo[:kmz_uuid].default(""))
-			.items[:table].add_label(row, 13, wo[:kmz_source].default(""))
-			.items[:table].add_label(row, 14, wo[:category].default(""))
+			.items[:table].add_label(row, 10, wo[:homepass].default(""))
+			.items[:table].add_label(row, 11, wo[:area_plant_code].default(""))
+			.items[:table].add_label(row, 12, wo[:created_at].default(""))
+			.items[:table].add_label(row, 13, wo[:kmz_uuid].default(""))
+			.items[:table].add_label(row, 14, wo[:kmz_source].default(""))
+			.items[:table].add_label(row, 15, wo[:category].default(""))
 
 			# Store work order data in cache by infra_code as symbol (unique identifier)
 			# This ensures correct lookup even after table sorting

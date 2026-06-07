@@ -1,0 +1,108 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2024 Realworld Systems. All Rights Reserved.
+# Date: 22 Sept 2024
+# yudo.ariyanto@gmail.com
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwwi_fms_plugin)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwwi_fms_plugin,
+	##
+	##
+	{
+		{:doc, _unset },
+		{:frame,_unset }
+	},
+	:plugin)
+$
+
+_pragma(classify_level=advanced)
+rwwi_fms_plugin.define_shared_constant(:databus_producer_data_types,
+				      {
+					      :goto_request,
+					      :geometry_to_draw,
+					      :post_render_sets
+				      },
+				      :private
+	       )
+$
+
+_pragma(classify_level=advanced)
+rwwi_fms_plugin.define_shared_constant(:post_render_sets,
+				      equality_geometry_set.new(),
+				      :private
+	       )
+$
+
+#
+
+
+_pragma(classify_level=restricted)
+_method rwwi_fms_plugin.init_actions()
+	## 
+	##
+	
+	_self.add_action( sw_action.new( :activate_fms,
+					 :caption,         "FMS",
+					 :engine, _self,
+					 :image, {:associate, :mit_base_gui},
+					 :action_message, :|activate_fms()|,
+					 :help_id, 5030 ) )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwwi_fms_plugin.activate_fms()
+	## 
+	## Activate
+
+	
+	d << _self.get_dialog( :fms )
+	
+	_if  d  _is _unset
+	_then
+		d << rwwi_fms_dialog.new( _self, _self.application )
+		_self.cache_dialog( :fms, d )
+
+	_endif
+	
+	d.activate()
+	
+	>> d	
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method rwwi_fms_plugin.sw_databus_data_requested(data_type, _gather args)
+	## 
+	## 
+	
+	>> _if data_type _is :post_render_sets
+	   _then
+		   _self.post_render_sets.empty()
+
+		   >> _if _self.dialogs.an_element() _isnt _unset
+		      _then
+			      dg << _self.dialogs.an_element()
+
+			      _if dg.get_render_status() _is _true _then
+				      
+				      >> dg.kml_direction()
+			      _else
+				      >>_self.post_render_sets.empty()
+
+			      _endif
+			      
+		      _endif	
+	   _endif
+	
+_endmethod
+$

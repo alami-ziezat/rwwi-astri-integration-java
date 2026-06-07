@@ -1,0 +1,56 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-18
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+_package sw #mapani
+$
+
+#remex(:map_animation_base)
+
+_pragma(classify_level=restricted, topic={demo})
+## Base class for animations on the map view.
+def_slotted_exemplar(:map_animation_base,
+	{{:map_view, _unset},
+	 {:index, _unset},
+	 {:dir, _unset}})
+$
+
+
+_pragma(classify_level=restricted, topic={demo})
+_method map_animation_base.new(map_view)
+	_return _clone.init(map_view)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={demo})
+_private _method map_animation_base.init(map_view)
+	.map_view << map_view
+	.index << 0
+	.dir << 1
+	_return _self
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={demo})
+_abstract _method map_animation_base.draw()
+	## Draw on the mapview windows. Return 2 results
+	## 1: a list of pixel_bounding_boxes of the locations where
+	## self has drawn.
+	## the time to wait to be drawn again. Return _unset to stop
+	## and quit the animation.
+_endmethod
+$

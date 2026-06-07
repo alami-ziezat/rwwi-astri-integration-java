@@ -368,6 +368,12 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		                                _else >> _unset
 		                                _endif
 
+		# Homepass field only for cluster infrastructure type
+		_local homepass_field << _if infrastructure_type = "cluster"
+		                         _then >> :target_cluster_drm_homepass
+		                         _else >> _unset
+		                         _endif
+
 		# Asset number field only for feeder infrastructure type
 		_local asset_number_field << _if infrastructure_type = "feeder"
 		                             _then >> :target_osp_route_asset_number
@@ -433,6 +439,11 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			                        _then >> _self.get_xml_element_value(wo_elem, area_plant_code_field)
 			                        _else >> ""
 			                        _endif
+
+			pl[:homepass] << _if homepass_field _isnt _unset
+			                 _then >> _self.get_xml_element_value(wo_elem, homepass_field)
+			                 _else >> ""
+			                 _endif
 
 			# Extract asset_number for feeder infrastructure type only
 			pl[:asset_number] << _if asset_number_field _isnt _unset

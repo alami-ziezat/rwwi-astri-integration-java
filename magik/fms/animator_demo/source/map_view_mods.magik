@@ -1,0 +1,84 @@
+##
+## File            : $File$
+## SCM             : $URL$
+##
+## Copyright       : Realworld Systems
+##                   e-mail  : support@realworld-systems.com
+##                   address : Venusstraat 17, 4105 JH Culemborg, The Netherlands
+##                   tel     : +31(0)345 614406
+##                   fax     : +31(0)345 614319
+##
+## Contains        : 
+##
+##
+## Date written    : 2014-10-18
+## Date changed    : $Date$
+## Revision        : $Rev$
+
+_package sw
+$
+
+_if map_view.method(:|run_controlled_render_sworg()|) _isnt _unset _then load_file_stop() _endif
+$
+
+map_view.define_method_synonym(:|run_controlled_render_sworg()|, :|run_controlled_render()|)
+$
+
+#
+# This is a vital piece for the animation because this is the
+# spot where the animator is told that the map starts and stops
+# rendering. Unfortunately in 4.3 there is not usable change
+# notification or event or whatever...
+#
+# As far as i have noticed there are 2 tracks for
+# run_controlled_render(). Either the sequence
+# :primary_render,:post_render,:transient_render is send or 
+# a single :transient_render is send.
+#
+# So both :primary_render and :transient_render can start a
+# render action. :transient_render will always end the render sequence.
+# 
+_pragma(classify_level=restricted)
+_method map_view.run_controlled_render(to_do, _gather args)
+	_if to_do.includes?(:primary_render) _orif
+	    to_do.includes?(:transient_render)
+	_then
+		_self.changed(:ani_start_render)
+	_endif
+	
+	results << _allresults _self.run_controlled_render_sworg(to_do, _scatter args)
+	
+	_if to_do.includes?(:transient_render)
+	_then
+		_self.changed(:ani_stop_render)
+	_endif
+	_return _scatter results
+_endmethod
+$
+
+
+document_gui_framework.define_method_synonym(:|handle_pan_action_sworg()|, :|handle_pan_action()|)
+$
+
+#
+# Dragging is something different. Upon the start of the drag
+# the animation is informed that something is about to
+# change. The animation is stopped. When the drag stops the
+# normal refresh takes over.
+#
+_pragma(classify_level=restricted)
+_method document_gui_framework.handle_pan_action( action_name,start_coord, _optional end_coord )
+	## 
+	## Handles :start_pan actions from the interaction handler.
+	##
+	_if action_name _is :start_pan
+	_then
+		_if ( a_doc << _self.document ) _isnt _unset 
+		_then
+			a_doc.changed(:ani_start_render)
+		_endif
+	_endif
+	_return _self.handle_pan_action_sworg( action_name,start_coord, end_coord )
+_endmethod
+$
+

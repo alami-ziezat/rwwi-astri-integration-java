@@ -1,0 +1,145 @@
+########################################################################
+####
+#### Title:  timer.magik
+#### Author:  Mark Cederholm
+#### Last Revised:  31-Aug-2000 for 3.1 compatibility
+####
+#### Notes:
+####
+#### EZ class for creating timed events.
+####
+#### This version no longer uses system.do_command("sleep") since it
+#### doesn't work in SW 3.1 - however, thread.sleep no longer appears to
+#### have memory leaks.  Even in 3.0, the memory leaks only amount to
+#### a couple of K for 24 hours of 5 second events, so unless you're
+#### running a 24x7 server image you shouldn't have to worry.
+####
+########################################################################
+
+#**********************************************************************
+# Exemplar for timed event handler
+#**********************************************************************
+_package sw
+$
+
+
+remex(:timed_event)
+$
+
+def_slotted_exemplar(:timed_event,
+                     {
+                        {:interval, _unset},
+                        {:proc, _unset},
+                        {:args, _unset},
+                        {:thread, _unset},
+                        {:go_status, _unset}
+                     })
+$
+
+#**********************************************************************
+# Methods for timed event handler
+#**********************************************************************
+
+_method timed_event.new(an_interval, a_proc, _gather some_args)
+
+   ## Create a new timed event.  A_PROC is a procedure to be executed
+   ## every AN_INTERVAL seconds with SOME_ARGS.  Execution time should
+   ## be within +/- 1 second or so of the desired interval.  Not for
+   ## use with very short (< 5 sec) intervals.
+
+   .interval << an_interval
+   .proc << a_proc
+   .args << some_args
+   .go_status << _false
+
+   >> _self
+
+_endmethod
+
+_method timed_event.go(_optional a_priority)
+
+   ## Begin the timed process if not already started
+   ## Default priority is thread.minimum_system_priority
+
+   priority << a_priority.default(_thisthread.minimum_system_priority)
+   _if .thread _is _unset _then
+      .go_status << _true
+      .thread << _proc(timer)
+                    timer.run_event()
+                 _endproc.fork_at(priority, _self)
+   _endif
+
+_endmethod
+
+_method timed_event.stop()
+
+   ## Shut down the timed process - expect 1 second or so delay
+
+   # we don't want to kill the thread explicitly while it's sleeping
+   # because that hangs everything up -- see method run_event()
+
+   .go_status << _false
+   _if .thread _is _unset _then
+      _return
+   _endif
+
+_endmethod
+
+_method timed_event.return_status()
+
+   ## Return status of event thread
+
+   _if .thread _is _unset _then
+      _return :stopped
+   _else
+      _return :running
+   _endif
+
+_endmethod
+
+_method timed_event.run_event()
+
+   ## This is the thread launched by method go()
+
+   .thread << _thisthread
+   _protect
+
+      # use date_time.now().as_seconds to monitor time passage
+
+      s0 << date_time.now().as_seconds
+
+      _loop
+
+         # check for stop notification
+
+         _if ~ .go_status _then
+            .thread.kill()
+         _endif
+
+         # use this if you're running a 3.0 image 24x7
+
+         # system.do_command("sleep 1")
+
+         # otherwise, for 3.1 or later use this:
+
+         _thisthread.sleep(1000)
+
+         # check for interval elapsed
+	 #write("interval=",.interval)
+         s1 << date_time.now().as_seconds
+         _if (s1 - s0) >= .interval _then
+            s0 << s1
+            .proc.fork_at(_thisthread.vm_priority + 1, _scatter .args)
+         _endif
+
+      _endloop
+
+   _protection
+      _if _thisthread _is .thread
+      _then
+         .thread << _unset
+      _endif
+   _endprotect
+
+_endmethod
+
