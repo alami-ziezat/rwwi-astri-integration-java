@@ -236,7 +236,6 @@ public class WorkOrderClient {
                         appendXmlField(xml, woJson, targetPrefix + "_topology", 6);
                         appendXmlField(xml, woJson, "target_cluster_area", 6);
                         appendXmlField(xml, woJson, "target_cluster_area_plant_code", 6);
-                        appendXmlField(xml, woJson, "target_cluster_drm_homepass", 6);
                         appendXmlField(xml, woJson, "target_cluster_olt_name", 6);
                         appendXmlField(xml, woJson, "target_cluster_olt_label", 6);
                     } else if ("subfeeder".equals(infrastructureType)) {
