@@ -1798,10 +1798,65 @@ _private _method rwwi_astri_boq_generator.add_fdt_accessories(result)
 _endmethod
 $
 
+_private _method rwwi_astri_boq_generator.feeder_splicing_qty()
+	## Calculate 500000510 (Splicing) quantity for feeder.
+	## Cables sharing the same stf_item_code are treated as one cable:
+	##   length is accumulated across all segments; core count used once.
+	## Formula per unique code: cores + (cores * (total_length _div 4000))
+	## Final result = sum across all unique cable codes.
+
+	_local cable_core_map << equality_hash_table.new_with(
+		"200000100", 24,
+		"200000975", 36,
+		"200001038", 48,
+		"200001970", 72,
+		"200001630", 96,
+		"200001030", 144,
+		"200001015", 288)
+
+	# Accumulate total length (m) per stf_item_code
+	_local length_by_code << equality_hash_table.new()
+
+	_for rc _over .change_set.fast_elements()
+	_loop
+		_local rec << rc.current_record
+		_if rec _is _unset _then _continue _endif
+		_if rec.source_collection.name _isnt :sheath_with_loc _then _continue _endif
+
+		_if rec.responds_to?(:construction_status) _andif
+		    rec.construction_status <> "Proposed"
+		_then
+			_continue
+		_endif
+
+		_if _not rec.responds_to?(:stf_item_code) _then _continue _endif
+		_local code << rec.stf_item_code
+		_if code _is _unset _orif cable_core_map[code] _is _unset _then _continue _endif
+
+		_local seg_len << rec.route_sectors().line_length / 100.0  # cm -> m
+		length_by_code[code] << length_by_code[code].default(0) + seg_len
+	_endloop
+
+	# Apply formula once per unique code
+	_local total << 0
+	_for code, total_len _over length_by_code.fast_keys_and_elements()
+	_loop
+		_local cores      << cable_core_map[code]
+		_local length_m   << total_len.ceiling
+		_local qty        << cores + (cores * (length_m _div 4000))
+		write("LOG: Feeder splicing - code:", code, "cores:", cores, "total_len:", length_m, "m qty:", qty)
+		total +<< qty
+	_endloop
+
+	write("LOG: Feeder splicing total:", total)
+	_return total
+_endmethod
+$
+
 _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 	## Add FAT accessories based on FAT count
 	## Adds:
-	##   - 500000510 (Splicing) with quantity = 2 × total FAT (both types)
+	##   - 500000510 (Splicing): cluster → ceiling(hp/8); subfeeder → (ceiling(hp/128)+2)×4; feeder → sum(cores+(cores*(len _div 4000)))
 	##   - 200000288 (Label FAT include QR Code) with quantity = pole mounted FAT (200001047)
 	##   - 200000802 (Label Pedestal) with quantity = pedestal mounted FAT (100000824)
 	##   - 500002107 (Testcomm OTDR & OPM FDT - FAT) with quantity = total FAT (both types)
@@ -1860,9 +1915,30 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 		# If FATs exist, add the accessories
 		_if total_fats > 0
 		_then
-			# Splicing - 2x total FAT count
-			_self.add_to_boq_result(result, "500000510", total_fats * 2)
-			write("LOG: Added Splicing (500000510) with quantity:", total_fats * 2)
+			# Splicing (500000510) - quantity depends on infra_type and homepass
+			_local hp_str << .boq_params[:homepass].default("0")
+			_local hp    << _if hp_str _isnt _unset _andif hp_str <> ""
+			                _then >> hp_str.as_number().default(0)
+			                _else >> 0
+			                _endif
+			_local splicing_qty
+			_if .infra_type = "cluster" _andif hp > 0
+			_then
+				# ceiling(hp / 8) = (hp + 7) _div 8
+				splicing_qty << (hp + 7) _div 8
+			_elif .infra_type = "subfeeder" _andif hp > 0
+			_then
+				# (ceiling(hp / 128) + 2) * 4
+				splicing_qty << ((hp + 127) _div 128 + 2) * 4
+			_elif .infra_type = "feeder"
+			_then
+				# sum over cables: cores + (cores * (length _div 4000))
+				splicing_qty << _self.feeder_splicing_qty()
+			_else
+				splicing_qty << total_fats * 2
+			_endif
+			_self.add_to_boq_result(result, "500000510", splicing_qty)
+			write("LOG: Added Splicing (500000510) with quantity:", splicing_qty, " (infra_type:", .infra_type, " hp:", hp, ")")
 
 			# Label FAT (include QR Code) - only for pole mounted FAT
 			_if pole_fat_count > 0

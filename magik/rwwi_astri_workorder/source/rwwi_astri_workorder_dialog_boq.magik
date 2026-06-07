@@ -196,7 +196,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 			:area_plant_code, wo[:area_plant_code].default(_unset),
 			:override_price_material, _unset,       # Optional
 			:override_price_service, _unset,        # Optional
-			:donation_value, wo[:donation_value]    # _unset if not available
+			:donation_value, wo[:donation_value],   # _unset if not available
+			:homepass, wo[:homepass].default("0")   # homepass count (cluster only, empty for others)
 		)
 
 		_self.log_info("Step 2: Preparing BOQ parameters...")
