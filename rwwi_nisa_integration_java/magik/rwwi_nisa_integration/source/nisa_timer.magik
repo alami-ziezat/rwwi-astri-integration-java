@@ -1,0 +1,89 @@
+#% text_encoding = iso8859_1
+## timed_event — interval-based background scheduler.
+## Original author: Mark Cederholm (31-Aug-2000).
+## Copied from rwwi_fms/source/timer.magik to avoid pulling in the
+## MySQL JDBC dependency of the full rwwi_fms module.
+_package sw
+$
+
+remex(:timed_event)
+$
+
+def_slotted_exemplar(:timed_event,
+	{
+		{:interval,  _unset},
+		{:proc,      _unset},
+		{:args,      _unset},
+		{:thread,    _unset},
+		{:go_status, _unset}
+	})
+$
+
+_method timed_event.new(an_interval, a_proc, _gather some_args)
+	## Create a new timed event. A_PROC is called every AN_INTERVAL seconds
+	## with SOME_ARGS. Accuracy is within +/- 1 second.
+
+	.interval  << an_interval
+	.proc      << a_proc
+	.args      << some_args
+	.go_status << _false
+	>> _self
+_endmethod
+$
+
+_method timed_event.go(_optional a_priority)
+	## Start the timed process if not already running.
+
+	priority << a_priority.default(_thisthread.minimum_system_priority)
+	_if .thread _is _unset
+	_then
+		.go_status << _true
+		.thread << _proc(timer)
+		               timer.run_event()
+		           _endproc.fork_at(priority, _self)
+	_endif
+_endmethod
+$
+
+_method timed_event.stop()
+	## Signal the timed process to stop (expect ~1 second delay).
+
+	.go_status << _false
+_endmethod
+$
+
+_method timed_event.return_status()
+	## Return :running or :stopped.
+
+	_if .go_status _is _true
+	_then >> :running
+	_else >> :stopped
+	_endif
+_endmethod
+$
+
+_method timed_event.run_event()
+	## Background thread body — sleeps 1 s at a time and fires proc when interval elapses.
+
+	.thread << _thisthread
+	_protect
+		s0 << date_time.now().as_seconds
+		_loop
+			_if ~ .go_status _then .thread.kill() _endif
+			_thisthread.sleep(1000)
+			s1 << date_time.now().as_seconds
+			_if (s1 - s0) >= .interval
+			_then
+				s0 << s1
+				.proc.fork_at(_thisthread.vm_priority + 1, _scatter .args)
+			_endif
+		_endloop
+	_protection
+		_if _thisthread _is .thread
+		_then
+			.thread    << _unset
+			.go_status << _false
+		_endif
+	_endprotect
+_endmethod
+$

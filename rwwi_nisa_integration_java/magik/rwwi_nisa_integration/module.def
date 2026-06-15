@@ -8,7 +8,6 @@ end
 requires
 	base
 	animator_demo
-	rwwi_fms
 end
 
 requires_java
