@@ -24,8 +24,7 @@ def_slotted_exemplar(:rwwi_nisa_dialog,
 	{:view,             _unset},              # ACE view (gis_program_manager.ace_view)
 	{:cs_transform,     _unset},              # WGS84 -> local CS transform (built once, reused)
 	{:search_mode,      _unset, :writable},   # :cluster_code (default) or :area
-	{:timer,            _unset},              # timed_event for auto-refresh
-	{:interval,         _unset}               # auto-refresh interval in seconds
+	{:blink_active,     _false}               # _true when blink animation is running
 }, :model)
 $
 
@@ -47,8 +46,7 @@ _private _method rwwi_nisa_dialog.init(owner)
 	.outage_cache  << equality_hash_table.new()
 	.search_mode        << :area
 	.selected_clusters  << rope.new()
-	.timer              << _unset
-	.interval           << 60
+	.blink_active       << _false
 
 	_self.add_dependent(.owner)
 	>> _super.init()
@@ -153,27 +151,18 @@ _private _method rwwi_nisa_dialog.build_toolbar(parent)
 
 	sw_label_item.new(tb, "  |  ")
 
-	sw_label_item.new(tb, " Interval: ")
-	.items[:interval_selector] << sw_text_item.new(tb,
-		:model,           _self,
-		:display_length,  8,
-		:editable?,       _false,
-		:change_selector, {:|interval_changed()|})
-	.items[:interval_selector].text_items << {"1/4 min", "1/2 min", "1 min", "2 min", "5 min"}
-	.items[:interval_selector].value      << "1 min"
-
 	.items[:start_btn] << sw_button_item.new(tb,
 		:image,    {:run, :ui_resources},
 		:model,    _self,
 		:selector, :go|()|,
-		:tooltip,  "Start auto-refresh")
+		:tooltip,  "Start blink animation")
 	.items[:start_btn].enabled? << _false
 
 	.items[:stop_btn] << sw_button_item.new(tb,
 		:image,    {:stop, :ui_resources},
 		:model,    _self,
 		:selector, :stop|()|,
-		:tooltip,  "Stop auto-refresh")
+		:tooltip,  "Stop blink animation")
 	.items[:stop_btn].enabled? << _false
 _endmethod
 $
@@ -298,7 +287,7 @@ _private _method rwwi_nisa_dialog.search_by_cluster_code(search_term)
 					:homepass_total,    rec.homepass_total.default("").write_string,
 					:zone_rwo,          _unset)
 
-				# Zone lookup — non-fatal if GIS DB is unavailable
+				# Zone lookup  -  non-fatal if GIS DB is unavailable
 				_try
 					_local zone_col << _self.database.collections[:ftth!zone]
 					_if zone_col _isnt _unset
@@ -390,7 +379,7 @@ _method rwwi_nisa_dialog.cluster_list_data()
 			.items[:table].add_label(row, 6, pl[:fdt_code])
 			.items[:table].add_label(row, 7, pl[:olt_hostname])
 			.items[:table].add_label(row, 8, pl[:homepass_total])
-			# Outage Status column — traffic light icon + label
+			# Outage Status column  -  traffic light icon + label
 			# In area mode use stella_id as cache key; in cluster_code mode use cluster_code
 			_local cache_key << _if .search_mode _is :area
 			                    _then >> pl[:cluster_id_stella].default(cc)
@@ -643,7 +632,7 @@ $
 
 _pragma(classify_level=debug, topic={nisa_integration})
 _method rwwi_nisa_dialog.parse_massproblem_response_test(json_string)
-	## TEST VERSION — always injects one dummy mass problem record regardless of
+	## TEST VERSION  -  always injects one dummy mass problem record regardless of
 	## whether the actual JSON response contains data.
 	## Use this during development/testing when the NISA API returns empty data.
 
@@ -683,7 +672,7 @@ _endmethod
 $
 
 ##
-## Database / coordinate helpers — mirrors rwi_aerial_kmz_object_writer.init() pattern
+## Database / coordinate helpers  -  mirrors rwi_aerial_kmz_object_writer.init() pattern
 ##
 
 _pragma(classify_level=basic, topic={nisa_integration})
@@ -788,7 +777,7 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.show_map(toggled?)
 	## Toggle cluster outage highlights on the map.
-	## Works on selected rows only — fires :show_map notification consumed by plugin.
+	## Works on selected rows only  -  fires :show_map notification consumed by plugin.
 
 	_if toggled? _andif .selected_clusters.empty?
 	_then
@@ -862,7 +851,7 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.all_outage_records
 	## Return ALL outage-active cluster records across every result row.
-	## Used by blink animations — independent of table selection.
+	## Used by blink animations  -  independent of table selection.
 	## Same structure as records() but iterates result_rows, not selected_clusters.
 
 	_local result        << rope.new()
@@ -1025,7 +1014,7 @@ _method rwwi_nisa_dialog.outage_tooltip_for(cluster_code)
 
 			_if filtered_sites.size > 0
 			_then
-				# OLT/Cluster/ID are the same for all sites of this cluster in one MP — show once
+				# OLT/Cluster/ID are the same for all sites of this cluster in one MP  -  show once
 				_local first_site << filtered_sites[1]
 				lines.add_last(write_string("---- Sites Information: "))
 				lines.add_last(write_string("OLT Name: ", first_site[:olt_name]))
@@ -1072,7 +1061,7 @@ _method rwwi_nisa_dialog.manage_actions()
 	_local has_results      << _not .result_rows.empty?
 	_local single_selected? << .selected_clusters.size = 1
 
-	# has_outage_selected: for Show on Map — at least one SELECTED row has active outage
+	# has_outage_selected: for Show on Map  -  at least one SELECTED row has active outage
 	_local has_outage_selected << _false
 	_for pl _over .selected_clusters.fast_elements()
 	_loop
@@ -1090,7 +1079,7 @@ _method rwwi_nisa_dialog.manage_actions()
 		_endif
 	_endloop
 
-	# has_outage_any: for Start blink — at least one row in the full list has active outage
+	# has_outage_any: for Start blink  -  at least one row in the full list has active outage
 	_local has_outage_any << _false
 	_for pl _over .result_rows.fast_elements()
 	_loop
@@ -1108,106 +1097,46 @@ _method rwwi_nisa_dialog.manage_actions()
 		_endif
 	_endloop
 
-	# Check All Outages is only relevant in cluster_code mode — in area mode the
+	# Check All Outages is only relevant in cluster_code mode  -  in area mode the
 	# outage cache is already pre-populated from the search API response.
 	.items[:run_btn].enabled?       << has_results _andif .search_mode _isnt :area
 	.items[:goto_btn].enabled?      << single_selected?
 	.items[:highlight_btn].enabled? << has_outage_selected
 
-	_local timer_running? << .timer _isnt _unset _andif .timer.return_status() _is :running
-	.items[:start_btn].enabled? << has_outage_any _andif _not timer_running?
-	.items[:stop_btn].enabled?  << timer_running?
+	.items[:start_btn].enabled? << has_outage_any _andif _not .blink_active
+	.items[:stop_btn].enabled?  << .blink_active _is _true
 _endmethod
 $
 
 ##
-## Auto-refresh timer
+## Blink animation control
 ##
-
-_pragma(classify_level=basic, topic={nisa_integration})
-_method rwwi_nisa_dialog.interval_changed(selected_value)
-	## Map interval dropdown selection to seconds and store in .interval.
-
-	.interval << _if selected_value = "1/4 min"
-	             _then >> 15
-	             _elif selected_value = "1/2 min"
-	             _then >> 30
-	             _elif selected_value = "2 min"
-	             _then >> 120
-	             _elif selected_value = "5 min"
-	             _then >> 300
-	             _else >> 60
-	             _endif
-_endmethod
-$
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.go()
-	## Start timed auto-refresh and immediately show blink animations on map.
-	## Blink display is independent of the Show on Map toggle.
+	## Start blink animation using existing cached outage records.
 
 	_if .result_rows.empty?
 	_then
-		_self.log_warning("No clusters to refresh. Run a search first.")
+		_self.log_warning("No clusters to animate. Run a search first.")
 		_return
 	_endif
 
-	_self.stop()
-
-	_local interval << .interval.default(60)
-	_local the_proc << _proc(dialog)
-	                       dialog.check_for_update()
-	                   _endproc
-	.timer << timed_event.new(interval, the_proc, _self)
-	.timer.go()
-
-	# Show blink immediately using existing records — no re-query needed
+	.blink_active << _true
 	_self.changed(:blink_mode, _true)
-
-	_self.log_info(write_string("[Auto] Started — refreshing every ", interval, "s"))
+	_self.log_info("[Blink] Started.")
 	_self.manage_actions()
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.stop()
-	## Stop timed auto-refresh and remove blink animations from map.
+	## Stop blink animation.
 
+	.blink_active << _false
 	_self.changed(:blink_mode, _false)
-	_if .timer _isnt _unset
-	_then
-		_if .timer.return_status() _is :running
-		_then
-			.timer.stop()
-		_endif
-		.timer << _unset
-	_endif
-	_self.log_info("[Auto] Stopped.")
+	_self.log_info("[Blink] Stopped.")
 	_self.manage_actions()
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={nisa_integration})
-_method rwwi_nisa_dialog.check_for_update()
-	## Timer callback — re-query NISA and rebuild blink markers on map.
-	## Blink display is independent of the Show on Map toggle.
-
-	_self.log_info("[Auto] Refreshing NISA data...")
-	_if .result_rows.empty? _then _return _endif
-
-	_if .search_mode _is :area
-	_then
-		_local term << .items[:search_field].value.default("").trim_spaces()
-		_if term.size >= 3
-		_then
-			_self.search_by_area(term)
-		_endif
-	_else
-		_self.check_outage_all()
-	_endif
-
-	# Rebuild blink animations with updated outage data regardless of show/hide state
-	_self.changed(:blink_mode, _true)
 _endmethod
 $
 
@@ -1267,7 +1196,7 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.mode_changed(selected_value)
-	## Handle mode dropdown change — sw_text_item passes the selected string.
+	## Handle mode dropdown change  -  sw_text_item passes the selected string.
 	## "Area" -> area mode; anything else -> cluster_code mode (default).
 
 	_if selected_value = "Area"
@@ -1346,7 +1275,7 @@ _private _method rwwi_nisa_dialog.search_by_area(area_name)
 				_return
 			_endif
 
-			## Build safe IN clause — values from trusted NISA API, validated char-by-char
+			## Build safe IN clause  -  values from trusted NISA API, validated char-by-char
 			_local safe_parts << rope.new()
 			_for cid, dummy _over clusterid_set.fast_keys_and_elements()
 			_loop
@@ -1393,7 +1322,7 @@ _private _method rwwi_nisa_dialog.search_by_area(area_name)
 					:homepass_total,    rec.homepass_total.default("").write_string,
 					:zone_rwo,          _unset)
 
-				# Zone lookup — non-fatal if GIS DB is unavailable
+				# Zone lookup  -  non-fatal if GIS DB is unavailable
 				_try
 					_local zone_col << _self.database.collections[:ftth!zone]
 					_if zone_col _isnt _unset

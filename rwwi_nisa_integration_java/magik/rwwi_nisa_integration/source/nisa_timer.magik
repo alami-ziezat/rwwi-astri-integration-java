@@ -1,5 +1,5 @@
 #% text_encoding = iso8859_1
-## timed_event — interval-based background scheduler.
+## timed_event  -  interval-based background scheduler.
 ## Original author: Mark Cederholm (31-Aug-2000).
 ## Copied from rwwi_fms/source/timer.magik to avoid pulling in the
 ## MySQL JDBC dependency of the full rwwi_fms module.
@@ -63,7 +63,7 @@ _endmethod
 $
 
 _method timed_event.run_event()
-	## Background thread body — sleeps 1 s at a time and fires proc when interval elapses.
+	## Background thread body  -  sleeps 1 s at a time and fires proc when interval elapses.
 
 	.thread << _thisthread
 	_protect
