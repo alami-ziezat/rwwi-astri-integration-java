@@ -169,21 +169,28 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.note_change(who, what, data)
 	## Handle change notifications from the dialog.
-	## :show_map    -> build geoms and enable rendering.
+	## :show_map    -> build geoms and enable static tooltip rendering.
+	## :blink_mode  -> start or stop blink animations (independent of show/hide).
 	## :goto_request -> navigate map to the given cluster property_list.
 
 	#write("NISA plugin note_change: ", what, " from ", who, " with data: ", data, " (current_doc=", .current_doc, ")")
 	_if what _is :show_map
 	_then
 		_self.show_mode(data)
+	_elif what _is :blink_mode
+	_then
+		_if data
+		_then
+			_self.start_blink_animations()
+		_else
+			_self.stop_blink_animations()
+		_endif
 	_elif what _is :goto_request
 	_then
 		# data is a pseudo_point already in local CS — mirrors bulk_search pattern
 		_if .current_doc _isnt _unset _andif data _isnt _unset
 		_then
 			.current_doc.goto(data.bounds)
-			#.current_doc.goto_bounds(data.bounds, :|detail|)
-			#.current_doc.view_scale << 2000
 		_endif
 	_endif
 _endmethod
@@ -210,7 +217,6 @@ _method rwwi_nisa_plugin.show_mode(enable?)
 		_endif
 	_else
 		.render_status << :disable
-		_self.stop_blink_animations()
 		# Undraw each zone geometry that was previously published
 		_if .zone_pseudo_areas _isnt _unset
 		_then
@@ -241,7 +247,6 @@ _method rwwi_nisa_plugin.show_records()
 		_self.build_rwo_cache()
 		_self.publish_zone_geometries()
 		_self.refresh_maps()
-		_self.start_blink_animations()
 	_endif
 _endmethod
 $
@@ -308,17 +313,21 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.start_blink_animations()
-	## Create a map_animator and add a map_blink_animation for every outage
-	## cluster currently in .geoms. Replaces any previous animator cleanly.
+	## Create a map_animator and add a map_blink_animation for every active
+	## outage cluster from dialog.records. Controlled solely by Start/Stop buttons —
+	## independent of the Show on Map toggle.
 
 	_self.stop_blink_animations()
-	_if .geoms _is _unset _orif .geoms.empty? _then _return _endif
+	_if .dialog _is _unset _then _return _endif
 	_if .current_doc _is _unset _then _return _endif
+
+	_local all_records << .dialog.records
+	_if all_records _is _unset _orif all_records.empty? _then _return _endif
 
 	_try _with errCon
 		.animator << map_animator.new(.current_doc)
 		.animator.run()
-		_for rec _over .geoms.fast_elements()
+		_for rec _over all_records.fast_elements()
 		_loop
 			_local coord << rec[:pseudo_point].coordinate
 			_local ani   << map_blink_animation.new(.current_doc, coord)
@@ -333,7 +342,9 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.stop_blink_animations()
-	## Gracefully stop and discard the map_animator.
+	## Gracefully stop and discard the map_animator, then refresh the display.
+	## animator.stop() restores the retained layer via clear_backgrounds(), but
+	## does not flush to the visible display — refresh_maps() does that.
 
 	_if .animator _isnt _unset
 	_then
@@ -343,6 +354,7 @@ _method rwwi_nisa_plugin.stop_blink_animations()
 		_endtry
 		.animator << _unset
 	_endif
+	_self.refresh_maps()
 _endmethod
 $
 

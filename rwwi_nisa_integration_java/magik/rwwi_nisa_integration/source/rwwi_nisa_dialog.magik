@@ -1044,7 +1044,8 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.go()
-	## Start timed auto-refresh. Mirrors FMS rwwi_fms_dialog.go() pattern.
+	## Start timed auto-refresh and immediately show blink animations on map.
+	## Blink display is independent of the Show on Map toggle.
 
 	_if .result_rows.empty?
 	_then
@@ -1061,6 +1062,9 @@ _method rwwi_nisa_dialog.go()
 	.timer << timed_event.new(interval, the_proc, _self)
 	.timer.go()
 
+	# Show blink immediately using existing records — no re-query needed
+	_self.changed(:blink_mode, _true)
+
 	_self.log_info(write_string("[Auto] Started — refreshing every ", interval, "s"))
 	_self.manage_actions()
 _endmethod
@@ -1068,22 +1072,26 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.stop()
-	## Stop timed auto-refresh. Mirrors FMS rwwi_fms_dialog.stop() pattern.
+	## Stop timed auto-refresh and remove blink animations from map.
 
-	_if .timer _is _unset _then _return _endif
-	_if .timer.return_status() _is :running
+	_self.changed(:blink_mode, _false)
+	_if .timer _isnt _unset
 	_then
-		.timer.stop()
-		_self.log_info("[Auto] Stopped.")
+		_if .timer.return_status() _is :running
+		_then
+			.timer.stop()
+		_endif
+		.timer << _unset
 	_endif
-	.timer << _unset
+	_self.log_info("[Auto] Stopped.")
 	_self.manage_actions()
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.check_for_update()
-	## Timer callback — re-query NISA and rebuild map markers.
+	## Timer callback — re-query NISA and rebuild blink markers on map.
+	## Blink display is independent of the Show on Map toggle.
 
 	_self.log_info("[Auto] Refreshing NISA data...")
 	_if .result_rows.empty? _then _return _endif
@@ -1099,10 +1107,8 @@ _method rwwi_nisa_dialog.check_for_update()
 		_self.check_outage_all()
 	_endif
 
-	_if .items[:highlight_btn].value _is _true
-	_then
-		_self.changed(:show_map, _true)
-	_endif
+	# Rebuild blink animations with updated outage data regardless of show/hide state
+	_self.changed(:blink_mode, _true)
 _endmethod
 $
 
