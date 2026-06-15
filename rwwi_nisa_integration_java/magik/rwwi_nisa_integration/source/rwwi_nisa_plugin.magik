@@ -21,7 +21,8 @@ def_slotted_exemplar(:rwwi_nisa_plugin,
 	{:current_doc,     _unset},   # Current map document (map view)
 	{:geoms,           _unset},   # Rope of property_lists {local_coord, cluster_pl}
 	{:render_status,     _unset},   # :enable or :disable
-	{:zone_pseudo_areas, _unset}    # Rope of pseudo_areas published via :geometry_to_draw
+	{:zone_pseudo_areas, _unset},   # Rope of pseudo_areas published via :geometry_to_draw
+	{:animator,          _unset}    # map_animator instance for blink animations
 }, :plugin)
 $
 
@@ -209,6 +210,7 @@ _method rwwi_nisa_plugin.show_mode(enable?)
 		_endif
 	_else
 		.render_status << :disable
+		_self.stop_blink_animations()
 		# Undraw each zone geometry that was previously published
 		_if .zone_pseudo_areas _isnt _unset
 		_then
@@ -239,6 +241,7 @@ _method rwwi_nisa_plugin.show_records()
 		_self.build_rwo_cache()
 		_self.publish_zone_geometries()
 		_self.refresh_maps()
+		_self.start_blink_animations()
 	_endif
 _endmethod
 $
@@ -299,6 +302,46 @@ _method rwwi_nisa_plugin.map_damage_notify(gc, a_map_view)
 	_then
 		_self.build_rwo_cache()  # Rebuild cache on each redraw to ensure it stays in sync with dialog records
 		_self.draw_all_clusters(gc)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.start_blink_animations()
+	## Create a map_animator and add a map_blink_animation for every outage
+	## cluster currently in .geoms. Replaces any previous animator cleanly.
+
+	_self.stop_blink_animations()
+	_if .geoms _is _unset _orif .geoms.empty? _then _return _endif
+	_if .current_doc _is _unset _then _return _endif
+
+	_try _with errCon
+		.animator << map_animator.new(.current_doc)
+		.animator.run()
+		_for rec _over .geoms.fast_elements()
+		_loop
+			_local coord << rec[:pseudo_point].coordinate
+			_local ani   << map_blink_animation.new(.current_doc, coord)
+			.animator.add(ani)
+		_endloop
+	_when error
+		write("NISA plugin: start_blink_animations error - ", errCon.report_contents_string)
+		.animator << _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.stop_blink_animations()
+	## Gracefully stop and discard the map_animator.
+
+	_if .animator _isnt _unset
+	_then
+		_try
+			.animator.stop()
+		_when error
+		_endtry
+		.animator << _unset
 	_endif
 _endmethod
 $

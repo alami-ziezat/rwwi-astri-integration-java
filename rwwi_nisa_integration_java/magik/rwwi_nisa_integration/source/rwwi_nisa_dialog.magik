@@ -22,7 +22,9 @@ def_slotted_exemplar(:rwwi_nisa_dialog,
 	{:database,         _unset},              # GIS database (gis_program_manager.databases[:gis])
 	{:view,             _unset},              # ACE view (gis_program_manager.ace_view)
 	{:cs_transform,     _unset},              # WGS84 -> local CS transform (built once, reused)
-	{:search_mode,      _unset, :writable}    # :cluster_code (default) or :area
+	{:search_mode,      _unset, :writable},   # :cluster_code (default) or :area
+	{:timer,            _unset},              # timed_event for auto-refresh
+	{:interval,         _unset}               # auto-refresh interval in seconds
 }, :model)
 $
 
@@ -43,6 +45,8 @@ _private _method rwwi_nisa_dialog.init(owner)
 	.result_rows   << rope.new()
 	.outage_cache  << equality_hash_table.new()
 	.search_mode   << :area
+	.timer         << _unset
+	.interval      << 60
 
 	_self.add_dependent(.owner)
 	>> _super.init()
@@ -144,6 +148,31 @@ _private _method rwwi_nisa_dialog.build_toolbar(parent)
 	.items[:highlight_btn].enabled? << _false
 
 	.items[:count_label] << sw_label_item.new(tb, "  0 clusters found  ")
+
+	sw_label_item.new(tb, "  |  ")
+
+	sw_label_item.new(tb, " Interval: ")
+	.items[:interval_selector] << sw_text_item.new(tb,
+		:model,           _self,
+		:display_length,  8,
+		:editable?,       _false,
+		:change_selector, {:|interval_changed()|})
+	.items[:interval_selector].text_items << {"1/4 min", "1/2 min", "1 min", "2 min", "5 min"}
+	.items[:interval_selector].value      << "1 min"
+
+	.items[:start_btn] << sw_button_item.new(tb,
+		:image,    {:run, :ui_resources},
+		:model,    _self,
+		:selector, :go|()|,
+		:tooltip,  "Start auto-refresh")
+	.items[:start_btn].enabled? << _false
+
+	.items[:stop_btn] << sw_button_item.new(tb,
+		:image,    {:stop, :ui_resources},
+		:model,    _self,
+		:selector, :stop|()|,
+		:tooltip,  "Stop auto-refresh")
+	.items[:stop_btn].enabled? << _false
 _endmethod
 $
 
@@ -317,6 +346,7 @@ _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.reset()
 	## Clear results, outage cache, and table
 
+	_self.stop()
 	.result_rows.empty()
 	.outage_cache.empty()
 	.cluster_cache.empty()
@@ -984,6 +1014,95 @@ _method rwwi_nisa_dialog.manage_actions()
 	.items[:run_btn].enabled?       << has_results _andif .search_mode _isnt :area
 	.items[:goto_btn].enabled?      << has_selection
 	.items[:highlight_btn].enabled? << has_outage
+
+	_local timer_running? << .timer _isnt _unset _andif .timer.return_status() _is :running
+	.items[:start_btn].enabled? << has_outage _andif _not timer_running?
+	.items[:stop_btn].enabled?  << timer_running?
+_endmethod
+$
+
+##
+## Auto-refresh timer
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.interval_changed(selected_value)
+	## Map interval dropdown selection to seconds and store in .interval.
+
+	.interval << _if selected_value = "1/4 min"
+	             _then >> 15
+	             _elif selected_value = "1/2 min"
+	             _then >> 30
+	             _elif selected_value = "2 min"
+	             _then >> 120
+	             _elif selected_value = "5 min"
+	             _then >> 300
+	             _else >> 60
+	             _endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.go()
+	## Start timed auto-refresh. Mirrors FMS rwwi_fms_dialog.go() pattern.
+
+	_if .result_rows.empty?
+	_then
+		_self.log_warning("No clusters to refresh. Run a search first.")
+		_return
+	_endif
+
+	_self.stop()
+
+	_local interval << .interval.default(60)
+	_local the_proc << _proc(dialog)
+	                       dialog.check_for_update()
+	                   _endproc
+	.timer << timed_event.new(interval, the_proc, _self)
+	.timer.go()
+
+	_self.log_info(write_string("[Auto] Started — refreshing every ", interval, "s"))
+	_self.manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.stop()
+	## Stop timed auto-refresh. Mirrors FMS rwwi_fms_dialog.stop() pattern.
+
+	_if .timer _is _unset _then _return _endif
+	_if .timer.return_status() _is :running
+	_then
+		.timer.stop()
+		_self.log_info("[Auto] Stopped.")
+	_endif
+	.timer << _unset
+	_self.manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.check_for_update()
+	## Timer callback — re-query NISA and rebuild map markers.
+
+	_self.log_info("[Auto] Refreshing NISA data...")
+	_if .result_rows.empty? _then _return _endif
+
+	_if .search_mode _is :area
+	_then
+		_local term << .items[:search_field].value.default("").trim_spaces()
+		_if term.size >= 3
+		_then
+			_self.search_by_area(term)
+		_endif
+	_else
+		_self.check_outage_all()
+	_endif
+
+	_if .items[:highlight_btn].value _is _true
+	_then
+		_self.changed(:show_map, _true)
+	_endif
 _endmethod
 $
 
