@@ -337,16 +337,41 @@ _method rwwi_nisa_plugin.start_blink_animations()
 		_return
 	_endif
 
+	# Only animate clusters visible in the current viewport.
+	# Off-screen clusters produce out-of-bounds pixel boxes that cause
+	# image.copy_from_canvas() to fail with a generic prim error.
+	_local view_area << pseudo_area.new_for_world(
+		.current_doc.current_view_bounds.sectors,
+		.current_doc.world)
+	_local visible << rope.new()
+	_try
+		_for rec _over all_records.fast_elements()
+		_loop
+			_if rec[:pseudo_point].within?(view_area)
+			_then
+				visible.add_last(rec)
+			_endif
+		_endloop
+	_when error
+		visible << all_records
+	_endtry
+
+	_if visible.empty?
+	_then
+		write("NISA plugin: start_blink_animations - no outage clusters in current viewport")
+		_return
+	_endif
+
 	_try _with errCon
 		.animator << map_animator.new(.current_doc)
 		.animator.run()
-		_for rec _over all_records.fast_elements()
+		_for rec _over visible.fast_elements()
 		_loop
 			_local coord << rec[:pseudo_point].coordinate
 			_local ani   << map_blink_animation.new(.current_doc, coord)
 			.animator.add(ani)
 		_endloop
-		write("NISA plugin: blink started: ", all_records.size, " cluster(s)")
+		write("NISA plugin: blink started: ", visible.size, " cluster(s) in viewport (", all_records.size, " total)")
 	_when error
 		write("NISA plugin: start_blink_animations error - ", errCon.report_contents_string)
 		.animator << _unset
