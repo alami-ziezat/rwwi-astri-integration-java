@@ -18,7 +18,8 @@ def_slotted_exemplar(:rwwi_nisa_dialog,
 	{:cluster_cache,    _unset, :writable},   # Row number -> cluster property_list
 	{:result_rows,      _unset, :writable},   # Current search results (rope of pl)
 	{:outage_cache,     _unset, :writable},   # cluster_code -> outage result pl
-	{:selected_cluster, _unset, :writable},   # Currently selected cluster pl
+	{:selected_cluster,  _unset, :writable},   # Single selected cluster pl (set only when exactly 1 row selected)
+	{:selected_clusters, _unset, :writable},  # All currently selected cluster pls (rope)
 	{:database,         _unset},              # GIS database (gis_program_manager.databases[:gis])
 	{:view,             _unset},              # ACE view (gis_program_manager.ace_view)
 	{:cs_transform,     _unset},              # WGS84 -> local CS transform (built once, reused)
@@ -44,9 +45,10 @@ _private _method rwwi_nisa_dialog.init(owner)
 	.cluster_cache << equality_hash_table.new()
 	.result_rows   << rope.new()
 	.outage_cache  << equality_hash_table.new()
-	.search_mode   << :area
-	.timer         << _unset
-	.interval      << 60
+	.search_mode        << :area
+	.selected_clusters  << rope.new()
+	.timer              << _unset
+	.interval           << 60
 
 	_self.add_dependent(.owner)
 	>> _super.init()
@@ -182,7 +184,7 @@ _private _method rwwi_nisa_dialog.build_table(parent)
 	.items[:table] << sw_table.new(parent,
 		:row_height,                   22,
 		:selection_type,               :row,
-		:selection_mode,               :one,
+		:selection_mode,               :many,
 		:model,                        _self,
 		:aspect,                       :cluster_list,
 		:row_lines?,                   _true,
@@ -350,7 +352,8 @@ _method rwwi_nisa_dialog.reset()
 	.result_rows.empty()
 	.outage_cache.empty()
 	.cluster_cache.empty()
-	.selected_cluster << _unset
+	.selected_cluster  << _unset
+	.selected_clusters << rope.new()
 
 	_self.changed(:cluster_list, :renew)
 	_self.show_map(_false)
@@ -426,18 +429,33 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.cluster_selected(table, selection)
-	## Handle row selection in cluster table
+	## Handle row selection in cluster table (multi-select).
+	## .selected_clusters holds all selected rows.
+	## .selected_cluster  holds the single pl only when exactly 1 row is selected.
 
-	_if selection _is _unset _orif selection.size = 0
+	.selected_clusters << rope.new()
+
+	_if selection _isnt _unset _andif selection.size > 0
 	_then
-		.selected_cluster << _unset
-		_self.manage_actions()
-		_return
+		_for row _over selection.fast_elements()
+		_loop
+			_local pl << .cluster_cache[row]
+			_if pl _isnt _unset _then .selected_clusters.add_last(pl) _endif
+		_endloop
 	_endif
 
-	_local row << selection.an_element()
-	.selected_cluster << .cluster_cache[row]
+	.selected_cluster << _if .selected_clusters.size = 1
+	                     _then >> .selected_clusters[1]
+	                     _else >> _unset
+	                     _endif
+
 	_self.manage_actions()
+
+	# Refresh map immediately when show_map is active so displayed clusters track selection
+	_if .items[:highlight_btn].value _is _true
+	_then
+		_self.changed(:show_map, _true)
+	_endif
 _endmethod
 $
 
@@ -755,11 +773,12 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.show_map(toggled?)
 	## Toggle cluster outage highlights on the map.
-	## Fires :show_map changed notification consumed by rwwi_nisa_plugin.
+	## Works on selected rows only — fires :show_map notification consumed by plugin.
 
-	_if .result_rows.empty?
+	_if toggled? _andif .selected_clusters.empty?
 	_then
-		_self.log_warning("No clusters to show on map.")
+		_self.log_warning("No clusters selected. Select rows in the table first.")
+		.items[:highlight_btn].value << _false
 		_return
 	_endif
 	_self.changed(:show_map, toggled?)
@@ -769,13 +788,67 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.records
 	## Return a rope of outage-active cluster records for map rendering.
-	## Only clusters with red icon (active outage: success=true, data.size > 0)
-	## are included.
+	## Only SELECTED rows with active outage (success=true, data.size > 0) are included.
+	## Deduplicates by stella_id (area mode) or cluster_code (cluster_code mode).
 	##
 	## Each element is a property_list with:
-	##   :pseudo_point - pseudo_point in local CS (coordinate only, no world set)
-	##   :cluster_pl   - original cluster property_list from result_rows
+	##   :pseudo_point - pseudo_point in local CS
+	##   :cluster_pl   - original cluster property_list
 	##   :outage_data  - cached outage result property_list
+
+	_local result        << rope.new()
+	_local xf            << _self.coord_xform()
+	_local seen_clusters << equality_hash_table.new()
+
+	_for pl _over .selected_clusters.fast_elements()
+	_loop
+		_local cc        << pl[:cluster_code]
+		_local cache_key << _if .search_mode _is :area
+		                    _then >> pl[:cluster_id_stella].default(cc)
+		                    _else >> cc
+		                    _endif
+		_local cached << .outage_cache[cache_key]
+
+		_local dedup_key << cache_key
+		_if seen_clusters[dedup_key] _isnt _unset _then _continue _endif
+
+		# Only include clusters with a confirmed active outage
+		_if cached _is _unset _orif
+		    _not (cached[:success] _is _true _andif cached[:data].size > 0)
+		_then
+			_continue
+		_endif
+
+		_local lat_str << pl[:lat].default("")
+		_local lon_str << pl[:lon].default("")
+		_if lat_str = "" _orif lon_str = "" _then _continue _endif
+
+		_try
+			_dynamic !current_world!             << .database.collections[:sw_gis!world].at(0,0)
+			_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+			_dynamic !print_float_precision!     << 16
+			_local local_coord << xf.convert(
+				coordinate.new(lon_str.as_number(), lat_str.as_number()))
+			_local pp << pseudo_point.new(local_coord)
+
+			result.add_last(property_list.new_with(
+				:pseudo_point, pp,
+				:cluster_pl,   pl,
+				:outage_data,  cached))
+			seen_clusters[dedup_key] << _true
+		_when error
+		_endtry
+	_endloop
+
+	>> result
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.all_outage_records
+	## Return ALL outage-active cluster records across every result row.
+	## Used by blink animations — independent of table selection.
+	## Same structure as records() but iterates result_rows, not selected_clusters.
 
 	_local result        << rope.new()
 	_local xf            << _self.coord_xform()
@@ -790,22 +863,13 @@ _method rwwi_nisa_dialog.records
 		                    _endif
 		_local cached << .outage_cache[cache_key]
 
-		# Use stella_id as dedup key in area mode (cluster_code may be empty)
-		_local dedup_key << _if .search_mode _is :area
-		                    _then >> pl[:cluster_id_stella].default(cc)
-		                    _else >> cc
-		                    _endif
+		_local dedup_key << cache_key
 		_if seen_clusters[dedup_key] _isnt _unset _then _continue _endif
 
-		# In area mode all results come from the NISA outage API — always include if lat/lon present.
-		# In cluster_code mode only include clusters confirmed as active outage in the cache.
-		_if .search_mode _isnt :area
+		_if cached _is _unset _orif
+		    _not (cached[:success] _is _true _andif cached[:data].size > 0)
 		_then
-			_if cached _is _unset _orif
-			    _not (cached[:success] _is _true _andif cached[:data].size > 0)
-			_then
-				_continue
-			_endif
+			_continue
 		_endif
 
 		_local lat_str << pl[:lat].default("")
@@ -986,13 +1050,33 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.manage_actions()
-	## Enable / disable buttons based on current state
+	## Enable / disable buttons based on current state.
+	## goto_btn: only when exactly 1 row is selected.
+	## highlight_btn / start_btn: when at least 1 SELECTED cluster has active outage.
 
-	_local has_results   << _not .result_rows.empty?
-	_local has_selection << .selected_cluster _isnt _unset
+	_local has_results      << _not .result_rows.empty?
+	_local single_selected? << .selected_clusters.size = 1
 
-	# highlight_btn only enabled when at least one cluster has an active outage
-	_local has_outage << _false
+	# has_outage_selected: for Show on Map — at least one SELECTED row has active outage
+	_local has_outage_selected << _false
+	_for pl _over .selected_clusters.fast_elements()
+	_loop
+		_local mk << _if .search_mode _is :area
+		             _then >> pl[:cluster_id_stella].default(pl[:cluster_code])
+		             _else >> pl[:cluster_code]
+		             _endif
+		_local cached << .outage_cache[mk]
+		_if cached _isnt _unset _andif
+		    cached[:success] _is _true _andif
+		    cached[:data].size > 0
+		_then
+			has_outage_selected << _true
+			_leave
+		_endif
+	_endloop
+
+	# has_outage_any: for Start blink — at least one row in the full list has active outage
+	_local has_outage_any << _false
 	_for pl _over .result_rows.fast_elements()
 	_loop
 		_local mk << _if .search_mode _is :area
@@ -1004,7 +1088,7 @@ _method rwwi_nisa_dialog.manage_actions()
 		    cached[:success] _is _true _andif
 		    cached[:data].size > 0
 		_then
-			has_outage << _true
+			has_outage_any << _true
 			_leave
 		_endif
 	_endloop
@@ -1012,11 +1096,11 @@ _method rwwi_nisa_dialog.manage_actions()
 	# Check All Outages is only relevant in cluster_code mode — in area mode the
 	# outage cache is already pre-populated from the search API response.
 	.items[:run_btn].enabled?       << has_results _andif .search_mode _isnt :area
-	.items[:goto_btn].enabled?      << has_selection
-	.items[:highlight_btn].enabled? << has_outage
+	.items[:goto_btn].enabled?      << single_selected?
+	.items[:highlight_btn].enabled? << has_outage_selected
 
 	_local timer_running? << .timer _isnt _unset _andif .timer.return_status() _is :running
-	.items[:start_btn].enabled? << has_outage _andif _not timer_running?
+	.items[:start_btn].enabled? << has_outage_any _andif _not timer_running?
 	.items[:stop_btn].enabled?  << timer_running?
 _endmethod
 $

@@ -321,7 +321,7 @@ _method rwwi_nisa_plugin.start_blink_animations()
 	_if .dialog _is _unset _then _return _endif
 	_if .current_doc _is _unset _then _return _endif
 
-	_local all_records << .dialog.records
+	_local all_records << .dialog.all_outage_records
 	_if all_records _is _unset _orif all_records.empty? _then _return _endif
 
 	_try _with errCon
