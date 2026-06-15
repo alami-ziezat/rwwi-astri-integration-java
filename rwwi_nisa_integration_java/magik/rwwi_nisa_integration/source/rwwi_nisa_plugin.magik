@@ -314,15 +314,28 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.start_blink_animations()
 	## Create a map_animator and add a map_blink_animation for every active
-	## outage cluster from dialog.records. Controlled solely by Start/Stop buttons —
-	## independent of the Show on Map toggle.
+	## outage cluster from dialog.all_outage_records. Controlled solely by
+	## Start/Stop buttons — independent of the Show on Map toggle.
 
 	_self.stop_blink_animations()
-	_if .dialog _is _unset _then _return _endif
-	_if .current_doc _is _unset _then _return _endif
+
+	_if .dialog _is _unset
+	_then
+		write("NISA plugin: start_blink_animations - dialog is unset")
+		_return
+	_endif
+	_if .current_doc _is _unset
+	_then
+		write("NISA plugin: start_blink_animations - current_doc is unset (no map view yet)")
+		_return
+	_endif
 
 	_local all_records << .dialog.all_outage_records
-	_if all_records _is _unset _orif all_records.empty? _then _return _endif
+	_if all_records _is _unset _orif all_records.empty?
+	_then
+		write("NISA plugin: start_blink_animations - no outage records with coordinates (coord transform may not be ready)")
+		_return
+	_endif
 
 	_try _with errCon
 		.animator << map_animator.new(.current_doc)
@@ -333,6 +346,7 @@ _method rwwi_nisa_plugin.start_blink_animations()
 			_local ani   << map_blink_animation.new(.current_doc, coord)
 			.animator.add(ani)
 		_endloop
+		write("NISA plugin: blink started — ", all_records.size, " cluster(s)")
 	_when error
 		write("NISA plugin: start_blink_animations error - ", errCon.report_contents_string)
 		.animator << _unset

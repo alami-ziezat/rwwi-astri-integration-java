@@ -689,10 +689,25 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.init_transform()
 	## Initialise database, view, and WGS84 -> local CS transform.
-	## Mirrors rwi_aerial_kmz_object_writer.init() exactly.
+	## Tries :gis key first, then falls back to any open database so
+	## this works regardless of the application's session key name.
 
 	.database << gis_program_manager.databases[:gis]
-	.view     << gis_program_manager.ace_view
+
+	# Fallback: iterate all open databases until one is found
+	_if .database _is _unset
+	_then
+		_for db _over gis_program_manager.databases.fast_elements()
+		_loop
+			_if db _isnt _unset
+			_then
+				.database << db
+				_leave
+			_endif
+		_endloop
+	_endif
+
+	.view << gis_program_manager.ace_view
 
 	_if .database _isnt _unset _andif .view _isnt _unset
 	_then
