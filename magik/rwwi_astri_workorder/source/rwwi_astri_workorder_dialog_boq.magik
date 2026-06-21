@@ -61,7 +61,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 
 		# Call the global create_boq procedure (returns saved file path)
 		write("Calling create_boq procedure...")
-		_local vendor_name   << wo[:vendor_name].default("")
+		_local vendor_name   << wo[:vendor].default("")
 		_local vendor_code   << wo[:vendor_code].default("")
 		_local vendor_status << _if _self.is_mr_vendor_code?(vendor_code)
 		                        _then >> "TURNKEY"
