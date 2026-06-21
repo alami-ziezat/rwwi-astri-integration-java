@@ -208,6 +208,7 @@ public class WorkOrderClient {
                     appendXmlField(xml, woJson, "latest_status_name", 6);
                     appendXmlField(xml, woJson, "assigned_vendor_label", 6);
                     appendXmlField(xml, woJson, "assigned_vendor_name", 6);
+                    appendXmlField(xml, woJson, "assigned_vendor_sap_vendor_code", 6);
                     appendXmlField(xml, woJson, "assigned_subcont_vendor_name", 6);
                     appendXmlField(xml, woJson, "created_at", 6);
                     appendXmlField(xml, woJson, "updated_at", 6);
