@@ -821,13 +821,13 @@ rwwi_astri_boq_generator.define_shared_constant(
 		),
 
 		# RT/RW Permit — donation-based; injected at end of generate(), not via catalog loop
-		# qty_material = 1 (fixed), qty_service = donation_value (from boq_params)
+		# qty_material = 0, qty_service = 1 (fixed)
 		# Generated ONLY when boq_params[:donation_value] is present and numeric
 		"500002155", property_list.new_with(
 			:code,          "500002155",
 			:object,        "other",
 			:name,          "RT/RW Permit",
-			:material_slot, :both
+			:material_slot, :service
 		)
 	),
 	:public
@@ -1024,8 +1024,8 @@ _method rwwi_astri_boq_generator.generate()
 				result["500002155"] << property_list.new_with(
 					:equipment_name,          "500002155",
 					:description,             "RT/RW Permit",
-					:quantity_material,       1,
-					:quantity_service,        donation_numeric,
+					:quantity_material,       0,
+					:quantity_service,        1,
 					:vendor_name,             .boq_params[:vendor_name].default(""),
 					:subcont_vendor_name,     .boq_params[:subcont_vendor_name].default(""),
 					:remarks,                 .boq_params[:remarks].default("Service"),

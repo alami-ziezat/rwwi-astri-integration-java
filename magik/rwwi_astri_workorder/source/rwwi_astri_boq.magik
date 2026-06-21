@@ -3087,7 +3087,7 @@ $
 
 
 _global create_boq <<
-_proc(design, infra_type, _optional donation_value)
+_proc(design, infra_type, vendor_name, vendor_code, vendor_status, _optional donation_value)
 
 	#rwwi_astri_workorder.show_messages("test")
 

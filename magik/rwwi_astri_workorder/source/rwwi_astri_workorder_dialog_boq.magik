@@ -61,8 +61,17 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 
 		# Call the global create_boq procedure (returns saved file path)
 		write("Calling create_boq procedure...")
+		_local vendor_name   << wo[:vendor_name].default("")
+		_local vendor_code   << wo[:vendor_code].default("")
+		_local vendor_status << _if _self.is_mr_vendor_code?(vendor_code)
+		                        _then >> "TURNKEY"
+		                        _else >> "NON TURNKEY"
+		                        _endif
 		_local boq_file_path << create_boq(scheme,
 			wo[:infrastructure_type].default("cluster").lowercase,
+			vendor_name,
+			vendor_code,
+			vendor_status,
 			wo[:donation_value])
 
 		_self.user_info(write_string("BoQ Excel generation completed successfully for design: ",
@@ -516,7 +525,8 @@ _private _method rwwi_astri_workorder_dialog.is_mr_vendor_code?(vendor_code)
 	## Cable (sheath_with_loc) and Pole items from vendors NOT in this list
 	## are sent to ASTRI with vendor_name = "internal".
 	_local mr_codes << {"1000001465", "1000000650", "1000000623",
-	                    "1000002614", "1000002219", "1000001432", "1000001528"}
+	                    "1000002614", "1000002219", "1000001432", "1000001528",
+	                    "1000001385"}
 	>> mr_codes.eq_includes?(vendor_code.default("").trim_spaces())
 _endmethod
 $

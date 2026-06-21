@@ -114,7 +114,7 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 		:permit_status,        "DONATION APPROVED")
 
 	_local donation_field << _if infra_type = "cluster"
-	                         _then >> :target_cluster_final_donation_value
+	                         _then >> :target_cluster_final_donation_value_with_pph
 	                         _else >> :target_cluster_subfeeder_donation_value
 	                         _endif
 
