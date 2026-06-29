@@ -775,13 +775,45 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_if _not cell_trans.empty?
 		_then
 			dt_trans.add_all_last(cell_trans)
-			write("  [OK] Macro cell created: ", cell_trans.size)
+			write("  [OK] Micro cell created: ", cell_trans.size)
 		_endif
 
-		# Pass 8.5: Boundary cluster areas
-		write("  Pass 8.5: Creating boundary cluster areas (", b[:boundary_cluster].size, ")...")
-		_for pm _over b[:boundary_cluster].fast_elements() _loop _self.create_area_based_object(pm) _endloop
-		write("  [OK] Boundary cluster areas processed: ", b[:boundary_cluster].size)
+		# Pass 8.5: Macro Cell from boundary cluster, or fallback to micro cell convex hull
+		write("  Pass 8.5: Creating Macro Cell from boundary (", b[:boundary_cluster].size, " boundary cluster(s))...")
+		_local bc_trans << rope.new()
+		_if _not b[:boundary_cluster].empty?
+		_then
+			# Boundary cluster area found in KML - create Macro Cell directly from it
+			_for pm _over b[:boundary_cluster].fast_elements() _loop _self.create_micro_cell(pm, bc_trans) _endloop
+			write("  [OK] Macro Cell created from ", b[:boundary_cluster].size, " boundary cluster area(s)")
+		_else
+			# No boundary cluster area in KML - derive Macro Cell from convex hull of ALL placemarks
+			write("  Pass 8.5: No boundary cluster found, computing Macro Cell from all-placemark convex hull...")
+			_local hull_sr << _self.extract_boundary_area(placemarks)
+			_if hull_sr _isnt _unset
+			_then
+				_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+				_local hull_area << pseudo_area.new(hull_sr)
+				hull_area.world << .database.world
+				# Dummy pm with precomputed_area so create_micro_cell skips coord parsing
+				_local dummy_pm << property_list.new_with(
+					:name,             .cluster,
+					:type,             "area",
+					:parent,           "",
+					:coord,            "",
+					:ring_name,        _unset,
+					:precomputed_area, hull_area
+				)
+				_self.create_micro_cell(dummy_pm, bc_trans)
+				write("  [OK] Macro Cell created from all-placemark convex hull")
+			_else
+				write("  WARNING: Could not compute boundary from placemarks, skipping Macro Cell")
+			_endif
+		_endif
+		_if _not bc_trans.empty?
+		_then
+			dt_trans.add_all_last(bc_trans)
+		_endif
 	_else
 		write("  Pass 8: Skipped (migration scope: Network)")
 	_endif
@@ -822,6 +854,88 @@ _method astri_design_migrator.migrate_placemarks(placemarks)
 		_self.notify_progress(
 			"Migration complete!",
 			"Done: " + b[:riser].size.write_string + " risers processed")
+	_endif
+
+	_self.print_statistics()
+	>> .stats
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_design_migrator.migrate_boundary_cell_only(placemarks)
+	## Repair migration: create ONLY the Macro Cell (ftth!zone type=Macro Cell)
+	## for clusters where the boundary_cluster was not migrated previously.
+	## Does NOT create project/design, network objects, demand points, etc.
+	##
+	## Logic mirrors Pass 8.5 of migrate_placemarks():
+	##   - boundary_cluster placemarks found  -> Macro Cell from each
+	##   - no boundary_cluster in placemarks  -> Macro Cell from convex hull of ALL placemarks
+	##
+	## Parameters:
+	##   placemarks (rope) - All placemarks parsed from the cluster KML
+	##
+	## Returns:
+	##   property_list - Statistics (:micro_cells, :errors)
+
+	# Skip if a Macro Cell already exists for this cluster in ftth!zone
+	_local existing_pred << predicate.eq(:type, "Macro Cell") _and predicate.eq(:cluster, .cluster)
+	_local existing_cells << .cell_col.select(existing_pred)
+	_if existing_cells.size > 0
+	_then
+		write("  SKIPPED: Macro Cell already exists for cluster: ", .cluster,
+			" (", existing_cells.size, " record(s) found)")
+		>> .stats
+	_endif
+
+	write("  Boundary cell repair: classifying ", placemarks.size, " placemarks...")
+	_local b << _self.classify_placemarks(placemarks)
+	write("  Classified: ", b[:boundary_cluster].size, " boundary cluster(s), ",
+		b[:micro_cell].size, " micro cell(s)")
+
+	_local dt_trans << rope.new()
+	_local cell_trans << rope.new()
+
+	_if _not b[:boundary_cluster].empty?
+	_then
+		# Boundary cluster area present - create Macro Cell from it
+		_for pm _over b[:boundary_cluster].fast_elements()
+		_loop _self.create_micro_cell(pm, cell_trans) _endloop
+		write("  [OK] Macro Cell from ", b[:boundary_cluster].size, " boundary cluster area(s)")
+	_else
+		# No boundary cluster - derive Macro Cell from convex hull of all placemarks
+		write("  No boundary cluster found, computing Macro Cell from all-placemark convex hull...")
+		_local hull_sr << _self.extract_boundary_area(placemarks)
+		_if hull_sr _isnt _unset
+		_then
+			_dynamic !current_world! << .database.collections[:sw_gis!world].at(0,0)
+			_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+			_local hull_area << pseudo_area.new(hull_sr)
+			hull_area.world << .database.world
+			_local dummy_pm << property_list.new_with(
+				:name,             .cluster,
+				:type,             "area",
+				:parent,           "",
+				:coord,            "",
+				:ring_name,        _unset,
+				:precomputed_area, hull_area
+			)
+			_self.create_micro_cell(dummy_pm, cell_trans)
+			write("  [OK] Macro Cell from all-placemark convex hull")
+		_else
+			write("  WARNING: Could not compute boundary from placemarks, skipping Macro Cell")
+		_endif
+	_endif
+
+	_if _not cell_trans.empty?
+	_then
+		dt_trans.add_all_last(cell_trans)
+	_endif
+
+	_if _not dt_trans.empty?
+	_then
+		_local dt << dataset_transaction.new(dt_trans, "Insert Macro Cell (boundary repair)")
+		dt.run()
+		write("  [OK] Committed ", dt_trans.size, " transaction(s)")
 	_endif
 
 	_self.print_statistics()

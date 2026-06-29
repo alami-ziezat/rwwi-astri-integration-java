@@ -1662,7 +1662,7 @@ _pragma(classify_level=restricted)
 _private _method astri_data_migrator.migrate_to_sw_alternative(wo, placemarks, infra_type, _optional kml_topology)
 	_local database << gis_program_manager.databases[:gis]
 	_local gv << gis_program_manager.cached_dataset(:gis)
-	_local alt_name << "|Engineering Design|migration"
+	_local alt_name << "|Engineering Design|Migration"
 	write("migrate_to_sw_alternative")
 	gv.go_to_alternative(alt_name)
 	gv.switch(:write)
@@ -2270,6 +2270,167 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 		_when error
 		_endtry
 		_return result
+	_endtry
+_endmethod
+$
+
+##
+## CLUSTER BOUNDARY CELL REPAIR MIGRATION
+##
+
+_pragma(classify_level=restricted)
+_method astri_data_migrator.migrate_cluster_boundary_cells()
+	## Repair migration: iterate all master_cluster records in SW and backfill
+	## the missing Macro Cell (ftth!zone type="Macro Cell") from each cluster KML.
+	##
+	## For each cluster with an abd_kmz_uuid:
+	##   - Downloads and parses its KML
+	##   - If "boundary cluster" area found  -> creates Macro Cell from it
+	##   - If not found                      -> creates Macro Cell from convex hull of all placemarks
+	##
+	## Writes into the |Engineering Design|migration alternative (same as migrate_cluster_objects).
+	##
+	## CLI usage:
+	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+	##   migrator.migrate_cluster_boundary_cells()
+
+	_local start_time << date_time.now()
+	write("=================================================================")
+	write("=== CLUSTER BOUNDARY CELL REPAIR Migration Started ===")
+	write("=================================================================")
+	write("Start time: ", start_time.write_string)
+	write("")
+
+	_local obj_stats << property_list.new_with(
+		:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+
+	_try _with cond
+		_local master_coll << .database.collections[:master_cluster]
+		_if master_coll _is _unset
+		_then
+			write("ERROR: master_cluster collection not found")
+			_return obj_stats
+		_endif
+
+		_for rec _over master_coll.fast_elements()
+		_loop
+			_local cluster_code << rec.cluster_code
+			_local kmz_uuid << rec.abd_kmz_uuid
+
+			_if cluster_code _is _unset _orif cluster_code = "" _orif
+			   kmz_uuid _is _unset _orif kmz_uuid = ""
+			_then _continue
+			_endif
+
+			obj_stats[:total] +<< 1
+			write("")
+			write("Processing boundary cell for CLUSTER: ", cluster_code)
+
+			_if _self.process_cluster_boundary_cell(rec, obj_stats)
+			_then
+				obj_stats[:migrated] +<< 1
+			_endif
+		_endloop
+
+		write("")
+		write("=== CLUSTER BOUNDARY CELL REPAIR Complete ===")
+	_when error
+		write("ERROR: ", cond.report_contents_string)
+	_endtry
+
+	_local end_time << date_time.now()
+	write("Duration: ", (end_time - start_time).write_string)
+	write("Total:    ", obj_stats[:total])
+	write("Migrated: ", obj_stats[:migrated])
+	write("Skipped:  ", obj_stats[:skipped])
+	write("Errors:   ", obj_stats[:errors])
+	write("=================================================================")
+
+	>> obj_stats
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.process_cluster_boundary_cell(rec, obj_stats)
+	## Download, parse KML for one cluster and create its Macro Cell only.
+	##
+	## Parameters:
+	##   rec      - master_cluster SW record
+	##   obj_stats - statistics property_list (mutated in place)
+	##
+	## Returns:
+	##   _true if Macro Cell was created, _false on error
+
+	_local cluster_code << rec.cluster_code
+	_local kmz_uuid << rec.abd_kmz_uuid
+
+	_try _with cond
+		obj_stats[:processed] +<< 1
+
+		# Download KML (same pattern as process_cluster_kml_migration)
+		_local output_dir << system.getenv("TEMP").default("C:\\temp")
+		_local xml_result << astri_download_cluster_kmz(kmz_uuid, output_dir)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			write("  ERROR: No KML downloaded for ", cluster_code)
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+		_local xml_doc << simple_xml.read_element_string(xml_result)
+		_local kml_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if kml_path_elem _is _unset
+		_then
+			write("  ERROR: No kml_file_path in response for ", cluster_code)
+			obj_stats[:errors] +<< 1
+			_return _false
+		_endif
+
+		# Parse KML into placemarks
+		_local kml_file_path << kml_path_elem.xml_result
+		_local parser << astri_kml_parser.new(kml_file_path)
+		_local (placemarks, _topology) << parser.parse()
+		write("  Parsed ", placemarks.size, " placemarks")
+
+		# Build context for design migrator
+		_local wo_data << property_list.new_with(
+			:uuid,                cluster_code,
+			:kmz_uuid,            kmz_uuid.write_string,
+			:olt_label,           rec.olt_code.default(""),
+			:area,                rec.region.default(""),
+			:infra_name,          cluster_code,
+			:infrastructure_type, "cluster",
+			:cluster_code_db,     cluster_code,
+			:subfeeder_code_db,   rec.subfeeder_code.default(""),
+			:feeder_code_db,      rec.feeder_code.default(""),
+			:olt_code,            rec.olt_code.default("")
+		)
+
+		# Navigate to engineering design migration alternative (same as migrate_to_sw_alternative)
+		_local database << .database
+		_local gv << gis_program_manager.cached_dataset(:gis)
+		gv.go_to_alternative("|Engineering Design|Migration")
+		gv.switch(:write)
+
+		_local migrator << astri_design_migrator.new(database, wo_data, "In Service")
+		_local stats << migrator.migrate_boundary_cell_only(placemarks)
+
+		_try _with commitErr
+			database.commit()
+			write("  [OK] Committed for ", cluster_code,
+				" (Macro Cells: ", stats[:micro_cells], ")")
+		_when error
+			write("  WARNING: Commit failed - ", commitErr.report_contents_string)
+		_endtry
+
+		_return _true
+
+	_when error
+		write("  ERROR processing ", cluster_code, ": ", cond.report_contents_string)
+		obj_stats[:errors] +<< 1
+		_return _false
 	_endtry
 _endmethod
 $

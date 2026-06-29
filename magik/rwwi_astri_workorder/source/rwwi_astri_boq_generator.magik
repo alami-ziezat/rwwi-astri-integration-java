@@ -1033,8 +1033,7 @@ _method rwwi_astri_boq_generator.generate()
 					:area,                    .boq_params[:area].default(""),
 					:area_plant_code,         .boq_params[:area_plant_code].default(""),
 					:override_price_material, _unset,
-					:override_price_service,  _unset)
-				#write("LOG: RT/RW Permit added — donation_value:", donation_numeric)
+					:override_price_service,  donation_numeric)
 			_else
 				write("LOG: RT/RW Permit skipped - donation_value is non-numeric:", donation_value)
 			_endif

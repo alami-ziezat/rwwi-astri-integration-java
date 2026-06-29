@@ -68,10 +68,13 @@ _pragma(classify_level=basic, topic={astri_integration})
 		                         _endif
 
 		# Step 1: Check if this is a MACRO CELL (boundary area without folders)
-		_if folders _is _unset _orif folders = "" _orif folders.index_of_seq("BOUNDARY CLUSTER") _isnt _unset
+		_if folders _is _unset _orif folders = "" _orif folders.lowercase.index_of_seq("boundary cluster") _isnt _unset
 		_then
-			# Parse area geometry
-			_local area << _self.parse_area_geometry(pm[:coord])
+			# Parse area geometry (use precomputed_area if provided, e.g. from all-placemark hull fallback)
+			_local area << _if pm[:precomputed_area] _isnt _unset
+			               _then >> pm[:precomputed_area]
+			               _else >> _self.parse_area_geometry(pm[:coord])
+			               _endif
 
 			# Create Macro Cell
 			_local prop_values << property_list.new_with(

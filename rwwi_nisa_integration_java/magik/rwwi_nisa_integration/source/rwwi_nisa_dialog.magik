@@ -289,13 +289,7 @@ _private _method rwwi_nisa_dialog.search_by_cluster_code(search_term)
 
 				# Zone lookup  -  non-fatal if GIS DB is unavailable
 				_try
-					_local zone_col << _self.database.collections[:ftth!zone]
-					_if zone_col _isnt _unset
-					_then
-						pl[:zone_rwo] << zone_col.select(
-							predicate.eq(:type, "Macro Cell") _and
-							predicate.eq(:cluster_code, cc)).an_element()
-					_endif
+					pl[:zone_rwo] << _self.find_zone_rwo(cc, pl[:lat], pl[:lon])
 				_when error
 				_endtry
 
@@ -406,7 +400,7 @@ _method rwwi_nisa_dialog.cluster_list_data()
 			_endif
 			.items[:table].add_cell(row, 9, {}, {:image, icon_status}, {:label, remark_status})
 			# lat/lon not displayed but remain in pl[:lat] / pl[:lon] for map rendering
-			
+
 			.cluster_cache[row] << pl
 		_endloop
 
@@ -428,7 +422,16 @@ _method rwwi_nisa_dialog.cluster_selected(table, selection)
 	_then
 		_for row _over selection.fast_elements()
 		_loop
-			_local pl << .cluster_cache[row]
+			# After a column-header sort, `row` is the VISUAL row index.
+			# Column 1 (#) holds the original insertion-order number set in
+			# cluster_list_data() and travels with the row during sort.
+			# Read it back to find the correct cluster_cache entry.
+			_local orig_row << row
+			_try
+				orig_row << table.cell(row, 1).value.as_number()
+			_when error
+			_endtry
+			_local pl << .cluster_cache[orig_row]
 			_if pl _isnt _unset _then .selected_clusters.add_last(pl) _endif
 		_endloop
 	_endif
@@ -437,7 +440,11 @@ _method rwwi_nisa_dialog.cluster_selected(table, selection)
 	                     _then >> .selected_clusters[1]
 	                     _else >> _unset
 	                     _endif
-
+	write("DEBUG: cluster_selected: ", .selected_clusters.size, " selected, single cluster = ",
+		_if .selected_cluster _isnt _unset
+		_then >> .selected_cluster[:cluster_code]
+		_else >> "(none)"
+		_endif)
 	_self.manage_actions()
 
 	# Refresh map immediately when show_map is active so displayed clusters track selection
@@ -668,6 +675,64 @@ _method rwwi_nisa_dialog.parse_massproblem_response_test(json_string)
 	result[:data]    << rope.new_with(dummy_mp)
 
 	>> result
+_endmethod
+$
+
+##
+## Zone RWO lookup
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.find_zone_rwo(cluster_code, lat_str, lon_str)
+	## Find the best matching ftth!zone record for the given cluster.
+	##
+	## Priority:
+	##   1. Macro Cell (type="Macro Cell") with matching cluster_code  -> return immediately
+	##   2. Micro Cell (type="Micro Cell") with matching cluster_code
+	##      AND whose area contains the outage coordinate               -> return first match
+	##   3. _unset if nothing found or coordinates are missing
+	##
+	## Parameters:
+	##   cluster_code - Cluster code string
+	##   lat_str      - Latitude string (WGS84, may be "" or _unset)
+	##   lon_str      - Longitude string (WGS84, may be "" or _unset)
+
+	_local zone_col << _self.database.collections[:ftth!zone]
+	_if zone_col _is _unset _then _return _unset _endif
+
+	# Step 1: Try Macro Cell first
+	_local macro_cell << zone_col.select(
+		predicate.eq(:type, "Macro Cell") _and
+		predicate.eq(:cluster_code, cluster_code)).an_element()
+	_if macro_cell _isnt _unset _then _return macro_cell _endif
+
+	# Step 2: No Macro Cell - fall back to Micro Cell containing the outage coordinate
+	_if lat_str _is _unset _orif lat_str = "" _orif
+	   lon_str _is _unset _orif lon_str = ""
+	_then
+		_return _unset
+	_endif
+
+	_try
+		_dynamic !current_world!             << .database.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << .database.collections[:sw_gis!world].at(0,0).coordinate_system
+
+		_local local_coord << _self.coord_xform().convert(
+			coordinate.new(lon_str.as_number(), lat_str.as_number()))
+
+		_local pt << pseudo_point.new(local_coord)
+		pt.world << .database.world
+
+		# Query Micro Cells for this cluster_code that spatially contain the outage point
+		_local micro_cell << zone_col.select(
+			predicate.eq(:type, "Micro Cell") _and
+			predicate.eq(:cluster_code, cluster_code) _and
+			predicate.interacts(:location, pt)).an_element()
+
+		_return micro_cell
+	_when error
+		_return _unset
+	_endtry
 _endmethod
 $
 
@@ -1291,52 +1356,57 @@ _private _method rwwi_nisa_dialog.search_by_area(area_name)
 				_return
 			_endif
 
-			_local in_clause << ""
-			_for i _over 1.upto(safe_parts.size)
+			## Batch IN clauses to avoid large query I/O errors over network (max 50 per batch)
+			_local batch_size  << 50
+			_local batch_start << 1
 			_loop
-				_if i > 1 _then in_clause << in_clause + ", " _endif
-				in_clause << in_clause + safe_parts[i]
+				_if batch_start > safe_parts.size _then _leave _endif
+				_local batch_end << (batch_start + batch_size - 1).min(safe_parts.size)
+
+				_local in_clause << ""
+				_for i _over batch_start.upto(batch_end)
+				_loop
+					_if i > batch_start _then in_clause << in_clause + ", " _endif
+					in_clause << in_clause + safe_parts[i]
+				_endloop
+
+				_local sql << write_string(
+					"SELECT cluster_id_stella, cluster_code_astri, olt_code, fdt_code, ",
+					"cluster_latitude, cluster_longitude, olt_hostname, homepass_total ",
+					"FROM smallworld.dim_cluster_stella_master_smallworld ",
+					"WHERE cluster_id_stella IN (", in_clause, ") ",
+					"ORDER BY cluster_code_astri")
+
+				_local recs << db_conn.sql_select(sql)
+				_loop
+					_local rec    << recs.get()
+					_if rec _is _unset _then _leave _endif
+					_local stella_id << rec.cluster_id_stella.default("").write_string
+					_local cc        << rec.cluster_code_astri.default("").write_string
+					_local db_pl << property_list.new_with(
+						:cluster_id_stella, stella_id,
+						:cluster_code,      cc,
+						:olt_code,          rec.olt_code.default("").write_string,
+						:fdt_code,          rec.fdt_code.default("").write_string,
+						:lat,               rec.cluster_latitude.default("").write_string,
+						:lon,               rec.cluster_longitude.default("").write_string,
+						:olt_hostname,      rec.olt_hostname.default("").write_string,
+						:homepass_total,    rec.homepass_total.default("").write_string,
+						:zone_rwo,          _unset)
+
+					# Zone lookup  -  non-fatal if GIS DB is unavailable
+					_try
+						db_pl[:zone_rwo] << _self.find_zone_rwo(cc, db_pl[:lat], db_pl[:lon])
+						#write("Zone RWO for cluster ", cc, " = ", db_pl[:zone_rwo], %newline.write_string)
+					_when error
+					_endtry
+
+					db_lookup[stella_id] << db_pl
+				_endloop
+				recs.close()
+
+				batch_start << batch_end + 1
 			_endloop
-
-			_local sql << write_string(
-				"SELECT cluster_id_stella, cluster_code_astri, olt_code, fdt_code, ",
-				"cluster_latitude, cluster_longitude, olt_hostname, homepass_total ",
-				"FROM smallworld.dim_cluster_stella_master_smallworld ",
-				"WHERE cluster_id_stella IN (", in_clause, ") ",
-				"ORDER BY cluster_code_astri")
-
-			_local recs << db_conn.sql_select(sql)
-			_loop
-				_local rec    << recs.get()
-				_if rec _is _unset _then _leave _endif
-				_local stella_id << rec.cluster_id_stella.default("").write_string
-				_local cc        << rec.cluster_code_astri.default("").write_string
-				_local db_pl << property_list.new_with(
-					:cluster_id_stella, stella_id,
-					:cluster_code,      cc,
-					:olt_code,          rec.olt_code.default("").write_string,
-					:fdt_code,          rec.fdt_code.default("").write_string,
-					:lat,               rec.cluster_latitude.default("").write_string,
-					:lon,               rec.cluster_longitude.default("").write_string,
-					:olt_hostname,      rec.olt_hostname.default("").write_string,
-					:homepass_total,    rec.homepass_total.default("").write_string,
-					:zone_rwo,          _unset)
-
-				# Zone lookup  -  non-fatal if GIS DB is unavailable
-				_try
-					_local zone_col << _self.database.collections[:ftth!zone]
-					_if zone_col _isnt _unset
-					_then
-						db_pl[:zone_rwo] << zone_col.select(
-							predicate.eq(:type, "Macro Cell") _and
-							predicate.eq(:cluster_code, cc)).an_element()
-					_endif
-				_when error
-				_endtry
-
-				db_lookup[stella_id] << db_pl
-			_endloop
-			recs.close()
 
 			_try
 				db_conn.commit()
@@ -1354,6 +1424,7 @@ _private _method rwwi_nisa_dialog.search_by_area(area_name)
 			_try
 				db_conn.rollback()
 				db_conn.close()
+				extdb_java_acp.close_all()
 			_when error
 			_endtry
 		_endif

@@ -67,6 +67,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 		                        _then >> "TURNKEY"
 		                        _else >> "NON TURNKEY"
 		                        _endif
+		write("Vendor: ", vendor_name, " | Code: ", vendor_code, " | Status:", vendor_status)
 		_local boq_file_path << create_boq(scheme,
 			wo[:infrastructure_type].default("cluster").lowercase,
 			vendor_name,
@@ -318,7 +319,8 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 									:equipment_name, equipment_name,
 									:description, item[:description],
 									:qty_material, qty_material,
-									:qty_service, qty_service))
+									:qty_service, qty_service,
+									:override_price_service, item[:override_price_service]))
 							_else
 								# Error response from API
 								_local error_msg << json_obj[:error].default("Unknown error")
@@ -421,7 +423,13 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 						"  Equipment Code   : ", item[:equipment_name], %newline,
 						"  Description      : ", item[:description], %newline,
 						"  Material Qty     : ", mat_qty, %newline,
-						"  Service Qty      : ", svc_qty, %newline,
+						"  Service Qty      : ", svc_qty, %newline)
+					_if item[:override_price_service] _isnt _unset
+					_then
+						success_msg << success_msg + write_string(
+							"  Price Service    : ", item[:override_price_service], %newline)
+					_endif
+					success_msg << success_msg + write_string(
 						"  Status           : SUCCESS", %newline,
 						%newline)
 				_endloop

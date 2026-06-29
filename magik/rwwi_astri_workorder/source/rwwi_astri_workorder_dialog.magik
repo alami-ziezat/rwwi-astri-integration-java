@@ -754,7 +754,7 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			.items[:table].add_label(row, 5,  wo[:status].default(""))
 			.items[:table].add_label(row, 6,  wo[:topology].default(""))
 			.items[:table].add_label(row, 7,  wo[:vendor].default(""))
-			.items[:table].add_label(row, 8,  wo[:donation_value].default(""))
+			.items[:table].add_label(row, 8,  _self.format_donation_display(wo[:donation_value]))
 			.items[:table].add_label(row, 9,  wo[:area].default(""))
 			.items[:table].add_label(row, 10, wo[:homepass].default(""))
 			.items[:table].add_label(row, 11, wo[:area_plant_code].default(""))
@@ -1107,6 +1107,29 @@ _private _method rwwi_astri_workorder_dialog.update_donation_button_state()
 	_local has_list   << .wo_cache _isnt _unset _andif _not .wo_cache.empty?
 	_local not_feeder << .filters[:infrastructure_type].default("cluster") <> "feeder"
 	.items[:get_donation_btn].enabled? << has_list _and not_feeder
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.format_donation_display(value)
+	## Format a numeric string with dot thousand separators for display.
+	## e.g. "1000000" -> "1.000.000"
+	## Returns empty string if value is unset/empty, or original if non-numeric.
+	_if value _is _unset _orif value = "" _then >> "" _endif
+	_local num_str << value.write_string.trim_spaces()
+	_if num_str.as_number() _is _unset _then >> num_str _endif
+	_local result << ""
+	_local count  << 0
+	_for i _over num_str.size.downto(1)
+	_loop
+		_if count > 0 _andif (count _mod 3) = 0
+		_then
+			result << "." + result
+		_endif
+		result << num_str[i].write_string + result
+		count +<< 1
+	_endloop
+	>> result
 _endmethod
 $
 
