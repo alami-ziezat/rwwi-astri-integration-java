@@ -440,11 +440,6 @@ _method rwwi_nisa_dialog.cluster_selected(table, selection)
 	                     _then >> .selected_clusters[1]
 	                     _else >> _unset
 	                     _endif
-	write("DEBUG: cluster_selected: ", .selected_clusters.size, " selected, single cluster = ",
-		_if .selected_cluster _isnt _unset
-		_then >> .selected_cluster[:cluster_code]
-		_else >> "(none)"
-		_endif)
 	_self.manage_actions()
 
 	# Refresh map immediately when show_map is active so displayed clusters track selection

@@ -1512,8 +1512,9 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_subfeeder_kml_migration(rec, obj_stats)
-	_local subfeeder_code << rec.subfeeder_code
-	_local kmz_uuid << rec.abd_kmz_uuid
+	# Convert ds_char16_vector DB fields to plain strings for Java interop
+	_local subfeeder_code << rec.subfeeder_code.write_string
+	_local kmz_uuid       << rec.abd_kmz_uuid.write_string
 
 	_try _with cond
 		rec.subfeeder_status << "PROCESS"
@@ -1576,6 +1577,8 @@ _method astri_data_migrator.migrate_cluster_objects()
 			_return obj_stats
 		_endif
 
+		_local commit_batch << 0
+
 		_for rec _over master_coll.fast_elements()
 		_loop
 			_local cluster_code << rec.cluster_code
@@ -1590,16 +1593,38 @@ _method astri_data_migrator.migrate_cluster_objects()
 			write("")
 			write("Processing CLUSTER: ", cluster_code, " - Status: ", current_status)
 
-			_if current_status = "MIGRATED"
+			_if current_status = "MIGRATED" _orif current_status = "ERROR"
 			_then
 				obj_stats[:skipped] +<< 1
 				_continue
 			_endif
 
 			_if _self.process_cluster_kml_migration(rec, obj_stats)
-			_then obj_stats[:migrated] +<< 1
+			_then
+				obj_stats[:migrated] +<< 1
+				commit_batch +<< 1
+				_if commit_batch _mod 50 = 0
+				_then
+					_try _with commit_err
+						.database.commit()
+						write("  [COMMIT] Committed after ", commit_batch, " migrated clusters (total migrated: ", obj_stats[:migrated], ")")
+					_when error
+						write("  [COMMIT ERROR] Failed to commit: ", commit_err.report_contents_string)
+					_endtry
+				_endif
 			_endif
 		_endloop
+
+		# Final commit for any remaining records not yet committed
+		_if commit_batch _mod 50 <> 0
+		_then
+			_try _with commit_err
+				.database.commit()
+				write("  [COMMIT] Final commit - total migrated: ", obj_stats[:migrated])
+			_when error
+				write("  [COMMIT ERROR] Final commit failed: ", commit_err.report_contents_string)
+			_endtry
+		_endif
 
 		write("=== CLUSTER OBJECT Migration Complete ===")
 	_when error
@@ -1612,8 +1637,9 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_cluster_kml_migration(rec, obj_stats)
-	_local cluster_code << rec.cluster_code
-	_local kmz_uuid << rec.abd_kmz_uuid
+	# Convert ds_char16_vector DB fields to plain strings for Java interop
+	_local cluster_code << rec.cluster_code.write_string
+	_local kmz_uuid     << rec.abd_kmz_uuid.write_string
 
 	_try _with cond
 		rec.subfeeder_status << "PROCESS"
@@ -1850,9 +1876,9 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_cluster_scheduled_migration(rec, obj_stats)
-	_local infra_code   << rec[:infra_code].default("")
-	_local topology_str << rec[:topology].default("")
-	_local kmz_uuid     << rec[:uuid].default("")
+	_local infra_code   << rec[:infra_code].default("").write_string
+	_local topology_str << rec[:topology].default("").write_string
+	_local kmz_uuid     << rec[:uuid].default("").write_string
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
@@ -1959,9 +1985,9 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, obj_stats)
-	_local infra_code   << rec[:infra_code].default("")
-	_local topology_str << rec[:topology].default("")
-	_local kmz_uuid     << rec[:uuid].default("")
+	_local infra_code   << rec[:infra_code].default("").write_string
+	_local topology_str << rec[:topology].default("").write_string
+	_local kmz_uuid     << rec[:uuid].default("").write_string
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
@@ -2068,9 +2094,9 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj_stats)
-	_local infra_code   << rec[:infra_code].default("")
-	_local topology_str << rec[:topology].default("")
-	_local kmz_uuid     << rec[:uuid].default("")
+	_local infra_code   << rec[:infra_code].default("").write_string
+	_local topology_str << rec[:topology].default("").write_string
+	_local kmz_uuid     << rec[:uuid].default("").write_string
 
 	_if kmz_uuid _is _unset _orif kmz_uuid = ""
 	_then
@@ -2361,8 +2387,9 @@ _private _method astri_data_migrator.process_cluster_boundary_cell(rec, obj_stat
 	## Returns:
 	##   _true if Macro Cell was created, _false on error
 
-	_local cluster_code << rec.cluster_code
-	_local kmz_uuid << rec.abd_kmz_uuid
+	# Convert ds_char16_vector DB fields to plain strings for Java interop
+	_local cluster_code << rec.cluster_code.write_string
+	_local kmz_uuid     << rec.abd_kmz_uuid.write_string
 
 	_try _with cond
 		obj_stats[:processed] +<< 1
@@ -2390,8 +2417,10 @@ _private _method astri_data_migrator.process_cluster_boundary_cell(rec, obj_stat
 
 		# Parse KML into placemarks
 		_local kml_file_path << kml_path_elem.xml_result
-		_local parser << astri_kml_parser.new(kml_file_path)
-		_local (placemarks, _topology) << parser.parse()
+		_local parser    << astri_kml_parser.new(kml_file_path)
+		_local placemarks << _unset
+		_local topology   << _unset
+		(placemarks, topology) << parser.parse()
 		write("  Parsed ", placemarks.size, " placemarks")
 
 		# Build context for design migrator

@@ -75,20 +75,18 @@ _private _method map_blink_animation.fill_image_cache(p_cache)
 	# Note that the wash_pattern only works if the map view is
 	# setup to use Advanced Map Drawing.
 	outer_style << fill_style.new_with_properties(
-			       :wash_percent,
-			       50,
-			       :foreground_colour,
-			       colour.new_with_properties(:red,209,:green,227,:blue,255,:scale,255))
-	middle_style << fill_style.new_with_properties(:foreground_colour,
-						       colour.new_with_properties(:red,77,:green,144,:blue,254,:scale,255))
+			       :wash_percent,       70,
+			       :foreground_colour,  colour.called(:red))
+	middle_style << fill_style.new_with_properties(
+				:foreground_colour, colour.called(:yellow))
 	white_line_style << line_style.new_with_properties(
 				    :width, 1,
-				    :foreground_colour,
-				    colour.called(:white)) 
+				    :foreground_colour, colour.called(:white))
 	grey_line_style << line_style.new_with_properties(
 				   :width, 1,
 				   :foreground_colour,
 				   colour.new_with_properties(:red,141,:green,149,:blue,161,:scale,255))
+	#_local bg_style << fill_style.new_with_properties(:foreground_colour, colour.called(:white))
 	_for i _over range(1,4)
 	_loop		
 		_local mem_cv << memory_canvas.new(pb.width, pb.height)
@@ -99,13 +97,13 @@ _private _method map_blink_animation.fill_image_cache(p_cache)
 		mem_cv.fill_ellipse(outer_style,
 				    pixel_midx-radius, pixel_midy-radius,
 				    pixel_midx+radius, pixel_midy+radius)
-		mem_cv.fill_ellipse( middle_style,
-				     pixel_midx-mini_radius, pixel_midy-mini_radius,
-				     pixel_midx+mini_radius, pixel_midy+mini_radius )
-		mem_cv.draw_circle( white_line_style,
-				    pixel_midx, pixel_midy, mini_radius-2)
-		mem_cv.draw_circle( grey_line_style,
-				    pixel_midx, pixel_midy, mini_radius-1)
+		mem_cv.fill_ellipse(middle_style,
+				    pixel_midx-mini_radius, pixel_midy-mini_radius,
+				    pixel_midx+mini_radius, pixel_midy+mini_radius)
+		mem_cv.draw_circle(white_line_style,
+				   pixel_midx, pixel_midy, mini_radius-2)
+		mem_cv.draw_circle(grey_line_style,
+				   pixel_midx, pixel_midy, mini_radius-1)
 		mem_img << image.new_for_window(mem_cv, _false, mem_cv.width-1, mem_cv.height-1)
 		mem_img.clear()
 		mem_img.copy_from_canvas(1,1)
