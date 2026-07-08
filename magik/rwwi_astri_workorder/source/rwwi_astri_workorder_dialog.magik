@@ -19,7 +19,8 @@ def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 	{:wo_cache,         _unset, :writable},    # Cache to store work orders by row number
 	{:last_kmz_path,    _unset, :writable},    # Path of most recently exported KMZ
 	{:last_boq_path,    _unset, :writable},    # Path of most recently saved BOQ document
-	{:last_excel_path,  _unset, :writable}     # Path of manually selected Excel file for upload
+	{:last_excel_path,  _unset, :writable},    # Path of manually selected Excel file for upload
+	{:batch_infra_codes, _unset, :writable}    # Active batch import filter (equality_hash_table of infra_code→true, or _unset)
 }, :model)
 $
 
@@ -69,12 +70,12 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:model, _self)
 
 	# Create outer container with flexible row sizing
-	# 9 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed),
-	#         Table (flexible), Text Window (flexible),
-	#         Bottom Action Toolbar (fixed), Bottom Upload+KML Toolbar (fixed),
-	#         Bottom BOQ+Excel Toolbar (fixed), Progress Footer (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 9, 1,
-		:row_resize_values, {0, 0, 0, 1, 1, 0, 0, 0, 0})
+	# 10 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed),
+	#          Toolbar4/BatchImport (fixed), Table (flexible), Text Window (flexible),
+	#          Bottom Action Toolbar (fixed), Bottom Upload+KML Toolbar (fixed),
+	#          Bottom BOQ+Excel Toolbar (fixed), Progress Footer (fixed)
+	.items[:outer] << outer << sw_container.new(top_c, 10, 1,
+		:row_resize_values, {0, 0, 0, 0, 1, 1, 0, 0, 0, 0})
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
@@ -82,6 +83,9 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 
 	# Build local KMZ file browser toolbar
 	_self.build_toolbar3(outer)
+
+	# Build batch import toolbar
+	_self.build_toolbar4(outer)
 
 	# Build work order table
 	_self.build_table(outer)
@@ -268,6 +272,59 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
 		:selector, :schedule_wo|()|,
 		:tooltip, "Insert selected WO into scheduler log (drm_scheduler_logs)")
 	.items[:schedule_wo_btn].enabled? << _false
+_endmethod
+$
+
+_private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
+	## Build batch import toolbar.
+	## Provides Browse List + Load WO List + Schedule All buttons for
+	## importing an infra_code list from a .txt file.
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type, :container,
+		:show_separators?, _true,
+		:enable_action_menu?, _false)
+
+	a_toolbar << toolbar_con.create_toolbar()
+
+	sw_label_item.new(a_toolbar, "  Batch Import:  ")
+
+	.items[:batch_browse_btn] << sw_button_item.new(a_toolbar,
+		:image, {:browse, :ui_resources},
+		:model, _self,
+		:selector, :browse_batch_list|()|,
+		:tooltip, "Browse for infra_code list (.txt file)")
+
+	.items[:batch_list_path] << sw_text_item.new(a_toolbar,
+		:model, _self,
+		:display_length, 50,
+		:editable?, _false)
+	.items[:batch_list_path].value << ""
+
+	.items[:batch_clear_btn] << sw_button_item.new(a_toolbar,
+		:label, "Clear",
+		:model, _self,
+		:selector, :clear_batch_list|()|,
+		:tooltip, "Clear batch import list")
+	.items[:batch_clear_btn].enabled? << _false
+
+	sw_label_item.new(a_toolbar, "  ")
+
+	.items[:load_wo_list_btn] << sw_button_item.new(a_toolbar,
+		:label, "Load WO List",
+		:model, _self,
+		:selector, :load_wo_list|()|,
+		:tooltip, "Fetch and display work orders for all infra_codes in the file")
+	.items[:load_wo_list_btn].enabled? << _false
+
+	sw_label_item.new(a_toolbar, "  ")
+
+	.items[:schedule_all_btn] << sw_button_item.new(a_toolbar,
+		:label, "Schedule All",
+		:model, _self,
+		:selector, :schedule_all_wo|()|,
+		:tooltip, "Insert all displayed work orders into the scheduler log")
+	.items[:schedule_all_btn].enabled? << _false
 _endmethod
 $
 
@@ -725,6 +782,20 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 				_self.build_filter_params())
 		_else
 			>> .engine.get_workorders_from_db(_self.build_filter_params())
+		_endif
+
+		# Apply batch import filter if active
+		_if .batch_infra_codes _isnt _unset _andif _not .batch_infra_codes.empty?
+		_then
+			_local batch_filtered << rope.new()
+			_for wo _over workorders.fast_elements()
+			_loop
+				_if .batch_infra_codes[wo[:infra_code].default("")] _isnt _unset
+				_then
+					batch_filtered.add(wo)
+				_endif
+			_endloop
+			workorders << batch_filtered
 		_endif
 
 		# Populate table using sw_table methods

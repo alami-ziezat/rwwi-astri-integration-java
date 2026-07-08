@@ -1748,17 +1748,23 @@ _method astri_data_migrator.migrate_scheduled_objects()
 
 	_local overall_stats << property_list.new_with(
 		:cluster_total, 0,   :cluster_migrated, 0,   :cluster_errors, 0,
+		:cluster_succeeded_codes, rope.new(), :cluster_failed_codes, rope.new(), :cluster_features, 0,
 		:subfeeder_total, 0, :subfeeder_migrated, 0, :subfeeder_errors, 0,
-		:feeder_total, 0,    :feeder_migrated, 0,    :feeder_errors, 0)
+		:subfeeder_succeeded_codes, rope.new(), :subfeeder_failed_codes, rope.new(), :subfeeder_features, 0,
+		:feeder_total, 0,    :feeder_migrated, 0,    :feeder_errors, 0,
+		:feeder_succeeded_codes, rope.new(), :feeder_failed_codes, rope.new(), :feeder_features, 0)
 
 	# Phase 1: FEEDER
 	_try
 		write("PHASE 1/3: Starting FEEDER scheduled migration...")
 		write("")
 		_local s << _self.migrate_feeder_scheduled_objects()
-		overall_stats[:feeder_total]    << s[:total]
-		overall_stats[:feeder_migrated] << s[:migrated]
-		overall_stats[:feeder_errors]   << s[:errors]
+		overall_stats[:feeder_total]           << s[:total]
+		overall_stats[:feeder_migrated]        << s[:migrated]
+		overall_stats[:feeder_errors]          << s[:errors]
+		overall_stats[:feeder_succeeded_codes] << s[:succeeded_codes].default(rope.new())
+		overall_stats[:feeder_failed_codes]    << s[:failed_codes].default(rope.new())
+		overall_stats[:feeder_features]        << s[:features_written].default(0)
 		write("PHASE 1/3: FEEDER completed")
 		write("")
 	_when error
@@ -1772,9 +1778,12 @@ _method astri_data_migrator.migrate_scheduled_objects()
 		write("PHASE 2/3: Starting SUBFEEDER scheduled migration...")
 		write("")
 		_local s << _self.migrate_subfeeder_scheduled_objects()
-		overall_stats[:subfeeder_total]    << s[:total]
-		overall_stats[:subfeeder_migrated] << s[:migrated]
-		overall_stats[:subfeeder_errors]   << s[:errors]
+		overall_stats[:subfeeder_total]           << s[:total]
+		overall_stats[:subfeeder_migrated]        << s[:migrated]
+		overall_stats[:subfeeder_errors]          << s[:errors]
+		overall_stats[:subfeeder_succeeded_codes] << s[:succeeded_codes].default(rope.new())
+		overall_stats[:subfeeder_failed_codes]    << s[:failed_codes].default(rope.new())
+		overall_stats[:subfeeder_features]        << s[:features_written].default(0)
 		write("PHASE 2/3: SUBFEEDER completed")
 		write("")
 	_when error
@@ -1788,9 +1797,12 @@ _method astri_data_migrator.migrate_scheduled_objects()
 		write("PHASE 3/3: Starting CLUSTER scheduled migration...")
 		write("")
 		_local s << _self.migrate_cluster_scheduled_objects()
-		overall_stats[:cluster_total]    << s[:total]
-		overall_stats[:cluster_migrated] << s[:migrated]
-		overall_stats[:cluster_errors]   << s[:errors]
+		overall_stats[:cluster_total]           << s[:total]
+		overall_stats[:cluster_migrated]        << s[:migrated]
+		overall_stats[:cluster_errors]          << s[:errors]
+		overall_stats[:cluster_succeeded_codes] << s[:succeeded_codes].default(rope.new())
+		overall_stats[:cluster_failed_codes]    << s[:failed_codes].default(rope.new())
+		overall_stats[:cluster_features]        << s[:features_written].default(0)
 		write("PHASE 3/3: CLUSTER completed")
 		write("")
 	_when error
@@ -1828,6 +1840,8 @@ _method astri_data_migrator.migrate_scheduled_objects()
 	write("Duration: ", duration.write_string)
 	write("=================================================================")
 
+	_self.write_batch_summary_log(overall_stats, start_time, end_time)
+
 	>> overall_stats
 _endmethod
 $
@@ -1840,7 +1854,9 @@ _method astri_data_migrator.migrate_cluster_scheduled_objects()
 	_local start_time << date_time.now()
 	write("=== CLUSTER SCHEDULED Migration Started ===")
 
-	_local obj_stats << property_list.new_with(:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+	_local obj_stats << property_list.new_with(
+		:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0,
+		:succeeded_codes, rope.new(), :failed_codes, rope.new(), :features_written, 0)
 
 	_try _with cond
 		_local scheduled << _self.get_scheduled_records("cluster")
@@ -1861,6 +1877,9 @@ _method astri_data_migrator.migrate_cluster_scheduled_objects()
 			_if _self.process_cluster_scheduled_migration(rec, obj_stats)
 			_then
 				obj_stats[:migrated] +<< 1
+				obj_stats[:succeeded_codes].add(infra_code)
+			_else
+				obj_stats[:failed_codes].add(infra_code)
 			_endif
 		_endloop
 
@@ -1923,7 +1942,15 @@ _private _method astri_data_migrator.process_cluster_scheduled_migration(rec, ob
 				:area,                "",
 				:area_plant_code,     "")
 
-			_self.migrate_to_sw_design(wo, placemarks, "cluster", topology)
+			_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, "cluster", topology)
+			_if mig_stats _isnt _unset
+			_then
+				obj_stats[:features_written] +<< (
+					mig_stats[:aerial_routes].default(0) +
+					mig_stats[:underground_routes].default(0) +
+					mig_stats[:new_poles].default(0) +
+					mig_stats[:demand_points].default(0))
+			_endif
 			_self.update_scheduled_status(infra_code, "cluster", "migrated")
 			_return _true
 		_else
@@ -1949,7 +1976,9 @@ _method astri_data_migrator.migrate_subfeeder_scheduled_objects()
 	_local start_time << date_time.now()
 	write("=== SUBFEEDER SCHEDULED Migration Started ===")
 
-	_local obj_stats << property_list.new_with(:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+	_local obj_stats << property_list.new_with(
+		:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0,
+		:succeeded_codes, rope.new(), :failed_codes, rope.new(), :features_written, 0)
 
 	_try _with cond
 		_local scheduled << _self.get_scheduled_records("subfeeder")
@@ -1970,6 +1999,9 @@ _method astri_data_migrator.migrate_subfeeder_scheduled_objects()
 			_if _self.process_subfeeder_scheduled_migration(rec, obj_stats)
 			_then
 				obj_stats[:migrated] +<< 1
+				obj_stats[:succeeded_codes].add(infra_code)
+			_else
+				obj_stats[:failed_codes].add(infra_code)
 			_endif
 		_endloop
 
@@ -2032,7 +2064,15 @@ _private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, 
 				:area,                "",
 				:area_plant_code,     "")
 
-			_self.migrate_to_sw_design(wo, placemarks, "subfeeder", topology)
+			_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, "subfeeder", topology)
+			_if mig_stats _isnt _unset
+			_then
+				obj_stats[:features_written] +<< (
+					mig_stats[:aerial_routes].default(0) +
+					mig_stats[:underground_routes].default(0) +
+					mig_stats[:new_poles].default(0) +
+					mig_stats[:demand_points].default(0))
+			_endif
 			_self.update_scheduled_status(infra_code, "subfeeder", "migrated")
 			_return _true
 		_else
@@ -2058,7 +2098,9 @@ _method astri_data_migrator.migrate_feeder_scheduled_objects()
 	_local start_time << date_time.now()
 	write("=== FEEDER SCHEDULED Migration Started ===")
 
-	_local obj_stats << property_list.new_with(:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0)
+	_local obj_stats << property_list.new_with(
+		:total, 0, :processed, 0, :migrated, 0, :skipped, 0, :errors, 0,
+		:succeeded_codes, rope.new(), :failed_codes, rope.new(), :features_written, 0)
 
 	_try _with cond
 		_local scheduled << _self.get_scheduled_records("feeder")
@@ -2079,6 +2121,9 @@ _method astri_data_migrator.migrate_feeder_scheduled_objects()
 			_if _self.process_feeder_scheduled_migration(rec, obj_stats)
 			_then
 				obj_stats[:migrated] +<< 1
+				obj_stats[:succeeded_codes].add(infra_code)
+			_else
+				obj_stats[:failed_codes].add(infra_code)
 			_endif
 		_endloop
 
@@ -2141,7 +2186,15 @@ _private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj
 				:area,                "",
 				:area_plant_code,     "")
 
-			_self.migrate_to_sw_design(wo, placemarks, "feeder", topology)
+			_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, "feeder", topology)
+			_if mig_stats _isnt _unset
+			_then
+				obj_stats[:features_written] +<< (
+					mig_stats[:aerial_routes].default(0) +
+					mig_stats[:underground_routes].default(0) +
+					mig_stats[:new_poles].default(0) +
+					mig_stats[:demand_points].default(0))
+			_endif
 			_self.update_scheduled_status(infra_code, "feeder", "migrated")
 			_return _true
 		_else
@@ -2226,6 +2279,7 @@ _private _method astri_data_migrator.migrate_to_sw_design(wo, placemarks, infra_
 	      ", HP: ", stats[:demand_points],
 	      ", Cable: ", stats[:sheath_length].rounded, "m",
 	      ", Errors: ", stats[:errors])
+	>> stats
 _endmethod
 $
 
@@ -2504,5 +2558,233 @@ _private _method astri_data_migrator.update_scheduled_status(infra_code, infra_t
 		_when error
 		_endtry
 	_endtry
+_endmethod
+$
+
+## ============================================================
+## BATCH SUMMARY LOG
+## Writes a formatted .txt summary to TEMP folder at the end of
+## migrate_scheduled_objects().  Each run produces a new file
+## (filename encodes the run datetime); existing files are untouched.
+## ============================================================
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.write_batch_summary_log(stats, start_time, end_time)
+	## Write ETL summary .txt to TEMP after all scheduled migrations complete.
+
+	_local d1 << start_time.date
+	_local t1 << start_time.time
+	_local d2 << end_time.date
+
+	_local date_str   << _self._sum_fmt_date(d1)
+	_local compact_dt << _self._sum_compact_dt(d1, t1)
+	_local date_str2  << _self._sum_fmt_date(d2)
+	_local ts_range   << _if date_str = date_str2
+	                    _then >> date_str
+	                    _else >> write_string(date_str, " -- ", date_str2)
+	                    _endif
+
+	_local types_label << _self._sum_active_types(stats)
+
+	# Grand totals
+	_local g_total << stats[:cluster_total] + stats[:subfeeder_total] + stats[:feeder_total]
+	_local g_migr  << stats[:cluster_migrated] + stats[:subfeeder_migrated] + stats[:feeder_migrated]
+	_local g_err   << stats[:cluster_errors] + stats[:subfeeder_errors] + stats[:feeder_errors]
+	_local g_feat  << stats[:cluster_features].default(0) +
+	                  stats[:subfeeder_features].default(0) +
+	                  stats[:feeder_features].default(0)
+
+	_local pct_str << _if g_total > 0
+	                 _then
+	                     _local pct_int << (g_migr.as_float() * 10000.0 / g_total.as_float()).rounded
+	                     >> write_string(pct_int _div 100, ".", _self._sum_zpad(pct_int _mod 100), "%")
+	                 _else
+	                     >> "0.00%"
+	                 _endif
+
+	_local SEP << "+------------------------------------------------------+"
+	_local lines << rope.new()
+
+	# Title row (variable width, matches content)
+	_local title_body << write_string("[SMALLWORLD] - SUMMARY ETL [", types_label, "] [", date_str, "]")
+	lines.add(write_string("+===", title_body, "===+"))
+
+	# Header block
+	lines.add(_self._sum_row("Asset Level",      types_label))
+	lines.add(_self._sum_row("Datetime",          compact_dt))
+	lines.add(_self._sum_row("Updated Timestamp", ts_range))
+	lines.add(SEP)
+
+	# Grand totals block
+	lines.add(_self._sum_row("Total processed",       g_total.write_string))
+	lines.add(_self._sum_row("Total successful",       g_migr.write_string))
+	lines.add(_self._sum_row("Total failed",           g_err.write_string))
+	lines.add(_self._sum_row("Success percentage",     pct_str))
+	lines.add(_self._sum_row("Total features written", g_feat.write_string))
+	lines.add("+======================================================+")
+
+	# Per-infra-type sections
+	_local type_defs << {{"cluster", "CLUSTER"}, {"subfeeder", "SUB-FEEDER"}, {"feeder", "FEEDER"}}
+
+	_for td _over type_defs.fast_elements()
+	_loop
+		_local itype  << td[1]
+		_local ilabel << td[2]
+		_local t_tot  << stats[write_string(itype, "_total").as_symbol()].default(0)
+		_if t_tot = 0 _then _continue _endif
+
+		_local t_migr << stats[write_string(itype, "_migrated").as_symbol()].default(0)
+		_local t_err  << stats[write_string(itype, "_errors").as_symbol()].default(0)
+		_local t_succ << stats[write_string(itype, "_succeeded_codes").as_symbol()].default(rope.new())
+		_local t_fail << stats[write_string(itype, "_failed_codes").as_symbol()].default(rope.new())
+
+		# Section header line
+		_local hdr << write_string("+== ", ilabel, " ")
+		_loop
+			_if hdr.size >= 55 _then _leave _endif
+			hdr << hdr + "="
+		_endloop
+		lines.add(hdr + "+")
+
+		lines.add(_self._sum_row("Processed", t_tot.write_string))
+		lines.add(_self._sum_row("Success",   t_migr.write_string))
+		lines.add(_self._sum_row("Failed",    t_err.write_string))
+		lines.add(SEP)
+
+		_if _not t_succ.empty?
+		_then
+			_self._sum_code_lines(lines, "List succeed", t_succ)
+		_endif
+
+		_if _not t_fail.empty?
+		_then
+			_self._sum_code_lines(lines, "List failed",  t_fail)
+		_endif
+
+		lines.add(SEP)
+	_endloop
+
+	# Write file (new file per run — unique datetime in name)
+	_local temp_dir << system.getenv("TEMP").default("C:\\temp")
+	_local filename << write_string("SMALLWORLD - SUMMARY ETL - ", compact_dt, ".txt")
+	_local filepath << write_string(temp_dir, "\\", filename)
+
+	_try
+		_local stream << external_text_output_stream.new(filepath)
+		_protect
+			_for line _over lines.fast_elements()
+			_loop
+				stream.write(line)
+				stream.write(%newline)
+			_endloop
+		_protection
+			stream.close()
+		_endprotect
+		write("=== Batch summary log written: ", filepath, " ===")
+	_when error
+		write("ERROR writing batch summary log: ", condition.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator._sum_row(key, value)
+	## Format a 56-char wide data row: | KEY (20 chars) : VALUE (padded) |
+	_local k << key.write_string
+	_local v << value.write_string
+	_loop
+		_if k.size >= 20 _then _leave _endif
+		k << k + " "
+	_endloop
+	_local line << write_string("| ", k, ": ", v, " ")
+	_loop
+		_if line.size >= 55 _then _leave _endif
+		line << line + " "
+	_endloop
+	>> line + "|"
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator._sum_code_lines(lines, label, codes)
+	## Append wrapped infra_code list lines to lines rope.
+	## Content width: 52 chars inside "| ... |" (56 total).
+	_local prefix      << write_string(label, ": ")
+	_local content_max << 52
+	_local current     << prefix
+
+	_for code _over codes.fast_elements()
+	_loop
+		_local token << write_string(code, ", ")
+		_if current.size + token.size > content_max _andif current <> prefix
+		_then
+			_local ln << "| " + current
+			_loop
+				_if ln.size >= 55 _then _leave _endif
+				ln << ln + " "
+			_endloop
+			lines.add(ln + "|")
+			current << token
+		_else
+			current << current + token
+		_endif
+	_endloop
+
+	# Flush final partial line, strip trailing ", "
+	_if current <> prefix _andif current <> ""
+	_then
+		_if current.size >= 2 _andif current.subseq(current.size - 1, 2) = ", "
+		_then
+			current << current.subseq(1, current.size - 2)
+		_endif
+		_local ln << "| " + current
+		_loop
+			_if ln.size >= 55 _then _leave _endif
+			ln << ln + " "
+		_endloop
+		lines.add(ln + "|")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator._sum_fmt_date(d)
+	## Return date as "YYYY-MM-DD"
+	>> write_string(d.year, "-", _self._sum_zpad(d.month), "-", _self._sum_zpad(d.day))
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator._sum_compact_dt(d, t)
+	## Return "YYYYMMDD_HHMMSS" for filename and Datetime field
+	>> write_string(d.year,
+		_self._sum_zpad(d.month), _self._sum_zpad(d.day), "_",
+		_self._sum_zpad(t.hours), _self._sum_zpad(t.minutes), _self._sum_zpad(t.seconds))
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator._sum_zpad(n)
+	## Return integer n as 2-digit string with leading zero if n < 10
+	_if n < 10 _then >> write_string("0", n) _endif
+	>> n.write_string
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator._sum_active_types(stats)
+	## Build human-readable infra-type label for types that had records
+	_local parts << rope.new()
+	_if stats[:cluster_total].default(0)   > 0 _then parts.add("CLUSTER")    _endif
+	_if stats[:subfeeder_total].default(0) > 0 _then parts.add("SUB-FEEDER") _endif
+	_if stats[:feeder_total].default(0)    > 0 _then parts.add("FEEDER")     _endif
+	_if parts.empty? _then >> "ALL" _endif
+	_local result << ""
+	_for i _over 1.upto(parts.size)
+	_loop
+		_if i > 1 _then result << result + " | " _endif
+		result << result + parts[i]
+	_endloop
+	>> result
 _endmethod
 $
