@@ -27,7 +27,8 @@ def_slotted_exemplar(:astri_data_migrator,
 		{:transform, _unset},          # WGS84 to local coordinate transform
 		{:stats, _unset},              # Migration statistics
 		{:db_connection, _unset},      # PostgreSQL database connection
-		{:scheduler_table, _unset}     # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_log)
+		{:scheduler_table, _unset},    # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_log)
+		{:last_log_file, _unset}       # Full path of the most recently written summary .txt
 	},
 	{})
 $
@@ -1740,7 +1741,11 @@ _method astri_data_migrator.migrate_scheduled_objects()
 	##
 	## CLI usage:
 	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
-	##   migrator.migrate_scheduled_objects()
+	##   result << migrator.migrate_scheduled_objects()
+	##   log_path << result[:log_file]        # or migrator.last_log_file()
+	##
+	## Returns: overall_stats property_list, which includes :log_file — the full
+	##          path of the summary .txt written for this run (_unset if none).
 
 	_local start_time << date_time.now()
 	write("=================================================================")
@@ -1844,7 +1849,12 @@ _method astri_data_migrator.migrate_scheduled_objects()
 	write("Duration: ", duration.write_string)
 	write("=================================================================")
 
-	_self.write_batch_summary_log(overall_stats, start_time, end_time)
+	# Write the summary .txt and capture its full path so callers can use it.
+	# The path is returned both in overall_stats[:log_file] and via .last_log_file.
+	_local log_file << _self.write_batch_summary_log(overall_stats, start_time, end_time)
+	overall_stats[:log_file] << log_file
+	.last_log_file << log_file
+	write("Summary log file: ", log_file.default("(not created)"))
 
 	>> overall_stats
 _endmethod
@@ -2591,9 +2601,11 @@ _method astri_data_migrator.migrate_etl_scheduled_objects()
 	##
 	## CLI usage:
 	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
-	##   migrator.migrate_etl_scheduled_objects()
+	##   result << migrator.migrate_etl_scheduled_objects()
+	##   log_path << result[:log_file]        # or migrator.last_log_file()
 	##
-	## Returns: overall_stats property_list
+	## Returns: overall_stats property_list, including :log_file (full path of the
+	##          summary .txt written for this run, or _unset if none).
 
 	write("=== AUTOMATED ETL SCHEDULER RUN (drm_etl_scheduler_log) ===")
 	.scheduler_table << "smallworld.drm_etl_scheduler_log"
@@ -2603,6 +2615,15 @@ _method astri_data_migrator.migrate_etl_scheduled_objects()
 		# Always restore the default table so the same instance can run either job
 		.scheduler_table << "smallworld.drm_scheduler_logs"
 	_endprotect
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.last_log_file()
+	## Full path of the summary .txt written by the most recent run,
+	## or _unset if no run has completed / the file could not be written.
+	## Convenience accessor for callers that don't keep the run's return value.
+	>> .last_log_file
 _endmethod
 $
 
@@ -2725,8 +2746,11 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 			stream.close()
 		_endprotect
 		write("=== Batch summary log written: ", filepath, " ===")
+		# Return the full path of the written log file for downstream callers
+		_return filepath
 	_when error
 		write("ERROR writing batch summary log: ", condition.report_contents_string)
+		_return _unset
 	_endtry
 _endmethod
 $

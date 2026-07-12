@@ -68,6 +68,18 @@ Each run processes `status='scheduled'` rows in the order **FEEDER → SUBFEEDER
 updates each row `scheduled → processing → migrated`/`failed`, and writes a summary `.txt`
 to `%TEMP%` on completion.
 
+**Both runs return the summary log file path** so other code can pick it up:
+
+```magik
+result   << migrator.migrate_scheduled_objects()      # or migrate_etl_scheduled_objects()
+log_path << result[:log_file]                          # full path of the .txt (or _unset)
+# also available via:
+log_path << migrator.last_log_file()
+```
+
+`write_batch_summary_log()` returns the path (or `_unset` on write failure); the run stores it
+in `overall_stats[:log_file]` and in the `.last_log_file` slot (accessor `last_log_file()`).
+
 ---
 
 ## Part 1 — Batch Import (Toolbar 4) → `drm_scheduler_logs`
