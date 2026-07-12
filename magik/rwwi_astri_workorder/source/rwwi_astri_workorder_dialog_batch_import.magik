@@ -229,8 +229,17 @@ _method rwwi_astri_workorder_dialog.fetch_batch_workorders()
 			_local params << property_list.new()
 			params[code_field] << code
 
-			_local wos << .engine.get_workorders_from_api(
-				sec_type, fetch_limit, 0, params)
+			# Isolate each code: an API/parse error on one code must NOT stop
+			# the rest of the batch. On error, treat as "not found" and continue.
+			_local wos << _unset
+			_try _with fetch_cond
+				wos << .engine.get_workorders_from_api(
+					sec_type, fetch_limit, 0, params)
+			_when error
+				_self.log_warning(write_string("Fetch error [", sec_type, "]: ", code,
+					" - skipped (", fetch_cond.report_contents_string, ")"))
+				wos << _unset
+			_endtry
 
 			_local got? << _false
 			_if wos _isnt _unset
@@ -321,7 +330,8 @@ _method rwwi_astri_workorder_dialog.add_all_to_scheduler()
 			:scheduler_username, username,
 			:status,             "scheduled",
 			:topology,           wo[:topology].default(""),
-			:uuid,               wo[:kmz_uuid].default(""))
+			:uuid,               wo[:kmz_uuid].default(""),
+			:description,        "BULK")
 
 		_local ok? << .engine.insert_scheduler_log(params)
 		_if ok?

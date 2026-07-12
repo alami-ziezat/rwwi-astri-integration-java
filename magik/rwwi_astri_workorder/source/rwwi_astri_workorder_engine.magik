@@ -394,7 +394,11 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 		                          _else >> _unset
 		                          _endif
 
-		# Iterate through workorder elements
+		# Iterate through workorder elements.
+		# Guard against unset/empty data (e.g. count=0) so an empty result
+		# returns an empty list instead of raising.
+		_if data_elem _isnt _unset
+		_then
 		_for wo_elem _over data_elem.elements_matching_name(:workorder)
 		_loop
 			_local pl << property_list.new()
@@ -473,8 +477,9 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 						  
 			result_rope.add(pl)
 		_endloop
+		_endif
 
-		_if .db_connection _isnt _unset 
+		_if .db_connection _isnt _unset
 		_then
 			write("close connection")
 			extdb_java_acp.close_all()
@@ -866,9 +871,9 @@ _method rwwi_astri_workorder_engine.insert_scheduler_log(params)
 
 	_local sql << "INSERT INTO smallworld.drm_scheduler_logs " +
 		"(infra_code, name, infra_type, username, scheduler_username, " +
-		"schedule_date, start_time, end_time, status, topology, uuid, " +
+		"schedule_date, start_time, end_time, status, topology, uuid, description, " +
 		"created_at, updated_at) " +
-		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, ?, NOW(), NOW())"
+		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, ?, ?, NOW(), NOW())"
 
 	_local conn << _unset
 
@@ -891,7 +896,8 @@ _method rwwi_astri_workorder_engine.insert_scheduler_log(params)
 			params[:scheduler_username],
 			params[:status],
 			params[:topology],
-			params[:uuid])
+			params[:uuid],
+			params[:description].default("BULK"))
 
 		conn.commit()
 		extdb_java_acp.close_all()
@@ -981,9 +987,9 @@ _method rwwi_astri_workorder_engine.insert_etl_scheduler_log(params)
 
 	_local sql << "INSERT INTO smallworld.drm_etl_scheduler_log " +
 		"(infra_code, name, infra_type, username, scheduler_username, " +
-		"schedule_date, start_time, end_time, status, topology, uuid, subject, " +
+		"schedule_date, start_time, end_time, status, topology, uuid, subject, description, " +
 		"created_at, updated_at) " +
-		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, ?, ?, NOW(), NOW())"
+		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, ?, ?, ?, NOW(), NOW())"
 
 	_local conn << _unset
 
@@ -1007,7 +1013,8 @@ _method rwwi_astri_workorder_engine.insert_etl_scheduler_log(params)
 			params[:status],
 			params[:topology],
 			params[:uuid],
-			params[:subject])
+			params[:subject],
+			params[:description].default("SINGLE"))
 
 		conn.commit()
 		extdb_java_acp.close_all()

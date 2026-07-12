@@ -156,9 +156,11 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 	##
 	## Returns: donation value string, or _unset if not found / on error.
 
+	_local infra_code << wo[:infra_code].default("")
+
 	_local filters << property_list.new_with(
 		:assigned_vendor_name, "--not internal",
-		:target_cluster_code,  wo[:infra_code].default(""),
+		:target_cluster_code,  infra_code,
 		:latest_status_name,   "--not cancelled",
 		:permit_status,        "DONATION APPROVED")
 
@@ -170,24 +172,50 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 	_local json_response << astri_get_donation_work_orders(100, 0, filters)
 
 	_if json_response _is _unset _orif json_response = ""
-	_then >> _unset
+	_then
+		write("No donation response for ", infra_code, " - skipped")
+		>> _unset
 	_endif
 
-	_try
+	_try _with cond
 		_local json_obj << json_parser.parse(json_response)
 		_local data     << json_obj[:data]
-		
-		# API always returns success:true — empty data means not found
-		_if data _is _unset _orif data.size = 0
-		_then >> _unset
+
+		# Determine result count safely (data may be unset or non-sized)
+		_local count << 0
+		_if data _isnt _unset
+		_then
+			_try
+				count << data.size
+			_when error
+				count << 0
+			_endtry
 		_endif
-		write("Donation API results found: " + data.size.write_string, "dontation_field: " + donation_field.write_string)
-		_local matched_value << data[1][donation_field].write_string
-		_return matched_value
+
+		# Empty result = no approved donation on record for this WO (not an error)
+		_if count = 0
+		_then
+			write("No approved donation found for ", infra_code)
+			>> _unset
+		_endif
+
+		# Read the donation value from the first row
+		_local row << data[1]
+		_local raw << _if row _is _unset _then >> _unset _else >> row[donation_field] _endif
+		_if raw _is _unset _orif raw.write_string = ""
+		_then
+			write("Donation value not available for ", infra_code)
+			>> _unset
+		_endif
+
+		>> raw.write_string
+
 	_when error
-		_self.log_error("Donation single-fetch failed: " +
-		                condition.report_contents_string)
-		_return _unset
+		# Real parse/read failure - report in plain language, never abort the caller
+		_self.log_warning(write_string(
+			"Could not read donation for ", infra_code,
+			" - skipped (", cond.report_contents_string, ")"))
+		>> _unset
 	_endtry
 _endmethod
 $

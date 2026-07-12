@@ -100,7 +100,8 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 		:status,             "scheduled",
 		:topology,           topology,
 		:uuid,               uuid,
-		:subject,            subject)
+		:subject,            subject,
+		:description,        "SINGLE")
 
 	# --- Insert into ETL scheduler table ---
 	_local ok? << .engine.insert_etl_scheduler_log(params)

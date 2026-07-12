@@ -2295,10 +2295,16 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 	## Returns: rope of property_lists
 
 	_local table << .scheduler_table.default("smallworld.drm_scheduler_logs")
+
+	# Same condition for BOTH runs (manual and automated ETL):
+	# status = 'scheduled', for this infra_type, created within the last day
+	# (>= yesterday). Infra types are processed in the fixed order
+	# FEEDER -> SUBFEEDER -> CLUSTER by migrate_scheduled_objects().
 	_local sql << "SELECT infra_code, name, infra_type, topology, uuid, status, " +
 		"scheduler_username, schedule_date " +
 		"FROM " + table + " " +
 		"WHERE status = 'scheduled' AND infra_type = ? " +
+		"AND created_at >= (CURRENT_DATE - INTERVAL '1 day') " +
 		"ORDER BY created_at ASC"
 
 	_local result << rope.new()
@@ -2612,13 +2618,9 @@ _pragma(classify_level=restricted)
 _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, end_time)
 	## Write ETL summary .txt to TEMP after all scheduled migrations complete.
 
-	_local d1 << start_time.date
-	_local t1 << start_time.time
-	_local d2 << end_time.date
-
-	_local date_str   << _self.sum_fmt_date(d1)
-	_local compact_dt << _self.sum_compact_dt(d1, t1)
-	_local date_str2  << _self.sum_fmt_date(d2)
+	_local date_str   << _self.sum_fmt_date(start_time)
+	_local compact_dt << _self.sum_compact_dt(start_time)
+	_local date_str2  << _self.sum_fmt_date(end_time)
 	_local ts_range   << _if date_str = date_str2
 	                    _then >> date_str
 	                    _else >> write_string(date_str, " -- ", date_str2)
@@ -2636,7 +2638,9 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 
 	_local pct_str << _if g_total > 0
 	                 _then
-	                     _local pct_int << (g_migr.as_float() * 10000.0 / g_total.as_float()).rounded
+	                     # Integer/integer division yields a rational in Magik; .rounded -> integer.
+	                     # pct_int is the percentage x100 (e.g. 9115 => 91.15%).
+	                     _local pct_int << ((g_migr * 10000) / g_total).rounded
 	                     >> write_string(pct_int _div 100, ".", _self.sum_zpad(pct_int _mod 100), "%")
 	                 _else
 	                     >> "0.00%"
@@ -2788,18 +2792,63 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator.sum_fmt_date(d)
-	## Return date as "YYYY-MM-DD"
-	>> write_string(d.year, "-", _self.sum_zpad(d.month), "-", _self.sum_zpad(d.day))
+_private _method astri_data_migrator.sum_parse_dt(dt)
+	## Parse a date_time into padded string parts.
+	## date_time.write_string renders as "DD/MM/YYYY HH:MM:SS" on this system;
+	## this avoids relying on date_time.date / .time (not supported here).
+	## Returns a simple_vector: {yyyy, mm, dd, hh, mi, ss} (all strings, padded).
+
+	_local s << dt.write_string.trim_spaces()
+
+	# Split date and time on the space
+	_local sp        << s.index_of(%space)
+	_local date_part << _if sp _is _unset _then >> s _else >> s.subseq(1, sp - 1) _endif
+	_local time_part << _if sp _is _unset _then >> "" _else >> s.subseq(sp + 1) _endif
+
+	# Date: DD/MM/YYYY
+	_local s1  << date_part.index_of(%/)
+	_local dd  << _if s1 _is _unset _then >> date_part _else >> date_part.subseq(1, s1 - 1) _endif
+	_local r1  << _if s1 _is _unset _then >> "" _else >> date_part.subseq(s1 + 1) _endif
+	_local s2  << r1.index_of(%/)
+	_local mm  << _if s2 _is _unset _then >> r1 _else >> r1.subseq(1, s2 - 1) _endif
+	_local yyyy << _if s2 _is _unset _then >> "" _else >> r1.subseq(s2 + 1) _endif
+
+	# Time: HH:MM:SS
+	_local c1  << time_part.index_of(%:)
+	_local hh  << _if c1 _is _unset _then >> "00" _else >> time_part.subseq(1, c1 - 1) _endif
+	_local r2  << _if c1 _is _unset _then >> "" _else >> time_part.subseq(c1 + 1) _endif
+	_local c2  << r2.index_of(%:)
+	_local mi  << _if c2 _is _unset _then >> "00" _else >> r2.subseq(1, c2 - 1) _endif
+	_local ss  << _if c2 _is _unset _then >> "00" _else >> r2.subseq(c2 + 1) _endif
+
+	>> {_self.sum_pad2(yyyy), _self.sum_pad2(mm), _self.sum_pad2(dd),
+	    _self.sum_pad2(hh), _self.sum_pad2(mi), _self.sum_pad2(ss)}
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator.sum_compact_dt(d, t)
-	## Return "YYYYMMDD_HHMMSS" for filename and Datetime field
-	>> write_string(d.year,
-		_self.sum_zpad(d.month), _self.sum_zpad(d.day), "_",
-		_self.sum_zpad(t.hours), _self.sum_zpad(t.minutes), _self.sum_zpad(t.seconds))
+_private _method astri_data_migrator.sum_fmt_date(dt)
+	## Return date_time as "YYYY-MM-DD"
+	_local p << _self.sum_parse_dt(dt)
+	>> write_string(p[1], "-", p[2], "-", p[3])
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.sum_compact_dt(dt)
+	## Return date_time as "YYYYMMDD_HHMMSS" for filename and Datetime field
+	_local p << _self.sum_parse_dt(dt)
+	>> write_string(p[1], p[2], p[3], "_", p[4], p[5], p[6])
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.sum_pad2(s)
+	## Ensure a string is at least 2 chars, left-padded with '0'
+	_local str << s.write_string.trim_spaces()
+	_if str.size >= 2 _then >> str _endif
+	_if str.size = 0 _then >> "00" _endif
+	>> "0" + str
 _endmethod
 $
 

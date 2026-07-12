@@ -34,6 +34,42 @@ Schedule WO  --> (single WO)  --> drm_etl_scheduler_log   --> migrate_etl_schedu
 
 ---
 
+## How to Run the Schedulers
+
+Both runs are Magik CLI methods on `astri_data_migrator`. Create the migrator once, then call
+whichever run you need (they are independent and can be run in any order):
+
+```magik
+migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+
+# MANUAL run — processes smallworld.drm_scheduler_logs (queued by Batch Import "Add All")
+migrator.migrate_scheduled_objects()
+
+# AUTOMATED ETL run — processes smallworld.drm_etl_scheduler_log (queued by "Schedule WO")
+migrator.migrate_etl_scheduled_objects()
+```
+
+Or a fresh migrator per run:
+
+```magik
+astri_data_migrator.new(gis_program_manager.databases[:gis]).migrate_scheduled_objects()
+astri_data_migrator.new(gis_program_manager.databases[:gis]).migrate_etl_scheduled_objects()
+```
+
+Per-type only (manual table), if you need to run a single infra type:
+
+```magik
+migrator.migrate_feeder_scheduled_objects()
+migrator.migrate_subfeeder_scheduled_objects()
+migrator.migrate_cluster_scheduled_objects()
+```
+
+Each run processes `status='scheduled'` rows in the order **FEEDER → SUBFEEDER → CLUSTER**,
+updates each row `scheduled → processing → migrated`/`failed`, and writes a summary `.txt`
+to `%TEMP%` on completion.
+
+---
+
 ## Part 1 — Batch Import (Toolbar 4) → `drm_scheduler_logs`
 
 ### Access control (root/admin only)
@@ -83,6 +119,11 @@ Rules:
   (feeder → `target_osp_route_code`; cluster/subfeeder → `target_<type>_code`). Page limit 50.
 - **Progress footer** updates on every code (`Fetching [type] i/N: <code>`).
 - Per-section log line `Section [type]: matched X / N`; unmatched codes logged `Not found`.
+- **Error isolation** — each per-code fetch is wrapped in `_try/_when error`, so an API or
+  XML-parse failure on one code is logged (`Fetch error [type]: <code> - skipped`) and the loop
+  continues with the remaining codes. Empty results (`count=0`) also return cleanly:
+  `parse_xml_response` guards the workorder loop so a no-`<data>` response yields an empty list
+  instead of raising.
 - Each WO is tagged with its **own** `:infrastructure_type`; deduped by infra_code.
 - **Donation values are auto-fetched** as part of Load WO List (see below).
 
@@ -115,6 +156,7 @@ Loops the displayed WOs and inserts each into `drm_scheduler_logs` via
 1. Skip if a Smallworld project/design already exists.
 2. Skip if already present in `drm_scheduler_logs`.
 
+Each inserted row sets **`description = "BULK"`**.
 Reports a summary popup: `Added / Skipped (design) / Skipped (already scheduled) / Failed`.
 **No apd_kmz H-1 check on this path** (that rule is ETL-only).
 
@@ -141,7 +183,8 @@ Type label: cluster → `CLUSTER`, subfeeder → `SUB-FEEDER`, feeder → `FEEDE
 (Multi-type would join with `|`, but a single Schedule WO is always one type.)
 
 ### Insert
-`engine.insert_etl_scheduler_log(params)` — same columns as `insert_scheduler_log` plus `:subject`.
+`engine.insert_etl_scheduler_log(params)` — same columns as `insert_scheduler_log` plus
+`:subject`. Each inserted row sets **`description = "SINGLE"`** (vs `"BULK"` for batch).
 
 ### H-1 check detail (`apd_kmz_recent?`)
 Queries the dim master table for the type
@@ -172,6 +215,19 @@ A `.scheduler_table` slot selects the source table; it defaults to
 `get_scheduled_records()` and `update_scheduled_status()` now build their SQL from
 `.scheduler_table`, so both runs reuse the identical per-type migration + summary-log code.
 
+**Row selection is identical for BOTH runs** (in `get_scheduled_records`):
+
+```sql
+WHERE status = 'scheduled' AND infra_type = ?
+  AND created_at >= (CURRENT_DATE - INTERVAL '1 day')
+ORDER BY created_at ASC
+```
+
+Both jobs process rows with **`status = 'scheduled'`** for the given infra_type, created
+**within the last day** (≥ yesterday); older rows are ignored. Infra types are always
+processed in the fixed order **FEEDER → SUBFEEDER → CLUSTER** (the phase order of
+`migrate_scheduled_objects()`, inherited by the ETL run).
+
 ```magik
 _method astri_data_migrator.migrate_etl_scheduled_objects()
     .scheduler_table << "smallworld.drm_etl_scheduler_log"
@@ -195,10 +251,18 @@ migrator.migrate_etl_scheduled_objects()   # automated -> drm_etl_scheduler_log
 
 ---
 
-## Part 4 — Summary ETL Log (reused by both runs)
+## Part 4 — Summary ETL Log (written by BOTH runs)
 
-Unchanged writer: `write_batch_summary_log()` + `sum_*` helpers. Called at the end of every
-scheduler run (manual and automated). Output:
+`write_batch_summary_log()` + `sum_*` helpers are called at the end of **every** scheduler run —
+both `migrate_scheduled_objects()` (manual) and `migrate_etl_scheduled_objects()` (automated,
+which delegates to it). Each run writes its own `.txt` to TEMP.
+
+> **Date handling fix.** `date_time.now()` on this platform does **not** understand `.date` /
+> `.time` (it raised `does not understand message date`). The helpers now parse
+> `date_time.write_string` (`DD/MM/YYYY HH:MM:SS`) via `sum_parse_dt()` instead, so both reports
+> generate correctly.
+
+Output:
 
 ```
 +=== [SMALLWORLD] - SUMMARY ETL [SUB-FEEDER] [2026-05-29] ===+
@@ -248,7 +312,8 @@ Batch import **Load WO List** now resolves feeder codes via `target_osp_route_co
 
 | File | Change |
 |---|---|
-| `rwwi_astri_workorder_engine.magik` | **New:** `insert_etl_scheduler_log`, `get_etl_scheduler_log_status`, `apd_kmz_recent?` |
+| `rwwi_astri_workorder_engine.magik` | **New:** `insert_etl_scheduler_log`, `get_etl_scheduler_log_status`, `apd_kmz_recent?`; both inserts now write a `description` column (`BULK`/`SINGLE`) |
+| `astri_data_migrator.magik` | Fixed summary-log date handling (parse `date_time.write_string` via `sum_parse_dt`); `get_scheduled_records` selection for both runs (`status = 'scheduled'` AND `infra_type = ?` AND `created_at >= yesterday`) |
 | `rwwi_astri_workorder_dialog_schedule.magik` | `schedule_wo()` → ETL table + H-1 check + `subject`; **new** `build_etl_subject()` |
 | `rwwi_astri_workorder_dialog_batch_import.magik` | `migrate_all_wo` → **`add_all_to_scheduler`** (writes `drm_scheduler_logs`); per-code fetch; 25/type cap; progress footer |
 | `rwwi_astri_workorder_dialog.magik` | Toolbar 4 button `:migrate_all_btn`/"Migrate All" → `:add_all_btn`/**"Add All"** (`add_all_to_scheduler`); slot `:batch_sections`; multi-section `workorder_list_data()` |
@@ -275,4 +340,9 @@ Batch import **Load WO List** now resolves feeder codes via `target_osp_route_co
 - **Per-type cap 25 / 75 total** enforced at batch load with a blocking popup.
 - **Donation auto-fetch** — Load WO List populates the Donation column in the same pass
   (per-WO type, feeder skipped); no separate "Get Donation WO" click needed for the batch list.
-- **Summary log** written by both runs; new file per run, existing logs untouched.
+- **Summary log** written by **both** runs (manual + automated); new file per run, existing
+  logs untouched. Date parts are parsed from `date_time.write_string` (platform has no
+  `date_time.date`/`.time`).
+- **`description` column** — batch/manual rows = `"BULK"`; single Schedule WO rows = `"SINGLE"`.
+- **Run selection (both runs identical)** — `status = 'scheduled'` AND `infra_type = ?` AND
+  `created_at >= yesterday`; infra types processed in order FEEDER → SUBFEEDER → CLUSTER.
