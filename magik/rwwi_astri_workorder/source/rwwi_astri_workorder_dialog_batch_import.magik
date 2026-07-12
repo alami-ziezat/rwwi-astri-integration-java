@@ -4,16 +4,40 @@ _package user
 $
 
 ## Batch Import WO from TXT file
-## Reads infra_code list from a plain-text file and loads / schedules WOs in bulk.
+## Reads a multi-type infra_code list from a plain-text file, displays the
+## matching work orders, and adds them to smallworld.drm_scheduler_logs
+## (processed later by the manual scheduler run).
 ##
-## TXT file format:
-##   Line 1: infra_type  (CLUSTER, SUBFEEDER, or FEEDER - case-insensitive)
-##   Line 2+: one infra_code per line, blank lines are ignored
-##
-## Example:
-##   CLUSTER
+## TXT file format (bracketed section headers, 1-3 types, any order):
+##   [FEEDER]
+##   BDG001511
+##   BDG001402
+##   [SUBFEEDER]
+##   BBS000366
+##   [CLUSTER]
 ##   JKT00001
-##   JKT00002
+##
+## - A header line starts with "[" and ends with "]"; the inner text
+##   (case-insensitive) must be FEEDER, SUBFEEDER, or CLUSTER.
+## - Codes follow their header, one per line. Blank lines are ignored.
+## - Migration always runs in the order FEEDER -> SUBFEEDER -> CLUSTER.
+
+_pragma(classify_level=restricted, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.batch_import_allowed?()
+	## Batch import (Toolbar 4) is restricted to 'root' or 'admin' users.
+	## Returns _true only when the current GIS user name is one of those.
+	## Any lookup failure defaults to _false (deny).
+
+	_local user_name << _unset
+	_try
+		user_name << gis_program_manager.cached_dataset(:gis).auth_view.current_user.name
+	_when error
+	_endtry
+
+	_local uname << user_name.default("").lowercase
+	>> uname = "root" _orif uname = "admin"
+_endmethod
+$
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.browse_batch_list()
@@ -41,28 +65,28 @@ _method rwwi_astri_workorder_dialog.ok_batch_list(path)
 	.items[:batch_list_path].value << path
 	.items[:batch_clear_btn].enabled?  << _true
 	.items[:load_wo_list_btn].enabled? << _true
-	.items[:schedule_all_btn].enabled? << _false
+	.items[:add_all_btn].enabled?  << _false
 	write("Batch list file selected: ", path)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.clear_batch_list()
-	## Clear the batch import path, filter, and disable dependent buttons.
+	## Clear the batch import path, sections, and disable dependent buttons.
 
 	.items[:batch_list_path].value     << ""
 	.items[:batch_clear_btn].enabled?  << _false
 	.items[:load_wo_list_btn].enabled? << _false
-	.items[:schedule_all_btn].enabled? << _false
-	.batch_infra_codes << _unset
+	.items[:add_all_btn].enabled?  << _false
+	.batch_sections << _unset
 	write("Batch list cleared.")
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.load_wo_list()
-	## Parse the selected .txt file and load matching WOs into the dialog table.
-	## Sets the infrastructure type filter from line 1 of the file.
+	## Parse the selected .txt file into sections and load the matching WOs
+	## into the dialog table (one API fetch per section).
 
 	_local path << .items[:batch_list_path].value.default("")
 	_if path = ""
@@ -71,59 +95,183 @@ _method rwwi_astri_workorder_dialog.load_wo_list()
 		_return
 	_endif
 
-	_local (infra_type, infra_codes) << _self._parse_batch_file(path)
+	_local sections << _self.parse_batch_file(path)
 
-	_if infra_type _is _unset
+	_if sections _is _unset
 	_then
-		_self.user_error("Could not parse file." + %newline.write_string +
-			"Ensure line 1 is CLUSTER, SUBFEEDER, or FEEDER.")
+		_self.user_error(write_string(
+			"Could not parse file.", %newline,
+			"Use bracketed headers: [FEEDER], [SUBFEEDER], or [CLUSTER],", %newline,
+			"each followed by its infra_codes (one per line)."))
 		_return
 	_endif
 
-	_if infra_codes.empty?
+	_if sections.empty?
 	_then
-		_self.user_error("No infra_codes found in file (lines 2+).")
+		_self.user_error("No sections found. File needs at least one [TYPE] header.")
 		_return
 	_endif
 
-	# Build equality_hash_table for O(1) lookup in workorder_list_data()
-	_local codes_ht << equality_hash_table.new()
-	_for code _over infra_codes.fast_elements()
+	# Count total requested codes across all sections
+	_local total_codes << 0
+	_for section _over sections.fast_elements()
 	_loop
-		codes_ht[code] << _true
+		total_codes +<< section[:codes].size
 	_endloop
-	.batch_infra_codes << codes_ht
 
-	# Sync the infrastructure type filter UI
-	_self._set_infra_type_filter(infra_type)
+	_if total_codes = 0
+	_then
+		_self.user_error("No infra_codes found under the section headers.")
+		_return
+	_endif
 
-	# Maximise limit so all batch entries can be found in one call
-	.items[:filter_limit].value  << "100"
-	.items[:filter_offset].value << "0"
+	# --- Enforce per-type limit: max 25 codes per infra type (75 total) ---
+	_local max_per_type << 25
+	_local type_counts  << property_list.new()
+	_for section _over sections.fast_elements()
+	_loop
+		_local t << section[:infra_type]
+		type_counts[t] << type_counts[t].default(0) + section[:codes].size
+	_endloop
+
+	_local detail   << ""
+	_local exceeded? << _false
+	_for t, cnt _over type_counts.fast_keys_and_elements()
+	_loop
+		_if cnt > max_per_type
+		_then
+			exceeded? << _true
+			detail << write_string(detail, "  ", t.uppercase, ": ", cnt,
+				" (max ", max_per_type, ")", %newline)
+		_endif
+	_endloop
+
+	_if exceeded?
+	_then
+		_self.user_error(write_string(
+			"Batch list exceeds the allowed limit.", %newline,
+			"Each infrastructure type may contain at most ", max_per_type,
+			" codes (", max_per_type * 3, " total).", %newline, %newline,
+			detail, %newline,
+			"Please reduce the list and try again."))
+		_self.log_warning("Batch load blocked - per-type limit (25) exceeded")
+		_return
+	_endif
+
+	.batch_sections << sections
+
+	# Sync dropdown to the first section's type (indicative only in batch mode)
+	_self.set_infra_type_filter(sections[1][:infra_type])
 
 	_self.log_separator()
-	_self.log_info(write_string("Batch load: ", infra_codes.size,
-		" infra_codes [", infra_type, "] from: ", path))
+	_self.log_info(write_string("Batch load: ", sections.size, " section(s), ",
+		total_codes, " infra_code(s) from: ", path))
 
-	# Reload table — workorder_list_data() will apply the batch filter
+	# Reload table — workorder_list_data() runs the multi-section fetch
 	_self.apply_filters()
 
-	# Enable Schedule All only if at least one WO was found
+	# Enable Add All only if at least one WO was found
 	_local found << .wo_cache _isnt _unset _andif _not .wo_cache.empty?
-	.items[:schedule_all_btn].enabled? << found
+	.items[:add_all_btn].enabled? << found
 
-	_self.log_info(write_string("Batch load complete. Found: ",
-		.wo_cache.size.write_string, " / ", infra_codes.size, " WOs."))
+	_self.set_progress(write_string("Batch load complete. Found ",
+		.wo_cache.size.write_string, " / ", total_codes, " WO(s)."))
+	_self.log_info(write_string("Batch load complete. Found ",
+		.wo_cache.size.write_string, " / ", total_codes, " WO(s)."))
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method rwwi_astri_workorder_dialog.schedule_all_wo()
-	## Schedule all work orders currently displayed in the table.
-	## Applies the same two validations as schedule_wo() for each row:
-	##   1. No existing Smallworld project/design
-	##   2. Not already present in drm_scheduler_logs
-	## Reports a summary popup on completion.
+_method rwwi_astri_workorder_dialog.fetch_batch_workorders()
+	## Fetch WOs one infra_code at a time using the API's server-side code
+	## filter (the batch API cannot return a full set). For each requested
+	## code a separate query is issued with the code as the filter param:
+	##   - feeder             -> target_osp_route_code (infra_code, NOT area)
+	##   - cluster/subfeeder  -> target_<type>_code
+	## Each matched WO is tagged with its section's infra_type (deduped by
+	## infra_code). Progress is logged per section; codes with no API match
+	## are logged as "not found".
+	##
+	## Returns: rope of work order property_lists
+
+	_local result      << rope.new()
+	_local seen        << equality_hash_table.new()   # dedup by infra_code across all sections
+	_local fetch_limit << 50
+
+	_for section _over .batch_sections.fast_elements()
+	_loop
+		_local sec_type  << section[:infra_type]
+		_local sec_codes << section[:codes]
+		_local requested << sec_codes.size
+		_local matched_count << 0
+
+		# Server-side filter field name for this infra type.
+		# Feeder matches by infra_code via target_osp_route_code (not area).
+		_local code_field << _if sec_type = "feeder"
+		                     _then >> :target_osp_route_code
+		                     _else >> write_string("target_", sec_type, "_code").as_symbol()
+		                     _endif
+
+		_self.log_info(write_string(
+			"Section [", sec_type, "]: ", requested,
+			" code(s) requested - fetching one by one..."))
+
+		_local idx << 0
+		_for code, flag _over sec_codes.fast_keys_and_elements()
+		_loop
+			idx +<< 1
+
+			# Live progress feedback in the footer
+			_self.set_progress(write_string(
+				"Fetching [", sec_type, "] ", idx, "/", requested, ": ", code))
+
+			# One query per code, filtered server-side by the code field
+			_local params << property_list.new()
+			params[code_field] << code
+
+			_local wos << .engine.get_workorders_from_api(
+				sec_type, fetch_limit, 0, params)
+
+			_local got? << _false
+			_if wos _isnt _unset
+			_then
+				_for wo _over wos.fast_elements()
+				_loop
+					got? << _true
+					_local icode << wo[:infra_code].default("")
+					_if seen[icode] _is _unset
+					_then
+						wo[:infrastructure_type] << sec_type
+						result.add(wo)
+						seen[icode] << _true
+					_endif
+				_endloop
+			_endif
+
+			_if got?
+			_then
+				matched_count +<< 1
+			_else
+				_self.log_warning(write_string("Not found [", sec_type, "]: ", code))
+			_endif
+		_endloop
+
+		_self.log_info(write_string(
+			"Section [", sec_type, "]: matched ", matched_count, " / ", requested))
+	_endloop
+
+	_return result
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.add_all_to_scheduler()
+	## Add every displayed work order to smallworld.drm_scheduler_logs
+	## (processed later by the manual scheduler run). Applies the same two
+	## validations as the single Schedule WO path, minus the ETL-specific
+	## apd_kmz H-1 check:
+	##   1. Skip if a Smallworld project/design already exists
+	##   2. Skip if already present in drm_scheduler_logs
 
 	_if .wo_cache _is _unset _orif .wo_cache.empty?
 	_then
@@ -132,15 +280,15 @@ _method rwwi_astri_workorder_dialog.schedule_all_wo()
 	_endif
 
 	_local username << gis_program_manager.cached_dataset(:gis).auth_view.current_user.name.default("unknown")
-	_local scheduled_count << 0
-	_local skipped_design   << 0
-	_local skipped_dup      << 0
-	_local failed_count     << 0
+	_local added_count    << 0
+	_local skipped_design << 0
+	_local skipped_dup    << 0
+	_local failed_count   << 0
 
 	_self.log_separator()
-	_self.log_info(write_string("Schedule All — processing ", .wo_cache.size, " work orders..."))
+	_self.log_info(write_string("ADD ALL - ", .wo_cache.size, " work order(s) -> drm_scheduler_logs"))
 
-	_for _infra_sym, wo _over .wo_cache.fast_keys_and_elements()
+	_for key, wo _over .wo_cache.fast_keys_and_elements()
 	_loop
 		_local infra_code << wo[:infra_code].default("")
 		_local wo_number  << wo[:wo_number].default("")
@@ -164,37 +312,31 @@ _method rwwi_astri_workorder_dialog.schedule_all_wo()
 			_continue
 		_endif
 
-		# Build params — same fields as schedule_wo()
-		_local topology   << wo[:topology].default("")
-		_local uuid       << wo[:kmz_uuid].default("")
-		_local infra_type << wo[:infrastructure_type].default(
-			.filters[:infrastructure_type].default("cluster"))
-
 		_local params << property_list.new_with(
 			:infra_code,         infra_code,
 			:name,               wo[:infra_name].default(""),
-			:infra_type,         infra_type,
+			:infra_type,         wo[:infrastructure_type].default(
+				                     .filters[:infrastructure_type].default("cluster")),
 			:username,           username,
 			:scheduler_username, username,
 			:status,             "scheduled",
-			:topology,           topology,
-			:uuid,               uuid)
+			:topology,           wo[:topology].default(""),
+			:uuid,               wo[:kmz_uuid].default(""))
 
 		_local ok? << .engine.insert_scheduler_log(params)
 		_if ok?
 		_then
-			scheduled_count +<< 1
-			_self.log_success(write_string("Scheduled: ", wo_number,
-				" [", infra_code, "] topology=", topology))
+			added_count +<< 1
+			_self.log_success(write_string("Added: ", wo_number, " [", infra_code, "]"))
 		_else
 			failed_count +<< 1
-			_self.log_error("Failed to schedule: " + wo_number)
+			_self.log_error("Failed to add: " + wo_number)
 		_endif
 	_endloop
 
 	_local summary << write_string(
-		"Schedule All complete.", %newline,
-		"  Scheduled                       : ", scheduled_count, %newline,
+		"Add All complete.", %newline,
+		"  Added to scheduler              : ", added_count, %newline,
 		"  Skipped (design/project exists) : ", skipped_design, %newline,
 		"  Skipped (already scheduled)     : ", skipped_dup)
 	_if failed_count > 0
@@ -209,17 +351,18 @@ _endmethod
 $
 
 _pragma(classify_level=restricted, topic={astri_integration})
-_private _method rwwi_astri_workorder_dialog._parse_batch_file(path)
-	## Parse a .txt batch file.
-	## Line 1 (first non-blank): infra_type — CLUSTER, SUBFEEDER, or FEEDER
-	## Lines 2+: one infra_code per line, blank lines skipped.
+_private _method rwwi_astri_workorder_dialog.parse_batch_file(path)
+	## Parse a multi-type .txt batch file with bracketed headers.
+	##   Header line : "[FEEDER]" / "[SUBFEEDER]" / "[CLUSTER]" (case-insensitive)
+	##   Code lines  : one infra_code per line under the current header
+	##   Blank lines : ignored
 	##
-	## Returns: (infra_type_string, infra_codes_rope)
-	## Returns: (_unset, _unset) on parse error or invalid infra_type.
+	## Returns: rope of sections, each a property_list {:infra_type, :codes}
+	##          where :codes is an equality_hash_table (infra_code -> _true).
+	## Returns: _unset on parse error (invalid header, or code before any header).
 
-	_local infra_type  << _unset
-	_local infra_codes << rope.new()
-	_local line_num    << 0
+	_local sections << rope.new()
+	_local current  << _unset
 
 	_try
 		_local stream << external_text_input_stream.new(path)
@@ -230,22 +373,28 @@ _private _method rwwi_astri_workorder_dialog._parse_batch_file(path)
 				_local trimmed << line.trim_spaces()
 				_if trimmed = "" _then _continue _endif
 
-				line_num +<< 1
-
-				_if line_num = 1
+				_if trimmed[1] = %[ _andif trimmed[trimmed.size] = %]
 				_then
-					_local type_upper << trimmed.uppercase
-					_if type_upper = "CLUSTER" _orif
-					    type_upper = "SUBFEEDER" _orif
-					    type_upper = "FEEDER"
+					# Section header
+					_local inner << trimmed.subseq(2, trimmed.size - 2).trim_spaces().uppercase
+					_if inner = "CLUSTER" _orif inner = "SUBFEEDER" _orif inner = "FEEDER"
 					_then
-						infra_type << type_upper.lowercase
+						current << property_list.new_with(
+							:infra_type, inner.lowercase,
+							:codes,      equality_hash_table.new())
+						sections.add(current)
 					_else
-						write("ERROR: invalid infra_type in batch file: ", trimmed)
-						_return _unset, _unset
+						write("ERROR: invalid infra_type header: ", trimmed)
+						_return _unset
 					_endif
 				_else
-					infra_codes.add(trimmed)
+					# Infra code line
+					_if current _is _unset
+					_then
+						write("ERROR: infra_code before any [TYPE] header: ", trimmed)
+						_return _unset
+					_endif
+					current[:codes][trimmed] << _true
 				_endif
 			_endloop
 		_protection
@@ -253,17 +402,18 @@ _private _method rwwi_astri_workorder_dialog._parse_batch_file(path)
 		_endprotect
 	_when error
 		write("ERROR reading batch file: ", condition.report_contents_string)
-		_return _unset, _unset
+		_return _unset
 	_endtry
 
-	_return infra_type, infra_codes
+	_return sections
 _endmethod
 $
 
 _pragma(classify_level=restricted, topic={astri_integration})
-_private _method rwwi_astri_workorder_dialog._set_infra_type_filter(infra_type)
+_private _method rwwi_astri_workorder_dialog.set_infra_type_filter(infra_type)
 	## Set the infrastructure type dropdown to infra_type and update all
 	## dependent UI elements (topology visibility, label text, filters slot).
+	## In batch mode this is indicative only — each WO carries its own type.
 
 	.items[:filter_infrastructure].value << infra_type
 	_self.infrastructure_type_changed()

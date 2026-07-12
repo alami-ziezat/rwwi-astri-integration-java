@@ -20,7 +20,7 @@ def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 	{:last_kmz_path,    _unset, :writable},    # Path of most recently exported KMZ
 	{:last_boq_path,    _unset, :writable},    # Path of most recently saved BOQ document
 	{:last_excel_path,  _unset, :writable},    # Path of manually selected Excel file for upload
-	{:batch_infra_codes, _unset, :writable}    # Active batch import filter (equality_hash_table of infra_code→true, or _unset)
+	{:batch_sections,   _unset, :writable}     # Ordered rope of batch sections {:infra_type, :codes}, or _unset when no batch loaded
 }, :model)
 $
 
@@ -69,13 +69,21 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:identifier, :top_container,
 		:model, _self)
 
-	# Create outer container with flexible row sizing
-	# 10 rows: Toolbar1 (fixed), Toolbar2 (fixed), Toolbar3/LocalKMZ (fixed),
-	#          Toolbar4/BatchImport (fixed), Table (flexible), Text Window (flexible),
-	#          Bottom Action Toolbar (fixed), Bottom Upload+KML Toolbar (fixed),
-	#          Bottom BOQ+Excel Toolbar (fixed), Progress Footer (fixed)
-	.items[:outer] << outer << sw_container.new(top_c, 10, 1,
-		:row_resize_values, {0, 0, 0, 0, 1, 1, 0, 0, 0, 0})
+	# Batch import (Toolbar 4) is restricted to root/admin users.
+	# When not allowed, the row is omitted entirely so the toolbar is hidden.
+	_local batch_allowed? << _self.batch_import_allowed?()
+
+	# Create outer container with flexible row sizing.
+	# Rows: Toolbar1, Toolbar2, Toolbar3/LocalKMZ, [Toolbar4/BatchImport],
+	#       Table (flex), Text Window (flex), Bottom Action Toolbar,
+	#       Bottom Upload+KML Toolbar, Bottom BOQ+Excel Toolbar, Progress Footer
+	_local n_rows << _if batch_allowed? _then >> 10 _else >> 9 _endif
+	_local resize << _if batch_allowed?
+	                 _then >> {0, 0, 0, 0, 1, 1, 0, 0, 0, 0}
+	                 _else >> {0, 0, 0, 1, 1, 0, 0, 0, 0}
+	                 _endif
+	.items[:outer] << outer << sw_container.new(top_c, n_rows, 1,
+		:row_resize_values, resize)
 
 	# Build toolbar with filters
 	_self.build_toolbar(outer)
@@ -84,8 +92,11 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 	# Build local KMZ file browser toolbar
 	_self.build_toolbar3(outer)
 
-	# Build batch import toolbar
-	_self.build_toolbar4(outer)
+	# Build batch import toolbar (root/admin only)
+	_if batch_allowed?
+	_then
+		_self.build_toolbar4(outer)
+	_endif
 
 	# Build work order table
 	_self.build_table(outer)
@@ -192,7 +203,18 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
 		:display_length, 20,
 		:editable?, _true)
 
-	
+	# Extra OSP Route Area filter — feeder only (hidden by default; shown for feeder).
+	# For feeder, :filter_cluster becomes the code (target_osp_route_code) and this
+	# field carries the area (target_osp_route_area) so feeder can search by either.
+	.items[:label_osp_area] << sw_label_item.new(pagination_toolbar, "  OSP Route Area:  ")
+	.items[:filter_osp_area] << sw_text_item.new(pagination_toolbar,
+		:model, _self,
+		:display_length, 20,
+		:editable?, _true)
+	.items[:label_osp_area].managed?  << _false
+	.items[:filter_osp_area].managed? << _false
+
+
 	sw_label_item.new(pagination_toolbar, "  Limit:  ")
 	.items[:filter_limit] << sw_text_item.new(pagination_toolbar,
 		:model, _self,
@@ -277,8 +299,8 @@ $
 
 _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 	## Build batch import toolbar.
-	## Provides Browse List + Load WO List + Schedule All buttons for
-	## importing an infra_code list from a .txt file.
+	## Provides Browse List + Load WO List + Add All buttons for importing an
+	## infra_code list from a .txt file and adding them to the scheduler log.
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type, :container,
@@ -319,12 +341,12 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 
 	sw_label_item.new(a_toolbar, "  ")
 
-	.items[:schedule_all_btn] << sw_button_item.new(a_toolbar,
-		:label, "Schedule All",
+	.items[:add_all_btn] << sw_button_item.new(a_toolbar,
+		:label, "Add All",
 		:model, _self,
-		:selector, :schedule_all_wo|()|,
-		:tooltip, "Insert all displayed work orders into the scheduler log")
-	.items[:schedule_all_btn].enabled? << _false
+		:selector, :add_all_to_scheduler|()|,
+		:tooltip, "Add all displayed work orders to the scheduler log (drm_scheduler_logs)")
+	.items[:add_all_btn].enabled? << _false
 _endmethod
 $
 
@@ -772,30 +794,31 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		# Clear cache before populating new data
 		.wo_cache.empty()
 
-		# Get data from engine based on current source
-		_local workorders << _if .filters[:source] _is :api
-		_then
-			>> .engine.get_workorders_from_api(
-				.filters[:infrastructure_type].default("cluster"),
-				.filters[:limit],
-				.filters[:offset],
-				_self.build_filter_params())
-		_else
-			>> .engine.get_workorders_from_db(_self.build_filter_params())
-		_endif
+		# Determine batch mode: multi-section import active?
+		_local batch_mode? << .batch_sections _isnt _unset _andif _not .batch_sections.empty?
 
-		# Apply batch import filter if active
-		_if .batch_infra_codes _isnt _unset _andif _not .batch_infra_codes.empty?
+		_local workorders
+		_if batch_mode?
 		_then
-			_local batch_filtered << rope.new()
-			_for wo _over workorders.fast_elements()
-			_loop
-				_if .batch_infra_codes[wo[:infra_code].default("")] _isnt _unset
-				_then
-					batch_filtered.add(wo)
-				_endif
-			_endloop
-			workorders << batch_filtered
+			# Batch mode: one API fetch per section, match by infra_code,
+			# tag each WO with its OWN infra_type (supports mixed types).
+			workorders << _self.fetch_batch_workorders()
+
+			# Also fetch donation values as part of Load WO List (per-WO type,
+			# feeder skipped) so the Donation column is populated in one pass.
+			_self.apply_batch_donations(workorders)
+		_else
+			# Get data from engine based on current source
+			workorders << _if .filters[:source] _is :api
+			_then
+				>> .engine.get_workorders_from_api(
+					.filters[:infrastructure_type].default("cluster"),
+					.filters[:limit],
+					.filters[:offset],
+					_self.build_filter_params())
+			_else
+				>> .engine.get_workorders_from_db(_self.build_filter_params())
+			_endif
 		_endif
 
 		# Populate table using sw_table methods
@@ -808,7 +831,13 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			row +<< 1
 			_local wo_number  << wo[:wo_number].default("")
 			_local infra_code << wo[:infra_code].default("")
-			wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
+
+			# In batch mode each WO already carries its own :infrastructure_type
+			# (set by fetch_batch_workorders); otherwise use the current filter.
+			_if _not batch_mode?
+			_then
+				wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
+			_endif
 
 			# Restore donation value if previously fetched for this infra code
 			_local saved_d << saved_donations[infra_code.as_symbol()]
@@ -871,29 +900,37 @@ _method rwwi_astri_workorder_dialog.infrastructure_type_changed()
 	write("Infrastructure type changed to:", infra_type)
 
 	# Update label text and topology visibility based on infrastructure type
+	# NOTE: the active version of this method is in rwwi_astri_workorder_dialog_filters.magik
+	# (loaded later). Kept in sync here for consistency.
 	_if infra_type = "cluster"
 	_then
-		# Cluster: show topology, label = "Cluster Code"
+		# Cluster: show topology, label = "Cluster Code", hide OSP area
 		.items[:label_code].label << "  Cluster Code:  "
 		.items[:label_topology].managed? << _true
 		.items[:filter_topology].managed? << _true
 		.items[:filter_topology].enabled? << _true
+		.items[:label_osp_area].managed?  << _false
+		.items[:filter_osp_area].managed? << _false
 
 	_elif infra_type = "subfeeder"
 	_then
-		# Subfeeder: hide topology, label = "Subfeeder Code"
+		# Subfeeder: hide topology, label = "Subfeeder Code", hide OSP area
 		.items[:label_code].label << "  Subfeeder Code:  "
 		.items[:label_topology].managed? << _false
 		.items[:filter_topology].managed? << _false
 		.items[:filter_topology].enabled? << _false
+		.items[:label_osp_area].managed?  << _false
+		.items[:filter_osp_area].managed? << _false
 
 	_elif infra_type = "feeder"
 	_then
-		# Feeder: hide topology, label = "OSP Route Area"
-		.items[:label_code].label << "  OSP Route Area:  "
+		# Feeder: hide topology, code field = "Feeder Code", show OSP Route Area
+		.items[:label_code].label << "  Feeder Code:  "
 		.items[:label_topology].managed? << _false
 		.items[:filter_topology].managed? << _false
 		.items[:filter_topology].enabled? << _false
+		.items[:label_osp_area].managed?  << _true
+		.items[:filter_osp_area].managed? << _true
 	_endif
 
 	# Update the stored infrastructure type in filters
@@ -972,15 +1009,26 @@ _private _method rwwi_astri_workorder_dialog.build_filter_params()
 	_local code_value << .items[:filter_cluster].value
 	_if code_value _isnt _unset _and code_value.size > 0
 	_then
-		# Dynamic field name based on infrastructure type:
+		# Dynamic code field name based on infrastructure type:
 		# - cluster:   target_cluster_code
 		# - subfeeder: target_subfeeder_code
-		# - feeder:    target_osp_route_area (NOT target_feeder_code)
+		# - feeder:    target_osp_route_code (infra_code)
+		# NOTE: active version is in rwwi_astri_workorder_dialog_filters.magik.
 		_local code_field << _if infra_type = "feeder"
-		                     _then >> :target_osp_route_area
+		                     _then >> :target_osp_route_code
 		                     _else >> write_string("target_", infra_type, "_code").as_symbol()
 		                     _endif
 		filters[code_field] << code_value
+	_endif
+
+	# Feeder-only extra filter: OSP Route Area (target_osp_route_area)
+	_if infra_type = "feeder"
+	_then
+		_local area_value << .items[:filter_osp_area].value
+		_if area_value _isnt _unset _andif area_value.size > 0
+		_then
+			filters[:target_osp_route_area] << area_value
+		_endif
 	_endif
 
 	_return filters

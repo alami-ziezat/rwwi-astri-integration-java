@@ -43,27 +43,35 @@ _method rwwi_astri_workorder_dialog.infrastructure_type_changed()
 	# Update label text and topology visibility based on infrastructure type
 	_if infra_type = "cluster"
 	_then
-		# Cluster: show topology, label = "Cluster Code"
+		# Cluster: show topology, label = "Cluster Code", hide OSP area
 		.items[:label_code].label << "  Cluster Code:  "
 		.items[:label_topology].managed? << _true
 		.items[:filter_topology].managed? << _true
 		.items[:filter_topology].enabled? << _true
+		.items[:label_osp_area].managed?  << _false
+		.items[:filter_osp_area].managed? << _false
 
 	_elif infra_type = "subfeeder"
 	_then
-		# Subfeeder: hide topology, label = "Subfeeder Code"
+		# Subfeeder: hide topology, label = "Subfeeder Code", hide OSP area
 		.items[:label_code].label << "  Subfeeder Code:  "
 		.items[:label_topology].managed? << _false
 		.items[:filter_topology].managed? << _false
 		.items[:filter_topology].enabled? << _false
+		.items[:label_osp_area].managed?  << _false
+		.items[:filter_osp_area].managed? << _false
 
 	_elif infra_type = "feeder"
 	_then
-		# Feeder: hide topology, label = "OSP Route Area"
-		.items[:label_code].label << "  OSP Route Area:  "
+		# Feeder: hide topology. The main code field is now the Feeder Code
+		# (target_osp_route_code); the extra OSP Route Area field is shown so
+		# feeder can be searched by either code or area.
+		.items[:label_code].label << "  Feeder Code:  "
 		.items[:label_topology].managed? << _false
 		.items[:filter_topology].managed? << _false
 		.items[:filter_topology].enabled? << _false
+		.items[:label_osp_area].managed?  << _true
+		.items[:filter_osp_area].managed? << _true
 	_endif
 
 	# Update the stored infrastructure type in filters
@@ -139,15 +147,26 @@ _private _method rwwi_astri_workorder_dialog.build_filter_params()
 	_local code_value << .items[:filter_cluster].value
 	_if code_value _isnt _unset _and code_value.size > 0
 	_then
-		# Dynamic field name based on infrastructure type:
+		# Dynamic code field name based on infrastructure type:
 		# - cluster:   target_cluster_code
 		# - subfeeder: target_subfeeder_code
-		# - feeder:    target_osp_route_area (NOT target_feeder_code)
+		# - feeder:    target_osp_route_code (infra_code)
 		_local code_field << _if infra_type = "feeder"
-		                     _then >> :target_osp_route_area
+		                     _then >> :target_osp_route_code
 		                     _else >> write_string("target_", infra_type, "_code").as_symbol()
 		                     _endif
 		filters[code_field] << code_value
+	_endif
+
+	# Feeder-only extra filter: OSP Route Area (target_osp_route_area).
+	# Feeder can therefore be searched by code, by area, or both.
+	_if infra_type = "feeder"
+	_then
+		_local area_value << .items[:filter_osp_area].value
+		_if area_value _isnt _unset _andif area_value.size > 0
+		_then
+			filters[:target_osp_route_area] << area_value
+		_endif
 	_endif
 
 	_return filters

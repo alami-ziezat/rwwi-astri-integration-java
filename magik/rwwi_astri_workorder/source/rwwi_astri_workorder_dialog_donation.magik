@@ -92,6 +92,55 @@ _endmethod
 $
 
 # =============================================================================
+# Batch helper: fetch donation for a mixed-type loaded list (per-WO type)
+# =============================================================================
+
+_pragma(classify_level=debug, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.apply_batch_donations(workorders)
+	## Fetch donation values for a batch-loaded WO list. Unlike the button
+	## action (single filter type), each WO uses its OWN :infrastructure_type,
+	## so mixed-type files work. Feeder WOs are skipped (not applicable).
+	## Sets wo[:donation_value] in place; called from workorder_list_data()
+	## during Load WO List so the Donation column renders in the same pass.
+
+	_if workorders _is _unset _orif workorders.empty? _then _return _endif
+
+	_local total          << workorders.size
+	_local idx            << 0
+	_local matched        << 0
+	_local skipped_feeder << 0
+
+	_self.log_info(write_string("Fetching donation values for ", total, " WO(s)..."))
+
+	_for wo _over workorders.fast_elements()
+	_loop
+		idx +<< 1
+		_local infra_type << wo[:infrastructure_type].default("cluster").lowercase
+
+		# Donation is not applicable to feeder
+		_if infra_type = "feeder"
+		_then
+			skipped_feeder +<< 1
+			_continue
+		_endif
+
+		_local infra_code << wo[:infra_code].default("")
+		_self.set_progress(write_string("Donation ", idx, "/", total, ": ", infra_code))
+
+		_local val << _self.fetch_donation_value_for_wo(wo, infra_type)
+		_if val _isnt _unset _andif val <> ""
+		_then
+			wo[:donation_value] << val
+			matched +<< 1
+		_endif
+	_endloop
+
+	_self.log_info(write_string("Batch donation: matched ", matched, " / ",
+		total - skipped_feeder, " (feeder skipped: ", skipped_feeder, ")"))
+_endmethod
+$
+
+# =============================================================================
 # Private Helper: Fetch donation value for a single WO (used by BOQ auto-fetch)
 # =============================================================================
 

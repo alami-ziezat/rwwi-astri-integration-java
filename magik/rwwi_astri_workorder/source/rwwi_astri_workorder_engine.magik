@@ -25,9 +25,9 @@ _pragma(classify_level=debug, topic={astri_integration})
 ## Logic: If abd_kmz_uuid exists, use it and return 'ABD', otherwise use apd_kmz_uuid and return 'APD'
 rwwi_astri_workorder_engine.define_shared_constant(:sql_for_kmz_uuid,
 	property_list.new_with(
-		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, topology, cluster_code, subfeeder_code, feeder_code, olt_code, drm_hp FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
-		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, topology, subfeeder_code, feeder_code, olt_code, drm_homepass FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
-		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, topology, feeder_code, olt_code FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
+		:cluster, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, apd_kmz_upload_date, topology, cluster_code, subfeeder_code, feeder_code, olt_code, drm_hp FROM smallworld.dim_cluster_master_smallworld WHERE cluster_code = ? LIMIT 1",
+		:subfeeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, apd_kmz_upload_date, topology, subfeeder_code, feeder_code, olt_code, drm_homepass FROM smallworld.dim_subfeeder_master_smallworld WHERE subfeeder_code = ? LIMIT 1",
+		:feeder, "SELECT COALESCE(abd_kmz_uuid, apd_kmz_uuid) AS kmz_uuid, CASE WHEN abd_kmz_uuid IS NOT NULL THEN 'ABD' ELSE 'APD' END AS kmz_source, apd_kmz_upload_date, topology, feeder_code, olt_code FROM smallworld.dim_feeder_master_smallworld WHERE feeder_code = ? LIMIT 1"
 	),
 	_false
 )
@@ -67,7 +67,8 @@ _method rwwi_astri_workorder_engine.get_workorders_from_api(
 	##     Infrastructure-specific filters:
 	##       For cluster: :target_cluster_topology, :target_cluster_code
 	##       For subfeeder: :target_subfeeder_code
-	##       For feeder: :target_osp_route_area
+	##       For feeder: :target_osp_route_code (infra_code) and/or :target_osp_route_area
+	##     (filters is a pass-through property_list - any key is forwarded to the API)
 	##
 	## Returns:
 	##   rope of property_lists with work order data
@@ -457,6 +458,7 @@ _method rwwi_astri_workorder_engine.parse_xml_response(xml_string, infrastructur
 			# Add all database fields to property list (all fields always present with defaults)
 			pl[:kmz_uuid] << db_result[:kmz_uuid].default("")
 			pl[:kmz_source] << db_result[:kmz_source].default("")
+			pl[:apd_kmz_upload_date] << db_result[:apd_kmz_upload_date].default("")
 			pl[:cluster_code_db] << db_result[:cluster_code].default("")
 			pl[:subfeeder_code_db] << db_result[:subfeeder_code].default("")
 			pl[:feeder_code_db] << db_result[:feeder_code].default("")
@@ -747,19 +749,21 @@ _method rwwi_astri_workorder_engine.get_kmz_uuid_from_db(infrastructure_type, co
 		_local result << property_list.new_with(
 			:kmz_uuid, "",
 			:kmz_source, "",
+			:apd_kmz_upload_date, "",
 			:cluster_code, "",
 			:subfeeder_code, "",
 			:feeder_code, "",
 			:olt_code, "",
 			:homepass, "")
 
-			
+
 		_if rec _isnt _unset
 		_then
 			# Extract common fields (always returned)
 			result[:kmz_uuid] << rec.kmz_uuid.default("")
 			result[:kmz_source] << rec.kmz_source.default("")
 			result[:topology] << rec.topology.default("")
+			result[:apd_kmz_upload_date] << rec.apd_kmz_upload_date.default("").write_string
 
 			# Extract infrastructure-specific fields based on type
 			_if infrastructure_type = "cluster"
@@ -959,6 +963,190 @@ _method rwwi_astri_workorder_engine.get_scheduler_log_status(infra_code)
 		_endtry
 		extdb_java_acp.close_all()
 		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_engine.insert_etl_scheduler_log(params)
+	## Insert WO record into smallworld.drm_etl_scheduler_log (automated ETL run).
+	## Same columns as drm_scheduler_logs plus a 'subject' text column.
+	##
+	## Parameters:
+	##   params (property_list) - keys: :infra_code, :name, :infra_type,
+	##     :username, :scheduler_username, :status, :topology, :uuid, :subject
+	##
+	## Returns:
+	##   boolean - _true on success, _false on failure
+
+	_local sql << "INSERT INTO smallworld.drm_etl_scheduler_log " +
+		"(infra_code, name, infra_type, username, scheduler_username, " +
+		"schedule_date, start_time, end_time, status, topology, uuid, subject, " +
+		"created_at, updated_at) " +
+		"VALUES (?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, CURRENT_TIME, ?, ?, ?, ?, NOW(), NOW())"
+
+	_local conn << _unset
+
+	_try _with cond
+		_local is_connect?
+		(is_connect?, conn) << user:rwwi_external_ds_manager.open_connection_for(
+			"[POSTGRESQL_ASTRI_DB]")
+
+		_if _not is_connect?
+		_then
+			write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for ETL scheduler insert")
+			_return _false
+		_endif
+
+		conn.sql_modify(sql,
+			params[:infra_code],
+			params[:name],
+			params[:infra_type],
+			params[:username],
+			params[:scheduler_username],
+			params[:status],
+			params[:topology],
+			params[:uuid],
+			params[:subject])
+
+		conn.commit()
+		extdb_java_acp.close_all()
+		write("ETL scheduler log inserted for infra_code:", params[:infra_code])
+		_return _true
+
+	_when error
+		write("ERROR in insert_etl_scheduler_log():", cond.report_contents_string)
+		_try
+			_if conn _isnt _unset _then conn.rollback() _endif
+		_when error
+		_endtry
+		extdb_java_acp.close_all()
+		_return _false
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_engine.get_etl_scheduler_log_status(infra_code)
+	## Check if an ETL scheduler log record already exists for the given infra_code.
+	##
+	## Returns:
+	##   string - existing status value, or _unset if no record found
+
+	_local sql << "SELECT status FROM smallworld.drm_etl_scheduler_log " +
+		"WHERE infra_code = ? ORDER BY created_at DESC LIMIT 1"
+
+	_local conn << _unset
+
+	_try _with cond
+		_local is_connect?
+		(is_connect?, conn) << user:rwwi_external_ds_manager.open_connection_for(
+			"[POSTGRESQL_ASTRI_DB]")
+
+		_if _not is_connect?
+		_then
+			write("WARNING: Cannot connect to POSTGRESQL_ASTRI_DB for ETL scheduler check")
+			_return _unset
+		_endif
+
+		_local recs << conn.sql_select(sql, infra_code)
+		_local rec  << recs.get()
+		recs.close()
+
+		_try
+			conn.commit()
+		_when error
+			conn.rollback()
+		_endtry
+
+		extdb_java_acp.close_all()
+
+		_if rec _isnt _unset
+		_then
+			_return rec.status.default("")
+		_endif
+
+		_return _unset
+
+	_when error
+		write("ERROR in get_etl_scheduler_log_status():", cond.report_contents_string)
+		_try
+			_if conn _isnt _unset _then conn.rollback() _endif
+		_when error
+		_endtry
+		extdb_java_acp.close_all()
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_engine.apd_kmz_recent?(infrastructure_type, code)
+	## Return _true if the work order's apd_kmz_upload_date is NEWER than H-1
+	## (i.e. more recent than yesterday), by querying the dim master table.
+	## Returns _false when no record, no upload date, or the date is older.
+	##
+	## Parameters:
+	##   infrastructure_type (string) - "cluster" | "subfeeder" | "feeder"
+	##   code (string)                - infra_code to look up
+
+	_if code _is _unset _orif code = "" _then _return _false _endif
+
+	# Map infra type -> (dim table, code column)
+	_local table_map << property_list.new_with(
+		:cluster,   {"dim_cluster_master_smallworld",   "cluster_code"},
+		:subfeeder, {"dim_subfeeder_master_smallworld", "subfeeder_code"},
+		:feeder,    {"dim_feeder_master_smallworld",    "feeder_code"})
+
+	_local tc << table_map[infrastructure_type.as_symbol()]
+	_if tc _is _unset _then _return _false _endif
+
+	# COUNT rows where apd_kmz_upload_date is newer than yesterday (H-1).
+	# NULL upload dates never satisfy the comparison, so they count as 0 -> blocked.
+	_local sql << "SELECT COUNT(*) AS cnt FROM smallworld." + tc[1] +
+		" WHERE " + tc[2] + " = ? " +
+		"AND apd_kmz_upload_date > (CURRENT_DATE - INTERVAL '1 day')"
+
+	_local conn << _unset
+
+	_try _with cond
+		_local is_connect?
+		(is_connect?, conn) << user:rwwi_external_ds_manager.open_connection_for(
+			"[POSTGRESQL_ASTRI_DB]")
+
+		_if _not is_connect?
+		_then
+			write("WARNING: Cannot connect to POSTGRESQL_ASTRI_DB for apd_kmz date check")
+			_return _false
+		_endif
+
+		_local recs << conn.sql_select(sql, code)
+		_local rec  << recs.get()
+		recs.close()
+
+		_try
+			conn.commit()
+		_when error
+			conn.rollback()
+		_endtry
+
+		extdb_java_acp.close_all()
+
+		_if rec _isnt _unset
+		_then
+			_return rec.cnt.default(0) > 0
+		_endif
+
+		_return _false
+
+	_when error
+		write("ERROR in apd_kmz_recent?():", cond.report_contents_string)
+		_try
+			_if conn _isnt _unset _then conn.rollback() _endif
+		_when error
+		_endtry
+		extdb_java_acp.close_all()
+		_return _false
 	_endtry
 _endmethod
 $

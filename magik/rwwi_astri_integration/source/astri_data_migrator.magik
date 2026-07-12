@@ -26,7 +26,8 @@ def_slotted_exemplar(:astri_data_migrator,
 		{:cluster_col, _unset},        # master_cluster collection
 		{:transform, _unset},          # WGS84 to local coordinate transform
 		{:stats, _unset},              # Migration statistics
-		{:db_connection, _unset}       # PostgreSQL database connection
+		{:db_connection, _unset},      # PostgreSQL database connection
+		{:scheduler_table, _unset}     # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_log)
 	},
 	{})
 $
@@ -64,6 +65,9 @@ _private _method astri_data_migrator.init(a_database)
 		:skipped, 0,
 		:errors, 0
 	)
+
+	# Default scheduler source table (overridden for the automated ETL run)
+	.scheduler_table << "smallworld.drm_scheduler_logs"
 
 	>> _self
 _endmethod
@@ -2290,9 +2294,10 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 	##
 	## Returns: rope of property_lists
 
+	_local table << .scheduler_table.default("smallworld.drm_scheduler_logs")
 	_local sql << "SELECT infra_code, name, infra_type, topology, uuid, status, " +
 		"scheduler_username, schedule_date " +
-		"FROM smallworld.drm_scheduler_logs " +
+		"FROM " + table + " " +
 		"WHERE status = 'scheduled' AND infra_type = ? " +
 		"ORDER BY created_at ASC"
 
@@ -2523,7 +2528,8 @@ _private _method astri_data_migrator.update_scheduled_status(infra_code, infra_t
 	## UPDATE status and updated_at in drm_scheduler_logs.
 	## Targets rows matching infra_code + infra_type.
 
-	_local sql << "UPDATE smallworld.drm_scheduler_logs " +
+	_local table << .scheduler_table.default("smallworld.drm_scheduler_logs")
+	_local sql << "UPDATE " + table + " " +
 		"SET status = ?, updated_at = NOW() " +
 		"WHERE infra_code = ? AND infra_type = ?"
 
@@ -2562,10 +2568,44 @@ _endmethod
 $
 
 ## ============================================================
+## AUTOMATED ETL SCHEDULER RUN — drm_etl_scheduler_log -> SW Design
+## Mirrors migrate_scheduled_objects() but reads the ETL table instead of
+## drm_scheduler_logs. Both runs are independent public entry points:
+##   migrate_scheduled_objects()      -> manual run  (drm_scheduler_logs)
+##   migrate_etl_scheduled_objects()  -> automated run (drm_etl_scheduler_log)
+## The only difference is the source table, swapped via the .scheduler_table
+## slot, so all per-type processing and the summary log are fully reused.
+## ============================================================
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_etl_scheduled_objects()
+	## Automated ETL run: process 'scheduled' rows from drm_etl_scheduler_log
+	## for all infra types (FEEDER -> SUBFEEDER -> CLUSTER) and write a summary
+	## .txt to TEMP. Runs independently of migrate_scheduled_objects().
+	##
+	## CLI usage:
+	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+	##   migrator.migrate_etl_scheduled_objects()
+	##
+	## Returns: overall_stats property_list
+
+	write("=== AUTOMATED ETL SCHEDULER RUN (drm_etl_scheduler_log) ===")
+	.scheduler_table << "smallworld.drm_etl_scheduler_log"
+	_protect
+		>> _self.migrate_scheduled_objects()
+	_protection
+		# Always restore the default table so the same instance can run either job
+		.scheduler_table << "smallworld.drm_scheduler_logs"
+	_endprotect
+_endmethod
+$
+
+## ============================================================
 ## BATCH SUMMARY LOG
-## Writes a formatted .txt summary to TEMP folder at the end of
-## migrate_scheduled_objects().  Each run produces a new file
-## (filename encodes the run datetime); existing files are untouched.
+## Writes a formatted .txt summary to TEMP folder at the end of each
+## scheduler run (migrate_scheduled_objects / migrate_etl_scheduled_objects).
+## Each run produces a new file (filename encodes the run datetime);
+## existing files are untouched.
 ## ============================================================
 
 _pragma(classify_level=restricted)
@@ -2576,15 +2616,15 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 	_local t1 << start_time.time
 	_local d2 << end_time.date
 
-	_local date_str   << _self._sum_fmt_date(d1)
-	_local compact_dt << _self._sum_compact_dt(d1, t1)
-	_local date_str2  << _self._sum_fmt_date(d2)
+	_local date_str   << _self.sum_fmt_date(d1)
+	_local compact_dt << _self.sum_compact_dt(d1, t1)
+	_local date_str2  << _self.sum_fmt_date(d2)
 	_local ts_range   << _if date_str = date_str2
 	                    _then >> date_str
 	                    _else >> write_string(date_str, " -- ", date_str2)
 	                    _endif
 
-	_local types_label << _self._sum_active_types(stats)
+	_local types_label << _self.sum_active_types(stats)
 
 	# Grand totals
 	_local g_total << stats[:cluster_total] + stats[:subfeeder_total] + stats[:feeder_total]
@@ -2597,7 +2637,7 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 	_local pct_str << _if g_total > 0
 	                 _then
 	                     _local pct_int << (g_migr.as_float() * 10000.0 / g_total.as_float()).rounded
-	                     >> write_string(pct_int _div 100, ".", _self._sum_zpad(pct_int _mod 100), "%")
+	                     >> write_string(pct_int _div 100, ".", _self.sum_zpad(pct_int _mod 100), "%")
 	                 _else
 	                     >> "0.00%"
 	                 _endif
@@ -2610,17 +2650,17 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 	lines.add(write_string("+===", title_body, "===+"))
 
 	# Header block
-	lines.add(_self._sum_row("Asset Level",      types_label))
-	lines.add(_self._sum_row("Datetime",          compact_dt))
-	lines.add(_self._sum_row("Updated Timestamp", ts_range))
+	lines.add(_self.sum_row("Asset Level",      types_label))
+	lines.add(_self.sum_row("Datetime",          compact_dt))
+	lines.add(_self.sum_row("Updated Timestamp", ts_range))
 	lines.add(SEP)
 
 	# Grand totals block
-	lines.add(_self._sum_row("Total processed",       g_total.write_string))
-	lines.add(_self._sum_row("Total successful",       g_migr.write_string))
-	lines.add(_self._sum_row("Total failed",           g_err.write_string))
-	lines.add(_self._sum_row("Success percentage",     pct_str))
-	lines.add(_self._sum_row("Total features written", g_feat.write_string))
+	lines.add(_self.sum_row("Total processed",       g_total.write_string))
+	lines.add(_self.sum_row("Total successful",       g_migr.write_string))
+	lines.add(_self.sum_row("Total failed",           g_err.write_string))
+	lines.add(_self.sum_row("Success percentage",     pct_str))
+	lines.add(_self.sum_row("Total features written", g_feat.write_string))
 	lines.add("+======================================================+")
 
 	# Per-infra-type sections
@@ -2646,19 +2686,19 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 		_endloop
 		lines.add(hdr + "+")
 
-		lines.add(_self._sum_row("Processed", t_tot.write_string))
-		lines.add(_self._sum_row("Success",   t_migr.write_string))
-		lines.add(_self._sum_row("Failed",    t_err.write_string))
+		lines.add(_self.sum_row("Processed", t_tot.write_string))
+		lines.add(_self.sum_row("Success",   t_migr.write_string))
+		lines.add(_self.sum_row("Failed",    t_err.write_string))
 		lines.add(SEP)
 
 		_if _not t_succ.empty?
 		_then
-			_self._sum_code_lines(lines, "List succeed", t_succ)
+			_self.sum_code_lines(lines, "List succeed", t_succ)
 		_endif
 
 		_if _not t_fail.empty?
 		_then
-			_self._sum_code_lines(lines, "List failed",  t_fail)
+			_self.sum_code_lines(lines, "List failed",  t_fail)
 		_endif
 
 		lines.add(SEP)
@@ -2688,7 +2728,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator._sum_row(key, value)
+_private _method astri_data_migrator.sum_row(key, value)
 	## Format a 56-char wide data row: | KEY (20 chars) : VALUE (padded) |
 	_local k << key.write_string
 	_local v << value.write_string
@@ -2706,7 +2746,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator._sum_code_lines(lines, label, codes)
+_private _method astri_data_migrator.sum_code_lines(lines, label, codes)
 	## Append wrapped infra_code list lines to lines rope.
 	## Content width: 52 chars inside "| ... |" (56 total).
 	_local prefix      << write_string(label, ": ")
@@ -2748,23 +2788,23 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator._sum_fmt_date(d)
+_private _method astri_data_migrator.sum_fmt_date(d)
 	## Return date as "YYYY-MM-DD"
-	>> write_string(d.year, "-", _self._sum_zpad(d.month), "-", _self._sum_zpad(d.day))
+	>> write_string(d.year, "-", _self.sum_zpad(d.month), "-", _self.sum_zpad(d.day))
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator._sum_compact_dt(d, t)
+_private _method astri_data_migrator.sum_compact_dt(d, t)
 	## Return "YYYYMMDD_HHMMSS" for filename and Datetime field
 	>> write_string(d.year,
-		_self._sum_zpad(d.month), _self._sum_zpad(d.day), "_",
-		_self._sum_zpad(t.hours), _self._sum_zpad(t.minutes), _self._sum_zpad(t.seconds))
+		_self.sum_zpad(d.month), _self.sum_zpad(d.day), "_",
+		_self.sum_zpad(t.hours), _self.sum_zpad(t.minutes), _self.sum_zpad(t.seconds))
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator._sum_zpad(n)
+_private _method astri_data_migrator.sum_zpad(n)
 	## Return integer n as 2-digit string with leading zero if n < 10
 	_if n < 10 _then >> write_string("0", n) _endif
 	>> n.write_string
@@ -2772,7 +2812,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator._sum_active_types(stats)
+_private _method astri_data_migrator.sum_active_types(stats)
 	## Build human-readable infra-type label for types that had records
 	_local parts << rope.new()
 	_if stats[:cluster_total].default(0)   > 0 _then parts.add("CLUSTER")    _endif
