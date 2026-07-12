@@ -174,7 +174,7 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 	_if json_response _is _unset _orif json_response = ""
 	_then
 		write("No donation response for ", infra_code, " - skipped")
-		>> _unset
+		_return _unset
 	_endif
 
 	_try _with cond
@@ -196,7 +196,7 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 		_if count = 0
 		_then
 			write("No approved donation found for ", infra_code)
-			>> _unset
+			_return _unset
 		_endif
 
 		# Read the donation value from the first row
@@ -205,17 +205,17 @@ _private _method rwwi_astri_workorder_dialog.fetch_donation_value_for_wo(wo, inf
 		_if raw _is _unset _orif raw.write_string = ""
 		_then
 			write("Donation value not available for ", infra_code)
-			>> _unset
+			_return _unset
 		_endif
 
-		>> raw.write_string
+		_return raw.write_string
 
 	_when error
 		# Real parse/read failure - report in plain language, never abort the caller
 		_self.log_warning(write_string(
 			"Could not read donation for ", infra_code,
 			" - skipped (", cond.report_contents_string, ")"))
-		>> _unset
+		_return _unset
 	_endtry
 _endmethod
 $

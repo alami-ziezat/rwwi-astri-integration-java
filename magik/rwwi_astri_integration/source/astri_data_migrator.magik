@@ -2844,11 +2844,18 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.sum_pad2(s)
-	## Ensure a string is at least 2 chars, left-padded with '0'
+	## Ensure a string is at least 2 chars, left-padded with '0'.
+	## Single return path (a bare '>>' inside an _if does not reliably exit here).
 	_local str << s.write_string.trim_spaces()
-	_if str.size >= 2 _then >> str _endif
-	_if str.size = 0 _then >> "00" _endif
-	>> "0" + str
+	_local result << str
+	_if str.size = 0
+	_then
+		result << "00"
+	_elif str.size = 1
+	_then
+		result << "0" + str
+	_endif
+	>> result
 _endmethod
 $
 
