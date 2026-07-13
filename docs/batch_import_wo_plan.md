@@ -87,14 +87,39 @@ stores both in `overall_stats[:log_file]` / `[:log_name]` and in the `.last_log_
 
 ## Part 1 — Batch Import (Toolbar 4) → `drm_scheduler_logs`
 
-### Access control (root/admin only)
+### Access control — three roles
 
-Toolbar 4 is **only shown to `root` or `admin`** users. `activate_in()` calls
-`batch_import_allowed?()` (compares the current GIS user name, case-insensitive, to
-`root`/`admin`; any lookup failure denies). When not allowed, the toolbar **row is omitted
-entirely** — the outer container is built with **9 rows** instead of 10 and `build_toolbar4()`
-is skipped, so the batch UI is fully hidden (not just disabled). No batch item keys exist for
-unauthorized users; all other toolbars and behaviour are unchanged.
+`user_role()` classifies the current GIS user (case-insensitive) as `:root`, `:admin`, or
+`:user`. `activate_in()` builds **all** toolbars, then `apply_role_visibility()` shows/hides
+them (via `set_toolbar_visible()` → `managed?`, guarded):
+
+| Role | Batch Import toolbar | Other action toolbars | Table / log / footer |
+|---|---|---|---|
+| **root** | shown | shown | shown |
+| **admin** | shown | **hidden** | shown |
+| **user** | hidden | shown | shown |
+
+All toolbars are always **built** (their items are referenced elsewhere and the batch-load path
+needs the filter items) — only visibility differs. Each `build_*` toolbar method returns its
+container, stored in `.items[:toolbar1_con … :bottom3_con]`.
+
+### Migrate All (admin, direct + e-mail)
+
+Toolbar 4 also has a **"Migrate All"** button (`migrate_all_wo`). It migrates the displayed WOs
+**directly** (no scheduler) via `astri_data_migrator.migrate_wo_list()` (FEEDER → SUBFEEDER →
+CLUSTER), writes the HTML report, and **e-mails it** via the `admin_drm_scheduler` module
+(`admin_drm_scheduler.email_report(log_path, log_name)`). Because it lives on the Batch Import
+toolbar, only root/admin can reach it.
+
+### admin_drm_scheduler module
+
+`cmail.exe`/`recipients.txt` and the e-mail logic are now a proper SW module
+(`admin_drm_scheduler`, a **requires** of `rwwi_astri_workorder`):
+- `source/admin_drm_scheduler.magik` — `email_report(path, name)` and `run_and_email(:manual|:etl)`;
+  locates cmail via `smallworld_product.get_resource_file(name, :data, :admin_drm_scheduler)`.
+- `resources/base/data/` — `cmail.exe`, `cmail-nossl.exe`, `recipients.txt`.
+- `resources/base/bin/` — the two `.bat`s + stdin caller `admin_drm_batch.magik`
+  (the caller just invokes `admin_drm_scheduler.run_and_email(mode)`).
 
 
 ### TXT File Format (multi-type, bracketed headers)

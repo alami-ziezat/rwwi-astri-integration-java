@@ -9,6 +9,7 @@ requires
 	base
 	rwwi_astri_integration
 	rwi_external_databases
+	admin_drm_scheduler
 end
 
 language en_gb

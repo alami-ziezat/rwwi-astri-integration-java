@@ -2650,6 +2650,174 @@ _endmethod
 $
 
 ## ============================================================
+## DIRECT BATCH MIGRATION - WO list -> SW Design (no scheduler)
+## Used by the Work Order dialog "Migrate All" button (admin). Reuses
+## migrate_to_sw_design() + write_batch_summary_log() (HTML). Fixed order
+## FEEDER -> SUBFEEDER -> CLUSTER. Returns overall_stats incl :log_file/:log_name.
+## ============================================================
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_wo_list(wo_list)
+	## Directly migrate a list of work orders into Smallworld (no scheduler).
+	## Each WO must carry :infra_code, :kmz_uuid and :infrastructure_type.
+	## Processing order is fixed: FEEDER -> SUBFEEDER -> CLUSTER.
+	## Writes the HTML summary report and returns overall_stats, which includes
+	## :log_file (full .html path) and :log_name (base name, no extension).
+
+	_local start_time << date_time.now()
+	write("=================================================================")
+	write("=== DIRECT MIGRATION (MIGRATE ALL) ===")
+	write("Start time: ", start_time.write_string)
+	write("")
+
+	_local overall_stats << property_list.new_with(
+		:cluster_total, 0,   :cluster_migrated, 0,   :cluster_errors, 0,
+		:cluster_succeeded_codes, rope.new(), :cluster_failed_codes, rope.new(), :cluster_features, 0,
+		:subfeeder_total, 0, :subfeeder_migrated, 0, :subfeeder_errors, 0,
+		:subfeeder_succeeded_codes, rope.new(), :subfeeder_failed_codes, rope.new(), :subfeeder_features, 0,
+		:feeder_total, 0,    :feeder_migrated, 0,    :feeder_errors, 0,
+		:feeder_succeeded_codes, rope.new(), :feeder_failed_codes, rope.new(), :feeder_features, 0)
+
+	# Group WOs by their own infrastructure type.
+	# NOTE: use equality_hash_table (value-equality keys) - a property_list
+	# compares string keys by identity, so "subfeeder" stored vs "subfeeder"
+	# from the order literal would never match and nothing would migrate.
+	_local groups << equality_hash_table.new()
+	_for wo _over wo_list.fast_elements()
+	_loop
+		_local itype << wo[:infrastructure_type].default("cluster").lowercase
+		_local bucket << groups[itype]
+		_if bucket _is _unset
+		_then
+			bucket << rope.new()
+			groups[itype] << bucket
+		_endif
+		bucket.add(wo)
+	_endloop
+
+	# Process in fixed order FEEDER -> SUBFEEDER -> CLUSTER (skip absent types)
+	_local order << {"feeder", "subfeeder", "cluster"}
+	_for infra_type _over order.fast_elements()
+	_loop
+		_local bucket << groups[infra_type]
+		_if bucket _is _unset _orif bucket.empty? _then _continue _endif
+
+		write("")
+		write("=== Migrating ", bucket.size, " ", infra_type.uppercase, " WO(s) ===")
+
+		_local tot_key  << write_string(infra_type, "_total").as_symbol()
+		_local migr_key << write_string(infra_type, "_migrated").as_symbol()
+		_local err_key  << write_string(infra_type, "_errors").as_symbol()
+		_local succ_key << write_string(infra_type, "_succeeded_codes").as_symbol()
+		_local fail_key << write_string(infra_type, "_failed_codes").as_symbol()
+
+		_for wo _over bucket.fast_elements()
+		_loop
+			_local infra_code << wo[:infra_code].default("")
+			overall_stats[tot_key] +<< 1
+			write("")
+			write("Processing ", infra_type.uppercase, ": ", infra_code)
+
+			_if _self.migrate_one_wo(wo, infra_type, overall_stats)
+			_then
+				overall_stats[migr_key] +<< 1
+				overall_stats[succ_key].add(infra_code)
+			_else
+				overall_stats[err_key] +<< 1
+				overall_stats[fail_key].add(infra_code)
+			_endif
+		_endloop
+	_endloop
+
+	_local end_time << date_time.now()
+	write("")
+	write("=== DIRECT MIGRATION COMPLETE (", (end_time - start_time).write_string, ") ===")
+
+	# HTML report + path/name (same as the scheduler runs)
+	_local log << _self.write_batch_summary_log(overall_stats, start_time, end_time)
+	_if log _isnt _unset
+	_then
+		overall_stats[:log_file] << log[:path]
+		overall_stats[:log_name] << log[:name]
+		.last_log_file << log[:path]
+		.last_log_name << log[:name]
+	_else
+		overall_stats[:log_file] << _unset
+		overall_stats[:log_name] << _unset
+	_endif
+
+	>> overall_stats
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.migrate_one_wo(wo, infra_type, obj_stats)
+	## Download -> parse -> migrate a single WO into a new SW design.
+	## No scheduler status writes. Accumulates feature counts into
+	## obj_stats[<infra_type>_features]. Returns _true on success.
+
+	_local infra_code << wo[:infra_code].default("").write_string
+	_local kmz_uuid   << wo[:kmz_uuid].default("").write_string
+
+	_if kmz_uuid _is _unset _orif kmz_uuid = ""
+	_then
+		write("  ERROR: No kmz_uuid for: ", infra_code)
+		_return _false
+	_endif
+
+	_try _with cond
+		_local output_dir << system.getenv("TEMP").default("C:\\temp")
+		_local xml_result << _if infra_type = "cluster"
+		                     _then >> astri_download_cluster_kmz(kmz_uuid, output_dir)
+		                     _elif infra_type = "subfeeder"
+		                     _then >> astri_download_subfeeder_kmz(kmz_uuid, output_dir)
+		                     _else >> astri_download_feeder_kmz(kmz_uuid, output_dir)
+		                     _endif
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			write("  ERROR: download failed for: ", infra_code)
+			_return _false
+		_endif
+
+		_local xml_doc       << simple_xml.read_element_string(xml_result)
+		_local kml_path_elem << xml_doc.element_matching_name(:kml_file_path)
+
+		_if kml_path_elem _is _unset
+		_then
+			write("  ERROR: no kml_file_path for: ", infra_code)
+			_return _false
+		_endif
+
+		_local kml_file_path << kml_path_elem.xml_result
+		_local parser        << astri_kml_parser.new(kml_file_path)
+		_local (placemarks, topology) << parser.parse()
+
+		# Ensure fields migrate_to_sw_design expects are present
+		wo[:wo_number]           << wo[:wo_number].default(infra_code)
+		wo[:infra_name]          << wo[:infra_name].default(infra_code)
+		wo[:infrastructure_type] << infra_type
+
+		_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, infra_type, topology)
+		_if mig_stats _isnt _unset
+		_then
+			_local fkey << write_string(infra_type, "_features").as_symbol()
+			obj_stats[fkey] << obj_stats[fkey].default(0) + (
+				mig_stats[:aerial_routes].default(0) +
+				mig_stats[:underground_routes].default(0) +
+				mig_stats[:new_poles].default(0) +
+				mig_stats[:demand_points].default(0))
+		_endif
+		_return _true
+
+	_when error
+		write("  ERROR migrating ", infra_code, ": ", cond.report_contents_string)
+		_return _false
+	_endtry
+_endmethod
+$
+
+## ============================================================
 ## BATCH SUMMARY LOG
 ## Writes a formatted .txt summary to TEMP folder at the end of each
 ## scheduler run (migrate_scheduled_objects / migrate_etl_scheduled_objects).

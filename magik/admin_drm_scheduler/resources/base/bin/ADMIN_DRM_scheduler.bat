@@ -2,7 +2,10 @@ SET SW_GIS_ENVIRONMENT_FILE=F:\SW5\PNI_FTTH536\core\config\environment.bat
 SET SW_GIS_ALIAS_FILES=F:\SW5\PNI_FTTH536\pni_ftth\config\gis_aliases
 
 SET DRM_RUN_TYPE=manual
-SET DRM_SCHEDULER_DIR=F:\SW5\Scheduler\ADMIN_DRM_scheduler\
+REM DRM_SCHEDULER_DIR holds this .bat + the stdin caller (admin_drm_batch.magik) + logs.
+REM cmail.exe / recipients.txt are located at runtime from the loaded module's
+REM resources (admin_drm_scheduler), not from here.
+SET DRM_SCHEDULER_DIR=F:\SW5\Scheduler\admin_drm_scheduler\resources\base\bin\
 
 SET TIMESTAMP=%date:~10,4%%date:~7,2%%date:~4,2%%time:~0,2%%time:~3,2%
 SET LOGFILE=drm_%TIMESTAMP%.log

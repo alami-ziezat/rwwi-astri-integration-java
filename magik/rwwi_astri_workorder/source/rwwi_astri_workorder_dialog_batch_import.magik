@@ -65,7 +65,8 @@ _method rwwi_astri_workorder_dialog.ok_batch_list(path)
 	.items[:batch_list_path].value << path
 	.items[:batch_clear_btn].enabled?  << _true
 	.items[:load_wo_list_btn].enabled? << _true
-	.items[:add_all_btn].enabled?  << _false
+	.items[:add_all_btn].enabled?     << _false
+	.items[:migrate_all_btn].enabled? << _false
 	write("Batch list file selected: ", path)
 _endmethod
 $
@@ -77,7 +78,8 @@ _method rwwi_astri_workorder_dialog.clear_batch_list()
 	.items[:batch_list_path].value     << ""
 	.items[:batch_clear_btn].enabled?  << _false
 	.items[:load_wo_list_btn].enabled? << _false
-	.items[:add_all_btn].enabled?  << _false
+	.items[:add_all_btn].enabled?     << _false
+	.items[:migrate_all_btn].enabled? << _false
 	.batch_sections << _unset
 	write("Batch list cleared.")
 _endmethod
@@ -170,9 +172,10 @@ _method rwwi_astri_workorder_dialog.load_wo_list()
 	# Reload table — workorder_list_data() runs the multi-section fetch
 	_self.apply_filters()
 
-	# Enable Add All only if at least one WO was found
+	# Enable Add All + Migrate All only if at least one WO was found
 	_local found << .wo_cache _isnt _unset _andif _not .wo_cache.empty?
-	.items[:add_all_btn].enabled? << found
+	.items[:add_all_btn].enabled?     << found
+	.items[:migrate_all_btn].enabled? << found
 
 	_self.set_progress(write_string("Batch load complete. Found ",
 		.wo_cache.size.write_string, " / ", total_codes, " WO(s)."))
@@ -360,6 +363,95 @@ _method rwwi_astri_workorder_dialog.add_all_to_scheduler()
 	_self.log_separator()
 	_self.log_success(summary)
 	_self.show_alert(summary)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.migrate_all_wo()
+	## Admin action: migrate every displayed WO directly into Smallworld
+	## (no scheduler), then e-mail the HTML summary report via the
+	## admin_drm_scheduler module. Order is FEEDER -> SUBFEEDER -> CLUSTER.
+
+	_if .wo_cache _is _unset _orif .wo_cache.empty?
+	_then
+		_self.log_warning("No work orders loaded. Use Load WO List first.")
+		_return
+	_endif
+
+	_local database << gis_program_manager.databases[:gis]
+	_if database _is _unset
+	_then
+		_self.user_error("GIS database not available")
+		_return
+	_endif
+
+	# Build WO list from cache (each WO already tagged with its infra_type)
+	_local wo_list << rope.new()
+	_for key, wo _over .wo_cache.fast_keys_and_elements()
+	_loop
+		wo_list.add(wo)
+	_endloop
+
+	_self.user_info(write_string(
+		"Migrate All will process ", wo_list.size, " work order(s)", %newline,
+		"directly (no scheduler), in order FEEDER -> SUBFEEDER -> CLUSTER.", %newline, %newline,
+		"A summary report will be written and e-mailed. Do not close the dialog.", %newline,
+		"Click OK to start."))
+
+	_self.log_separator()
+	_self.log_info(write_string("MIGRATE ALL - ", wo_list.size, " work order(s)"))
+
+	_local overall << _unset
+	_local ok?     << _true
+
+	_try _with errCon
+		_local migrator << astri_data_migrator.new(database)
+		overall << migrator.migrate_wo_list(wo_list)
+	_when error
+		ok? << _false
+		_self.log_error("Migrate All failed: " + errCon.report_contents_string)
+		_self.user_error(write_string("Migrate All failed:", %newline,
+			errCon.report_contents_string))
+	_endtry
+
+	_if ok? _andif overall _isnt _unset
+	_then
+		_local g_total << overall[:cluster_total] + overall[:subfeeder_total] +
+			overall[:feeder_total]
+		_local g_migr  << overall[:cluster_migrated] + overall[:subfeeder_migrated] +
+			overall[:feeder_migrated]
+		_local g_err   << overall[:cluster_errors] + overall[:subfeeder_errors] +
+			overall[:feeder_errors]
+
+		# E-mail the HTML report via the admin_drm_scheduler module
+		_local log_path << overall[:log_file]
+		_local log_name << overall[:log_name]
+		_local emailed? << _false
+		_if log_path _isnt _unset
+		_then
+			_try _with mailCon
+				emailed? << admin_drm_scheduler.email_report(log_path, log_name)
+			_when error
+				_self.log_warning("Report e-mail failed: " + mailCon.report_contents_string)
+			_endtry
+		_endif
+
+		_local summary << write_string(
+			"Migrate All complete.", %newline,
+			"  Total processed  : ", g_total, %newline,
+			"  Total successful : ", g_migr, %newline,
+			"  Total failed     : ", g_err, %newline, %newline,
+			_if emailed? _then >> "Summary report e-mailed."
+			            _else >> "Summary report written (e-mail not sent)."
+			            _endif)
+
+		_self.log_separator()
+		_self.log_success(summary)
+		_self.show_alert(summary)
+
+		# A new design may now exist for the selected WO
+		_self.refresh_button_states()
+	_endif
 _endmethod
 $
 

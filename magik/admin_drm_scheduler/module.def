@@ -1,0 +1,16 @@
+admin_drm_scheduler 1
+
+description
+	DRM Scheduler e-mail integration.
+	Locates cmail.exe / recipients.txt (bundled as module resources) and
+	e-mails the HTML ETL summary report produced by astri_data_migrator -
+	used by both the scheduled batch runs (.bat) and the Work Order dialog
+	"Migrate All" action.
+end
+
+requires
+	base
+	rwwi_astri_integration
+end
+
+language en_gb

@@ -69,34 +69,21 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 		:identifier, :top_container,
 		:model, _self)
 
-	# Batch import (Toolbar 4) is restricted to root/admin users.
-	# When not allowed, the row is omitted entirely so the toolbar is hidden.
-	_local batch_allowed? << _self.batch_import_allowed?()
-
 	# Create outer container with flexible row sizing.
-	# Rows: Toolbar1, Toolbar2, Toolbar3/LocalKMZ, [Toolbar4/BatchImport],
+	# ALL toolbars are always built (their items are referenced elsewhere, and
+	# the batch-load path needs the filter items). Per-role VISIBILITY is applied
+	# afterwards by apply_role_visibility() - see user_role().
+	# Rows: Toolbar1, Toolbar2, Toolbar3/LocalKMZ, Toolbar4/BatchImport,
 	#       Table (flex), Text Window (flex), Bottom Action Toolbar,
 	#       Bottom Upload+KML Toolbar, Bottom BOQ+Excel Toolbar, Progress Footer
-	_local n_rows << _if batch_allowed? _then >> 10 _else >> 9 _endif
-	_local resize << _if batch_allowed?
-	                 _then >> {0, 0, 0, 0, 1, 1, 0, 0, 0, 0}
-	                 _else >> {0, 0, 0, 1, 1, 0, 0, 0, 0}
-	                 _endif
-	.items[:outer] << outer << sw_container.new(top_c, n_rows, 1,
-		:row_resize_values, resize)
+	.items[:outer] << outer << sw_container.new(top_c, 10, 1,
+		:row_resize_values, {0, 0, 0, 0, 1, 1, 0, 0, 0, 0})
 
-	# Build toolbar with filters
-	_self.build_toolbar(outer)
-	_self.build_toolbar2(outer)
-
-	# Build local KMZ file browser toolbar
-	_self.build_toolbar3(outer)
-
-	# Build batch import toolbar (root/admin only)
-	_if batch_allowed?
-	_then
-		_self.build_toolbar4(outer)
-	_endif
+	# Build all toolbars, keeping each container so it can be shown/hidden
+	.items[:toolbar1_con] << _self.build_toolbar(outer)
+	.items[:toolbar2_con] << _self.build_toolbar2(outer)
+	.items[:toolbar3_con] << _self.build_toolbar3(outer)
+	.items[:toolbar4_con] << _self.build_toolbar4(outer)
 
 	# Build work order table
 	_self.build_table(outer)
@@ -104,23 +91,84 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 	# Build text window for process logs and statistics
 	_self.build_text_window(outer)
 
-	# Build bottom action toolbar (primary WO actions)
-	_self.build_bottom_toolbar1(outer)
-
-	# Build bottom upload+KML toolbar (upload settings + Export APD to KML)
-	_self.build_bottom_toolbar2(outer)
-
-	# Build BOQ + Excel file browser toolbar (above progress footer)
-	_self.build_bottom_toolbar3(outer)
+	# Bottom action toolbars
+	.items[:bottom1_con] << _self.build_bottom_toolbar1(outer)
+	.items[:bottom2_con] << _self.build_bottom_toolbar2(outer)
+	.items[:bottom3_con] << _self.build_bottom_toolbar3(outer)
 
 	# Build progress footer (non-editable status line)
 	_self.build_progress_footer(outer)
+
+	# Apply per-role toolbar visibility (root: all, admin: batch only, user: all but batch)
+	_self.apply_role_visibility()
 
 	# Initial data load
 	_self.changed(:workorder_list, :refresh)
 
 	# Return the top-level container (required)
 	_return top_c
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.user_role()
+	## Returns the current user's role based on the GIS user name:
+	##   :root  -> user name "root"
+	##   :admin -> user name "admin"
+	##   :user  -> anyone else (or lookup failure)
+
+	_local user_name << _unset
+	_try
+		user_name << gis_program_manager.cached_dataset(:gis).auth_view.current_user.name
+	_when error
+	_endtry
+
+	_local uname << user_name.default("").lowercase
+	>> _if uname = "root"  _then >> :root
+	   _elif uname = "admin" _then >> :admin
+	   _else >> :user
+	   _endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.set_toolbar_visible(item_key, visible?)
+	## Show or hide a stored toolbar container (no-op if not built).
+	## Guarded: if the container does not support managed?, leave it visible.
+	_local con << .items[item_key]
+	_if con _isnt _unset
+	_then
+		_try
+			con.managed? << visible?
+		_when error
+			write("WARNING: could not toggle visibility for ", item_key)
+		_endtry
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.apply_role_visibility()
+	## Show/hide toolbars by role:
+	##   root  -> everything visible
+	##   admin -> ONLY the Batch Import toolbar (+ table/log/footer, always shown)
+	##   user  -> everything EXCEPT the Batch Import toolbar
+	## The table, text window and progress footer are never hidden.
+
+	_local role << _self.user_role()
+
+	# Non-batch action toolbars
+	_local non_batch << {:toolbar1_con, :toolbar2_con, :toolbar3_con,
+	                     :bottom1_con, :bottom2_con, :bottom3_con}
+
+	_local show_non_batch? << role _isnt :admin      # admin hides these
+	_local show_batch?     << role _isnt :user        # only root/admin see batch
+
+	_for k _over non_batch.fast_elements()
+	_loop
+		_self.set_toolbar_visible(k, show_non_batch?)
+	_endloop
+	_self.set_toolbar_visible(:toolbar4_con, show_batch?)
 _endmethod
 $
 
@@ -163,6 +211,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar(parent)
 		:editable?, _false)
 	.items[:filter_category].text_items << {"All", "Cluster BOQ", "Installation", "Maintenance"}
 	.items[:filter_category].value << "All"
+	>> toolbar_con
 _endmethod
 $
 _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
@@ -242,6 +291,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar2(parent)
 		:selector, :get_donation_work_orders_for_list|()|,
 		:tooltip, "Fetch donation values for all loaded work orders (cluster/subfeeder only)")
 	.items[:get_donation_btn].enabled? << _false
+	>> toolbar_con
 _endmethod
 $
 
@@ -294,6 +344,7 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar3(parent)
 		:selector, :schedule_wo|()|,
 		:tooltip, "Insert selected WO into scheduler log (drm_scheduler_logs)")
 	.items[:schedule_wo_btn].enabled? << _false
+	>> toolbar_con
 _endmethod
 $
 
@@ -347,6 +398,17 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 		:selector, :add_all_to_scheduler|()|,
 		:tooltip, "Add all displayed work orders to the scheduler log (drm_scheduler_logs)")
 	.items[:add_all_btn].enabled? << _false
+
+	sw_label_item.new(a_toolbar, "  ")
+
+	.items[:migrate_all_btn] << sw_button_item.new(a_toolbar,
+		:label, "Migrate All",
+		:model, _self,
+		:selector, :migrate_all_wo|()|,
+		:tooltip, "Migrate all displayed work orders directly (no scheduler) and e-mail the report")
+	.items[:migrate_all_btn].enabled? << _false
+
+	>> toolbar_con
 _endmethod
 $
 
@@ -406,6 +468,7 @@ _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar2(parent)
 		:selector, :upload_kmz|()|,
 		:tooltip, "Upload last exported KMZ to ASTRI Document API")
 	.items[:upload_kmz_btn].enabled? << _false
+	>> toolbar_con
 _endmethod
 $
 
@@ -479,6 +542,7 @@ _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar3(parent)
 		:selector, :upload_excel|()|,
 		:tooltip, "Upload selected Excel file to ASTRI Document API")
 	.items[:upload_excel_btn].enabled? << _false
+	>> toolbar_con
 _endmethod
 $
 
@@ -696,6 +760,7 @@ _private _method rwwi_astri_workorder_dialog.build_bottom_toolbar1(parent)
 		:selector, :migrate_existing|()|,
 		:tooltip, "Migrate existing ABD KMZ into Smallworld design")
 	.items[:migrate_existing_btn].enabled? << _false
+	>> toolbar_con
 _endmethod
 $
 

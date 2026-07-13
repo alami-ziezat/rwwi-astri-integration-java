@@ -1,0 +1,95 @@
+#% text_encoding = iso8859_1
+
+_package user
+$
+
+## admin_drm_scheduler
+## E-mail integration for the DRM scheduler HTML summary reports.
+##
+## cmail.exe + recipients.txt are bundled as module resources under
+## resources/base/data and located at runtime via
+##   smallworld_product.get_resource_file(<name>, :data, :admin_drm_scheduler)
+##
+## Two entry points (called on the exemplar itself):
+##   admin_drm_scheduler.run_and_email(:manual | :etl)  - run a scheduler + e-mail
+##   admin_drm_scheduler.email_report(log_path, log_name) - e-mail an existing report
+
+remex(:admin_drm_scheduler)
+$
+
+def_slotted_exemplar(:admin_drm_scheduler, {}, {})
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method admin_drm_scheduler.email_report(log_path, log_name)
+	## E-mail an already-produced HTML report via cmail.
+	##   log_path - full path of the .html report
+	##   log_name - report base name (no extension), used as the subject
+	## Returns _true if the mail command was issued, _false otherwise.
+
+	_if log_path _is _unset _orif log_path = ""
+	_then
+		write("admin_drm_scheduler: no report path - skipping e-mail.")
+		_return _false
+	_endif
+
+	# Locate the bundled cmail binary + recipients list (module resources)
+	_local cmail  << _unset
+	_local recips << _unset
+	_try _with cond
+		cmail  << smallworld_product.get_resource_file("cmail.exe",      :data, :admin_drm_scheduler)
+		recips << smallworld_product.get_resource_file("recipients.txt", :data, :admin_drm_scheduler)
+	_when error
+		write("admin_drm_scheduler: cannot locate cmail resources - ",
+		      cond.report_contents_string)
+		_return _false
+	_endtry
+
+	_if cmail _is _unset _orif recips _is _unset
+	_then
+		write("admin_drm_scheduler: cmail.exe / recipients.txt not found in module resources.")
+		_return _false
+	_endif
+
+	_local subject_text << log_name.default("SMALLWORLD - SUMMARY ETL")
+
+	_local mail_host    << write_string(" -host:172.17.12.165",
+					    " -from:no-reply@morarepublic.co.id",
+					    " -to:@", recips)
+	_local mail_subject << write_string(" ", %", "-subject:", subject_text, %")
+	# HTML body: cmail -body-html:<file> sends a UTF-8 HTML body
+	_local mail_body    << write_string(" ", %", "-body-html:", log_path, %")
+
+	_local l_command << write_string(cmail, mail_host, mail_subject, mail_body)
+	write("admin_drm_scheduler: ", l_command)
+
+	_local output << system.do_command(l_command)
+	write(output)
+	_return _true
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method admin_drm_scheduler.run_and_email(_optional run_type)
+	## Run a DRM scheduler migration and e-mail its HTML summary report.
+	##   run_type: :manual (default) -> migrate_scheduled_objects()
+	##             :etl              -> migrate_etl_scheduled_objects()
+	## Returns _true if a report was produced and e-mailed.
+
+	_local migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+	_local result << _if run_type _is :etl
+	                 _then >> migrator.migrate_etl_scheduled_objects()
+	                 _else >> migrator.migrate_scheduled_objects()
+	                 _endif
+
+	_local log_path << result[:log_file]
+	_local log_name << result[:log_name]
+	_if log_path _is _unset
+	_then
+		write("admin_drm_scheduler: no summary log produced - skipping e-mail.")
+		_return _false
+	_endif
+
+	_return _self.email_report(log_path, log_name)
+_endmethod
+$
