@@ -48,7 +48,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_excel()
 				wo[:donation_value] << d_val
 				write("Donation value auto-fetched:", d_val)
 				# Sync to wo_cache so table data source reflects the new value
-				_local cache_key << wo[:infra_code].default("").as_symbol()
+				_local cache_key << _self.wo_cache_key(wo[:infra_code].default(""), wo[:infrastructure_type].default(""))
 				_if .wo_cache[cache_key] _isnt _unset
 				_then
 					.wo_cache[cache_key][:donation_value] << d_val
@@ -156,7 +156,7 @@ _method rwwi_astri_workorder_dialog.generate_boq_json()
 				wo[:donation_value] << d_val
 				_self.log_success("Donation value auto-fetched: " + d_val.write_string)
 				# Sync to wo_cache so table data source reflects the new value
-				_local cache_key << wo[:infra_code].default("").as_symbol()
+				_local cache_key << _self.wo_cache_key(wo[:infra_code].default(""), wo[:infrastructure_type].default(""))
 				_if .wo_cache[cache_key] _isnt _unset
 				_then
 					.wo_cache[cache_key][:donation_value] << d_val

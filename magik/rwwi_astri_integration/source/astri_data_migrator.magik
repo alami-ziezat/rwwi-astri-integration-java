@@ -28,7 +28,8 @@ def_slotted_exemplar(:astri_data_migrator,
 		{:stats, _unset},              # Migration statistics
 		{:db_connection, _unset},      # PostgreSQL database connection
 		{:scheduler_table, _unset},    # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_log)
-		{:last_log_file, _unset}       # Full path of the most recently written summary .txt
+		{:last_log_file, _unset},      # Full path of the most recently written summary .html
+		{:last_log_name, _unset}       # Base file name (no extension) of that summary
 	},
 	{})
 $
@@ -1742,10 +1743,13 @@ _method astri_data_migrator.migrate_scheduled_objects()
 	## CLI usage:
 	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
 	##   result << migrator.migrate_scheduled_objects()
-	##   log_path << result[:log_file]        # or migrator.last_log_file()
+	##   log_path << result[:log_file]        # full path (or migrator.last_log_file())
+	##   log_name << result[:log_name]        # file name, no extension (or last_log_name())
 	##
-	## Returns: overall_stats property_list, which includes :log_file — the full
-	##          path of the summary .txt written for this run (_unset if none).
+	## Returns: overall_stats property_list, which includes:
+	##   :log_file - full path of the summary .html written for this run
+	##   :log_name - the file name WITHOUT extension
+	##   (both _unset if the file could not be written)
 
 	_local start_time << date_time.now()
 	write("=================================================================")
@@ -1849,12 +1853,21 @@ _method astri_data_migrator.migrate_scheduled_objects()
 	write("Duration: ", duration.write_string)
 	write("=================================================================")
 
-	# Write the summary .txt and capture its full path so callers can use it.
-	# The path is returned both in overall_stats[:log_file] and via .last_log_file.
-	_local log_file << _self.write_batch_summary_log(overall_stats, start_time, end_time)
-	overall_stats[:log_file] << log_file
-	.last_log_file << log_file
-	write("Summary log file: ", log_file.default("(not created)"))
+	# Write the summary .html and capture its path + base name (no extension).
+	# Both are returned in overall_stats (:log_file, :log_name) and stored in
+	# the .last_log_file / .last_log_name slots.
+	_local log << _self.write_batch_summary_log(overall_stats, start_time, end_time)
+	_if log _isnt _unset
+	_then
+		overall_stats[:log_file] << log[:path]
+		overall_stats[:log_name] << log[:name]
+		.last_log_file << log[:path]
+		.last_log_name << log[:name]
+	_else
+		overall_stats[:log_file] << _unset
+		overall_stats[:log_name] << _unset
+	_endif
+	write("Summary log file: ", overall_stats[:log_file].default("(not created)"))
 
 	>> overall_stats
 _endmethod
@@ -2602,10 +2615,11 @@ _method astri_data_migrator.migrate_etl_scheduled_objects()
 	## CLI usage:
 	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
 	##   result << migrator.migrate_etl_scheduled_objects()
-	##   log_path << result[:log_file]        # or migrator.last_log_file()
+	##   log_path << result[:log_file]        # full path (or migrator.last_log_file())
+	##   log_name << result[:log_name]        # file name, no extension (or last_log_name())
 	##
-	## Returns: overall_stats property_list, including :log_file (full path of the
-	##          summary .txt written for this run, or _unset if none).
+	## Returns: overall_stats property_list, including :log_file (full .html path)
+	##          and :log_name (file name without extension); both _unset if none.
 
 	write("=== AUTOMATED ETL SCHEDULER RUN (drm_etl_scheduler_log) ===")
 	.scheduler_table << "smallworld.drm_etl_scheduler_log"
@@ -2620,10 +2634,18 @@ $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method astri_data_migrator.last_log_file()
-	## Full path of the summary .txt written by the most recent run,
+	## Full path of the summary .html written by the most recent run,
 	## or _unset if no run has completed / the file could not be written.
 	## Convenience accessor for callers that don't keep the run's return value.
 	>> .last_log_file
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.last_log_name()
+	## Base file name (WITHOUT extension) of the most recent summary log,
+	## or _unset. e.g. "SMALLWORLD - SUMMARY ETL - 20260713_195733".
+	>> .last_log_name
 _endmethod
 $
 
@@ -2637,7 +2659,11 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, end_time)
-	## Write ETL summary .txt to TEMP after all scheduled migrations complete.
+	## Write an HTML ETL summary to TEMP after all scheduled migrations complete.
+	## Returns a property_list {:path, :name}:
+	##   :path - full path of the written .html file
+	##   :name - the file name WITHOUT the .html extension
+	## Returns _unset if the file could not be written.
 
 	_local date_str   << _self.sum_fmt_date(start_time)
 	_local compact_dt << _self.sum_compact_dt(start_time)
@@ -2667,28 +2693,44 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 	                     >> "0.00%"
 	                 _endif
 
-	_local SEP << "+------------------------------------------------------+"
+	_local title << write_string("[SMALLWORLD] - SUMMARY ETL [", types_label, "] [", date_str, "]")
 	_local lines << rope.new()
 
-	# Title row (variable width, matches content)
-	_local title_body << write_string("[SMALLWORLD] - SUMMARY ETL [", types_label, "] [", date_str, "]")
-	lines.add(write_string("+===", title_body, "===+"))
+	# --- HTML head + styles (single-quoted attributes avoid Magik quote escaping) ---
+	lines.add("<!DOCTYPE html>")
+	lines.add("<html lang='en'><head><meta charset='UTF-8'>")
+	lines.add(write_string("<title>", title, "</title>"))
+	lines.add("<style>")
+	lines.add("body{font-family:Segoe UI,Arial,sans-serif;background:#f4f6f8;color:#222;margin:24px;}")
+	lines.add("h1{font-size:18px;margin:0 0 4px;}h2{font-size:15px;margin:0 0 8px;color:#1a4e8a;}")
+	lines.add(".card{background:#fff;border:1px solid #dce1e6;border-radius:8px;padding:14px 18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.05);}")
+	lines.add("table{border-collapse:collapse;width:100%;}th,td{text-align:left;padding:6px 10px;border-bottom:1px solid #eef1f4;font-size:13px;}")
+	lines.add("th{width:230px;color:#555;font-weight:600;}")
+	lines.add(".ok{color:#1a7f37;}.fail{color:#c0392b;}.muted{color:#777;font-size:12px;}")
+	lines.add(".codes{font-family:Consolas,monospace;font-size:12px;line-height:1.7;word-break:break-all;margin:4px 0 10px;}")
+	lines.add(".pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;}")
+	lines.add(".pill-ok{background:#e6f4ea;color:#1a7f37;}.pill-fail{background:#fdecea;color:#c0392b;}")
+	lines.add("</style></head><body>")
 
-	# Header block
-	lines.add(_self.sum_row("Asset Level",      types_label))
-	lines.add(_self.sum_row("Datetime",          compact_dt))
-	lines.add(_self.sum_row("Updated Timestamp", ts_range))
-	lines.add(SEP)
+	# --- Header card ---
+	lines.add("<div class='card'>")
+	lines.add(write_string("<h1>", title, "</h1>"))
+	lines.add("<table>")
+	lines.add(_self.html_row("Asset Level",       types_label))
+	lines.add(_self.html_row("Datetime",          compact_dt))
+	lines.add(_self.html_row("Updated Timestamp", ts_range))
+	lines.add("</table></div>")
 
-	# Grand totals block
-	lines.add(_self.sum_row("Total processed",       g_total.write_string))
-	lines.add(_self.sum_row("Total successful",       g_migr.write_string))
-	lines.add(_self.sum_row("Total failed",           g_err.write_string))
-	lines.add(_self.sum_row("Success percentage",     pct_str))
-	lines.add(_self.sum_row("Total features written", g_feat.write_string))
-	lines.add("+======================================================+")
+	# --- Grand totals card ---
+	lines.add("<div class='card'><h2>Grand Total</h2><table>")
+	lines.add(_self.html_row("Total processed",       g_total.write_string))
+	lines.add(_self.html_row("Total successful",       g_migr.write_string))
+	lines.add(_self.html_row("Total failed",           g_err.write_string))
+	lines.add(_self.html_row("Success percentage",     pct_str))
+	lines.add(_self.html_row("Total features written", g_feat.write_string))
+	lines.add("</table></div>")
 
-	# Per-infra-type sections
+	# --- Per-infra-type cards ---
 	_local type_defs << {{"cluster", "CLUSTER"}, {"subfeeder", "SUB-FEEDER"}, {"feeder", "FEEDER"}}
 
 	_for td _over type_defs.fast_elements()
@@ -2703,36 +2745,35 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 		_local t_succ << stats[write_string(itype, "_succeeded_codes").as_symbol()].default(rope.new())
 		_local t_fail << stats[write_string(itype, "_failed_codes").as_symbol()].default(rope.new())
 
-		# Section header line
-		_local hdr << write_string("+== ", ilabel, " ")
-		_loop
-			_if hdr.size >= 55 _then _leave _endif
-			hdr << hdr + "="
-		_endloop
-		lines.add(hdr + "+")
-
-		lines.add(_self.sum_row("Processed", t_tot.write_string))
-		lines.add(_self.sum_row("Success",   t_migr.write_string))
-		lines.add(_self.sum_row("Failed",    t_err.write_string))
-		lines.add(SEP)
+		lines.add(write_string("<div class='card'><h2>", ilabel, "</h2><table>"))
+		lines.add(_self.html_row("Processed", t_tot.write_string))
+		lines.add(_self.html_row("Success",   t_migr.write_string))
+		lines.add(_self.html_row("Failed",    t_err.write_string))
+		lines.add("</table>")
 
 		_if _not t_succ.empty?
 		_then
-			_self.sum_code_lines(lines, "List succeed", t_succ)
+			lines.add("<p><span class='pill pill-ok'>List succeed</span></p>")
+			lines.add(write_string("<div class='codes ok'>", _self.html_codes(t_succ), "</div>"))
 		_endif
 
 		_if _not t_fail.empty?
 		_then
-			_self.sum_code_lines(lines, "List failed",  t_fail)
+			lines.add("<p><span class='pill pill-fail'>List failed</span></p>")
+			lines.add(write_string("<div class='codes fail'>", _self.html_codes(t_fail), "</div>"))
 		_endif
 
-		lines.add(SEP)
+		lines.add("</div>")
 	_endloop
 
+	lines.add(write_string("<p class='muted'>Generated ", compact_dt, "</p>"))
+	lines.add("</body></html>")
+
 	# Write file (new file per run — unique datetime in name)
-	_local temp_dir << system.getenv("TEMP").default("C:\\temp")
-	_local filename << write_string("SMALLWORLD - SUMMARY ETL - ", compact_dt, ".txt")
-	_local filepath << write_string(temp_dir, "\\", filename)
+	_local temp_dir  << system.getenv("TEMP").default("C:\\temp")
+	_local base_name << write_string("SMALLWORLD - SUMMARY ETL - ", compact_dt)  # no extension
+	_local filename  << write_string(base_name, ".html")
+	_local filepath  << write_string(temp_dir, "\\", filename)
 
 	_try
 		_local stream << external_text_output_stream.new(filepath)
@@ -2745,9 +2786,9 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 		_protection
 			stream.close()
 		_endprotect
-		write("=== Batch summary log written: ", filepath, " ===")
-		# Return the full path of the written log file for downstream callers
-		_return filepath
+		write("=== Batch summary log (HTML) written: ", filepath, " ===")
+		# Return full path AND base file name (without extension) for callers
+		_return property_list.new_with(:path, filepath, :name, base_name)
 	_when error
 		write("ERROR writing batch summary log: ", condition.report_contents_string)
 		_return _unset
@@ -2756,62 +2797,28 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator.sum_row(key, value)
-	## Format a 56-char wide data row: | KEY (20 chars) : VALUE (padded) |
-	_local k << key.write_string
-	_local v << value.write_string
-	_loop
-		_if k.size >= 20 _then _leave _endif
-		k << k + " "
-	_endloop
-	_local line << write_string("| ", k, ": ", v, " ")
-	_loop
-		_if line.size >= 55 _then _leave _endif
-		line << line + " "
-	_endloop
-	>> line + "|"
+_private _method astri_data_migrator.html_row(key, value)
+	## Build one HTML table row: <tr><th>key</th><td>value</td></tr>
+	>> write_string("<tr><th>", key.write_string, "</th><td>", value.write_string, "</td></tr>")
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator.sum_code_lines(lines, label, codes)
-	## Append wrapped infra_code list lines to lines rope.
-	## Content width: 52 chars inside "| ... |" (56 total).
-	_local prefix      << write_string(label, ": ")
-	_local content_max << 52
-	_local current     << prefix
-
+_private _method astri_data_migrator.html_codes(codes)
+	## Join a collection of infra_codes into a comma-separated string for HTML.
+	_local s      << ""
+	_local first? << _true
 	_for code _over codes.fast_elements()
 	_loop
-		_local token << write_string(code, ", ")
-		_if current.size + token.size > content_max _andif current <> prefix
+		_if first?
 		_then
-			_local ln << "| " + current
-			_loop
-				_if ln.size >= 55 _then _leave _endif
-				ln << ln + " "
-			_endloop
-			lines.add(ln + "|")
-			current << token
+			first? << _false
 		_else
-			current << current + token
+			s << s + ", "
 		_endif
+		s << s + code.write_string
 	_endloop
-
-	# Flush final partial line, strip trailing ", "
-	_if current <> prefix _andif current <> ""
-	_then
-		_if current.size >= 2 _andif current.subseq(current.size - 1, 2) = ", "
-		_then
-			current << current.subseq(1, current.size - 2)
-		_endif
-		_local ln << "| " + current
-		_loop
-			_if ln.size >= 55 _then _leave _endif
-			ln << ln + " "
-		_endloop
-		lines.add(ln + "|")
-	_endif
+	>> s
 _endmethod
 $
 

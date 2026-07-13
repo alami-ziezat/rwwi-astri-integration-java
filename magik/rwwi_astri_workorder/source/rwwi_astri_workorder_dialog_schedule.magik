@@ -69,8 +69,8 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 		_return
 	_endif
 
-	# --- Validation 3: Already in ETL scheduler log ---
-	_local existing_status << .engine.get_etl_scheduler_log_status(infra_code)
+	# --- Validation 3: Already in ETL scheduler log (per infra_code + infra_type) ---
+	_local existing_status << .engine.get_etl_scheduler_log_status(infra_code, infra_type)
 
 	_if existing_status _isnt _unset _andif existing_status <> ""
 	_then

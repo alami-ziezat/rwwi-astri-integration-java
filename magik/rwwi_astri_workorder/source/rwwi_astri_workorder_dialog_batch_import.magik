@@ -189,13 +189,13 @@ _method rwwi_astri_workorder_dialog.fetch_batch_workorders()
 	##   - feeder             -> target_osp_route_code (infra_code, NOT area)
 	##   - cluster/subfeeder  -> target_<type>_code
 	## Each matched WO is tagged with its section's infra_type (deduped by
-	## infra_code). Progress is logged per section; codes with no API match
-	## are logged as "not found".
+	## infra_type + infra_code, so the same code can appear under two types).
+	## Progress is logged per section; codes with no API match are "not found".
 	##
 	## Returns: rope of work order property_lists
 
 	_local result      << rope.new()
-	_local seen        << equality_hash_table.new()   # dedup by infra_code across all sections
+	_local seen        << equality_hash_table.new()   # dedup by (infra_type + infra_code)
 	_local fetch_limit << 50
 
 	_for section _over .batch_sections.fast_elements()
@@ -247,12 +247,14 @@ _method rwwi_astri_workorder_dialog.fetch_batch_workorders()
 				_for wo _over wos.fast_elements()
 				_loop
 					got? << _true
-					_local icode << wo[:infra_code].default("")
-					_if seen[icode] _is _unset
+					# Dedup on (infra_type + infra_code) so the same code under a
+					# different type (e.g. subfeeder vs cluster) is NOT dropped.
+					_local skey << _self.wo_cache_key(wo[:infra_code].default(""), sec_type)
+					_if seen[skey] _is _unset
 					_then
 						wo[:infrastructure_type] << sec_type
 						result.add(wo)
-						seen[icode] << _true
+						seen[skey] << _true
 					_endif
 				_endloop
 			_endif
@@ -301,6 +303,8 @@ _method rwwi_astri_workorder_dialog.add_all_to_scheduler()
 	_loop
 		_local infra_code << wo[:infra_code].default("")
 		_local wo_number  << wo[:wo_number].default("")
+		_local infra_type << wo[:infrastructure_type].default(
+			.filters[:infrastructure_type].default("cluster"))
 
 		# Validation 1: Smallworld project or design already exists
 		_local (has_project, has_design) << _self.check_project_and_design_exist(wo)
@@ -311,21 +315,20 @@ _method rwwi_astri_workorder_dialog.add_all_to_scheduler()
 			_continue
 		_endif
 
-		# Validation 2: Already in scheduler log
-		_local existing_status << .engine.get_scheduler_log_status(infra_code)
+		# Validation 2: Already in scheduler log (per infra_code + infra_type)
+		_local existing_status << .engine.get_scheduler_log_status(infra_code, infra_type)
 		_if existing_status _isnt _unset _andif existing_status <> ""
 		_then
 			skipped_dup +<< 1
 			_self.log_warning(write_string("Skipped (already scheduled): ",
-				infra_code, " [", existing_status, "]"))
+				infra_code, " [", infra_type, " / ", existing_status, "]"))
 			_continue
 		_endif
 
 		_local params << property_list.new_with(
 			:infra_code,         infra_code,
 			:name,               wo[:infra_name].default(""),
-			:infra_type,         wo[:infrastructure_type].default(
-				                     .filters[:infrastructure_type].default("cluster")),
+			:infra_type,         infra_type,
 			:username,           username,
 			:scheduler_username, username,
 			:status,             "scheduled",

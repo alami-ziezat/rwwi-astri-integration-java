@@ -72,13 +72,16 @@ to `%TEMP%` on completion.
 
 ```magik
 result   << migrator.migrate_scheduled_objects()      # or migrate_etl_scheduled_objects()
-log_path << result[:log_file]                          # full path of the .txt (or _unset)
+log_path << result[:log_file]                          # full path of the .html (or _unset)
+log_name << result[:log_name]                          # file name WITHOUT extension (or _unset)
 # also available via:
 log_path << migrator.last_log_file()
+log_name << migrator.last_log_name()
 ```
 
-`write_batch_summary_log()` returns the path (or `_unset` on write failure); the run stores it
-in `overall_stats[:log_file]` and in the `.last_log_file` slot (accessor `last_log_file()`).
+`write_batch_summary_log()` returns `{:path, :name}` (or `_unset` on write failure); the run
+stores both in `overall_stats[:log_file]` / `[:log_name]` and in the `.last_log_file` /
+`.last_log_name` slots (accessors `last_log_file()` / `last_log_name()`).
 
 ---
 
@@ -161,6 +164,26 @@ Load WO List also fetches donation values so the **Donation column is populated 
   shown live.
 - The standalone **"Get Donation WO"** button is unchanged for the normal (non-batch) flow.
 
+### Same infra_code across types (subfeeder & cluster)
+
+A file may list the **same infra_code under two types** (e.g. `PLB006435` under both
+`[SUBFEEDER]` and `[CLUSTER]`). Previously the table cache keyed on `infra_code` alone, so the
+two collided and only one row showed. Now:
+
+- The table has a new **"Infra Type"** column (col 16).
+- `.wo_cache` is keyed by a **composite key** `"<infra_type>|<infra_code>"` (helper
+  `wo_cache_key(infra_code, infra_type)`), so subfeeder `PLB006435` and cluster `PLB006435`
+  coexist as separate rows.
+- The batch fetch **dedups on `(infra_type + infra_code)`** instead of `infra_code`, so the
+  second type is not dropped.
+- Row selection reads both col 3 (infra_code) and col 16 (infra_type) to resolve the WO.
+- This applies to the **normal Apply-Filters flow too** — each WO is tagged with its own type
+  and keyed the same way (no behaviour change there, since a single filter yields one type).
+- The scheduler duplicate check is **per-(infra_code, infra_type)**:
+  `get_scheduler_log_status(infra_code, infra_type)` and
+  `get_etl_scheduler_log_status(infra_code, infra_type)` both add `AND infra_type = ?`, so the
+  same code under two types can be queued/scheduled independently.
+
 ### `add_all_to_scheduler()`
 
 Loops the displayed WOs and inserts each into `drm_scheduler_logs` via
@@ -168,7 +191,8 @@ Loops the displayed WOs and inserts each into `drm_scheduler_logs` via
 1. Skip if a Smallworld project/design already exists.
 2. Skip if already present in `drm_scheduler_logs`.
 
-Each inserted row sets **`description = "BULK"`**.
+Each inserted row sets **`description = "BULK"`**. The duplicate check is
+`get_scheduler_log_status(infra_code, infra_type)` — per (code, type).
 Reports a summary popup: `Added / Skipped (design) / Skipped (already scheduled) / Failed`.
 **No apd_kmz H-1 check on this path** (that rule is ETL-only).
 
@@ -184,7 +208,8 @@ with an extra condition and the `subject` column.
 2. **`apd_kmz_upload_date` must be newer than H-1 (yesterday)** → else block.
    Checked via `engine.apd_kmz_recent?(infra_type, infra_code)`. The **block popup shows the
    WO's current `apd_kmz_upload_date`** (`(none)` when empty) so the user sees why it's blocked.
-3. Already in `drm_etl_scheduler_log` (`engine.get_etl_scheduler_log_status`) → block.
+3. Already in `drm_etl_scheduler_log`
+   (`engine.get_etl_scheduler_log_status(infra_code, infra_type)`, per code+type) → block.
 
 ### `subject` value
 Built by `build_etl_subject(infra_type)`:
@@ -263,40 +288,71 @@ migrator.migrate_etl_scheduled_objects()   # automated -> drm_etl_scheduler_log
 
 ---
 
-## Part 4 — Summary ETL Log (written by BOTH runs)
+## Part 4 — Summary ETL Log (HTML, written by BOTH runs)
 
-`write_batch_summary_log()` + `sum_*` helpers are called at the end of **every** scheduler run —
-both `migrate_scheduled_objects()` (manual) and `migrate_etl_scheduled_objects()` (automated,
-which delegates to it). Each run writes its own `.txt` to TEMP.
+`write_batch_summary_log()` is called at the end of **every** scheduler run — both
+`migrate_scheduled_objects()` (manual) and `migrate_etl_scheduled_objects()` (automated, which
+delegates to it). Each run writes an **HTML** report to TEMP.
+
+> **Format:** the report is now **HTML** (was a fixed-width text box). It renders as styled
+> cards — a header card (Asset Level / Datetime / Updated Timestamp), a Grand Total card, and
+> one card per infra type (Processed / Success / Failed + the succeed/failed code lists).
+> Built by `html_row()` / `html_codes()` (the old `sum_row` / `sum_code_lines` were removed);
+> HTML attributes use single quotes to avoid Magik quote-escaping.
 
 > **Date handling fix.** `date_time.now()` on this platform does **not** understand `.date` /
-> `.time` (it raised `does not understand message date`). The helpers now parse
-> `date_time.write_string` (`DD/MM/YYYY HH:MM:SS`) via `sum_parse_dt()` instead, so both reports
-> generate correctly.
+> `.time`. The helpers parse `date_time.write_string` (`DD/MM/YYYY HH:MM:SS`) via
+> `sum_parse_dt()` instead.
 
-Output:
+Structure (rendered):
 
 ```
-+=== [SMALLWORLD] - SUMMARY ETL [SUB-FEEDER] [2026-05-29] ===+
-| Asset Level       : Sub-Feeder                       |
-| Datetime          : 20260529_100545                  |
-| Updated Timestamp : 2026-05-25 -- 2026-05-29         |
-+------------------------------------------------------+
-| Total processed   : 723                              |
-| Total successful  : 659                              |
-| Total failed      : 64                               |
-| Success percentage: 91.15%                           |
-| Total features written : 67106                       |
-+======================================================+
-+== SUB-FEEDER ========================================+
-| Processed : 571 | Success : 518 | Failed : 53        |
-| List succeed: BBS000366, BBS000404, ...              |
-+------------------------------------------------------+
+[SMALLWORLD] - SUMMARY ETL [SUB-FEEDER] [2026-05-29]
+  Asset Level        : Sub-Feeder
+  Datetime           : 20260529_100545
+  Updated Timestamp  : 2026-05-25 -- 2026-05-29
+Grand Total
+  Total processed / successful / failed / Success % / Total features written
+SUB-FEEDER
+  Processed / Success / Failed
+  List succeed: BBS000366, BBS000404, ...
+  List failed : ...
 ```
 
-- File: `%TEMP%\SMALLWORLD - SUMMARY ETL - <YYYYMMDD_HHMMSS>.txt`
+- File: `%TEMP%\SMALLWORLD - SUMMARY ETL - <YYYYMMDD_HHMMSS>.html`
 - New file per run (datetime in name); existing logs never overwritten.
-- Fixed processing order **FEEDER → SUBFEEDER → CLUSTER**; absent types produce no section.
+- Fixed processing order **FEEDER → SUBFEEDER → CLUSTER**; absent types produce no card.
+- **Return values:** the run returns `overall_stats[:log_file]` (full `.html` path) and
+  `overall_stats[:log_name]` (file name without extension); also `last_log_file()` /
+  `last_log_name()`.
+
+### E-mail integration (`admin_drm_scheduler/`)
+
+The scheduler batch scripts e-mail the HTML report with **Inveigle CMail**:
+- Logic is a reusable proc **`run_drm_scheduler_and_email(run_type)`**
+  (`:manual` → `migrate_scheduled_objects`, `:etl` → `migrate_etl_scheduled_objects`); the
+  trailing `_block` calls it.
+- Uses **`-body-html:<log_path>`** (cmail's UTF-8 HTML body flag) instead of `-body-file:`.
+- Subject = **`last_log_name()`** (base name, no extension) — replaces the old fragile
+  `split_by("\\")[8].split_by(".")[1]` path parsing.
+- Path/name come straight from the migrator (`last_log_file()` / `last_log_name()`).
+
+**One shared script**, two `.bat` files. The batch sets `DRM_RUN_TYPE` and the script's
+`_block` reads it (`system.getenv("DRM_RUN_TYPE")`, default `manual`) to pick the run:
+
+| Run | Batch | `DRM_RUN_TYPE` | Log prefix |
+|---|---|---|---|
+| Manual | `ADMIN_DRM_scheduler.bat` | `manual` | `drm_` |
+| Automated ETL | `ADMIN_DRM_etl_scheduler.bat` | `etl` | `drm_etl_` |
+
+Both `.bat` files pipe the **same** `admin_drm_batch.magik` (single source of truth — no
+duplicated proc). Each `.bat` sets `DRM_RUN_TYPE` explicitly so a leaked env var can't flip
+the mode.
+
+The scheduler directory (holding `cmail.exe` + `recipients.txt`, and the script/logs) is also
+an env var — **`DRM_SCHEDULER_DIR`** — set in each `.bat` and read by the script
+(`system.getenv("DRM_SCHEDULER_DIR")`, with the original hardcoded paths as fallback). The
+`.bat` reuses it for `LOGDIR` and the piped script path, so the location is defined once.
 
 ---
 
@@ -324,8 +380,8 @@ Batch import **Load WO List** now resolves feeder codes via `target_osp_route_co
 
 | File | Change |
 |---|---|
-| `rwwi_astri_workorder_engine.magik` | **New:** `insert_etl_scheduler_log`, `get_etl_scheduler_log_status`, `apd_kmz_recent?`; both inserts now write a `description` column (`BULK`/`SINGLE`) |
-| `astri_data_migrator.magik` | Fixed summary-log date handling (parse `date_time.write_string` via `sum_parse_dt`); `get_scheduled_records` selection for both runs (`status = 'scheduled'` AND `infra_type = ?` AND `created_at >= yesterday`) |
+| `rwwi_astri_workorder_engine.magik` | **New:** `insert_etl_scheduler_log`, `get_etl_scheduler_log_status`, `apd_kmz_recent?`; both inserts now write a `description` column (`BULK`/`SINGLE`); status checks now take `(infra_code, infra_type)` and filter `AND infra_type = ?` |
+| `astri_data_migrator.magik` | Summary log now **HTML** (`html_row`/`html_codes`, `.html` ext); `write_batch_summary_log` returns `{:path,:name}`; run returns `:log_file` + `:log_name` (+ slots/accessors `last_log_file()`/`last_log_name()`); date handling via `sum_parse_dt`; `get_scheduled_records` selection for both runs (`status = 'scheduled'` AND `infra_type = ?` AND `created_at >= yesterday`) |
 | `rwwi_astri_workorder_dialog_schedule.magik` | `schedule_wo()` → ETL table + H-1 check + `subject`; **new** `build_etl_subject()` |
 | `rwwi_astri_workorder_dialog_batch_import.magik` | `migrate_all_wo` → **`add_all_to_scheduler`** (writes `drm_scheduler_logs`); per-code fetch; 25/type cap; progress footer |
 | `rwwi_astri_workorder_dialog.magik` | Toolbar 4 button `:migrate_all_btn`/"Migrate All" → `:add_all_btn`/**"Add All"** (`add_all_to_scheduler`); slot `:batch_sections`; multi-section `workorder_list_data()` |
@@ -335,6 +391,8 @@ Batch import **Load WO List** now resolves feeder codes via `target_osp_route_co
 | `rwwi_astri_workorder_dialog_donation.magik` | **New** `apply_batch_donations(workorders)` — per-WO-type donation fetch for the batch list (feeder skipped) |
 | `rwwi_astri_workorder_dialog.magik` | `workorder_list_data()` batch branch calls `apply_batch_donations()` after the WO fetch |
 | `rwwi_astri_workorder_dialog.magik` | `activate_in()` gates Toolbar 4 on `batch_import_allowed?()` (9 vs 10 rows; skip `build_toolbar4`) |
+| `rwwi_astri_workorder_dialog.magik` | New **"Infra Type"** table column (col 16); `.wo_cache` keyed by composite `wo_cache_key(infra_code, infra_type)`; `workorder_selection` reads col 3 + col 16 |
+| `rwwi_astri_workorder_dialog_boq.magik` / `_donation.magik` | wo_cache lookups switched to the composite key |
 | `rwwi_astri_workorder_dialog_batch_import.magik` | **New** `batch_import_allowed?()` — `root`/`admin` check |
 
 ---

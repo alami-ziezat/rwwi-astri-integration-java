@@ -71,7 +71,9 @@ _method rwwi_astri_workorder_dialog.get_donation_work_orders_for_list()
 	# Propagate to selected_wo if currently selected
 	_if .selected_wo _isnt _unset
 	_then
-		_local sel_key << .selected_wo[:infra_code].default("").as_symbol()
+		_local sel_key << _self.wo_cache_key(
+			.selected_wo[:infra_code].default(""),
+			.selected_wo[:infrastructure_type].default(""))
 		_local cached  << .wo_cache[sel_key]
 		_if cached _isnt _unset _andif cached[:donation_value] _isnt _unset
 		_then

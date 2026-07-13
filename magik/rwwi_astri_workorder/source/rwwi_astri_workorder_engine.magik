@@ -917,17 +917,20 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method rwwi_astri_workorder_engine.get_scheduler_log_status(infra_code)
-	## Check if a scheduler log record already exists for the given infra_code.
+_method rwwi_astri_workorder_engine.get_scheduler_log_status(infra_code, infra_type)
+	## Check if a scheduler log record already exists for the given
+	## infra_code AND infra_type (so the same code under different types is
+	## treated as distinct).
 	##
 	## Parameters:
 	##   infra_code (string) - Infrastructure code to check
+	##   infra_type (string) - "cluster" | "subfeeder" | "feeder"
 	##
 	## Returns:
 	##   string - existing status value, or _unset if no record found
 
 	_local sql << "SELECT status FROM smallworld.drm_scheduler_logs " +
-		"WHERE infra_code = ? ORDER BY created_at DESC LIMIT 1"
+		"WHERE infra_code = ? AND infra_type = ? ORDER BY created_at DESC LIMIT 1"
 
 	_local conn << _unset
 
@@ -942,7 +945,7 @@ _method rwwi_astri_workorder_engine.get_scheduler_log_status(infra_code)
 			_return _unset
 		_endif
 
-		_local recs << conn.sql_select(sql, infra_code)
+		_local recs << conn.sql_select(sql, infra_code, infra_type)
 		_local rec  << recs.get()
 		recs.close()
 
@@ -1034,14 +1037,19 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method rwwi_astri_workorder_engine.get_etl_scheduler_log_status(infra_code)
-	## Check if an ETL scheduler log record already exists for the given infra_code.
+_method rwwi_astri_workorder_engine.get_etl_scheduler_log_status(infra_code, infra_type)
+	## Check if an ETL scheduler log record already exists for the given
+	## infra_code AND infra_type (same code under different types is distinct).
+	##
+	## Parameters:
+	##   infra_code (string) - Infrastructure code to check
+	##   infra_type (string) - "cluster" | "subfeeder" | "feeder"
 	##
 	## Returns:
 	##   string - existing status value, or _unset if no record found
 
 	_local sql << "SELECT status FROM smallworld.drm_etl_scheduler_log " +
-		"WHERE infra_code = ? ORDER BY created_at DESC LIMIT 1"
+		"WHERE infra_code = ? AND infra_type = ? ORDER BY created_at DESC LIMIT 1"
 
 	_local conn << _unset
 
@@ -1056,7 +1064,7 @@ _method rwwi_astri_workorder_engine.get_etl_scheduler_log_status(infra_code)
 			_return _unset
 		_endif
 
-		_local recs << conn.sql_select(sql, infra_code)
+		_local recs << conn.sql_select(sql, infra_code, infra_type)
 		_local rec  << recs.get()
 		recs.close()
 

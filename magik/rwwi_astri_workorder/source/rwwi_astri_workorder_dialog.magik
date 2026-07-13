@@ -587,18 +587,19 @@ _private _method rwwi_astri_workorder_dialog.build_table(parent)
 		:min_height, 300)
 
 	# Set column labels
-	# Col:  1     2            3             4       5        6           7         8           9       10           11                12         13          14            15
+	# Col:  1     2            3             4       5        6           7         8           9       10           11                12         13          14            15          16
 	.items[:table].set_column_labels({
-		"No", "WO Number", "Infra Code", "Name", "Status", "Topology", "Vendor", "Donation", "Area", "Homepass", "Area Plant Code", "Created", "KMZ UUID", "KML Source", "Category"})
+		"No", "WO Number", "Infra Code", "Name", "Status", "Topology", "Vendor", "Donation", "Area", "Homepass", "Area Plant Code", "Created", "KMZ UUID", "KML Source", "Category", "Infra Type"})
 
 	# Set column resize values (relative widths)
-	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1, 1, 2.5, 1.5, 1.5, 1, 1, 1, 1, 0.8, 1.5}
+	.items[:table].col_resize_values << {0, 2, 1.5, 3, 1, 1, 2.5, 1.5, 1.5, 1, 1, 1, 1, 0.8, 1.5, 1.2}
 
 	# Enable column filtering
 	.items[:table].enable_column_filter(2, _true)  # WO Number
 	.items[:table].enable_column_filter(3, _true)  # Infra Code
 	.items[:table].enable_column_filter(4, _true)  # Name
 	.items[:table].enable_column_filter(5, _true)  # Status
+	.items[:table].enable_column_filter(16, _true) # Infra Type
 
 	# Enable sorting after columns are configured
 	.items[:table].enable_sort? << _true
@@ -838,9 +839,14 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			_then
 				wo[:infrastructure_type] << .filters[:infrastructure_type].default("cluster")
 			_endif
+			_local infra_type << wo[:infrastructure_type].default("")
 
-			# Restore donation value if previously fetched for this infra code
-			_local saved_d << saved_donations[infra_code.as_symbol()]
+			# Composite key (infra_type + infra_code) so the same code under
+			# different types (e.g. subfeeder vs cluster) does not collide.
+			_local key << _self.wo_cache_key(infra_code, infra_type)
+
+			# Restore donation value if previously fetched for this WO
+			_local saved_d << saved_donations[key]
 			_if saved_d _isnt _unset
 			_then
 				wo[:donation_value] << saved_d
@@ -862,10 +868,11 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 			.items[:table].add_label(row, 13, wo[:kmz_uuid].default(""))
 			.items[:table].add_label(row, 14, wo[:kmz_source].default(""))
 			.items[:table].add_label(row, 15, wo[:category].default(""))
+			.items[:table].add_label(row, 16, infra_type)
 
-			# Store work order data in cache by infra_code as symbol (unique identifier)
-			# This ensures correct lookup even after table sorting
-			.wo_cache[infra_code.as_symbol()] << wo
+			# Store work order data in cache under the composite key so lookups
+			# stay correct even after table sorting and across infra types.
+			.wo_cache[key] << wo
 		_endloop
 
 		# Update record count
@@ -1036,6 +1043,15 @@ _endmethod
 $
 
 _pragma(classify_level=debug, topic={astri_integration})
+_private _method rwwi_astri_workorder_dialog.wo_cache_key(infra_code, infra_type)
+	## Build the composite wo_cache key: "<infra_type>|<infra_code>".
+	## Keying on both fields prevents collisions when the same infra_code
+	## exists under different infra types (e.g. subfeeder vs cluster).
+	>> write_string(infra_type.default("").lowercase, "|", infra_code.default(""))
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
 	## Handle work order selection in table
 	##
@@ -1053,20 +1069,20 @@ _method rwwi_astri_workorder_dialog.workorder_selection(table, selection)
 	# Get selected row (visual row number after sorting)
 	_local selected_row << selection.an_element()
 
-	# Get infra_code from column 3 of selected row
-	# cell() returns the label item, so we need to get its value
-	_local infra_code_item << table.cell(selected_row, 3)
-	_local infra_code << infra_code_item.value
+	# Read infra_code (col 3) and infra_type (col 16) of the selected row.
+	# cell() returns the label item, so we take its value.
+	_local infra_code << table.cell(selected_row, 3).value
+	_local infra_type << table.cell(selected_row, 16).value
 
-	# Convert to symbol for cache lookup
-	_local cache_key << infra_code.as_symbol()
+	# Composite key so subfeeder/cluster sharing an infra_code resolve correctly
+	_local cache_key << _self.wo_cache_key(infra_code, infra_type)
 
-	# Look up work order data by infra_code symbol (unique identifier)
+	# Look up work order data by composite key
 	_local wo << .wo_cache[cache_key]
 
 	_if wo _is _unset
 	_then
-		write("WARNING: Work order not found in cache for infra_code:", infra_code, " (key:", cache_key, ")")
+		write("WARNING: Work order not found in cache (key:", cache_key, ")")
 		.selected_wo << _unset
 		_self.update_detail_panel(_unset)
 		_return
@@ -1134,7 +1150,7 @@ _private _method rwwi_astri_workorder_dialog.update_detail_panel(wo)
 			"INFRASTRUCTURE INFORMATION:", %newline,
 			"  Code             : ", wo[:infra_code].default("N/A"), %newline,
 			"  Name             : ", wo[:infra_name].default("N/A"), %newline,
-			"  Type             : ", .filters[:infrastructure_type].default("N/A"), %newline)
+			"  Type             : ", wo[:infrastructure_type].default(.filters[:infrastructure_type].default("N/A")), %newline)
 
 		# Add optional infrastructure fields
 		_if wo[:topology] _isnt _unset _andif wo[:topology] <> ""
