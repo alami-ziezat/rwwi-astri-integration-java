@@ -61,7 +61,7 @@ _private _method astri_design_migrator.create_uub(pm, p_trans)
 				>> "HH Concrete FDT : 40x40x60 cm"
 			_elif folders_lc.index_of_seq("20x20x20") _isnt _unset
 			_then
-				>> "HH Concrete FDT : 20x20x20 cm"
+				>> "HH Concrete Pit : 20x20x20 cm"   # 20x20x20 is a pulling pit, not an FDT
 			_else
 				>> "HH Concrete FDT : 40x40x60 cm"  # Default
 			_endif
