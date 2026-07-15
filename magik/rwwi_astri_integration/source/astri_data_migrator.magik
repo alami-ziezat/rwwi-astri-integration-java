@@ -29,7 +29,9 @@ def_slotted_exemplar(:astri_data_migrator,
 		{:db_connection, _unset},      # PostgreSQL database connection
 		{:scheduler_table, _unset},    # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_log)
 		{:last_log_file, _unset},      # Full path of the most recently written summary .html
-		{:last_log_name, _unset}       # Base file name (no extension) of that summary
+		{:last_log_name, _unset},      # Base file name (no extension) of that summary
+		{:etl_window_start, _unset},   # ETL run time window start (minutes from midnight), or _unset = no window
+		{:etl_window_end, _unset}      # ETL run time window end (minutes from midnight)
 	},
 	{})
 $
@@ -1896,6 +1898,13 @@ _method astri_data_migrator.migrate_cluster_scheduled_objects()
 
 		_for rec _over scheduled.fast_elements()
 		_loop
+			# Stop if the ETL time window has ended (rest is left for next run)
+			_if _not _self.in_time_window?()
+			_then
+				write("Time window ended - stopping CLUSTER processing.")
+				_leave
+			_endif
+
 			_local infra_code << rec[:infra_code].default("")
 			write("")
 			write("Processing CLUSTER: ", infra_code)
@@ -2018,6 +2027,13 @@ _method astri_data_migrator.migrate_subfeeder_scheduled_objects()
 
 		_for rec _over scheduled.fast_elements()
 		_loop
+			# Stop if the ETL time window has ended (rest is left for next run)
+			_if _not _self.in_time_window?()
+			_then
+				write("Time window ended - stopping SUBFEEDER processing.")
+				_leave
+			_endif
+
 			_local infra_code << rec[:infra_code].default("")
 			write("")
 			write("Processing SUBFEEDER: ", infra_code)
@@ -2140,6 +2156,13 @@ _method astri_data_migrator.migrate_feeder_scheduled_objects()
 
 		_for rec _over scheduled.fast_elements()
 		_loop
+			# Stop if the ETL time window has ended (rest is left for next run)
+			_if _not _self.in_time_window?()
+			_then
+				write("Time window ended - stopping FEEDER processing.")
+				_leave
+			_endif
+
 			_local infra_code << rec[:infra_code].default("")
 			write("")
 			write("Processing FEEDER: ", infra_code)
@@ -2607,28 +2630,77 @@ $
 ## ============================================================
 
 _pragma(classify_level=basic, topic={astri_integration})
-_method astri_data_migrator.migrate_etl_scheduled_objects()
+_method astri_data_migrator.migrate_etl_scheduled_objects(_optional window_start, window_end)
 	## Automated ETL run: process 'scheduled' rows from drm_etl_scheduler_log
-	## for all infra types (FEEDER -> SUBFEEDER -> CLUSTER) and write a summary
-	## .txt to TEMP. Runs independently of migrate_scheduled_objects().
+	## for all infra types (FEEDER -> SUBFEEDER -> CLUSTER), constrained to a
+	## time window, and write the HTML summary report (always, even on early stop).
+	##
+	## Time window (dynamic): processing runs only while the current time is
+	## within [start, end]; when the window ends it STOPS (remaining rows are
+	## left for the next run) and the report is still written/e-mailed.
+	##   window_start / window_end : "HH:MM" strings (optional).
+	##   Resolution order: args -> env DRM_ETL_START / DRM_ETL_END -> 22:00 / 09:00.
 	##
 	## CLI usage:
-	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
-	##   result << migrator.migrate_etl_scheduled_objects()
-	##   log_path << result[:log_file]        # full path (or migrator.last_log_file())
-	##   log_name << result[:log_name]        # file name, no extension (or last_log_name())
+	##   result << migrator.migrate_etl_scheduled_objects()          # default 22:00-09:00
+	##   result << migrator.migrate_etl_scheduled_objects("20:00", "07:00")
+	##   log_path << result[:log_file]   ;   log_name << result[:log_name]
 	##
-	## Returns: overall_stats property_list, including :log_file (full .html path)
-	##          and :log_name (file name without extension); both _unset if none.
+	## Returns: overall_stats property_list (incl. :log_file / :log_name).
+
+	# Resolve the window (args override env vars override defaults 22:00 / 09:00)
+	_local s_str << window_start.default(system.getenv("DRM_ETL_START").default("22:00"))
+	_local e_str << window_end.default(system.getenv("DRM_ETL_END").default("09:00"))
+	.etl_window_start << _self.parse_hhmm(s_str, 1320)   # 22:00
+	.etl_window_end   << _self.parse_hhmm(e_str, 540)    # 09:00
 
 	write("=== AUTOMATED ETL SCHEDULER RUN (drm_etl_scheduler_log) ===")
+	write("ETL time window: ", s_str, " - ", e_str)
 	.scheduler_table << "smallworld.drm_etl_scheduler_log"
+
+	_local result << _unset
 	_protect
-		>> _self.migrate_scheduled_objects()
+		result << _self.migrate_scheduled_objects()
 	_protection
-		# Always restore the default table so the same instance can run either job
-		.scheduler_table << "smallworld.drm_scheduler_logs"
+		# Restore defaults so the same instance can run either job again
+		.scheduler_table  << "smallworld.drm_scheduler_logs"
+		.etl_window_start << _unset
+		.etl_window_end   << _unset
 	_endprotect
+	>> result
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.parse_hhmm(str, default_min)
+	## Parse an "HH:MM" string to minutes-from-midnight; default_min on failure.
+	_local s << str.default("").trim_spaces()
+	_local colon << s.index_of(%:)
+	_if colon _is _unset _then _return default_min _endif
+	_local hh << s.subseq(1, colon - 1).as_number().default(-1)
+	_local mm << s.subseq(colon + 1).as_number().default(-1)
+	_if hh < 0 _orif mm < 0 _then _return default_min _endif
+	>> (hh * 60) + mm
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.in_time_window?()
+	## Returns _true if no ETL window is set (manual/UI runs), or if the current
+	## time-of-day is within [etl_window_start, etl_window_end] (handles the
+	## midnight wrap, e.g. 22:00 -> 09:00).
+	_if .etl_window_start _is _unset _then _return _true _endif
+
+	_local p << _self.sum_parse_dt(date_time.now())
+	_local now_min << (p[4].as_number().default(0) * 60) + p[5].as_number().default(0)
+	_local s << .etl_window_start
+	_local e << .etl_window_end
+
+	_local in? << _if s <= e
+	              _then >> (now_min >= s) _andif (now_min < e)   # same-day window
+	              _else >> (now_min >= s) _orif (now_min < e)    # wraps midnight
+	              _endif
+	>> in?
 _endmethod
 $
 
@@ -3039,7 +3111,7 @@ _private _method astri_data_migrator.sum_month_name(n)
 	## Return the 3-char uppercase month name for month number n (1-12).
 	_local names << {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
 	                 "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
-	_if n >= 1 _andif n <= 12 _then >> names[n] _endif
+	_if n >= 1 _andif n <= 12 _then _return names[n] _endif
 	>> "???"
 _endmethod
 $
@@ -3072,7 +3144,7 @@ $
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.sum_zpad(n)
 	## Return integer n as 2-digit string with leading zero if n < 10
-	_if n < 10 _then >> write_string("0", n) _endif
+	_if n < 10 _then _return write_string("0", n) _endif
 	>> n.write_string
 _endmethod
 $
@@ -3084,7 +3156,7 @@ _private _method astri_data_migrator.sum_active_types(stats)
 	_if stats[:cluster_total].default(0)   > 0 _then parts.add("CLUSTER")    _endif
 	_if stats[:subfeeder_total].default(0) > 0 _then parts.add("SUB-FEEDER") _endif
 	_if stats[:feeder_total].default(0)    > 0 _then parts.add("FEEDER")     _endif
-	_if parts.empty? _then >> "ALL" _endif
+	_if parts.empty? _then _return "ALL" _endif
 	_local result << ""
 	_for i _over 1.upto(parts.size)
 	_loop

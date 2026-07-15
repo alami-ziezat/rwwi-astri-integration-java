@@ -247,9 +247,9 @@ with an extra condition and the `subject` column.
 
 ### Validations (block with popup)
 1. Smallworld project/design already exists → block.
-2. **`apd_kmz_upload_date` must be newer than H-1 (yesterday)** → else block.
-   Checked via `engine.apd_kmz_recent?(infra_type, infra_code)`. The **block popup shows the
-   WO's current `apd_kmz_upload_date`** (`(none)` when empty) so the user sees why it's blocked.
+2. **`apd_kmz_upload_date` must be within the last month** (`>= CURRENT_DATE - INTERVAL '1 month'`)
+   → else block. Checked via `engine.apd_kmz_recent?(infra_type, infra_code)`. The **block popup
+   shows the WO's current `apd_kmz_upload_date`** (`(none)` when empty). *(Was H-1/yesterday.)*
 3. Already in `drm_etl_scheduler_log`
    (`engine.get_etl_scheduler_log_status(infra_code, infra_type)`, per code+type) → block.
 
@@ -308,25 +308,45 @@ processed in the fixed order **FEEDER → SUBFEEDER → CLUSTER** (the phase ord
 `migrate_scheduled_objects()`, inherited by the ETL run).
 
 ```magik
-_method astri_data_migrator.migrate_etl_scheduled_objects()
+_method astri_data_migrator.migrate_etl_scheduled_objects(_optional window_start, window_end)
+    # resolve window (args -> env DRM_ETL_START/END -> defaults 22:00 / 09:00)
+    .etl_window_start << ... ; .etl_window_end << ...
     .scheduler_table << "smallworld.drm_etl_scheduler_log"
+    _local result << _unset
     _protect
-        >> _self.migrate_scheduled_objects()
+        result << _self.migrate_scheduled_objects()   # capture (>> inside _protect returns _unset!)
     _protection
-        .scheduler_table << "smallworld.drm_scheduler_logs"   # restore default
+        .scheduler_table << "smallworld.drm_scheduler_logs"   # restore
+        .etl_window_start << _unset ; .etl_window_end << _unset
     _endprotect
+    >> result
 _endmethod
 ```
+
+### ETL processing time window (automated run only)
+
+The **automated ETL run is time-boxed**. `migrate_etl_scheduled_objects` sets a
+`[etl_window_start, etl_window_end]` window (default **22:00 → 09:00**, crossing midnight);
+each per-type loop checks `in_time_window?()` before each WO and **stops** (`_leave`) once the
+window ends — remaining rows are left for the next run. The HTML report is **still written and
+e-mailed** after stopping.
+
+- **Dynamic window:** `HH:MM` via method args, else env vars **`DRM_ETL_START`** / **`DRM_ETL_END`**
+  (set in `ADMIN_DRM_etl_scheduler.bat`), else defaults `22:00` / `09:00`.
+- The **manual run** and the UI **Migrate All** are **not** time-boxed (`etl_window_start` is
+  `_unset` → `in_time_window?` always `_true`).
+
+> **Return fix:** `>> _self.migrate_scheduled_objects()` *inside* `_protect` returned `_unset`
+> (so `result[:log_file]` in `run_and_email` raised *"unset does not understand []"*). The
+> result is now captured in a local and returned after the `_protect`.
 
 CLI:
 ```magik
 migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
-migrator.migrate_scheduled_objects()       # manual   -> drm_scheduler_logs
-migrator.migrate_etl_scheduled_objects()   # automated -> drm_etl_scheduler_log
+migrator.migrate_scheduled_objects()                       # manual   -> drm_scheduler_logs
+migrator.migrate_etl_scheduled_objects()                   # automated -> drm_etl (22:00-09:00)
+migrator.migrate_etl_scheduled_objects("20:00", "07:00")   # custom window
 ```
-
-> The direct "Migrate All" engine methods from v2 (`migrate_wo_list` / `migrate_one_wo`) were
-> **removed** — no UI path migrates directly anymore.
 
 ---
 

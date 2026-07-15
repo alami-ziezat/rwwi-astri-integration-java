@@ -7,6 +7,11 @@ REM cmail.exe / recipients.txt are located at runtime from the loaded module's
 REM resources (admin_drm_scheduler), not from here.
 SET DRM_SCHEDULER_DIR=F:\SW5\Scheduler\admin_drm_scheduler\resources\base\bin\
 
+REM ETL processing time window (HH:MM). Processing stops when the window ends;
+REM the report is still e-mailed. Default is 22:00 - 09:00. Uncomment to override:
+REM SET DRM_ETL_START=22:00
+REM SET DRM_ETL_END=09:00
+
 SET TIMESTAMP=%date:~10,4%%date:~7,2%%date:~4,2%%time:~0,2%%time:~3,2%
 SET LOGFILE=drm_etl_%TIMESTAMP%.log
 SET LOGDIR=%DRM_SCHEDULER_DIR%logs

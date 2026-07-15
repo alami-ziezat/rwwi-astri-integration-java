@@ -66,8 +66,16 @@ Processes `drm_scheduler_logs`. Log file prefix: `drm_`.
 ```bat
 SET DRM_RUN_TYPE=etl
 SET DRM_SCHEDULER_DIR=F:\SW5\Scheduler\admin_drm_scheduler\resources\base\bin\
+REM Optional processing time window (HH:MM). Default 22:00 - 09:00.
+REM SET DRM_ETL_START=22:00
+REM SET DRM_ETL_END=09:00
 ```
 Processes `drm_etl_scheduler_log`. Log file prefix: `drm_etl_`.
+
+**Time window:** the automated ETL run only processes WOs while the current time is within
+`[DRM_ETL_START, DRM_ETL_END]` (default **22:00 → 09:00**, crossing midnight). When the window
+ends it **stops** — remaining rows are left for the next run — and the report is **still e-mailed**.
+Set `DRM_ETL_START` / `DRM_ETL_END` in the `.bat` to change the window.
 
 ### What you must set before running (edit each `.bat`)
 | Variable | Meaning |
@@ -76,6 +84,7 @@ Processes `drm_etl_scheduler_log`. Log file prefix: `drm_etl_`.
 | `SW_GIS_ALIAS_FILES` | path to the `gis_aliases` file |
 | `DRM_RUN_TYPE` | `manual` or `etl` (already set per file) |
 | `DRM_SCHEDULER_DIR` | folder holding the `.bat`, `admin_drm_batch.magik`, and `logs\` (trailing `\` required) |
+| `DRM_ETL_START` / `DRM_ETL_END` | *(ETL only, optional)* processing time window `HH:MM`; default `22:00` / `09:00` |
 | the `runalias.exe` path + alias name | the product/alias to boot (must load this module) |
 
 > `DRM_SCHEDULER_DIR` only locates the stdin caller + the `logs\` output. `cmail.exe` /

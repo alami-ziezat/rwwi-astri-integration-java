@@ -51,7 +51,7 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 		_return
 	_endif
 
-	# --- Validation 2: apd_kmz_upload_date must be newer than H-1 (yesterday) ---
+	# --- Validation 2: apd_kmz_upload_date must be within the last month ---
 	_local upload_date << wo[:apd_kmz_upload_date].default("")
 	_local upload_date_disp << _if upload_date = "" _then >> "(none)" _else >> upload_date _endif
 	_if _not .engine.apd_kmz_recent?(infra_type, infra_code)
@@ -61,10 +61,10 @@ _method rwwi_astri_workorder_dialog.schedule_wo()
 			             %newline,
 			             "Current APD KMZ upload date: ", upload_date_disp,
 			             %newline,
-			             "Must be newer than H-1 (yesterday).",
+			             "Must be within the last month.",
 			             %newline, "Scheduling is blocked."))
 		_self.log_warning(write_string(
-			"Schedule blocked - apd_kmz_upload_date not > H-1: ", infra_code,
+			"Schedule blocked - apd_kmz_upload_date older than 1 month: ", infra_code,
 			" (upload_date=", upload_date_disp, ")"))
 		_return
 	_endif

@@ -1097,8 +1097,8 @@ $
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method rwwi_astri_workorder_engine.apd_kmz_recent?(infrastructure_type, code)
-	## Return _true if the work order's apd_kmz_upload_date is NEWER than H-1
-	## (i.e. more recent than yesterday), by querying the dim master table.
+	## Return _true if the work order's apd_kmz_upload_date is within the last
+	## MONTH (>= CURRENT_DATE - 1 month), by querying the dim master table.
 	## Returns _false when no record, no upload date, or the date is older.
 	##
 	## Parameters:
@@ -1116,11 +1116,11 @@ _method rwwi_astri_workorder_engine.apd_kmz_recent?(infrastructure_type, code)
 	_local tc << table_map[infrastructure_type.as_symbol()]
 	_if tc _is _unset _then _return _false _endif
 
-	# COUNT rows where apd_kmz_upload_date is newer than yesterday (H-1).
+	# COUNT rows where apd_kmz_upload_date is within the last month.
 	# NULL upload dates never satisfy the comparison, so they count as 0 -> blocked.
 	_local sql << "SELECT COUNT(*) AS cnt FROM smallworld." + tc[1] +
 		" WHERE " + tc[2] + " = ? " +
-		"AND apd_kmz_upload_date > (CURRENT_DATE - INTERVAL '1 day')"
+		"AND apd_kmz_upload_date >= (CURRENT_DATE - INTERVAL '1 month')"
 
 	_local conn << _unset
 

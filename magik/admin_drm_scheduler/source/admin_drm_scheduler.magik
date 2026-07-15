@@ -82,6 +82,13 @@ _method admin_drm_scheduler.run_and_email(_optional run_type)
 	                 _else >> migrator.migrate_scheduled_objects()
 	                 _endif
 
+	# Defensive: a run should always return overall_stats, but never index _unset
+	_if result _is _unset
+	_then
+		write("admin_drm_scheduler: run returned no result - skipping e-mail.")
+		_return _false
+	_endif
+
 	_local log_path << result[:log_file]
 	_local log_name << result[:log_name]
 	_if log_path _is _unset
