@@ -65,8 +65,7 @@ _method rwwi_astri_workorder_dialog.ok_batch_list(path)
 	.items[:batch_list_path].value << path
 	.items[:batch_clear_btn].enabled?  << _true
 	.items[:load_wo_list_btn].enabled? << _true
-	.items[:add_all_btn].enabled?     << _false
-	.items[:migrate_all_btn].enabled? << _false
+	.items[:process_btn].enabled? << _false
 	write("Batch list file selected: ", path)
 _endmethod
 $
@@ -78,8 +77,7 @@ _method rwwi_astri_workorder_dialog.clear_batch_list()
 	.items[:batch_list_path].value     << ""
 	.items[:batch_clear_btn].enabled?  << _false
 	.items[:load_wo_list_btn].enabled? << _false
-	.items[:add_all_btn].enabled?     << _false
-	.items[:migrate_all_btn].enabled? << _false
+	.items[:process_btn].enabled? << _false
 	.batch_sections << _unset
 	write("Batch list cleared.")
 _endmethod
@@ -172,10 +170,9 @@ _method rwwi_astri_workorder_dialog.load_wo_list()
 	# Reload table — workorder_list_data() runs the multi-section fetch
 	_self.apply_filters()
 
-	# Enable Add All + Migrate All only if at least one WO was found
+	# Enable Process only if at least one WO was found
 	_local found << .wo_cache _isnt _unset _andif _not .wo_cache.empty?
-	.items[:add_all_btn].enabled?     << found
-	.items[:migrate_all_btn].enabled? << found
+	.items[:process_btn].enabled? << found
 
 	_self.set_progress(write_string("Batch load complete. Found ",
 		.wo_cache.size.write_string, " / ", total_codes, " WO(s)."))
@@ -363,6 +360,23 @@ _method rwwi_astri_workorder_dialog.add_all_to_scheduler()
 	_self.log_separator()
 	_self.log_success(summary)
 	_self.show_alert(summary)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method rwwi_astri_workorder_dialog.process_wo()
+	## Handler for the "Process" button. Dispatches to the mode selected in the
+	## :process_mode dropdown:
+	##   "Import All APD to SW via Scheduler" -> add_all_to_scheduler()
+	##   otherwise (default, Directly)        -> migrate_all_wo()
+
+	_local mode << .items[:process_mode].value.default("")
+	_if mode = "Import All APD to SW via Scheduler"
+	_then
+		_self.add_all_to_scheduler()
+	_else
+		_self.migrate_all_wo()
+	_endif
 _endmethod
 $
 

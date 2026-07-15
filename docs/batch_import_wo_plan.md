@@ -103,13 +103,30 @@ All toolbars are always **built** (their items are referenced elsewhere and the 
 needs the filter items) — only visibility differs. Each `build_*` toolbar method returns its
 container, stored in `.items[:toolbar1_con … :bottom3_con]`.
 
-### Migrate All (admin, direct + e-mail)
+### Process dropdown (Directly vs via Scheduler)
 
-Toolbar 4 also has a **"Migrate All"** button (`migrate_all_wo`). It migrates the displayed WOs
-**directly** (no scheduler) via `astri_data_migrator.migrate_wo_list()` (FEEDER → SUBFEEDER →
-CLUSTER), writes the HTML report, and **e-mails it** via the `admin_drm_scheduler` module
-(`admin_drm_scheduler.email_report(log_path, log_name)`). Because it lives on the Batch Import
-toolbar, only root/admin can reach it.
+Toolbar 4 has a single **"Process"** button plus a `:process_mode` dropdown with two options:
+
+| Dropdown option | Action (`process_wo` dispatches) |
+|---|---|
+| **Import All APD to SW Directly** (default) | `migrate_all_wo()` — direct migration (no scheduler) via `migrate_wo_list()`, writes the HTML report, and **e-mails it** via `admin_drm_scheduler.email_report()` |
+| **Import All APD to SW via Scheduler** | `add_all_to_scheduler()` — queue the WOs into `drm_scheduler_logs` |
+
+Direct migration runs FEEDER → SUBFEEDER → CLUSTER. Because the toolbar is root/admin-only, so
+is Process.
+
+### Toolbar 4 icons
+
+Action buttons use `:image, {:<icon>, :ui_resources}` (same pattern as the NISA dialog):
+
+| Button | Icon |
+|---|---|
+| Browse List | `:browse` |
+| Clear | `:clear` |
+| Load WO List | `:find` (magnifying glass — the standard search icon; there is no `binocular` in the core UI resources) |
+| Process | `:run` |
+
+Each keeps a `:tooltip` so the action stays discoverable.
 
 ### admin_drm_scheduler module
 
@@ -346,6 +363,9 @@ SUB-FEEDER
 
 - File: `%TEMP%\SMALLWORLD - SUMMARY ETL - <YYYYMMDD_HHMMSS>.html`
 - New file per run (datetime in name); existing logs never overwritten.
+- **Displayed dates use a 3-char month name** — `DD MMM YYYY`, e.g. `12 JUL 2026` (title +
+  "Updated Timestamp"), via `sum_fmt_date` / `sum_month_name`. The filename and the "Datetime"
+  field keep the compact numeric `YYYYMMDD_HHMMSS` stamp for uniqueness/sorting.
 - Fixed processing order **FEEDER → SUBFEEDER → CLUSTER**; absent types produce no card.
 - **Return values:** the run returns `overall_stats[:log_file]` (full `.html` path) and
   `overall_stats[:log_name]` (file name without extension); also `last_log_file()` /

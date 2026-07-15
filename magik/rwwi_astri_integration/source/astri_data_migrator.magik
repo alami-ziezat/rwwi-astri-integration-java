@@ -3027,9 +3027,20 @@ $
 
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.sum_fmt_date(dt)
-	## Return date_time as "YYYY-MM-DD"
+	## Return date_time as "DD MMM YYYY" (3-char month name), e.g. "12 JUL 2026"
 	_local p << _self.sum_parse_dt(dt)
-	>> write_string(p[1], "-", p[2], "-", p[3])
+	_local mm_num << p[2].as_number().default(1)
+	>> write_string(p[3], " ", _self.sum_month_name(mm_num), " ", p[1])
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method astri_data_migrator.sum_month_name(n)
+	## Return the 3-char uppercase month name for month number n (1-12).
+	_local names << {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+	                 "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+	_if n >= 1 _andif n <= 12 _then >> names[n] _endif
+	>> "???"
 _endmethod
 $
 

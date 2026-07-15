@@ -350,8 +350,9 @@ $
 
 _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 	## Build batch import toolbar.
-	## Provides Browse List + Load WO List + Add All buttons for importing an
-	## infra_code list from a .txt file and adding them to the scheduler log.
+	## Provides Browse List + Load WO List + a Process dropdown+button that runs
+	## either "Import All APD to SW Directly" (direct migration + e-mail) or
+	## "Import All APD to SW via Scheduler" (add to drm_scheduler_logs).
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type, :container,
@@ -374,8 +375,17 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 		:editable?, _false)
 	.items[:batch_list_path].value << ""
 
+	# Load WO List (find / magnifying-glass icon)
+	.items[:load_wo_list_btn] << sw_button_item.new(a_toolbar,
+		:image, {:find, :ui_resources},
+		:model, _self,
+		:selector, :load_wo_list|()|,
+		:tooltip, "Load WO List - fetch and display work orders for all infra_codes in the file")
+	.items[:load_wo_list_btn].enabled? << _false
+
+	# Clear (icon) - directly after Load, no spacer
 	.items[:batch_clear_btn] << sw_button_item.new(a_toolbar,
-		:label, "Clear",
+		:image, {:clear, :ui_resources},
 		:model, _self,
 		:selector, :clear_batch_list|()|,
 		:tooltip, "Clear batch import list")
@@ -383,30 +393,25 @@ _private _method rwwi_astri_workorder_dialog.build_toolbar4(parent)
 
 	sw_label_item.new(a_toolbar, "  ")
 
-	.items[:load_wo_list_btn] << sw_button_item.new(a_toolbar,
-		:label, "Load WO List",
+	sw_label_item.new(a_toolbar, "  Process:  ")
+
+	# Mode dropdown: direct migration (default) or add-to-scheduler
+	.items[:process_mode] << sw_text_item.new(a_toolbar,
 		:model, _self,
-		:selector, :load_wo_list|()|,
-		:tooltip, "Fetch and display work orders for all infra_codes in the file")
-	.items[:load_wo_list_btn].enabled? << _false
+		:display_length, 32,
+		:editable?, _false)
+	.items[:process_mode].text_items << {
+		"Import All APD to SW Directly",
+		"Import All APD to SW via Scheduler"}
+	.items[:process_mode].value << "Import All APD to SW Directly"
 
-	sw_label_item.new(a_toolbar, "  ")
-
-	.items[:add_all_btn] << sw_button_item.new(a_toolbar,
-		:label, "Add All",
+	# Process (run icon) - runs the mode selected in the dropdown
+	.items[:process_btn] << sw_button_item.new(a_toolbar,
+		:image, {:run, :ui_resources},
 		:model, _self,
-		:selector, :add_all_to_scheduler|()|,
-		:tooltip, "Add all displayed work orders to the scheduler log (drm_scheduler_logs)")
-	.items[:add_all_btn].enabled? << _false
-
-	sw_label_item.new(a_toolbar, "  ")
-
-	.items[:migrate_all_btn] << sw_button_item.new(a_toolbar,
-		:label, "Migrate All",
-		:model, _self,
-		:selector, :migrate_all_wo|()|,
-		:tooltip, "Migrate all displayed work orders directly (no scheduler) and e-mail the report")
-	.items[:migrate_all_btn].enabled? << _false
+		:selector, :process_wo|()|,
+		:tooltip, "Process - run the selected action on all displayed work orders")
+	.items[:process_btn].enabled? << _false
 
 	>> toolbar_con
 _endmethod
