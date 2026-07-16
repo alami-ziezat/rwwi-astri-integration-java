@@ -2342,16 +2342,23 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 
 	_local table << .scheduler_table.default("smallworld.drm_scheduler_logs")
 
-	# Same condition for BOTH runs (manual and automated ETL):
-	# status = 'scheduled', for this infra_type, created within the last day
-	# (>= yesterday). Infra types are processed in the fixed order
-	# FEEDER -> SUBFEEDER -> CLUSTER by migrate_scheduled_objects().
-	_local sql << "SELECT infra_code, name, infra_type, topology, uuid, status, " +
+	# Row selection differs by pipeline:
+	#   - Automated ETL (drm_etl_scheduler_log): drain ALL pending rows for this
+	#     infra_type, OLDEST apd_kmz upload first (schedule_date ASC). The loader
+	#     owns inserts and dedups on (infra_code, infra_type), so the whole
+	#     backlog is safe to process every run (nothing is stranded).
+	#   - Manual (drm_scheduler_logs): only rows queued within the last day.
+	_local base_sql << "SELECT infra_code, name, infra_type, topology, uuid, status, " +
 		"scheduler_username, schedule_date " +
 		"FROM " + table + " " +
-		"WHERE status = 'scheduled' AND infra_type = ? " +
-		"AND created_at >= (CURRENT_DATE - INTERVAL '1 day') " +
-		"ORDER BY created_at ASC"
+		"WHERE status = 'scheduled' AND infra_type = ? "
+
+	_local sql << _if table = "smallworld.drm_etl_scheduler_log"
+	              _then >> base_sql + "ORDER BY schedule_date ASC, infra_code ASC"
+	              _else >> base_sql +
+	                       "AND created_at >= (CURRENT_DATE - INTERVAL '1 day') " +
+	                       "ORDER BY created_at ASC"
+	              _endif
 
 	_local result << rope.new()
 
@@ -2671,6 +2678,226 @@ _method astri_data_migrator.migrate_etl_scheduled_objects(_optional window_start
 _endmethod
 $
 
+## ============================================================
+## PER-TYPE AUTOMATED ETL — source-loaded from the dim master tables
+## Three independent jobs (cluster / subfeeder / feeder). Each job:
+##   1. load_etl_source(type)  - populate drm_etl_scheduler_log from the dim
+##      master table (records with apd_kmz_upload_date within the last month;
+##      duplicate-safe on (infra_code, infra_type)).
+##   2. process just that type (oldest apd_kmz upload first, time-windowed).
+##   3. write + return a per-type HTML summary (for e-mail).
+## ============================================================
+
+_pragma(classify_level=restricted, topic={astri_integration})
+_private _method astri_data_migrator.load_etl_source(infra_type)
+	## Populate smallworld.drm_etl_scheduler_log from the dim master table for
+	## the given infra_type. Inserts every source row whose apd_kmz_upload_date
+	## is within the last month (H..H-30), that has a non-null code AND a non-null
+	## apd_kmz_uuid, and is NOT already present for this (infra_code, infra_type).
+	##
+	## Runs a single set-based INSERT ... SELECT ... WHERE NOT EXISTS entirely in
+	## PostgreSQL (the dim tables and the target both live in the smallworld schema).
+	##
+	## Parameters:
+	##   infra_type (string) - "cluster" | "subfeeder" | "feeder"
+	##
+	## Returns: number of rows inserted (0 on bad type or error).
+
+	# infra_type -> {dim table, code col, name col, subject label}
+	_local cfg << property_list.new_with(
+		:cluster,   {"dim_cluster_master_smallworld",   "cluster_code",   "cluster_name",   "CLUSTER"},
+		:subfeeder, {"dim_subfeeder_master_smallworld", "subfeeder_code", "subfeeder_name", "SUB-FEEDER"},
+		:feeder,    {"dim_feeder_master_smallworld",    "feeder_code",    "feeder_name",    "FEEDER"})
+
+	_local c << cfg[infra_type.as_symbol()]
+	_if c _is _unset
+	_then
+		write("ERROR load_etl_source: invalid infra_type: ", infra_type)
+		_return 0
+	_endif
+
+	_local dim_table << c[1]
+	_local code_col  << c[2]
+	_local name_col  << c[3]
+	_local label     << c[4]
+
+	# subject built in-DB (platform date_time has no .date/.time); e.g.
+	#   [SMALLWORLD] - SUMMARY ETL [CLUSTER] [2026-07-16]
+	_local subj_expr << "'[SMALLWORLD] - SUMMARY ETL [" + label +
+		"] [' || TO_CHAR(CURRENT_DATE,'YYYY-MM-DD') || ']'"
+
+	_local sql << "INSERT INTO smallworld.drm_etl_scheduler_log " +
+		"(infra_code, name, infra_type, username, scheduler_username, " +
+		"schedule_date, start_time, end_time, status, topology, uuid, subject, description, " +
+		"created_at, updated_at) " +
+		"SELECT src." + code_col + ", " +
+		"COALESCE(src." + name_col + ", src." + code_col + "), " +
+		"'" + infra_type + "', " +
+		"'ETL_AUTO', 'ETL_AUTO', " +
+		"src.apd_kmz_upload_date, CURRENT_TIME, CURRENT_TIME, 'scheduled', " +
+		"src.topology, src.apd_kmz_uuid, " +
+		subj_expr + ", 'ETL_AUTO', NOW(), NOW() " +
+		"FROM smallworld." + dim_table + " src " +
+		"WHERE src.apd_kmz_upload_date >= (CURRENT_DATE - INTERVAL '1 month') " +
+		"AND src.apd_kmz_upload_date <= CURRENT_DATE " +
+		"AND src." + code_col + " IS NOT NULL " +
+		"AND src.apd_kmz_uuid IS NOT NULL " +
+		"AND NOT EXISTS (SELECT 1 FROM smallworld.drm_etl_scheduler_log t " +
+		"WHERE t.infra_code = src." + code_col + " AND t.infra_type = '" + infra_type + "')"
+
+	_local inserted << 0
+
+	_try _with cond
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) <<
+				rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			_if _not is_connect?
+			_then
+				write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for ETL source load")
+				_return 0
+			_endif
+		_endif
+
+		_local ret << .db_connection.sql_modify(sql)
+		inserted << _if ret.is_kind_of?(integer) _then >> ret _else >> 0 _endif
+
+		.db_connection.commit()
+		extdb_java_acp.close_all()
+		.db_connection << _unset
+		write("ETL source load [", infra_type, "]: ", inserted,
+		      " new row(s) inserted into drm_etl_scheduler_log")
+		_return inserted
+
+	_when error
+		write("ERROR in load_etl_source(): ", cond.report_contents_string)
+		_try
+			_if .db_connection _isnt _unset
+			_then
+				.db_connection.rollback()
+				extdb_java_acp.close_all()
+				.db_connection << _unset
+			_endif
+		_when error
+		_endtry
+		_return 0
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method astri_data_migrator.migrate_etl_scheduled_objects_for(infra_type, _optional window_start, window_end)
+	## Automated ETL run for a SINGLE infra type - an independent per-type job.
+	## Loads the queue from the dim source table, then processes that type's
+	## 'scheduled' rows (oldest apd_kmz upload first) inside the time window, and
+	## writes a per-type HTML summary.
+	##
+	## Parameters:
+	##   infra_type (string)       - "cluster" | "subfeeder" | "feeder"
+	##   window_start / window_end - "HH:MM" (optional); else env DRM_ETL_START /
+	##                               DRM_ETL_END; else defaults 22:00 / 09:00.
+	##
+	## CLI usage:
+	##   migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+	##   result   << migrator.migrate_etl_scheduled_objects_for("cluster")
+	##   log_path << result[:log_file]   ;   log_name << result[:log_name]
+	##
+	## Returns: overall_stats property_list (incl. :log_file / :log_name),
+	##          or _unset if infra_type is invalid.
+
+	_local itype << infra_type.default("").lowercase
+	_if _not {"cluster", "subfeeder", "feeder"}.includes?(itype)
+	_then
+		write("ERROR migrate_etl_scheduled_objects_for: invalid infra_type: ", infra_type)
+		_return _unset
+	_endif
+
+	# Resolve the processing time window (args -> env -> defaults 22:00 / 09:00)
+	_local s_str << window_start.default(system.getenv("DRM_ETL_START").default("22:00"))
+	_local e_str << window_end.default(system.getenv("DRM_ETL_END").default("09:00"))
+	.etl_window_start << _self.parse_hhmm(s_str, 1320)   # 22:00
+	.etl_window_end   << _self.parse_hhmm(e_str, 540)    # 09:00
+
+	_local start_time << date_time.now()
+	write("=================================================================")
+	write("=== AUTOMATED ETL RUN [", itype.uppercase, "] (drm_etl_scheduler_log) ===")
+	write("=================================================================")
+	write("ETL time window: ", s_str, " - ", e_str)
+	write("Start time: ", start_time.write_string)
+	write("")
+
+	.scheduler_table << "smallworld.drm_etl_scheduler_log"
+
+	# overall_stats shaped exactly like migrate_scheduled_objects() so the summary
+	# writer renders a single card for this type (absent types produce no card).
+	_local overall_stats << property_list.new_with(
+		:cluster_total, 0,   :cluster_migrated, 0,   :cluster_errors, 0,
+		:cluster_succeeded_codes, rope.new(), :cluster_failed_codes, rope.new(), :cluster_features, 0,
+		:subfeeder_total, 0, :subfeeder_migrated, 0, :subfeeder_errors, 0,
+		:subfeeder_succeeded_codes, rope.new(), :subfeeder_failed_codes, rope.new(), :subfeeder_features, 0,
+		:feeder_total, 0,    :feeder_migrated, 0,    :feeder_errors, 0,
+		:feeder_succeeded_codes, rope.new(), :feeder_failed_codes, rope.new(), :feeder_features, 0)
+
+	_protect
+		# 1. Populate the ETL queue from the dim source table (duplicate-safe)
+		_try
+			_self.load_etl_source(itype)
+			write("")
+		_when error
+			write("ERROR loading ETL source for ", itype, ": ",
+			      condition.report_contents_string)
+		_endtry
+
+		# 2. Process just this infra type
+		_try
+			_local s << _unset
+			_if itype = "feeder"
+			_then
+				s << _self.migrate_feeder_scheduled_objects()
+			_elif itype = "subfeeder"
+			_then
+				s << _self.migrate_subfeeder_scheduled_objects()
+			_else
+				s << _self.migrate_cluster_scheduled_objects()
+			_endif
+
+			overall_stats[write_string(itype, "_total").as_symbol()]           << s[:total]
+			overall_stats[write_string(itype, "_migrated").as_symbol()]        << s[:migrated]
+			overall_stats[write_string(itype, "_errors").as_symbol()]          << s[:errors]
+			overall_stats[write_string(itype, "_succeeded_codes").as_symbol()] << s[:succeeded_codes].default(rope.new())
+			overall_stats[write_string(itype, "_failed_codes").as_symbol()]    << s[:failed_codes].default(rope.new())
+			overall_stats[write_string(itype, "_features").as_symbol()]        << s[:features_written].default(0)
+		_when error
+			write("ERROR processing ", itype, ": ", condition.report_contents_string)
+		_endtry
+	_protection
+		# Restore defaults so the same instance can run another job
+		.scheduler_table  << "smallworld.drm_scheduler_logs"
+		.etl_window_start << _unset
+		.etl_window_end   << _unset
+	_endprotect
+
+	_local end_time << date_time.now()
+
+	# 3. Write the per-type HTML summary and capture path + name (for e-mail)
+	_local log << _self.write_batch_summary_log(overall_stats, start_time, end_time, itype.uppercase)
+	_if log _isnt _unset
+	_then
+		overall_stats[:log_file] << log[:path]
+		overall_stats[:log_name] << log[:name]
+		.last_log_file << log[:path]
+		.last_log_name << log[:name]
+	_else
+		overall_stats[:log_file] << _unset
+		overall_stats[:log_name] << _unset
+	_endif
+	write("Summary log file: ", overall_stats[:log_file].default("(not created)"))
+
+	>> overall_stats
+_endmethod
+$
+
 _pragma(classify_level=restricted)
 _private _method astri_data_migrator.parse_hhmm(str, default_min)
 	## Parse an "HH:MM" string to minutes-from-midnight; default_min on failure.
@@ -2898,7 +3125,7 @@ $
 ## ============================================================
 
 _pragma(classify_level=restricted)
-_private _method astri_data_migrator.write_batch_summary_log(stats, start_time, end_time)
+_private _method astri_data_migrator.write_batch_summary_log(stats, start_time, end_time, _optional name_tag)
 	## Write an HTML ETL summary to TEMP after all scheduled migrations complete.
 	## Returns a property_list {:path, :name}:
 	##   :path - full path of the written .html file
@@ -3011,7 +3238,12 @@ _private _method astri_data_migrator.write_batch_summary_log(stats, start_time, 
 
 	# Write file (new file per run — unique datetime in name)
 	_local temp_dir  << system.getenv("TEMP").default("C:\\temp")
-	_local base_name << write_string("SMALLWORLD - SUMMARY ETL - ", compact_dt)  # no extension
+	# Optional type tag (e.g. "CLUSTER") keeps the 3 per-type ETL reports distinct.
+	_local tag_part  << _if name_tag _is _unset _orif name_tag = ""
+	                    _then >> ""
+	                    _else >> write_string(name_tag, " - ")
+	                    _endif
+	_local base_name << write_string("SMALLWORLD - SUMMARY ETL - ", tag_part, compact_dt)  # no extension
 	_local filename  << write_string(base_name, ".html")
 	_local filepath  << write_string(temp_dir, "\\", filename)
 

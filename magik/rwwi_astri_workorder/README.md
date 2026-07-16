@@ -8,6 +8,9 @@
 
 Smallworld GIS UI module for managing ASTRI Work Orders from both API and database sources.
 
+> **Operator guide:** for how to use the **Batch Import** toolbar (admin/root users), see
+> [`BATCH_IMPORT_USER_GUIDE.md`](BATCH_IMPORT_USER_GUIDE.md).
+
 ## Features
 
 - ✅ Display work orders in sortable table with 9 columns

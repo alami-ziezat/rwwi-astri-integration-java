@@ -1,7 +1,12 @@
 SET SW_GIS_ENVIRONMENT_FILE=F:\SW5\PNI_FTTH536\core\config\environment.bat
 SET SW_GIS_ALIAS_FILES=F:\SW5\PNI_FTTH536\pni_ftth\config\gis_aliases
 
+REM Per-type automated ETL job: CLUSTER.
+REM Loads smallworld.dim_cluster_master_smallworld -> drm_etl_scheduler_log,
+REM processes cluster, then e-mails its own HTML summary. Independent of the
+REM subfeeder / feeder jobs.
 SET DRM_RUN_TYPE=etl
+SET DRM_ETL_INFRA_TYPE=cluster
 REM DRM_SCHEDULER_DIR holds this .bat + the stdin caller (admin_drm_batch.magik) + logs.
 REM cmail.exe / recipients.txt are located at runtime from the loaded module's
 REM resources (admin_drm_scheduler), not from here.
@@ -13,7 +18,7 @@ REM SET DRM_ETL_START=22:00
 REM SET DRM_ETL_END=09:00
 
 SET TIMESTAMP=%date:~10,4%%date:~7,2%%date:~4,2%%time:~0,2%%time:~3,2%
-SET LOGFILE=drm_etl_%TIMESTAMP%.log
+SET LOGFILE=drm_etl_cluster_%TIMESTAMP%.log
 SET LOGDIR=%DRM_SCHEDULER_DIR%logs
 SET JOB_SERVER_LOG=%LOGDIR%\%LOGFILE%
 

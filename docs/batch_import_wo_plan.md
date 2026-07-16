@@ -7,9 +7,19 @@
 > **Revision history**
 > - v1 (07-07): batch import → scheduler log.
 > - v2 (07-12 am): batch import reinterpreted as *direct* "Migrate All".
-> - **v3 (07-12 pm, current): reverted to a scheduler model with TWO tables and TWO
+> - **v3 (07-12 pm): reverted to a scheduler model with TWO tables and TWO
 >   independent runs.** Batch import queues into `drm_scheduler_logs`; single "Schedule WO"
 >   queues into the new `drm_etl_scheduler_log`. Neither UI action migrates directly.
+
+> ⚠️ **SUPERSEDED IN PART (2026-07-16).** The **ETL source described below is obsolete.** The
+> "Schedule WO" button was **removed**, and the automated ETL queue is no longer fed by a UI
+> action. Each infra type now has its **own automated ETL job** that **auto-loads its queue
+> from the `dim_<type>_master_smallworld` table** and processes it oldest-first
+> (`migrate_etl_scheduled_objects_for(<type>)`, three `ADMIN_DRM_etl_<type>.bat` files). The
+> **manual / batch-import path (`drm_scheduler_logs`) in Part 1 is unchanged.**
+> Current design: **`docs/etl_auto_source_from_dim_tables_plan.md`**. Treat every mention of
+> "Schedule WO", the single-row ETL insert, and the `created_at >= yesterday` ETL selection
+> below as historical.
 
 ---
 
@@ -17,19 +27,23 @@
 
 Two separate scheduler pipelines, run **independently**:
 
-| Pipeline | Queued by (UI) | Table | Processed by (run) |
+| Pipeline | Queued by | Table | Processed by (run) |
 |---|---|---|---|
-| **Manual** | Batch Import **"Add All"** (Toolbar 4) | `smallworld.drm_scheduler_logs` | `migrate_scheduled_objects()` |
-| **Automated ETL** | Single **"Schedule WO"** (Toolbar 3) | `smallworld.drm_etl_scheduler_log` | `migrate_etl_scheduled_objects()` |
+| **Manual** *(current)* | Batch Import **"Add All"** (Toolbar 4, UI) | `smallworld.drm_scheduler_logs` | `migrate_scheduled_objects()` |
+| ~~**Automated ETL**~~ *(obsolete source)* | ~~Single **"Schedule WO"** (Toolbar 3)~~ | `smallworld.drm_etl_scheduler_log` | ~~`migrate_etl_scheduled_objects()`~~ |
+
+> The ETL row above is **historical** — see the banner at the top. The automated ETL queue is now
+> auto-loaded per type from `dim_<type>_master_smallworld` and processed by
+> `migrate_etl_scheduled_objects_for(<type>)`.
 
 - `drm_etl_scheduler_log` has the **same columns** as `drm_scheduler_logs` **plus a `subject`** text column.
 - Both runs share the exact same per-type migration logic and both write the ETL **summary
   `.txt` log** to TEMP on completion. The source table is swapped via a `.scheduler_table` slot.
 
 ```
-                 UI                         TABLE                          RUN
-Batch Import --> Add All      --> drm_scheduler_logs      --> migrate_scheduled_objects()   (manual)
-Schedule WO  --> (single WO)  --> drm_etl_scheduler_log   --> migrate_etl_scheduled_objects() (automated)
+                 SOURCE                      TABLE                          RUN
+Batch Import --> Add All      --> drm_scheduler_logs      --> migrate_scheduled_objects()        (manual)
+dim_<type>   --> load_etl_source --> drm_etl_scheduler_log --> migrate_etl_scheduled_objects_for() (per-type auto)
 ```
 
 ---

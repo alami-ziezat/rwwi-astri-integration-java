@@ -100,3 +100,39 @@ _method admin_drm_scheduler.run_and_email(_optional run_type)
 	_return _self.email_report(log_path, log_name)
 _endmethod
 $
+
+_pragma(classify_level=basic, topic={astri_integration})
+_method admin_drm_scheduler.run_etl_for_type(infra_type_str)
+	## Run ONE per-type automated ETL job end-to-end: load the dim source into
+	## drm_etl_scheduler_log, process that type, then e-mail its HTML summary.
+	##   infra_type_str: "cluster" | "subfeeder" | "feeder"
+	## Returns _true if a report was produced and e-mailed, _false otherwise.
+
+	_local it << infra_type_str.default("").lowercase
+	_if _not {"cluster", "subfeeder", "feeder"}.includes?(it)
+	_then
+		write("admin_drm_scheduler: invalid infra type '", infra_type_str,
+		      "' - expected cluster | subfeeder | feeder.")
+		_return _false
+	_endif
+
+	_local migrator << astri_data_migrator.new(gis_program_manager.databases[:gis])
+	_local result   << migrator.migrate_etl_scheduled_objects_for(it)
+
+	_if result _is _unset
+	_then
+		write("admin_drm_scheduler: ETL run for ", it, " returned no result - skipping e-mail.")
+		_return _false
+	_endif
+
+	_local log_path << result[:log_file]
+	_local log_name << result[:log_name]
+	_if log_path _is _unset
+	_then
+		write("admin_drm_scheduler: no summary log produced for ", it, " - skipping e-mail.")
+		_return _false
+	_endif
+
+	_return _self.email_report(log_path, log_name)
+_endmethod
+$

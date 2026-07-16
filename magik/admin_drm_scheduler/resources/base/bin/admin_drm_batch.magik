@@ -6,7 +6,9 @@
 # #
 # #  Run type is chosen by the DRM_RUN_TYPE environment variable set in the .bat:
 # #     (unset / manual) -> manual run  (drm_scheduler_logs)
-# #     etl              -> automated run (drm_etl_scheduler_log)
+# #     etl              -> automated PER-TYPE run (drm_etl_scheduler_log);
+# #                         the infra type is taken from DRM_ETL_INFRA_TYPE
+# #                         (cluster | subfeeder | feeder) - one job per type.
 # #
 # ###################################################################################
 
@@ -15,8 +17,15 @@ $
 
 _block
 	_local mode_str << system.getenv("DRM_RUN_TYPE").default("manual").lowercase
-	_local mode << _if mode_str = "etl" _then >> :etl _else >> :manual _endif
-	write("DRM_RUN_TYPE = ", mode_str, "  ->  running ", mode)
-	admin_drm_scheduler.run_and_email(mode)
+	_if mode_str = "etl"
+	_then
+		_local it_str << system.getenv("DRM_ETL_INFRA_TYPE").default("").lowercase
+		write("DRM_RUN_TYPE = etl  DRM_ETL_INFRA_TYPE = ", it_str,
+		      "  ->  per-type automated ETL run")
+		admin_drm_scheduler.run_etl_for_type(it_str)
+	_else
+		write("DRM_RUN_TYPE = ", mode_str, "  ->  manual run")
+		admin_drm_scheduler.run_and_email(:manual)
+	_endif
 _endblock
 $
