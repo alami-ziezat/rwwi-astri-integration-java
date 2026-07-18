@@ -762,9 +762,8 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :both
 		),
 
-		# Plate belt 20mm for FAT (qty = total FAT * 4)
-		# Also used for Suspension clamp for Pole (qty = total Pole * 20%)
-		# Both share this code and accumulate into one BOQ line item
+		# Suspension clamp for Pole - per ring: ceiling(combined_excl * 20%)
+		# combined_excl = Proposed poles (excl. 7-2.5 / 200002675) + In Service poles (spec ignored)
 		"200000148", property_list.new_with(
 			:code, "200000148",
 			:object, "Pole",
@@ -772,7 +771,7 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :both
 		),
 
-		# Steel clamp for Pole (qty = same as Suspension clamp 200000148 = total Pole * 20%, ceiling)
+		# Steel clamp for Pole (qty = same as Suspension clamp 200000148)
 		"200000166", property_list.new_with(
 			:code, "200000166",
 			:object, "Pole",
@@ -788,7 +787,8 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :both
 		),
 
-		# Pole clamp single (qty = total Pole * 80%)
+		# Pole clamp single - per ring: combined_total - suspension_per_ring
+		# combined_total = Proposed poles + In Service poles (spec ignored)
 		"200000145", property_list.new_with(
 			:code, "200000145",
 			:object, "Pole",
@@ -796,7 +796,8 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :both
 		),
 
-		# Clamps Dead end Fittings / clamp buaya (qty = Pole clamp single * 2)
+		# Clamps Dead end Fittings / clamp buaya - per ring: clamp_per_ring * 2
+		# clamp_per_ring = combined_total - (combined_excl * 0.2); includes In Service poles
 		"500001103", property_list.new_with(
 			:code, "500001103",
 			:object, "Pole",
@@ -812,7 +813,8 @@ rwwi_astri_boq_generator.define_shared_constant(
 			:material_slot, :both
 		),
 
-		# Label Cable on pole / in Handhole (qty = 10% of total Pole, rounded, service only)
+		# Label Cable on pole / in Handhole - per ring: rounded(combined_total * 10%)
+		# combined_total = Proposed poles + In Service poles (spec ignored); service only
 		"200000290", property_list.new_with(
 			:code, "200000290",
 			:object, "Pole/Handhole",
@@ -1635,12 +1637,20 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 	## Formulas involving percentage/multiplication are applied per group then summed,
 	## so ceiling/rounding is applied per FDT ring rather than on the grand total.
 	##
+	## Pole counting (per ring):
+	##   Proposed poles   - identified by pole spec code (stf_item_code)
+	##   In Service poles - identified by :pole collection only (spec ignored);
+	##                      every In Service pole counts, and since spec is ignored
+	##                      none get the 200002675 exclusion (all land in excl bucket).
+	##   combined_total = proposed_total + in_service_total
+	##   combined_excl  = proposed_excl  + in_service_total
+	##
 	## Per-group formulas:
-	##   200000148 / 200000166 : ceiling(excl_7_2_5 * 0.2)   [excl. Pole 7-2.5 / 200002675]
-	##   200000145             : sum(ring_total - suspension_per_ring)
+	##   200000148 / 200000166 : ceiling(combined_excl * 0.2)   [Proposed excl. Pole 7-2.5 / 200002675]
+	##   200000145             : sum(combined_total - suspension_per_ring)
 	##   500001103             : sum(clamp_per_ring * 2)
-	##   200000290             : rounded(group_poles * 0.1)
-	## Flat formula (unaffected by grouping):
+	##   200000290             : rounded(combined_total * 0.1)   [includes In Service]
+	## Flat formula (Proposed poles only, unaffected by In Service):
 	##   200000690             : total_poles (1:1)
 	##
 	## Parameters:
@@ -1659,25 +1669,23 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 		_endloop
 
 		# Phase 1: count poles per ring_name from change_set
-		# poles_by_ring      : ring -> total pole count
-		# poles_excl_by_ring : ring -> pole count excluding 200002675 (Pole 7-2.5)
+		# poles_by_ring      : ring -> Proposed pole count (identified by spec code)
+		# poles_excl_by_ring : ring -> Proposed pole count excluding 200002675 (Pole 7-2.5)
+		# inservice_by_ring  : ring -> In Service pole count (identified by :pole
+		#                      collection only; spec ignored, every pole counts)
 		_local poles_by_ring      << equality_hash_table.new()
 		_local poles_excl_by_ring << equality_hash_table.new()
+		_local inservice_by_ring  << equality_hash_table.new()
 
 		_for rc _over .change_set.fast_elements()
 		_loop
 			_local obj << rc.current_record
 			_if obj _is _unset _then _continue _endif
-			_if obj.responds_to?(:construction_status) _andif
-			    obj.construction_status <> "Proposed"
+
+			_local status << _unset
+			_if obj.responds_to?(:construction_status)
 			_then
-				_continue
-			_endif
-			_if _not obj.responds_to?(:stf_item_code) _then _continue _endif
-			_local obj_code << obj.stf_item_code
-			_if obj_code _is _unset _orif _not pole_code_set.includes_key?(obj_code)
-			_then
-				_continue
+				status << obj.construction_status
 			_endif
 
 			_local ring << "default"
@@ -1686,64 +1694,109 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 				ring << obj.ring_name.write_string
 			_endif
 
-			poles_by_ring[ring] << poles_by_ring[ring].default(0) + 1
-			_if obj_code <> "200002675"
+			_if status _is _unset _orif status = "Proposed"
 			_then
-				poles_excl_by_ring[ring] << poles_excl_by_ring[ring].default(0) + 1
+				# Proposed poles: must carry a recognized pole spec code
+				_if _not obj.responds_to?(:stf_item_code) _then _continue _endif
+				_local obj_code << obj.stf_item_code
+				_if obj_code _is _unset _orif _not pole_code_set.includes_key?(obj_code)
+				_then
+					_continue
+				_endif
+
+				poles_by_ring[ring] << poles_by_ring[ring].default(0) + 1
+				_if obj_code <> "200002675"
+				_then
+					poles_excl_by_ring[ring] << poles_excl_by_ring[ring].default(0) + 1
+				_endif
+			_elif status = "In Service" _andif obj.source_collection.name _is :pole
+			_then
+				# In Service poles: ignore spec, count every pole in the collection
+				inservice_by_ring[ring] << inservice_by_ring[ring].default(0) + 1
 			_endif
 		_endloop
 
-		# Phase 2: sum total poles (flat formula) and apply per-group formulas
-		_local total_poles        << 0
-		_local suspension_total   << 0  # 200000148, 200000166
-		_local clamp_total        << 0  # 200000145 = sum(ring_total - suspension_per_ring)
-		_local clamp_buaya_total  << 0  # 500001103 = sum(clamp_per_ring * 2)
-		_local label_cable_total  << 0  # 200000290
+		# Phase 2: sum poles and apply per-group formulas.
+		# total_poles (200000690) uses Proposed poles only.
+		# combined (Proposed + In Service) drives 148/166/145/500001103 and 290.
+		_local total_poles          << 0  # 200000690 - Proposed only
+		_local suspension_total     << 0  # 200000148, 200000166
+		_local clamp_total          << 0  # 200000145 = sum(combined_total - suspension_per_ring)
+		_local clamp_buaya_total    << 0  # 500001103 = sum(clamp_per_ring * 2)
+		_local label_cable_total    << 0  # 200000290 = sum(rounded(combined_total * 0.1))
+		_local combined_grand_total << 0  # Proposed + In Service across all rings
 
-		_for ring, ring_total _over poles_by_ring.fast_keys_and_elements()
+		# Iterate the union of ring keys from Proposed and In Service tallies
+		_local all_rings << equality_hash_table.new()
+		_for r _over poles_by_ring.fast_keys()
 		_loop
-			_local excl_total        << poles_excl_by_ring[ring].default(0)
-			_local suspension_per_ring << (excl_total * 0.2).ceiling
-			_local clamp_per_ring      << ring_total - (excl_total * 0.2)
+			all_rings[r] << _true
+		_endloop
+		_for r _over inservice_by_ring.fast_keys()
+		_loop
+			all_rings[r] << _true
+		_endloop
 
-			total_poles          +<< ring_total
-			suspension_total     +<< suspension_per_ring
-			clamp_total          +<< ring_total - suspension_per_ring
-			clamp_buaya_total    +<< clamp_per_ring * 2
-			label_cable_total    +<< (ring_total * 0.1).rounded
+		_for ring _over all_rings.fast_keys()
+		_loop
+			_local prop_total   << poles_by_ring[ring].default(0)
+			_local prop_excl    << poles_excl_by_ring[ring].default(0)
+			_local inserv_total << inservice_by_ring[ring].default(0)
 
-			write("LOG: Ring:", ring, "| poles:", ring_total, "| excl_7_2_5:", excl_total,
+			# In Service ignores spec -> all count into both total and excl buckets
+			_local combined_total << prop_total + inserv_total
+			_local combined_excl  << prop_excl  + inserv_total
+
+			_local suspension_per_ring << (combined_excl * 0.2).ceiling
+			_local clamp_per_ring      << combined_total - (combined_excl * 0.2)
+
+			total_poles          +<< prop_total                            # 200000690: Proposed only
+			suspension_total     +<< suspension_per_ring                   # 200000148 / 200000166
+			clamp_total          +<< combined_total - suspension_per_ring  # 200000145
+			clamp_buaya_total    +<< clamp_per_ring * 2                    # 500001103
+			label_cable_total    +<< (combined_total * 0.1).rounded        # 200000290
+			combined_grand_total +<< combined_total
+
+			write("LOG: Ring:", ring, "| proposed:", prop_total, "| in_service:", inserv_total,
+			      "| combined:", combined_total, "| excl:", combined_excl,
 			      "| suspension:", suspension_per_ring, "| clamp:", clamp_per_ring)
 		_endloop
 
 		# Phase 3: add to BOQ
+		# Bahan Pondasi (200000690) uses Proposed poles only.
 		_if total_poles > 0
 		_then
 			# Bahan Pondasi tiang (200000690) - flat 1:1 total, auto-adds 500001742 (Label Pole)
 			_self.add_to_boq_result(result, "200000690", total_poles)
-			write("LOG: Added Bahan Pondasi tiang (200000690) with quantity:", total_poles)
+			write("LOG: Added Bahan Pondasi tiang (200000690) with quantity:", total_poles, "(Proposed poles only)")
+		_else
+			write("LOG: No Proposed poles, skipping Bahan Pondasi (200000690)")
+		_endif
 
-			# Suspension clamp (200000148) - sum of ceiling(excl_7_2_5 * 0.2) per ring
+		# Clamps + Label Cable include In Service poles (combined counts).
+		_if combined_grand_total > 0
+		_then
+			# Suspension clamp (200000148) - sum of ceiling(combined_excl * 0.2) per ring
 			_self.add_to_boq_result(result, "200000148", suspension_total)
-			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_total, "(sum of per-ring ceiling(excl_7_2_5 * 20%))")
+			write("LOG: Added Suspension clamp (200000148) with quantity:", suspension_total, "(sum of per-ring ceiling(combined_excl * 20%))")
 
 			# Steel clamp (200000166) - same as Suspension clamp
 			_self.add_to_boq_result(result, "200000166", suspension_total)
 			write("LOG: Added Steel clamp (200000166) with quantity:", suspension_total, "(same as Suspension clamp)")
 
-			# Pole clamp single (200000145) - sum of (ring_total - suspension_per_ring) per ring
+			# Pole clamp single (200000145) - sum of (combined_total - suspension_per_ring) per ring
 			_self.add_to_boq_result(result, "200000145", clamp_total)
-			write("LOG: Added Pole clamp single (200000145) with quantity:", clamp_total, "(sum of per-ring (poles - suspension))")
+			write("LOG: Added Pole clamp single (200000145) with quantity:", clamp_total, "(sum of per-ring (combined - suspension))")
 
 			# Clamp buaya / Dead end Fittings (500001103) - sum of (clamp_per_ring * 2) per ring
 			_self.add_to_boq_result(result, "500001103", clamp_buaya_total.ceiling)
 			write("LOG: Added Clamp buaya (500001103) with quantity:", clamp_buaya_total, "(sum of clamp_per_ring * 2 per ring)")
 
-			# Label Cable on pole/in Handhole (200000290) - sum of rounded(poles * 0.1) per ring
+			# Label Cable on pole/in Handhole (200000290) - sum of rounded(combined_total * 0.1) per ring
 			_self.add_to_boq_result(result, "200000290", label_cable_total)
-			write("LOG: Added Label Cable (200000290) with quantity:", label_cable_total, "(sum of per-ring rounded(poles * 10%))")
+			write("LOG: Added Label Cable (200000290) with quantity:", label_cable_total, "(sum of per-ring rounded(combined * 10%), incl. In Service)")
 		_else
-			write("LOG: No poles found in change_set, skipping pole accessories")
+			write("LOG: No poles (Proposed or In Service) found, skipping pole clamps/label")
 		_endif
 
 	_when error
