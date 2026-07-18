@@ -104,7 +104,7 @@ $
 _pragma(classify_level=basic, topic={astri_integration})
 _method admin_drm_scheduler.run_etl_for_type(infra_type_str)
 	## Run ONE per-type automated ETL job end-to-end: load the dim source into
-	## drm_etl_scheduler_log, process that type, then e-mail its HTML summary.
+	## drm_etl_scheduler_logs, process that type, then e-mail its HTML summary.
 	##   infra_type_str: "cluster" | "subfeeder" | "feeder"
 	## Returns _true if a report was produced and e-mailed, _false otherwise.
 

@@ -507,19 +507,24 @@ _private _method astri_design_migrator.scan_pole_splice(location, radius)
 		_if equipment_set _isnt _unset
 		_then
 			_local found_splice << _false
+			_local fe << _unset
+			_local found_figure_eight << _false
+			_local ffe << _unset
+			
 			_for eq _over equipment_set.fast_elements()
 			_loop
 				_if eq _isnt _unset _andif  eq.source_collection.name _is :sheath_splice
 				_then
 					found_splice << _true
+					fe << eq
 				_endif
-				_if found_splice _andif eq _isnt _unset _andif eq.source_collection.name _is :figure_eight
+				_if eq _isnt _unset _andif eq.source_collection.name _is :figure_eight
 				_then
-					_return _true, _true, el, eq
-				_else 
-					_return _true, _false, el, _unset 
+					found_figure_eight << _true
+					ffe << eq
 				_endif
 			_endloop
+			_return found_splice, found_figure_eight, fe, ffe
 		_endif
 	_endloop		
 	

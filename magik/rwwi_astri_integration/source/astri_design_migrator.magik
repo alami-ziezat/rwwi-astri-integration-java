@@ -140,6 +140,7 @@ _private _method astri_design_migrator.init(database, wo_data, _optional constru
 
 	# Get design manager
 	.design_manager << swg_dsn_admin_engine
+	write("Design manager initialized for database: ", .design_manager)
 	#gis_program_manager.cached_dataset(:design_admin).actual_dataset
 
 	# Setup coordinate system transformation
@@ -376,9 +377,13 @@ _method astri_design_migrator.create_project_and_design(placemarks, wo_number, i
 	                          _endif
 
 	write("  Job title formatted as: ", job_title_value, " (infra_type: ", infra_type.default("(not specified)"), ")")
-	_local sch
+	
+	.database.commit()
+	.database.go_to_alternative("|Engineering Design")
 
+	_local sch
  	_local prj << .design_manager.find_project_or_scheme(wo_number, :project)
+	write("  Project lookup for '", wo_number, "' returned: ", prj)
 	_if prj _isnt _unset
 	_then
 		# Check design is exist or not

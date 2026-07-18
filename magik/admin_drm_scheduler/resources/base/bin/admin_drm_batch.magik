@@ -6,7 +6,7 @@
 # #
 # #  Run type is chosen by the DRM_RUN_TYPE environment variable set in the .bat:
 # #     (unset / manual) -> manual run  (drm_scheduler_logs)
-# #     etl              -> automated PER-TYPE run (drm_etl_scheduler_log);
+# #     etl              -> automated PER-TYPE run (drm_etl_scheduler_logs);
 # #                         the infra type is taken from DRM_ETL_INFRA_TYPE
 # #                         (cluster | subfeeder | feeder) - one job per type.
 # #

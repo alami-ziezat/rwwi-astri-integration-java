@@ -27,7 +27,7 @@ def_slotted_exemplar(:astri_data_migrator,
 		{:transform, _unset},          # WGS84 to local coordinate transform
 		{:stats, _unset},              # Migration statistics
 		{:db_connection, _unset},      # PostgreSQL database connection
-		{:scheduler_table, _unset},    # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_log)
+		{:scheduler_table, _unset},    # Scheduler table name (drm_scheduler_logs | drm_etl_scheduler_logs)
 		{:last_log_file, _unset},      # Full path of the most recently written summary .html
 		{:last_log_name, _unset},      # Base file name (no extension) of that summary
 		{:etl_window_start, _unset},   # ETL run time window start (minutes from midnight), or _unset = no window
@@ -2343,7 +2343,7 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 	_local table << .scheduler_table.default("smallworld.drm_scheduler_logs")
 
 	# Row selection differs by pipeline:
-	#   - Automated ETL (drm_etl_scheduler_log): drain ALL pending rows for this
+	#   - Automated ETL (drm_etl_scheduler_logs): drain ALL pending rows for this
 	#     infra_type, OLDEST apd_kmz upload first (schedule_date ASC). The loader
 	#     owns inserts and dedups on (infra_code, infra_type), so the whole
 	#     backlog is safe to process every run (nothing is stranded).
@@ -2353,7 +2353,7 @@ _private _method astri_data_migrator.get_scheduled_records(infra_type)
 		"FROM " + table + " " +
 		"WHERE status = 'scheduled' AND infra_type = ? "
 
-	_local sql << _if table = "smallworld.drm_etl_scheduler_log"
+	_local sql << _if table = "smallworld.drm_etl_scheduler_logs"
 	              _then >> base_sql + "ORDER BY schedule_date ASC, infra_code ASC"
 	              _else >> base_sql +
 	                       "AND created_at >= (CURRENT_DATE - INTERVAL '1 day') " +
@@ -2627,18 +2627,18 @@ _endmethod
 $
 
 ## ============================================================
-## AUTOMATED ETL SCHEDULER RUN — drm_etl_scheduler_log -> SW Design
+## AUTOMATED ETL SCHEDULER RUN — drm_etl_scheduler_logs -> SW Design
 ## Mirrors migrate_scheduled_objects() but reads the ETL table instead of
 ## drm_scheduler_logs. Both runs are independent public entry points:
 ##   migrate_scheduled_objects()      -> manual run  (drm_scheduler_logs)
-##   migrate_etl_scheduled_objects()  -> automated run (drm_etl_scheduler_log)
+##   migrate_etl_scheduled_objects()  -> automated run (drm_etl_scheduler_logs)
 ## The only difference is the source table, swapped via the .scheduler_table
 ## slot, so all per-type processing and the summary log are fully reused.
 ## ============================================================
 
 _pragma(classify_level=basic, topic={astri_integration})
 _method astri_data_migrator.migrate_etl_scheduled_objects(_optional window_start, window_end)
-	## Automated ETL run: process 'scheduled' rows from drm_etl_scheduler_log
+	## Automated ETL run: process 'scheduled' rows from drm_etl_scheduler_logs
 	## for all infra types (FEEDER -> SUBFEEDER -> CLUSTER), constrained to a
 	## time window, and write the HTML summary report (always, even on early stop).
 	##
@@ -2661,9 +2661,9 @@ _method astri_data_migrator.migrate_etl_scheduled_objects(_optional window_start
 	.etl_window_start << _self.parse_hhmm(s_str, 1320)   # 22:00
 	.etl_window_end   << _self.parse_hhmm(e_str, 540)    # 09:00
 
-	write("=== AUTOMATED ETL SCHEDULER RUN (drm_etl_scheduler_log) ===")
+	write("=== AUTOMATED ETL SCHEDULER RUN (drm_etl_scheduler_logs) ===")
 	write("ETL time window: ", s_str, " - ", e_str)
-	.scheduler_table << "smallworld.drm_etl_scheduler_log"
+	.scheduler_table << "smallworld.drm_etl_scheduler_logs"
 
 	_local result << _unset
 	_protect
@@ -2681,7 +2681,7 @@ $
 ## ============================================================
 ## PER-TYPE AUTOMATED ETL — source-loaded from the dim master tables
 ## Three independent jobs (cluster / subfeeder / feeder). Each job:
-##   1. load_etl_source(type)  - populate drm_etl_scheduler_log from the dim
+##   1. load_etl_source(type)  - populate drm_etl_scheduler_logs from the dim
 ##      master table (records with apd_kmz_upload_date within the last month;
 ##      duplicate-safe on (infra_code, infra_type)).
 ##   2. process just that type (oldest apd_kmz upload first, time-windowed).
@@ -2690,7 +2690,7 @@ $
 
 _pragma(classify_level=restricted, topic={astri_integration})
 _private _method astri_data_migrator.load_etl_source(infra_type)
-	## Populate smallworld.drm_etl_scheduler_log from the dim master table for
+	## Populate smallworld.drm_etl_scheduler_logs from the dim master table for
 	## the given infra_type. Inserts every source row whose apd_kmz_upload_date
 	## is within the last month (H..H-30), that has a non-null code AND a non-null
 	## apd_kmz_uuid, and is NOT already present for this (infra_code, infra_type).
@@ -2726,7 +2726,7 @@ _private _method astri_data_migrator.load_etl_source(infra_type)
 	_local subj_expr << "'[SMALLWORLD] - SUMMARY ETL [" + label +
 		"] [' || TO_CHAR(CURRENT_DATE,'YYYY-MM-DD') || ']'"
 
-	_local sql << "INSERT INTO smallworld.drm_etl_scheduler_log " +
+	_local sql << "INSERT INTO smallworld.drm_etl_scheduler_logs " +
 		"(infra_code, name, infra_type, username, scheduler_username, " +
 		"schedule_date, start_time, end_time, status, topology, uuid, subject, description, " +
 		"created_at, updated_at) " +
@@ -2742,7 +2742,7 @@ _private _method astri_data_migrator.load_etl_source(infra_type)
 		"AND src.apd_kmz_upload_date <= CURRENT_DATE " +
 		"AND src." + code_col + " IS NOT NULL " +
 		"AND src.apd_kmz_uuid IS NOT NULL " +
-		"AND NOT EXISTS (SELECT 1 FROM smallworld.drm_etl_scheduler_log t " +
+		"AND NOT EXISTS (SELECT 1 FROM smallworld.drm_etl_scheduler_logs t " +
 		"WHERE t.infra_code = src." + code_col + " AND t.infra_type = '" + infra_type + "')"
 
 	_local inserted << 0
@@ -2767,7 +2767,7 @@ _private _method astri_data_migrator.load_etl_source(infra_type)
 		extdb_java_acp.close_all()
 		.db_connection << _unset
 		write("ETL source load [", infra_type, "]: ", inserted,
-		      " new row(s) inserted into drm_etl_scheduler_log")
+		      " new row(s) inserted into drm_etl_scheduler_logs")
 		_return inserted
 
 	_when error
@@ -2807,7 +2807,7 @@ _method astri_data_migrator.migrate_etl_scheduled_objects_for(infra_type, _optio
 	##          or _unset if infra_type is invalid.
 
 	_local itype << infra_type.default("").lowercase
-	_if _not {"cluster", "subfeeder", "feeder"}.includes?(itype)
+	_if _not {"cluster", "subfeeder", "feeder"}.eq_includes?(itype)
 	_then
 		write("ERROR migrate_etl_scheduled_objects_for: invalid infra_type: ", infra_type)
 		_return _unset
@@ -2821,13 +2821,13 @@ _method astri_data_migrator.migrate_etl_scheduled_objects_for(infra_type, _optio
 
 	_local start_time << date_time.now()
 	write("=================================================================")
-	write("=== AUTOMATED ETL RUN [", itype.uppercase, "] (drm_etl_scheduler_log) ===")
+	write("=== AUTOMATED ETL RUN [", itype.uppercase, "] (drm_etl_scheduler_logs) ===")
 	write("=================================================================")
 	write("ETL time window: ", s_str, " - ", e_str)
 	write("Start time: ", start_time.write_string)
 	write("")
 
-	.scheduler_table << "smallworld.drm_etl_scheduler_log"
+	.scheduler_table << "smallworld.drm_etl_scheduler_logs"
 
 	# overall_stats shaped exactly like migrate_scheduled_objects() so the summary
 	# writer renders a single card for this type (absent types produce no card).

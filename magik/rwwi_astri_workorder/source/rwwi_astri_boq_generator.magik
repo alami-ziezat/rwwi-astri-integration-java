@@ -1797,7 +1797,7 @@ _private _method rwwi_astri_boq_generator.add_fdt_accessories(result)
 _endmethod
 $
 
-_private _method rwwi_astri_boq_generator.feeder_splicing_qty()
+_method rwwi_astri_boq_generator.feeder_splicing_qty()
 	## Calculate 500000510 (Splicing) quantity for feeder.
 	## Cables sharing the same stf_item_code are treated as one cable:
 	##   length is accumulated across all segments; core count used once.
