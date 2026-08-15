@@ -1,0 +1,3 @@
+rwi_stela_integration_dialog
+rwi_stela_integration_engine
+rwi_stela_integration_plugin

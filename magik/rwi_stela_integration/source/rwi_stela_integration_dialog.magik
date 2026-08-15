@@ -1,0 +1,2413 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2026 Realworld Systems. All Rights Reserved.
+# Date: 04 April 2026
+# 
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwi_stela_integration_dialog)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwi_stela_integration_dialog,
+	{
+		{ :current_selection_ur1,_unset },
+		{ :current_selection_ur2,_unset },
+		{ :items,            _unset },
+		{ :table_list,       _unset },
+		{ :table_list2,  _unset },
+		{ :styles,           _unset },
+		{ :owner,            _unset },
+		{ :grs,              _unset },
+		{ :mapman,           _unset },
+		{ :ed,               _unset },
+		{ :a_uub,               _unset },
+		{ :a_sc,               _unset },
+		{ :ev,               _unset },
+		{ :records,          _unset },
+		{ :swl1,          _unset },
+		{ :swl2,          _unset },
+		{ :swl3,          _unset },
+		{ :a_hp,          _unset },
+
+		{:engine, _unset}
+	},{:model})
+$
+
+_pragma(classify_level=restricted)
+rwi_stela_integration_dialog.define_shared_constant( :databus_consumer_data_types,
+    { :map_selection },
+    :public )
+
+$
+#rwi_stela_integration_dialog.define_shared_variable(
+#                 :items,_unset,:public)
+#$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.new(_optional owner, framework)
+	## 
+	## 
+	>> _clone.init(owner, framework)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.init(owner, framework)
+	## 
+	##
+	_super.init()
+
+	.ev << gis_program_manager.cached_dataset(:gis)
+	.owner << owner
+	.grs << framework
+
+	.grs << smallworld_product.pni_application()
+	.mapman << .grs.plugin(:map_plugin)
+	.ed << .grs.plugin(:editor_manager)
+	.items << hash_table.new()
+	.current_selection_ur1 << _unset
+	.current_selection_ur2 << _unset
+	.swl1 << _unset
+	.swl2 << _unset
+	.swl3 << _unset 
+	# Data holder
+	.table_list << rope.new()
+	.table_list2 << rope.new()
+	.records << rope.new()
+	.a_uub << _unset 
+	.a_sc << _unset
+	.a_hp << _unset 
+	.engine << ""
+
+	# Add dependent dialog to plugin
+	_self.add_dependent(.owner)
+        >> _self
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.activate_in( parent )
+	## 
+	##
+	parent.title << "Stella Integration"
+
+	mb << menubar.new( parent )
+
+	m << _unset
+
+	# Create the first pulldown menu and its button items
+	p << pulldown_menu.new()
+	#button_item.new( p, "Load KML...", _self , :get_kml|()| )
+	button_item.new( p, "Clear",  _self , :clear|()| )
+	button_item.new( p, "Refresh", _self , :refresh|()| )
+	# Create the "File" button in the menubar
+	menu_button_item.new( mb, "File", p )
+
+	
+	top_outer << sw_container.new( parent, _unset, 1,
+				       :outer_spacing, 5,
+				       :row_spacing, 5,
+				       :row_resize_values, {0,1},
+				       :width, 1400,
+				       :height, 400 )
+
+	first_con << sw_border_container.new( top_outer, _unset, 1,
+					      :label, "",
+					      :row_resize_values,{0,1})
+	_self.build_toolbar( first_con )
+	second_con << sw_border_container.new( top_outer, _unset, 2,
+					      :label, "",
+					      :width, 600,
+					      :row_resize_values,{0})
+
+	_self.build_table_ur1( second_con )
+	_self.build_table_ur2( second_con )
+
+#	thirt_con << sw_border_container.new( top_outer, _unset, 1,
+#					      :label, "",
+#					   #   :width, 30,
+#					      :row_resize_values,{0})
+#	_self.build_label_result2( thirt_con )
+
+	_self.build_toolbar_second( second_con )
+	
+#	four_con << sw_border_container.new( top_outer, _unset, 1,
+#					      :label, "",
+#					      :row_resize_values,{0,1})
+#	_self.build_toolbar_second( four_con )
+	my_pane_map << property_list.new_with(
+			       :status_info, property_list.new_with(
+						     :width, 590, :style, :innie ))
+	.items[:status_bar] << status_bar.new(top_outer , my_pane_map)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.build_toolbar( parent )
+	## 
+	##
+	toolbar << sw_container.new( parent, 1, _unset,
+				     :col_spacing, 15  
+				)
+	file_toolbar << sw_toolbar_container.new( toolbar, _false,
+						  :background_type, :button_group,
+						  :button_group_height, sw_item.default_item_height )
+
+#	sw_label_item.new( file_toolbar, "source : ")
+#	
+#	.items[:swsource] << sw_text_item.new( file_toolbar, :model, _self,
+#						:editable?, _false,
+#						:text_items, {{:sw,"Smallworld"},
+#							      {:apiosm,"OpenStreetMap API"},
+#							      {:apigoogle,"Google API"}
+#							      
+#						}
+#					  )
+	
+	sw_label_item.new( file_toolbar, "Type:")
+	.items[:kmlsource] << sw_text_item.new( file_toolbar, :model, _self,
+					       :editable?, _false,
+					       :text_items, {#{:fst2fat,"FDT To FAT"},
+							      {:dsn,"Design"},
+							      {:exist,"Existing"}
+							     # {:valid,"Validation"}
+					       }
+					   )
+
+
+
+
+	.items[:clear] << sw_button_item.new( file_toolbar,
+					       :image, {:clear, :ui_resources},
+					       :model, _self,
+					       :selector, :clear|()|,
+					       :tooltip, "Clear" )
+	
+	.items[:refresh] << sw_button_item.new( file_toolbar,
+					       :image, {:refresh, :ui_resources},
+					       :model, _self,
+					       :selector, :refresh|()|,
+					       :tooltip, "Refresh" )
+
+
+#	.items[:add_ur1] << sw_button_item.new( file_toolbar,
+#					       :image, {:run, :ui_resources},
+#					       :model, _self,
+#					       :selector, :get_validation|()|,
+#					       :tooltip, "Run Validation" )
+
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.build_toolbar_second( parent )
+	## 
+	##
+	toolbar << sw_container.new( parent, 1, _unset,
+				     :col_spacing, 20  
+				)
+	file_toolbar << sw_toolbar_container.new( toolbar, _false,
+						  :background_type, :button_group,
+						  #:col_alignment, :fill,
+						  :button_group_height, sw_item.default_item_height )
+
+#	.items[:run_check] << sw_button_item.new( file_toolbar,
+#					       :image, {:run, :ui_resources},
+#					       :model, _self,
+#					       :selector, :get_result|()|,
+#					       #:enabled?, _false,
+#					       :tooltip, "Check " )
+
+#	sw_label_item.new( file_toolbar, "Report" )
+
+#	.items[:rpt_1] << sw_button_item.new( file_toolbar,
+#					       :image, {:export_to_excel, :ui_resources},
+#					       :model, _self,
+#					       :selector, :print_data|()|,
+#					       :tooltip, "Export Detail Object to Excel" )
+#
+#	.items[:rpt_2] << sw_button_item.new( file_toolbar,
+#					       :image, {:google_maps_22x22, :ui_resources},
+#					       :model, _self,
+#					       :selector, :print_data|()|,
+#					       :tooltip, "Export Detail Object to KML" )
+	
+
+		# --- Export BoQ into Excel ---
+		#	sw_label_item.new(file_toolbar, "  ")
+
+	.items[:boq_excel_btn] << sw_button_item.new(file_toolbar,
+		:label, "Export Data into Excel",
+		:model, _self,
+		:selector, :generate_boq_excel|()|,
+		:tooltip, "Generate Bill of Quantities as Excel file")
+	.items[:boq_excel_btn].enabled? << _true
+
+	# --- Browse Excel + path field ---
+	sw_label_item.new(file_toolbar, "  ")
+
+	.items[:browse_excel_btn] << sw_button_item.new(file_toolbar,
+		:label, "Browse Excel",
+		:model, _self,
+		:selector, :browse_excel|()|,
+		:tooltip, "Select a local Excel file for upload")
+
+	.items[:local_excel_path] << sw_text_item.new(file_toolbar,
+		:model, _self,
+		:display_length, 35,
+		:editable?, _true)
+	.items[:local_excel_path].value << ""
+
+	# --- Upload Excel ---
+	.items[:upload_excel_btn] << sw_button_item.new(file_toolbar,
+		:label, "Upload Excel",
+		:model, _self,
+		:selector, :upload_excel|()|,
+		:tooltip, "Upload selected Excel file to ASTRI Document API")
+	.items[:upload_excel_btn].enabled? << _false
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.build_label_result2( parent )
+	## 
+	##
+	
+	text_container << sw_container.new( parent, _unset, 1, :row_spacing, 10, :outer_spacing, 10)
+
+	.items[:result2] << sw_text_window.new( text_container,
+					       :col_alignment, :fill
+					  )
+	.items[:result2].text <<""
+	
+	.items[:result2].colour << colour.called(:white)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.build_label_result( parent )
+	## 
+	##
+	
+	text_container << sw_container.new( parent, _unset, 1, :row_spacing, 5, :outer_spacing, 10)
+
+	.items[:result] << sw_text_window.new( text_container,
+					       :col_alignment, :fill
+					  )
+	.items[:result].text <<""
+	
+	.items[:result].colour << colour.called(:white)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.build_table_ur1( parent )
+	## 
+	##
+	.items[:table] << a_table << sw_table.new( parent,
+				 :model, _self,
+				 :label, "Design Summary",
+				 :aspect, :table_ur1,
+				 :data_selector, :populate_ur1|()|,
+				 #:text_style , .styles[:true_style],
+				 :selection_notifier, :table_selected_ur1|()|,
+				 :row_lines?, _true,
+				 :selection_type, :row, # :row or :cell
+				 :selection_mode, :one, # :many or :one
+				 :enable_manage_columns?, _true,
+				 :min_height, 400 )
+	a_table.n_cols << 2
+	a_table.set_column_labels({ "Object",
+				    "Count"
+				  })
+	a_table.col_resize_values << {1,1}
+	# The table can be filtered, sorted and columns can be
+	# reordered and hidden
+	a_table.enable_filter? << _true
+	a_table.enable_sort? << _true
+	a_table.enable_manage_columns? << _true
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.build_table_ur2( parent )
+	## 
+	##
+	.items[:table2] << a_table2 << sw_table.new( parent,
+				 :model, _self,
+				 :label, "Detail",
+				 :aspect, :table_ur2,
+				 :data_selector, :populate_ur2|()|,
+				 :selection_notifier, :table_selected_ur2|()|,
+				 :row_lines?, _true,
+				 :selection_type, :row, # :row or :cell
+				 :selection_mode, :one, # :many or :one
+				 :enable_manage_columns?, _true,
+				 :min_height, 400 )
+	a_table2.n_cols << 3
+	a_table2.set_column_labels({ "Name",
+				    "Lat",
+				    "Long"
+				    #"Id Sw"
+				   })
+	a_table2.col_resize_values << {1,1}
+	# The table can be filtered, sorted and columns can be
+	# reordered and hidden
+	a_table2.enable_filter? << _true
+	a_table2.enable_sort? << _true
+	a_table2.enable_manage_columns? << _true
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_result()
+#	write("result  :",.items[:method].value)
+#	_if .items[:method].value ="kml"
+#	_then
+#		_self.create_network_from_kml()
+#	_elif .items[:method].value ="street"
+#	_then
+#		_self.create_network_from_street()
+#	_else
+#		_self.create_network_from_trail()
+#	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_validation()
+
+
+	
+	_self.get_data_homepass_not_valid()
+
+
+	
+
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_ur1()
+	##
+	##
+	#write("here")
+	#write(.items[:kmlsource].value,"   ", .items[:ur4].value)
+	#buf_ti << .items[:ur4].value
+	#.engine.get_ur1(.items, .records )
+	#_if .items[:kmlsource].value = "trail" _then
+	
+		#	_self.get_uub_from_trail(buf_ti)
+		#	_self.create_network_from_trail()
+	#_else
+	#	_self.get_fat_from_selected(buf_ti)
+		#v_kml << gis_program_manager.databases[:kml_dataset]
+		#_if v_kml _is _unset  
+		#_then
+		#	_self.show_message("Load KML data")
+		#	_return _false 
+		#_endif 
+		#_self.get_uub_from_kml(buf_ti)
+		#_endif
+
+	#_self.changed(:table_ur1, :refresh)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_ur1()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:pole]
+	
+#	_for data_pole_ur1 _over c_ur1.fast_elements()
+#	_loop
+#	
+#		.table_list.add_last(data_pole_ur1)
+#	_endloop
+#.table_list.add_last(
+
+	_self.changed(:table_ur1, :refresh)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.populate_ur1( a_table )
+	## 
+	##
+		row << 1
+
+		a_table.add_cell( 1, 1, {}, {:label, "Cluster" })
+		pl_pole << "1" #_self.get_data_cell()
+		a_table.add_cell( 1, 2, {}, {:label, pl_pole.size.write_string })
+	
+		a_table.add_cell( 2, 1, {}, {:label, "FAT" })
+		pl_odp << _self.get_data_odp()
+		write("pll",pl_odp)
+		_if pl_odp _isnt _unset  
+		_then
+			a_table.add_cell( 2, 2, {}, {:label, pl_odp.size.write_string })
+		_endif
+		
+		a_table.add_cell( 3, 1, {}, {:label, "Homepass" })
+		pl_otb << _self.get_data_homepass()
+		_if pl_otb _isnt _unset 
+		_then
+			a_table.add_cell( 3, 2, {}, {:label, pl_otb.size.write_string })
+		_endif
+
+		a_table.add_cell( 4, 1, {}, {:label, "FAT Need To Check" })
+		pl_fat << _self.get_data_fat_not_valid()
+		_if pl_fat _isnt _unset 
+		_then
+			a_table.add_cell( 4, 2, {}, {:label, pl_fat.size.write_string })
+		_endif
+
+		a_table.add_cell( 5, 1, {}, {:label, "Homepass Need To Check" })
+		pl_hp << _self.get_data_homepass_not_valid()
+		_if pl_hp _isnt _unset 
+		_then
+			a_table.add_cell( 5, 2, {}, {:label, pl_hp.size.write_string })
+		_endif
+
+		a_table.add_cell( 6, 1, {}, {:label, "Boundary FAT Need To Check" })
+		pl_hp << _self.get_data_boundary_fat_not_valid()
+		_if pl_hp _isnt _unset 
+		_then
+			a_table.add_cell( 6, 2, {}, {:label, pl_hp.size.write_string })
+		_endif
+				
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_ur2()
+	##
+	##
+
+	#.engine.get_ur2(.items, .records)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_ur2()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:pole]
+	
+#	_for data_pole_ur1 _over c_ur1.fast_elements()
+#	_loop
+#	
+#		.table_list.add_last(data_pole_ur1)
+#	_endloop
+#.table_list.add_last(
+
+	_self.changed(:table_ur2, :refresh)
+
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.populate_ur2( a_table )
+	## 
+	##
+
+	row << 1
+
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	vc << v.collections
+	!current_dsview! << v
+
+	_dynamic !print_float_precision! << 12
+
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	
+	count      << 0
+	dtn        << date_time_now()
+
+
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+
+	#print(.table_list2 )
+
+	_if .current_selection_ur1.write_string = "1"
+	_then
+		
+			s << swg_dsn_admin_engine.get_current_job()
+			_local area << s.project.project_areas.an_element().area
+			geo << area.bounds.centre
+			w_conv << t.convert(geo)
+			latitud << w_conv.y.write_string
+			longitud << w_conv.x.write_string
+			a_table.set_row_data( row, s )
+			nama << s.name.write_string
+			a_table.add_cell( row, 1, {}, {:label, nama })
+			a_table.add_cell( row, 2, {}, {:label, latitud })
+			a_table.add_cell( row, 3, {}, {:label, longitud })
+	_endif
+	
+
+	_for a_rec  _over .table_list2.fast_elements()
+	_loop
+	
+
+		_if a_rec.external_name ="Cell" _then
+			a_table.set_row_data( row, a_rec )
+			a_table.add_cell( row, 1, {}, {:label, a_rec.name })			
+			row +<< 1
+	
+		_else
+	
+			_if a_rec.location _isnt _unset _then 
+				h << a_rec.location.coord
+			
+				w_conv << t.convert(h)
+				#
+				latitud << w_conv.y.write_string
+				longitud << w_conv.x.write_string
+				
+				a_table.set_row_data( row, a_rec )
+				a_table.add_cell( row, 1, {}, {:label, a_rec.name })
+				a_table.add_cell( row, 2, {}, {:label, latitud })
+				a_table.add_cell( row, 3, {}, {:label, longitud })
+				#a_table.add_cell( row, 4, {}, {:label, a_rec.id.write_string })
+				row +<< 1
+				
+				#	write("Pole Dont have Location  :",a_rec.telco_pole_tag)
+			_endif
+		_endif
+		
+		
+		
+	_endloop
+
+	write("jj")
+_endmethod
+$
+	
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.clear()
+#	## 
+#	##
+#
+
+	
+	.table_list.empty()
+	.table_list2.empty()
+	.items[:table].refresh()
+	.items[:table2].refresh()
+#
+#
+#	.items[:table].clear_selection()
+#	.items[:table2].clear_selection()
+	_self.changed(:table_ur1, :refresh)
+	_self.changed(:table_ur2, :refresh)
+#	.records.empty()
+#	.current_selection_ur1 << _unset 
+#	.current_selection_ur2 << _unset
+#
+#	.items[:check_merge].enabled? << _false 
+#	.items[:clr_selection].enabled? << _false 
+#	
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_cell()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!zone]
+	count << 0
+
+
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+	_local area << s.project.project_areas.an_element().area
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		_try _with err
+		ob << i.current_record
+	
+		_if ob.external_name ="Cell"  _then
+			_if ob.type ="Macro Cell" _then 
+				#write(ob)
+				p.add(ob)
+				count +<< 1
+			_endif
+			
+
+		_endif
+
+		_when error
+			_continue
+		_endtry
+		#.table_list.add_last(data_pole_ur1)
+	_endloop
+#.table_list.add_last(
+#print(p)
+	
+
+	>> p
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_micro_cell(dp)
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	pol_col << vc[:ftth!zone]
+	sc_col << vc[:sheath_splice]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+
+	write(dp)
+	geo << dp.location.coord
+	a_point << pseudo_point.new( geo )
+	a_point.world << v.world
+	p_predicate << predicate.interacts(:location, {a_point} )
+	p_predicate_type << predicate.eq(:type, "Micro Cell")
+	s_pol << pol_col.select( p_predicate _and p_predicate_type )
+	write(s_pol.size)
+	_if s_pol.size > 0 _then
+		a_pol << s_pol.an_element()
+		p_area << a_pol.location
+		s_predicate << predicate.interacts(:location, p_area)
+		s_predicate_fat << predicate.eq(:sheath_splice_object_type, "FAT")
+		sc_pol << sc_col.Select(s_predicate _and s_predicate_fat)
+		write("jumlah fat : ",sc_pol.size)
+		_if sc_pol.size > 0
+		_then
+			fat << sc_pol.an_element()
+		_else
+			fat << _self.get_fat_cell(a_pol)
+		_endif
+		
+	_endif
+	
+
+	>> a_pol,fat
+
+_endmethod
+$
+
+
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_odp()
+
+	#write("hereODP")
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	#v << gis_program_manager.databases[:gis]
+	#vc << v.collections
+	#c_ur1 << .sc_col #vc[:pole]
+	count << 0
+
+
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		_try _with err
+			
+		ob << i.current_record
+	
+		_if ob.external_name ="Sheath Splice"  _then
+			_if  ob.sheath_splice_object_type ="FAT" _then 
+			#write(ob)
+			p.add(ob)
+			count +<< 1
+			_endif
+			
+
+		_endif
+		_when error
+			_continue
+		_endtry
+		#.table_list.add_last(data_pole_ur1)
+	_endloop
+#.table_list.add_last(
+#print(p)
+
+	>> p
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_fat_cell(cell)
+
+	#write("hereODP")
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	#v << gis_program_manager.databases[:gis]
+	#vc << v.collections
+	#c_ur1 << .sc_col #vc[:pole]
+	count << 0
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	pol_col << vc[:ftth!zone]
+	sc_col << vc[:sheath_splice]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+	t0 << system.time_now()
+	count << 0
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	area << cell.location
+	geo << area.bounds.centre
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		_try _with err
+			
+			ob << i.current_record
+	
+			_if ob.external_name ="Sheath Splice"  _then
+				_if  ob.sheath_splice_object_type ="FAT" _then 
+					
+					geo << ob.location.coord
+					a_point << pseudo_point.new( geo )
+					a_point.world << v.world
+					p_predicate << predicate.interacts(:location, {a_point} )
+					p_predicate_type << predicate.eq(:type, "Micro Cell")
+					s_pol << pol_col.select( p_predicate _and p_predicate_type )
+					
+					_if s_pol.size = 0
+					_then
+						p.add(ob)
+						count +<< 1
+					_endif
+					
+				_endif
+				
+			_endif
+		_when error
+			_continue
+		_endtry
+
+	_endloop
+
+	write(p.size)
+	_if p.size > 0 
+	_then
+		_for pp _over p.fast_elements()
+		_loop
+			
+			c << pp.location
+			pa << pseudo_point.new(c)
+			pa.world << v.world
+			
+			a_buffe << pa.buffer(1000)
+			a_buffe.world << !current_world!
+			write("sc id:", pp.id,"vs  :",cell.id)
+			pred << predicate.interacts(:location , {a_buffe})
+			pred_nm << predicate.eq(:id , cell.id)
+			g << pol_col.select(pred _and pred_nm)
+			write("ggggg :", g.size)
+			_if g.size > 0
+			_then
+				j << pp
+				_return  j
+				_leave
+			_endif
+
+		_endloop
+		#p << p.an_element()
+	_elif p.size = 1 
+	_then
+		j << p #.an_element()
+	_endif
+
+	>> j
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.scan_fat( c , buf_ti )
+	## 
+	##
+
+	#write("here scan pole")
+	v_gis << gis_program_manager.databases[:gis]
+	pole_col << v_gis.collections[:pole]
+
+	t0 << system.time_now()
+	count << 0
+	_dynamic !current_world! << v_gis.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
+
+	#buf_ti << 20000
+	
+	
+	pa << pseudo_point.new(c)
+	pa.world << v_gis.world
+
+	a_buffe << pa.buffer(buf_ti)
+	a_buffe.world << !current_world!
+	
+	pred << predicate.interacts(:location , {a_buffe})
+	g << pole_col.select(pred)
+
+	#write(g.size)
+	_if g.size > 0 _then
+		h << _true
+		_if g.size = 1 _then
+			pl << g.an_element()
+			y << pl.connected_routes()
+			_if y.size > 0 _then
+				a_pl << pl
+			_endif
+		_elif g.size > 1 _then
+			_for gg _over g.fast_elements()
+			_loop
+			#	write(gg)
+				y << gg.connected_routes()
+				_if y.size > 0 _then
+					a_pl << gg
+				_endif	
+			_endloop
+			
+		_endif
+
+		_if a_pl _is _unset _then
+			h << _false
+		_endif
+		
+		
+	_else
+		h << _false
+		a_pl << _unset 
+	_endif
+	#write(c," pole ", h)
+	#write(pl)
+	>> h,a_pl
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_fdt()
+
+	#write("hereODP")
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	#v << gis_program_manager.databases[:gis]
+	#vc << v.collections
+	#c_ur1 << .sc_col #vc[:pole]
+	count << 0
+
+
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		_try _with err
+			
+		ob << i.current_record
+	
+		_if ob.external_name ="Sheath Splice"  _then
+			_if  ob.sheath_splice_object_type ="FDT" _then 
+			#write(ob)
+			p.add(ob)
+			count +<< 1
+			_endif
+			
+		_endif
+		_when error
+			_continue
+		_endtry
+		#.table_list.add_last(data_pole_ur1)
+	_endloop
+#.table_list.add_last(
+#print(p)
+
+	>> p
+
+_endmethod
+$
+
+
+
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.populate_ur1_clear( a_table )
+	## 
+	##
+
+		row << 1
+
+		a_table.add_cell( 1, 1, {}, {:label, "Pole" })
+		a_table.add_cell( 1, 2, {}, {:label, "0" })
+	
+		a_table.add_cell( 2, 1, {}, {:label, "MS" })
+		a_table.add_cell( 2, 2, {}, {:label, "0" })
+	
+		a_table.add_cell( 3, 1, {}, {:label, "SH" })
+		a_table.add_cell( 3, 2, {}, {:label, "0" })
+	
+		a_table.add_cell( 4, 1, {}, {:label, "Closure" })
+		a_table.add_cell( 4, 2, {}, {:label, "0" })
+
+		a_table.add_cell( 5, 1, {}, {:label, "Slack" })	
+		a_table.add_cell( 5, 2, {}, {:label, "0" })
+
+		a_table.add_cell( 6, 1, {}, {:label, "Cable" })
+		a_table.add_cell( 6, 2, {}, {:label, "0" })
+
+_endmethod
+$
+
+
+
+
+
+_method rwi_stela_integration_dialog.refresh()
+
+		_self.changed(:table_ur1, :refresh)
+		_self.changed(:table_ur2, :refresh)
+		.records.empty()		
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_homepass()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!demand_point]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+
+		_try _with err
+		
+		ob << i.current_record
+
+		ex_name <<   ob.source_collection.name.write_string
+		#write(ex_name)
+		_if ex_name ="Conduit Route Face" _then
+			_continue
+		_endif
+		
+		_if ex_name ="ftth!demand_point"  _then
+			#_if  ob.construction_status ="Proposed" _then
+			#write(ob)
+				p.add(ob)
+				count +<< 1
+			#_endif 
+		_endif
+		
+		_when error
+			_continue
+		_endtry
+
+	_endloop
+
+	
+	>> p
+
+_endmethod
+$
+
+
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_homepass_not_valid()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!demand_point]
+	pol_col << vc[:ftth!zone]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+
+		_try _with err
+		
+			ob << i.current_record
+			ex_name <<   ob.source_collection.name.write_string
+			#write(ex_name)
+			_if ex_name ="Conduit Route Face" _then
+				_continue
+			_endif
+		
+			_if ex_name ="ftth!demand_point"  _then
+			
+		
+				geo << ob.location.coord
+				a_point << pseudo_point.new( geo )
+				a_point.world << v.world
+				p_predicate << predicate.interacts(:location, {a_point} )
+				p_predicate_type << predicate.eq(:type, "Micro Cell")
+				s_pol << pol_col.select( p_predicate) # _and p_predicate_type )
+		
+				_if s_pol.size = 0 _then
+					p.add(ob)
+				_endif
+				
+				
+			#	p.add(ob)
+				
+				count +<< 1
+				#_endif 
+			_endif
+			
+		_when error
+			_continue
+		_endtry
+		
+	_endloop
+	
+	>> p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_fat_not_valid()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!demand_point]
+	pol_col << vc[:ftth!zone]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+
+		_try _with err
+		
+			ob << i.current_record
+			ex_name <<   ob.source_collection.name.write_string
+			#write(ex_name)
+			_if ex_name ="Conduit Route Face" _then
+				_continue
+			_endif
+		
+			_if ex_name ="sheath_splice"  _then
+
+				_if  ob.sheath_splice_object_type ="FAT" _then 
+				
+					geo << ob.location.coord
+					a_point << pseudo_point.new( geo )
+					a_point.world << v.world
+					p_predicate << predicate.interacts(:location, {a_point} )
+					p_predicate_type << predicate.eq(:type, "Micro Cell")
+					s_pol << pol_col.select( p_predicate) # _and p_predicate_type )
+				
+					
+					
+					_if s_pol.size = 0 _then
+						p.add(ob)
+					_endif
+					
+				_endif 
+				
+				count +<< 1
+				#_endif 
+			_endif
+			
+		_when error
+			_continue
+		_endtry
+		
+	_endloop
+	
+	>> p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_boundary_fat_not_valid()
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!demand_point]
+	pol_col << vc[:ftth!zone]
+	sc_col << vc[:sheath_splice]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+	write("boundd")
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		#_try _with err
+		
+			ob << i.current_record
+			ex_name <<   ob.source_collection.name.write_string
+			#write(ex_name)
+			_if ex_name ="Conduit Route Face" _then
+				_continue
+			_endif
+		
+			_if ex_name ="ftth!zone"  _then
+				write(ob.type)
+				_if  ob.type ="Micro Cell" _then 
+					write("opk")
+					geo << ob.location  #.sectors
+					#a_point << pseudo_area.new( geo )
+					#a_point.world << v.world
+					
+					p_predicate << predicate.interacts(:location, (geo)) #{a_point} )
+					p_predicate_type << predicate.eq(:sheath_splice_object_type, "FAT")
+					s_pol << sc_col.select( p_predicate _and p_predicate_type )
+					write(s_pol.size)
+					_if s_pol.size = 0 _then
+						p.add(ob)
+					_elif s_pol.size >1 
+					_then
+						p.add(ob)
+					_endif
+					
+				_endif 
+				
+				count +<< 1
+				#_endif 
+			_endif
+			
+		#_when error
+		#	_continue
+		#_endtry
+		
+	_endloop
+	
+	>> p
+
+_endmethod
+$
+
+
+
+
+
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.table_selected_ur1( selection )
+	## 
+	##
+
+	_global sel
+	sel << selection
+	#.current_selection_ur1 << selection.get_row_data_from_selection().an_element()	
+	#write("cur : ",.current_selection_ur1)
+	#i << sel.selected_rows[1]
+	
+
+	_if sel.selected_rows[1] = 1 _then
+	#	write("Cluster")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_cell()
+	_elif sel.selected_rows[1] = 2 _then
+	#	write("FAT")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_odp()
+	_elif sel.selected_rows[1] = 3 _then
+	#	write("Homepass")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_homepass()
+	_elif sel.selected_rows[1] = 4 _then
+	#	write("Homepass")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_fat_not_valid()
+	_elif sel.selected_rows[1] = 5 _then
+	#	write("Homepass")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_homepass_not_valid()
+	_elif sel.selected_rows[1] = 6 _then
+	#	write("Homepass")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_boundary_fat_not_valid()
+	_endif
+
+	.current_selection_ur1 << sel.selected_rows[1]
+	write(.current_selection_ur1)
+	_self.changed(:table_ur2, :refresh)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.cek_ug()
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	e << _false
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :uub _then
+			#table_list.add(i.current_record)
+			e << _true 
+			_leave
+		_endif
+		
+	_endloop
+	
+	>> e
+	
+_endmethod
+$
+
+#line
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.cek_ae()
+
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	e << _false
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :pole _then
+			#table_list.add(i.current_record)
+			e << _true 
+			_leave
+		_endif
+		
+	_endloop
+	
+	>> e
+	
+_endmethod
+$
+
+_global datalake_stella_by_cluster_code <<
+_proc(cluster_code)
+
+	write("  Input cluster_code: ", cluster_code)
+
+	_local db_conn << _unset
+	_local result   << 0
+
+	_protect
+		_try _with errCon
+			
+			# Step 1: Connect to PostgreSQL
+			_local is_connect?
+			(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			
+			_if _not is_connect?
+			_then
+				write("  ERROR: Failed to connect to POSTGRESQL_ASTRI_DB")
+				#result << "{\"success\":false,\"error\":\"Failed to connect to PostgreSQL\"}"
+				_return
+			_endif
+			write("  Connected to POSTGRESQL_ASTRI_DB")
+
+			# Step 2: Look up cluster_id_stella for the given cluster_code_astri
+			_local sql_query << "SELECT olt_code FROM smallworld.dim_cluster_stella_master_smallworld WHERE cluster_code_astri = ? LIMIT 1"
+			write("  Querying dim_cluster_stella_master_smallworld...")
+
+			_local recs << db_conn.sql_select(sql_query, cluster_code)
+			_local rec  << recs.get()
+			recs.close()
+			write("ssd")
+#			# Clean transaction state after SELECT
+#			_try
+#				db_conn.commit()
+#			_when error
+#				db_conn.rollback()
+#			_endtry
+
+			write("sd  :  ",rec)
+			_if rec _is _unset
+			_then
+				write("  ERROR: No record found for cluster_code_astri = ", cluster_code)
+				#result << "{\"success\":false,\"error\":\"Cluster not found: " + cluster_code + "\"}"
+				_return result
+			_else
+				write(rec)
+				_local olt_code << rec.olt_code
+				_if olt_code _is _unset 
+				_then
+					j << ""
+				_else
+					j << olt_code
+				_endif
+				
+				result << j
+			_endif
+
+write("result  :",result)
+		_when error
+			write("  ERROR: ", errCon.report_contents_string)
+			#result << "{\"success\":false,\"error\":\"" + errCon.report_contents_string + "\"}"
+		_endtry
+
+	_protection
+		# Always close the DB connection on exit
+		_if db_conn _isnt _unset
+		_then
+			_try
+				db_conn.rollback()
+				db_conn.close()
+				extdb_java_acp.close_all()
+				write("  DB connection closed")
+			_when error
+				# Ignore cleanup errors
+			_endtry
+		_endif
+	_endprotect
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.generate_boq_excel()
+
+	s << swg_dsn_admin_engine.get_current_job()
+	nama << s.name.write_string
+	y << s.project.job_title
+	yy << y.split_by("-")
+	nm_cls << yy[2]
+	pj << s.inf_project.write_string
+	_local area << s.project.project_areas.an_element().area
+	geo << area.bounds.centre
+	change_set << mit_scheme_record_change_set.new(s)
+
+
+	ug << _self.cek_ug()
+	ae << _self.cek_ae()
+
+	_if ug _is _true _and ae _is _false 
+	_then
+		nt << "UG"
+	_elif ae _is _true _and ug _is _false
+	_then 
+		nt << "AE"
+	_elif ae _is _true _and ug _is _true
+	_then 
+		nt << "AE & UG"	
+	_endif
+
+	olt_nm << ""
+	#clr_nm << ""
+	_for i _over change_set.fast_elements()
+	_loop
+			
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			olt_nm << i.current_record.olt
+			_if olt_nm _is _unset
+			_then
+				olt_nm << ""
+			_endif
+			
+			sf_code << i.current_record.subfeeder_code
+			cl_code << i.current_record.cluster_code
+			olt_code << ""
+			write("b4 : ",cl_code)
+			olt_code << datalake_stella_by_cluster_code(cl_code)
+			write("gfd  :",olt_code)
+			_if olt_code = "" _orif olt_code _is _unset 
+			_then
+				olt_code << i.current_record.olt_code
+			_endif
+
+			write("next")
+			_leave
+		_endif
+		
+	_endloop
+
+
+
+	_if .current_selection_ur1 = 1
+	_then
+
+
+		a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\cluster-template (4).xlsx"
+		#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+		sht << "Template"
+		
+		Excel_Object << OLE_Client.Create_Object("Excel.Application")
+		Excel_Object.Visible << _True
+		write(a_filename,"  :  ",sht)
+		Workbooks << Excel_Object.Workbooks ()
+		WorkBook << Workbooks.add(a_filename)
+		
+		Sheet << Excel_Object.Sheets (sht)
+		#Sheet1 << Excel_Object.Sheets ("Sheet1")
+		
+		
+		a_ff << float_format.new_with_properties(
+				:float_format,:fixed,
+				:float_decimal_places,3)
+		
+		start << date_time_now()
+		
+		v << gis_program_manager.databases[:gis]
+		a_view << gis_program_manager.ace_view
+		#mapman << .grs.plugin(:maps)
+		vc << v.collections
+		pol_col << vc[:pol_boundary]
+		!current_dsview! << v
+		
+		_dynamic !print_float_precision! << 12
+		
+		_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+		
+		
+		count      << 2
+		dtn        << date_time_now()
+		
+		
+		cs1 <<  v.world.coordinate_system 
+		cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+		t << transform.new_converting_cs_to_cs(cs1,cs2)
+
+		w_conv << t.convert(geo)
+		latitud << w_conv.y.write_string
+		longitud << w_conv.x.write_string
+	
+		
+		#	a_table.add_cell( row, 1, {}, {:label, nama })
+		#	a_table.add_cell( row, 2, {}, {:label, latitud })
+		#	a_table.add_cell( row, 3, {}, {:label, longitud })
+
+		e_fdt << _self.get_data_fdt()
+		_if e_fdt.size > 0
+		_then
+			a_fdt << e_fdt.an_element()
+			nm_fdt << a_fdt.name
+			nm_olt <<a_fdt.olt_code
+		_else
+			nm_fdt << ""
+			nm_olt << ""
+		_endif
+
+		
+	
+		a_point << pseudo_point.new( geo )
+		a_point.world << v.world
+		p_predicate << predicate.interacts(:boundary, {a_point} )
+		p_predicate_town << predicate.eq(:type, "Town")
+		s_pol << pol_col.select( p_predicate _and p_predicate_town )
+		
+		_if s_pol.size > 0 _then
+			a_pol << s_pol.an_element()	
+			propinsi << a_pol.provinsi
+			kabupaten << a_pol.kabupaten
+			kecamatan << a_pol.kecamatan
+			desa << a_pol.desa	
+		_endif
+		
+		Cell_a << Sheet.Range ("A"+count.write_string)
+		Cell_b << Sheet.Range ("B"+count.write_string)
+		Cell_c << Sheet.Range ("C"+count.write_string)
+		Cell_f << Sheet.Range ("F"+count.write_string)
+		Cell_g << Sheet.Range ("G"+count.write_string)
+		Cell_i << Sheet.Range ("I"+count.write_string)
+		Cell_m << Sheet.Range ("M"+count.write_string)
+		Cell_n << Sheet.Range ("N"+count.write_string)
+		Cell_s << Sheet.Range ("S"+count.write_string)
+		Cell_t << Sheet.Range ("T"+count.write_string)
+		Cell_q << Sheet.Range ("Q"+count.write_string)
+		Cell_u << Sheet.Range ("U"+count.write_string)
+
+
+		cell_a.value << nama.write_string
+		cell_a.entirecolumn.autofit
+		cell_b.value << nm_fdt.write_string
+		cell_b.entirecolumn.autofit
+		cell_c.value << nama.write_string
+		cell_c.entirecolumn.autofit
+		cell_f.value << kabupaten.write_string
+		cell_f.entirecolumn.autofit
+		cell_g.value << propinsi.write_string
+		cell_g.entirecolumn.autofit
+		cell_i.value << propinsi.write_string
+		cell_i.entirecolumn.autofit
+		cell_m.value << desa.write_string
+		cell_m.entirecolumn.autofit
+		cell_n.value << nm_olt.write_string
+		cell_n.entirecolumn.autofit
+		cell_s.value << latitud.write_string
+		cell_s.entirecolumn.autofit
+		cell_t.value << longitud.write_string
+		cell_t.entirecolumn.autofit
+		cell_q.value << pj.write_string
+		cell_q.entirecolumn.autofit
+		cell_u.value << nm_cls.write_string
+		cell_u.entirecolumn.autofit
+		
+
+
+
+		
+	_elif .current_selection_ur1 = 2
+	_then
+		a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\fat-template (9).xlsx"
+		#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+		sht << "Sheet1"
+		
+		
+		Excel_Object << OLE_Client.Create_Object("Excel.Application")
+		Excel_Object.Visible << _True
+		write(a_filename,"  :  ",sht)
+		Workbooks << Excel_Object.Workbooks ()
+		WorkBook << Workbooks.add(a_filename)
+		
+		Sheet << Excel_Object.Sheets (sht)
+		#Sheet1 << Excel_Object.Sheets ("Sheet1")
+		
+		
+		a_ff << float_format.new_with_properties(
+				:float_format,:fixed,
+				:float_decimal_places,3)
+		
+		start << date_time_now()
+		
+		v << gis_program_manager.databases[:gis]
+		a_view << gis_program_manager.ace_view
+		#mapman << .grs.plugin(:maps)
+		vc << v.collections
+		!current_dsview! << v
+		
+		_dynamic !print_float_precision! << 12
+		
+		_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+		
+		
+		count      << 1
+		dtn        << date_time_now()
+		
+		
+		cs1 <<  v.world.coordinate_system 
+		cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+		t << transform.new_converting_cs_to_cs(cs1,cs2)
+		
+		_for a_rec  _over .table_list2.fast_elements()
+		_loop
+			#	write(a_rec.external_name)
+			_if a_rec.external_name = "Sheath Splice"
+			_then
+				#count +<< 1
+				_if a_rec.location _isnt _unset _then
+					#	write("here")
+					count +<< 1
+					h << a_rec.location.coord
+					w_conv << t.convert(h)
+					
+					latitud << w_conv.y
+					longitud << w_conv.x
+					
+					Cell_a << Sheet.Range ("A"+count.write_string)
+					Cell_b << Sheet.Range ("B"+count.write_string)
+					Cell_c << Sheet.Range ("C"+count.write_string)
+					Cell_d << Sheet.Range ("D"+count.write_string)
+					Cell_e << Sheet.Range ("E"+count.write_string)
+					Cell_f << Sheet.Range ("F"+count.write_string)
+					Cell_g << Sheet.Range ("G"+count.write_string)
+					
+					
+					cell_a.value << a_rec.name.write_string
+					cell_a.entirecolumn.autofit
+					cell_b.value << a_rec.cluster.write_string
+					cell_b.entirecolumn.autofit
+					cell_c.value << a_rec.name.write_string
+					cell_c.entirecolumn.autofit
+					cell_d.value << a_rec.ring_name.write_string
+					cell_d.entirecolumn.autofit
+					cell_e.value << "16"#a_rec.ring_name.write_string
+					cell_e.entirecolumn.autofit
+					cell_f.value << latitud # a_ff.format(latitud).write_string
+					cell_f.entirecolumn.autofit
+					cell_f.numberformat << "general"
+					cell_g.value << longitud #a_ff.format(longitud).write_string
+					cell_g.entirecolumn.autofit
+					cell_g.numberformat << "general"
+					
+					
+				_else 
+					write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
+				_endif
+				
+			_endif
+			_if count > 40
+			_then
+				_leave
+			_endif
+		_endloop
+
+	_elif .current_selection_ur1 = 3
+	_then
+
+	
+		a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\homepass-template (5).xlsx"
+		#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+		sht << "Sheet1"
+		
+		
+		Excel_Object << OLE_Client.Create_Object("Excel.Application")
+		Excel_Object.Visible << _True
+		write(a_filename,"  :  ",sht)
+		Workbooks << Excel_Object.Workbooks ()
+		WorkBook << Workbooks.add(a_filename)
+		
+		
+		Sheet << Excel_Object.Sheets (sht)
+		#Sheet1 << Excel_Object.Sheets ("Sheet1")
+		
+		
+		a_ff << float_format.new_with_properties(
+				:float_format,:fixed,
+				:float_decimal_places,3)
+		
+		start << date_time_now()
+		
+		v << gis_program_manager.databases[:gis]
+		a_view << gis_program_manager.ace_view
+		#mapman << .grs.plugin(:maps)
+		vc << v.collections
+		pol_col << vc[:pol_boundary]
+		!current_dsview! << v
+		
+		_dynamic !print_float_precision! << 12
+		
+		_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+		_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+		
+		
+		count      << 1
+		dtn        << date_time_now()
+		
+		
+		cs1 <<  v.world.coordinate_system 
+		cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+		t << transform.new_converting_cs_to_cs(cs1,cs2)
+		
+		_for a_rec  _over .table_list2.fast_elements()
+		_loop
+			#	write(a_rec.external_name)
+			_if a_rec.external_name = "Demand point"
+			_then
+				#count +<< 1
+				_if a_rec.location _isnt _unset _then
+				
+					a_point << a_rec.location
+					p_predicate << predicate.interacts(:boundary, {a_point} )
+					p_predicate_town << predicate.eq(:type, "Town")
+					s_pol << pol_col.select( p_predicate _and p_predicate_town )
+				
+					_if s_pol.size > 0 _then
+						a_pol << s_pol.an_element()	
+						propinsi << a_pol.provinsi
+						kabupaten << a_pol.kabupaten
+						kecamatan << a_pol.kecamatan
+						desa << a_pol.desa
+					
+					_endif
+					
+					count +<< 1
+					h << a_rec.location.coord
+					w_conv << t.convert(h)
+					
+					latitud << w_conv.y
+					longitud << w_conv.x
+
+					(d_cell, d_fat) << _self.get_data_micro_cell(a_rec)
+					write(d_cell.identification, d_fat)
+
+					Cell_a << Sheet.Range ("A"+count.write_string)
+					Cell_b << Sheet.Range ("B"+count.write_string)
+					Cell_c << Sheet.Range ("C"+count.write_string)
+					Cell_d << Sheet.Range ("D"+count.write_string)
+					Cell_e << Sheet.Range ("E"+count.write_string)
+					Cell_f << Sheet.Range ("F"+count.write_string)
+					Cell_g << Sheet.Range ("G"+count.write_string)
+					Cell_h << Sheet.Range ("H"+count.write_string)
+					Cell_i << Sheet.Range ("I"+count.write_string)
+					Cell_j << Sheet.Range ("J"+count.write_string)
+					Cell_k << Sheet.Range ("K"+count.write_string)
+					Cell_l << Sheet.Range ("L"+count.write_string)
+					Cell_m << Sheet.Range ("M"+count.write_string)
+					Cell_n << Sheet.Range ("N"+count.write_string)
+					Cell_o << Sheet.Range ("O"+count.write_string)
+					Cell_p << Sheet.Range ("P"+count.write_string)
+					Cell_q << Sheet.Range ("Q"+count.write_string)
+					Cell_r << Sheet.Range ("R"+count.write_string)
+					Cell_s << Sheet.Range ("S"+count.write_string)
+					Cell_t << Sheet.Range ("T"+count.write_string)
+					Cell_u << Sheet.Range ("U"+count.write_string)
+					Cell_v << Sheet.Range ("V"+count.write_string)
+					Cell_w << Sheet.Range ("W"+count.write_string)
+					Cell_x << Sheet.Range ("X"+count.write_string)
+					Cell_y << Sheet.Range ("Y"+count.write_string)
+					Cell_z << Sheet.Range ("Z"+count.write_string)
+					Cell_aa << Sheet.Range ("AA"+count.write_string)
+					Cell_ab << Sheet.Range ("AB"+count.write_string)
+					Cell_ac << Sheet.Range ("AC"+count.write_string)
+					Cell_ad << Sheet.Range ("AD"+count.write_string)
+					Cell_ae << Sheet.Range ("AE"+count.write_string)
+					Cell_af << Sheet.Range ("AF"+count.write_string)
+					Cell_ag << Sheet.Range ("AG"+count.write_string)
+					Cell_ah << Sheet.Range ("AH"+count.write_string)
+					Cell_ai << Sheet.Range ("AI"+count.write_string)
+					Cell_aj << Sheet.Range ("AJ"+count.write_string)
+					Cell_ak << Sheet.Range ("AK"+count.write_string)
+					Cell_al << Sheet.Range ("AL"+count.write_string)
+					Cell_am << Sheet.Range ("AM"+count.write_string)
+					Cell_an << Sheet.Range ("AN"+count.write_string)
+					Cell_ao << Sheet.Range ("AO"+count.write_string)
+					Cell_ap << Sheet.Range ("AP"+count.write_string)
+					Cell_aq << Sheet.Range ("AQ"+count.write_string)
+					Cell_ar << Sheet.Range ("AR"+count.write_string)
+					Cell_as << Sheet.Range ("AS"+count.write_string)
+					Cell_at << Sheet.Range ("AT"+count.write_string)
+					Cell_au << Sheet.Range ("AU"+count.write_string)
+
+				
+#					Cell_a.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_a.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_a.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#					#Cell_coord.Borders(:xlEdgeBottom).Weight << :xlThick
+#					Cell_b.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_b.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_b.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#					
+#				
+#					Cell_c.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_c.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_c.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#					Cell_d.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_d.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_d.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#					Cell_f.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_f.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_f.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#					Cell_e.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_e.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_e.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_g.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_g.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_g.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_h.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_h.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_h.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_i.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_i.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_i.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_j.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_j.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_j.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_k.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_k.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_k.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_l.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_l.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_l.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_m.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_m.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_m.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_n.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_n.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_n.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_o.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_o.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_o.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_p.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_p.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_p.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_q.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_q.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_q.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_r.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_r.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_r.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_s.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_s.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_s.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_t.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_t.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_t.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_u.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_u.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_u.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_v.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_v.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_v.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_w.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_w.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_w.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_x.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_x.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_x.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_y.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_y.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_y.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_z.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_z.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_z.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#
+#
+#					Cell_aa.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_aa.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_aa.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ab.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ab.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ab.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#					
+#				
+#					Cell_ac.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ac.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ac.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#					Cell_ad.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ad.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ad.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#					Cell_af.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_af.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_af.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#
+#					Cell_ae.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ae.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ae.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ag.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ag.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ag.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ah.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ah.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ah.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ai.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ai.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ai.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_aj.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_aj.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_aj.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ak.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ak.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ak.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_al.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_al.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_al.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_am.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_am.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_am.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_an.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_an.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_an.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ao.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ao.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ao.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ap.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ap.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ap.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_aq.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_aq.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_aq.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_ar.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_ar.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_ar.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_as.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_as.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_as.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_at.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_at.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_at.Borders(:xlEdgeRight).LineStyle << :xlContinuous
+#
+#					Cell_au.Borders(:xlEdgeTop).LineStyle << :xlContinuous
+#					Cell_au.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
+#					Cell_au.Borders(:xlEdgeRight).LineStyle << :xlContinuous	
+					
+					#Cell_i.Borders(:xlEdgeTop).Weight << :xlThick
+					#Cell_i.Borders(:xlEdgeLeft).Weight << :xlThick
+					#Cell_i.Borders(:xlEdgeRight).Weight << :xlThick
+					
+
+					cell_g.value << "General Retail" #pj.write_string
+					cell_g.entirecolumn.autofit
+					cell_i.value << a_rec.cluster_code.write_string
+					cell_i.entirecolumn.autofit
+					cell_j.value << nama.write_string
+					cell_j.entirecolumn.autofit
+					cell_k.value << nama.write_string
+					cell_k.entirecolumn.autofit
+					cell_ac.value << olt_code.write_string
+					cell_ac.entirecolumn.autofit
+					cell_ad.value << olt_nm.write_string
+					cell_ad.entirecolumn.autofit
+					cell_ae.value << d_fat.ring_name.write_string
+					cell_ae.entirecolumn.autofit
+					cell_af.value << d_fat.name.write_string
+					cell_af.entirecolumn.autofit
+					cell_au.value << a_rec.name.write_string
+					cell_au.entirecolumn.autofit
+					cell_aj.value << a_rec.name.write_string
+					cell_aj.entirecolumn.autofit
+					cell_ah.value << latitud # a_ff.format(latitud).write_string
+					cell_ah.entirecolumn.autofit
+					cell_ah.numberformat << "general"
+					cell_ai.value << longitud #a_ff.format(longitud).write_string
+					cell_ai.entirecolumn.autofit
+					cell_ai.numberformat << "general"
+					cell_an.value << nt.write_string
+					cell_an.entirecolumn.autofit
+					
+				_else 
+					write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
+				_endif
+				
+			_endif
+			_if count > 40
+			_then
+				_leave
+			_endif
+		_endloop
+	_endif
+	
+		
+	WorkBook.Release_Object ()
+	Excel_Object.Release_Object ()
+		
+_endmethod
+
+
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.table_selected_ur2( selection )
+	## 
+	##
+	v << gis_program_manager.databases[:gis]
+	
+	ed << .grs.plugin(:editor_manager)
+
+	_global sel
+	sel << selection
+	.current_selection_ur2 << selection.get_row_data_from_selection().an_element()
+	_if .current_selection_ur2.external_name ="Fibre Figure Eight" _then 
+		p << .current_selection_ur2.get_structure()
+		ef << ed.display_object_in_embedded_editor(.current_selection_ur2)
+		#.mapman.goto(p)
+		.grs.databus.make_data_available(:goto_request,{p, :highlight?, _true})
+	_elif .current_selection_ur2.external_name ="Sheath (LOC)" _then
+
+		ef << ed.display_object_in_embedded_editor(.current_selection_ur2)
+		#ef.select_spatial_context_and_goto()
+		#.current_selection_ur2.goto_border #mit!goto_bounds(v.world)
+		#.current_selection_ur2.get_geometry_set_for_highlight(v.world)
+		#ef.goto_in_current_world()
+		#ef.select_in_map()
+		#ef.highlight_rwo()
+		#write("goto..")
+		#.mapman.goto(.current_selection_ur2)
+
+		#ef.select_spatial_context_and_goto()
+		ef.goto_in_current_world()
+		#ef.select_in_map()
+		ef.highlight_rwo()
+	_else
+		ef << ed.display_object_in_embedded_editor(.current_selection_ur2)
+		#.mapman.goto(.current_selection_ur2)
+		ef.goto_in_current_world()
+		#ef.select_in_map()
+		ef.highlight_rwo()
+		#.app.databus.make_data_available(:goto_request,{.current_selection_ur2, :highlight?, _true})
+	_endif
+	
+	#print(.current_selection_ur2 )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.wm_close()
+	## 
+	## 
+	#	_self.clear()
+	_self.wm_close()
+_endmethod
+$
+

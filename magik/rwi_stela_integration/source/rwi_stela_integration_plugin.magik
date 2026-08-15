@@ -1,0 +1,129 @@
+#% text_encoding = iso8859_1
+# ************************************************************
+#
+# (c) 2026 Realworld Systems. All Rights Reserved.
+# Date: 04 April 2026
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwi_stela_integration_plugin)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwi_stela_integration_plugin,
+	##
+	##
+	{
+		{:doc, _unset },
+		{:frame,_unset }
+	},
+	:plugin)
+$
+
+_pragma(classify_level=advanced)
+rwi_stela_integration_plugin.define_shared_constant(:databus_producer_data_types,
+				      {
+					      :goto_request,
+					      :geometry_to_draw,
+					      :post_render_sets
+				      },
+				      :private
+	       )
+$
+
+_pragma(classify_level=advanced)
+rwi_stela_integration_plugin.define_shared_constant(:post_render_sets,
+				      equality_geometry_set.new(),
+				      :private
+	       )
+$
+
+
+rwi_stela_integration_plugin.define_shared_constant( :l_line_style,
+	line_style.new(colour.new_rgb(0.69412,  0.01098 , 0.00412),2,dash_pattern.solid),
+	
+	:private )
+$
+
+
+
+rwi_stela_integration_plugin.define_shared_constant( :l_point_style,
+	line_style.new_with_properties(:foreground_colour,colour.new_with_properties(:red,0,:green,0,:blue,1),
+				       :width,8),
+
+	:private )
+$
+
+
+rwi_stela_integration_plugin.define_shared_constant( :l_text_style,
+	text_style.new_with_properties(:foreground_colour,colour.new_with_properties(:red,1,:green,0,:blue,1),
+				       :width,3),
+	:private )
+$
+
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_plugin.init_actions()
+	## 
+	##
+	
+	_self.add_action( sw_action.new( :activate_get_fat,
+					 :caption,         "Stela Integration",
+					 :engine, _self,
+					 :image, {:associate, :mit_base_gui},
+					 :action_message, :|activate_rwi_stela_integration()|,
+					 :help_id, 5030 ) )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_plugin.activate_rwi_stela_integration()
+	## 
+	## Activate
+
+	
+	d << _self.get_dialog( :stela_integration )
+	
+	_if  d  _is _unset
+	_then
+		d << rwi_stela_integration_dialog.new( _self, _self.application )
+		_self.cache_dialog( :rwi_stela_integration, d )
+
+	_endif
+	
+	d.activate()
+	
+	>> d	
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method rwi_stela_integration_plugin.sw_databus_data_requested(data_type, _gather args)
+	## 
+	## 
+	
+	>> _if data_type _is :post_render_sets
+	   _then
+		   _self.post_render_sets.empty()
+
+		   >> _if _self.dialogs.an_element() _isnt _unset
+		      _then
+			      dg << _self.dialogs.an_element()
+
+			      _if dg.get_render_status() _is _true _then
+				      
+				      >> dg.kml_direction()
+			      _else
+				      >>_self.post_render_sets.empty()
+
+			      _endif
+			      
+		      _endif	
+	   _endif
+	
+_endmethod
+$

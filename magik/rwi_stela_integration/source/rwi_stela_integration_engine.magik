@@ -1,0 +1,557 @@
+#% text_encoding = iso8859_1
+# ************************************************************ 
+#							       
+# (c) 2026 Realworld Systems. All Rights Reserved.
+# Date: 04 April 2026						       
+# ************************************************************
+
+_package sw
+$
+
+remex(:rwi_stela_integration_engine)
+$
+
+_pragma(classify_level=restricted)
+def_slotted_exemplar(:rwi_stela_integration_engine,
+	{
+		{ :current_selection_ur1,_unset },
+		{ :current_selection_ur2,_unset },
+	#	{ :items,            _unset },
+	#	{ :table_list,       _unset },
+	#	{ :table_list2,  _unset },
+		{ :styles,           _unset },
+		{ :owner,            _unset },
+		{ :grs,              _unset },
+		{ :mapman,           _unset },
+		{ :ed,               _unset },
+		{ :ev,               _unset },
+	#	{ :records,          _unset },
+		{ :rekom,          _unset },
+		{ :tin,              _unset },
+		{ :tin_sub,          _unset },
+		{ :world_for_draw,   _unset },
+		{ :thread_engine,    _unset },
+		{ :current_trail,    _unset },
+		{ :result_geometries, _unset},
+		{ :show_results,     _unset },
+		{:engine, _unset}
+	},{:model})
+$
+
+_pragma(classify_level=restricted)
+rwi_stela_integration_engine.define_shared_constant( :databus_consumer_data_types,
+    { :map_selection },
+    :public )
+
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.new(_optional owner, framework)
+	## 
+	## 
+	_return _clone.init(owner, framework)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.init( owner , framework )
+	## 
+	## 
+
+	.grs << framework
+	.ev << gis_program_manager.cached_dataset(:gis)
+	.owner << owner
+	.mapman << .grs.plugin(:map_plugin)
+	.ed << .grs.plugin(:editor_manager)
+
+	# Holder for widgets
+	#	.items << hash_table.new()
+	.current_selection_ur1 << _unset
+	.current_selection_ur2 << _unset
+	
+	# Data holder
+	#.table_list << rope.new()
+	#.table_list2 << rope.new()
+	#.records << rope.new()
+	
+	# Add dependent dialog to plugin
+	_self.add_dependent(.owner)
+
+	_return _self
+_endmethod
+$
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.get_ur1(items, records)
+	##
+	##
+	
+	sel << .mapman.current_map.current_selection
+
+	_if sel.empty? _is _false _then
+		_if sel.size > 1 _then
+			.owner.show_alert("Select 1 Underground Route")
+		_else	
+			an_rwo << sel.an_element().rwo
+			records.add(an_rwo)
+			items[:ur1].text_items << {{:id,an_rwo.id.write_string},{:name,"Name : "+an_rwo.name.write_string.default("")},{:width,"Width : "+an_rwo.width.write_string}}
+			items[:add_ur1].enabled? << _false
+			items[:add_ur2].enabled? << _true
+			items[:run_check].enabled? << _false
+			items[:goto1].enabled? << _true
+			items[:goto_int1].enabled? << _true
+		_endif 
+	_else
+		.owner.show_alert("Select 1 Underground Route")
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.get_ur2(items, records)
+	##
+	##
+	
+	sel << .mapman.current_map.current_selection
+	
+	_if sel.empty? _is _false _then
+		_if sel.size > 1 _then
+			.owner.show_alert("Check Selection Object. Make Sure only 1 Underground Route Selected")		
+		_else
+			#Check U Route 1 make sure not empty
+			_if records.empty? _is _false _then
+				
+				an_rwo << sel.an_element().rwo
+				_for rec_ur _over records.fast_elements()
+				_loop
+					_if rec_ur = an_rwo _then
+						.owner.show_alert("Select Another Underground Route Object")
+						_leave
+				
+					_else 
+						records.add(an_rwo)
+						#.items[:ur2].text_items << {{:ur1,an_rwo.id.write_string}}
+						items[:ur2].text_items << {{:id,an_rwo.id.write_string},{:name,"Name : "+an_rwo.name.write_string.default("")},{:width,"Width : "+an_rwo.width.write_string}}
+						items[:add_ur2].enabled? << _false
+						items[:run_check].enabled? << _true
+						items[:goto2].enabled? << _true
+						items[:goto_int2].enabled? << _true
+					_endif
+				_endloop
+			_else
+			
+				.owner.show_alert("Make Sure Underground Route 1 is Added")
+			_endif
+			
+				
+		_endif 
+	_else
+		.owner.show_alert("No Selected Underground Route Object on Map")
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.int!get_result(items, records, a_dialog)
+	##
+	##
+	
+	# if record empty then user direct check 
+	_if records.empty? _is _true _then
+		
+		#mapman << .grs.plugin(:map_plugin)
+		sel << .mapman.current_map.current_selection
+		#an_rwo << sel.an_element().rwo	
+		
+		_if sel.empty? _is _false _then
+			_if sel.size = 2 _then
+	
+				#urr << rope.new()
+				_for ur _over sel.fast_elements()
+				_loop
+					records.add(ur.rwo)
+				_endloop
+
+				items[:ur1].text_items << {{:ur1,records[1].id.write_string},{:name,"Name : "+records[1].name.write_string.default("")},{:width,"Width : "+records[1].width.write_string}}
+				items[:ur2].text_items << {{:ur1,records[2].id.write_string},{:name,"Name : "+records[2].name.write_string.default("")},{:width,"Width : "+records[2].width.write_string}}
+
+				items[:add_ur1].enabled? << _false
+				items[:add_ur2].enabled? << _false
+				items[:goto1].enabled? << _true
+				items[:goto2].enabled? << _true
+				items[:goto_int1].enabled? << _true
+				items[:goto_int2].enabled? << _true
+				# 
+				_if records[1].rwo_collection_name _is :underground_route _and records[2].rwo_collection_name _is :underground_route _then
+		
+					(result, reason) << records[1].can_merge_all_cables?(records[2])
+				_else
+			
+					.owner.show_alert("Check Selected Object, Ensure To Select Only Underground Routes Object")
+					#result << _false 
+				_endif
+
+			_else
+			
+				.owner.show_alert("Check Selected Object and Ensure to select two Underground Routes Object")
+				#result << _false
+			
+			_endif
+	
+		_else
+			.owner.show_alert("No Selected Underground Routes Object on Map")
+		_endif
+	_else
+		# Running manual check
+		# Check Obj Selection to make sure only 2 ur
+		sel << .mapman.current_map.current_selection
+		_if sel.size > 2 _then
+			a_dialog.clear()
+			.owner.show_alert("Check Selected Object, Ensure To Select Only Underground Routes Object")
+		_else	
+			_if records.size > 2 _then
+				a_dialog.clear()
+				.owner.show_alert("Repeat select Underground Route by manual")
+		
+			_else
+				_if records[1].rwo_collection_name _is :underground_route _and records[2].rwo_collection_name _is :underground_route _then
+				
+					(result, reason) << records[1].can_merge_all_cables?(records[2])
+				_else
+					.owner.show_alert("Check Selected Object, Ensure To Select Only Underground Routes Object")
+					#result << _false
+				_endif
+			_endif
+			
+		_endif
+	_endif
+
+	_if result _is _true _then
+		#.items[:result2].text << "Can Be Merge "
+		a_dialog.get_data_ur(records[1],records[2])
+		items[:run_check].enabled? << _false
+		items[:check_merge].enabled? << _true 
+		items[:clr_selection].enabled? << _true 
+		#_self.get_data_ur1(.records[1])
+		#_self.get_data_ur2(.records[2])
+	_elif result _is _false _then 
+		items[:result2].text << "Can Not Be Merge Because   :  " +
+		newline_char + reason
+	_else
+		items[:result2].text << ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.get_data_ur(ur1, ur2, table_list, table_list2, a_dialog)
+	##
+	##
+	
+	c_ur1 << ur1.conduits
+	cbl_ur1 << ur1.cables
+	
+	_for data_conduit_ur1 _over c_ur1.fast_elements()
+	_loop
+	
+		table_list.add_last(data_conduit_ur1)
+	_endloop
+
+	_for data_cable_ur1 _over cbl_ur1.fast_elements()
+	_loop
+		sheath_ur1 << data_cable_ur1.sheath_with_loc 
+		table_list.add_last(sheath_ur1)
+	_endloop
+
+	c_ur2 << ur2.conduits
+	cbl_ur2 << ur2.cables
+	
+	_for data_conduit_ur2 _over c_ur2.fast_elements()
+	_loop
+	
+		table_list2.add_last(data_conduit_ur2)
+	_endloop
+
+	_for data_cable_ur2 _over cbl_ur2.fast_elements()
+	_loop
+		sheath_ur2 << data_cable_ur2.sheath_with_loc 
+		table_list2.add_last(sheath_ur2)
+	_endloop
+
+	a_dialog.changed(:table_ur1, :refresh)
+	a_dialog.changed(:table_ur2, :refresh)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.get_data_ur2(ur2, table_list2, a_dialog)
+	##
+	##
+	
+	c_ur2 << ur2.conduits
+	cbl_ur2 << ur2.cables
+	
+	_for data_conduit_ur2 _over c_ur2.fast_elements()
+	_loop
+	
+		table_list2.add_last(data_conduit_ur2)
+	_endloop
+
+	_for data_cable_ur2 _over cbl_ur2.fast_elements()
+	_loop
+		sheath_ur2 << data_cable_ur2.sheath_with_loc 
+		table_list2.add_last(sheath_ur2)
+	_endloop
+	
+	a_dialog.changed(:table_ur2, :refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.goto1(items, records)
+	## 
+	##
+
+	id << items[:ur1].text_items[1][2].write_string
+	
+	_for ur _over range (1,records.size)
+	_loop
+		_if records[ur].id.write_string = id _then
+			obj1 << records[ur].get_spatial_context(:route)
+			.mapman.goto(obj1)
+			ef << .ed.display_object_in_embedded_editor(records[ur])
+		_endif 
+	_endloop 
+
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.goto2(items, records)
+	## 
+	##
+
+	id << items[:ur2].text_items[1][2].write_string
+
+	_for ur _over range (1,records.size)
+	_loop
+		_if records[ur].id.write_string = id _then
+			obj2 << records[ur].get_spatial_context(:route)
+			.mapman.goto(obj2)
+			ef << .ed.display_object_in_embedded_editor(records[ur])
+		_endif 
+	_endloop 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.goto_int1(items, records)
+	## 
+	##
+
+	id << items[:ur1].text_items[1][2].write_string
+
+	_for ur _over range (1,records.size)
+	_loop
+		_if records[ur].id.write_string = id _then
+			obj1 << records[ur].get_spatial_context(:internal)
+			.mapman.goto(obj1)
+		_endif 
+	_endloop 
+
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.goto_int2(items, records)
+	## 
+	##
+
+	id << items[:ur2].text_items[1][2].write_string
+
+	_for ur _over range (1,records.size)
+	_loop
+		_if records[ur].id.write_string = id _then
+			obj2 << records[ur].get_spatial_context(:internal)
+			.mapman.goto(obj2)
+		_endif 
+	_endloop 
+
+_endmethod
+$
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_engine.check_merge(items, current_selection_ur1, current_selection_ur2, a_dialog)
+	##
+	##
+
+	a_dialog.changed(:table_ur1, :refresh)
+	a_dialog.changed(:table_ur2, :refresh)
+	dt1 << current_selection_ur1
+	dt2 << current_selection_ur2
+	
+	_if dt1 _is _unset _or dt2 _is _unset _then
+		.owner.show_alert("Select Data on Table")
+		_return 
+	_endif
+	
+	source_dt1 << dt1.source_collection.object_name
+	source_dt2 << dt2.source_collection.object_name
+
+	_if source_dt1 _is :mit_conduit _and source_dt2 _is :mit_conduit _then
+
+		_if dt1.spec_id =dt2.spec_id _and dt1.construction_status = dt1.construction_status _and dt1.usage = dt2.usage _then
+			items[:result2].text <<"Conduit Can Be Merge" #+ gr  +
+
+		_else				
+			items[:result2].text <<"Conduit Can Not Be Merge " +
+						newline_char + dt1.spec_id +" x "+dt2.spec_id +
+						newline_char + dt1.construction_status+" x "+dt2.construction_status +
+						newline_char + dt1.usage +" x "+dt2.usage 
+
+		_endif
+		
+	_elif source_dt1 _is :sheath_with_loc _and source_dt2 _is :sheath_with_loc _then
+		_if dt1.spec_id =dt2.spec_id _and dt1.construction_status = dt1.construction_status _then
+			items[:result2].text <<"Sheath(LOC) Can Be Merge"
+		_else
+			items[:result2].text <<"Sheath(LOC) Can Not Be Merge " +
+						newline_char + dt1.spec_id +" x "+dt2.spec_id +
+						newline_char + dt1.construction_status+" x "+dt2.construction_status
+		_endif
+		
+			
+	_else
+		items[:result2].text <<"Can Not Be Merge"
+	_endif
+	
+	
+_endmethod
+$
+
+_method underground_route.can_merge_all_cables?(p_underground_route)
+	##
+	## To test this method select 2 undergrond route 
+	## and run procedure on emacs magikSF> test_ur_add()
+	##
+
+	write("Start Checking Underground Route : ",_self.id ," With Underground Route : ",p_underground_route.id)
+	result << _false 
+	reason << ""
+
+	#Make sure it's Undergraoud Route
+	_if _self.rwo_collection_name _is :underground_route _and p_underground_route.rwo_collection_name _is :underground_route _then
+
+
+		# b. Confirm the Underground Routes are connected
+		# if route is connected with the other ug route then the result
+		# is true	
+	
+		l_underground_route_geom << _self.route
+		l_all_connected << l_underground_route_geom.all_connected_objects()
+		
+		_for l_conn _over l_all_connected.fast_elements()
+		_loop
+		
+			_if l_conn = p_underground_route _then
+				result << _true 
+				_leave 
+			_else
+				result << _false
+				reason << "Cannot Merge Because Underground Route Is Not Connected"
+			_endif
+		_endloop
+
+		#If result is true then move to next test
+		_if result _is _true _then
+
+			#Update 17 march 2022
+			#(This means there can only be 2 Underground Routes at the same point)
+
+			recs << rope.new()
+			recs.add(_self )
+			recs.add(p_underground_route)
+
+			#
+			first_node_l_ur << _self.route.first_node
+			last_node_l_ur << _self.route.last_node
+			first_node_p_ur << p_underground_route.route.first_node
+			last_node_p_ur << p_underground_route.route.last_node
+
+			#find connection point/node beetween 2 selected undeground route
+			_if last_node_l_ur = first_node_p_ur _orif last_node_l_ur = last_node_p_ur _then
+				l_node << last_node_l_ur
+			_elif first_node_l_ur = last_node_p_ur _orif first_node_l_ur = first_node_p_ur _then
+				l_node << first_node_l_ur
+			_endif 	
+
+			#check if connect with other Underground route
+			ur_connected << rope.new()
+			ar_connected << rope.new()
+			_for i_geom _over l_node.top_level_geoms()
+			_loop
+				_if i_geom.rwo.is_kind_of?(underground_route) _then
+					ur_connected.add(i_geom.rwo)
+				_endif
+#				_if i_geom.rwo.is_kind_of?(aerial_route) _then
+#					ar_connected.add(i_geom.rwo)
+#				_endif
+			_endloop
+
+			#
+			_if ur_connected.size > 2  _then
+				write("Cannot Merge because have more than 2 underground route in same point")
+				reason << "Cannot Merge because have more than 2 underground route in same point"
+				result <<  _false
+
+			_else 	
+				result << _true
+
+				#check field width and deep	
+				_if _self.width = p_underground_route.width _andif _self.upper_material_depth = p_underground_route.upper_material_depth _andif _self.core_material_depth = p_underground_route.core_material_depth _andif _self.base_material_depth = p_underground_route.base_material_depth _then
+						
+					result << _true 
+					
+#					#######
+#					#Cable Merge Test 1 : Ensure Cable is in both Underground Route Structures
+#					_if result _is _true _then 
+#
+#						write("....")
+#					
+#					_else
+#						result << _false
+#						reason << "Underground Route Cable is Not Connected"
+#						write("Test 1 ",result," Reason : ", reason)
+#					_endif	
+				_else
+
+					result << _false
+					reason << "Width or Depth of the two Undergorund Route are not the same "
+				_endif
+				
+			_endif
+			
+		_else
+			write("Test 1 ",result," Reason : ", reason)
+			result <<  _false 
+			
+		_endif
+	_else
+		
+		write("Check Selected Object and Make Sure To Select Only Underground Routes")
+		reason << "Check Selected Object and Make Sure To Select Only Underground Routes"
+		result << _false 
+	_endif 	
+	
+	>> result ,reason
+_endmethod
+$
