@@ -1,0 +1,251 @@
+_global get_count_sling_wire_line_length <<
+_proc()
+
+	v_gis << gis_program_manager.databases[:gis]
+	s_col << v_gis.collections[:sling_wire]
+	table_list << rope.new()
+	_dynamic !current_world! << v_gis.world
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	_local area << s.project.project_areas.an_element().area
+	r << rope.new()
+	
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
+	a_region << area #pseudo_area.new_convex_hull(r)
+	#a_region.world << v_gis.world
+
+	pred_m << predicate.within(:route , {a_region})
+	table_list << s_col.select(pred_m)
+
+
+	a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	row << 0
+	l_total << 0 #0.0
+	t_pjg << 0 #0.0
+
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service" #_orif s.ring_name <> fdt
+		_then
+			_continue
+		_endif
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+		write("name :",s.name,"    Folder :",s.line_type,"    pjg :",a_pjg)
+	_endloop
+
+
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
+	
+	write(t_a_pjg)
+
+	>> t_pjg
+_endproc
+$
+
+_global get_count_cable_length <<
+_proc()
+
+		a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0.0
+	p2 << 0.0
+	p3 << 0.0
+	p4 << 0.0
+	p5 << 0.0
+	p6 << 0.0
+	p7 << 0.0
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		_if p.construction_status="In Service"
+		_then
+			_continue
+		_endif
+		pjg << p.calculated_length #/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+		write("name :",p.name,"    Folder :",p.line_type,"    pjg :",a_pjg)
+		_if p.spec_id="SM G652D-ADSS 24C" 
+		_then
+			ph1 << 	p1 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 36C" 
+		_then
+			p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 48C" 
+		_then
+			p3 << 	p3 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 72C" 
+		_then
+			p4 << 	p4 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 96C" 
+		_then
+			p5 << 	p5 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 144C" 
+		_then
+			p6 << 	p6 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 288C" 
+		_then
+			p7 << 	p7 + p.calculated_sheath_length.value_in(:m).as_number()
+
+		_endif
+
+	_endloop
+
+	
+>> p1,p2,p3,p4,p5,p6,p7
+		
+_endproc
+$
+
+_global get_count_cable_length_b <<
+_proc()
+
+		a_ff << float_format.new_with_properties(
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
+	
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+	
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	p1 << 0.0
+	p2 << 0.0
+	p3 << 0.0
+	p4 << 0.0
+	p5 << 0.0
+	p6 << 0.0
+	p7 << 0.0
+	
+
+	_for p  _over table_list.fast_elements()
+	_loop
+		#_if p.construction_status="In Service"
+		#_then
+		#	_continue
+		#_endif
+		pjg << p.calculated_sheath_length #/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+		write("name :",p.name,"    Folder :",p.line_type,"    pjg :",a_pjg)
+		_if p.spec_id="SM G652D-ADSS 24C" 
+		_then
+			p1 << 	p1 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 36C" 
+		_then
+			p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 48C" 
+		_then
+			p3 << 	p3 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 72C" 
+		_then
+			p4 << 	p4 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 96C" 
+		_then
+			p5 << 	p5 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 144C" 
+		_then
+			p6 << 	p6 + p.calculated_sheath_length.value_in(:m).as_number()
+		_elif p.spec_id="SM G652D-ADSS 288C" 
+		_then
+			p7 << 	p7 + p.calculated_sheath_length.value_in(:m).as_number()
+
+		_endif
+
+	_endloop
+
+	
+>> p1,p2,p3,p4,p5,p6,p7
+		
+_endproc
+$
+

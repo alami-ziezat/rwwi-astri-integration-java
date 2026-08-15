@@ -1769,6 +1769,8 @@ _private _method rwwi_astri_boq_generator.add_pole_accessories(result)
 			# Bahan Pondasi tiang (200000690) - flat 1:1 total, auto-adds 500001742 (Label Pole)
 			_self.add_to_boq_result(result, "200000690", total_poles)
 			write("LOG: Added Bahan Pondasi tiang (200000690) with quantity:", total_poles, "(Proposed poles only)")
+			_self.add_to_boq_result(result, "500001742", total_poles)
+			write("LOG: Label Pole (500001742) with quantity:", total_poles, "(Proposed poles only)")
 		_else
 			write("LOG: No Proposed poles, skipping Bahan Pondasi (200000690)")
 		_endif
@@ -1869,6 +1871,11 @@ _method rwwi_astri_boq_generator.feeder_splicing_qty()
 	# Accumulate total length (m) per stf_item_code
 	_local length_by_code << equality_hash_table.new()
 
+	_if .change_set _is _unset _then
+		scheme << swg_dsn_admin_engine.get_current_job()
+		.change_set << mit_scheme_record_change_set.new(scheme)
+	_endif
+	
 	_for rc _over .change_set.fast_elements()
 	_loop
 		_local rec << rc.current_record
@@ -1977,7 +1984,7 @@ _private _method rwwi_astri_boq_generator.add_fat_accessories(result)
 			_if .infra_type = "cluster" _andif hp > 0
 			_then
 				# ceiling(hp / 8) = (hp + 7) _div 8
-				splicing_qty << (hp + 7) _div 8
+				splicing_qty << total_fats* 2 #(hp + 7) _div 8
 			_elif .infra_type = "subfeeder" _andif hp > 0
 			_then
 				# (ceiling(hp / 128) + 2) * 4

@@ -829,7 +829,6 @@ _proc()
 	s_col << v_gis.collections[:sling_wire]
 	table_list << rope.new()
 	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -883,10 +882,10 @@ _proc()
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -969,10 +968,10 @@ _proc()
 		row +<< 1		
 		#write(row)
 		#write("boring  :  ",s)
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -993,7 +992,6 @@ _proc()
 	s_col << v_gis.collections[:boring_machine]
 	table_list << rope.new()
 	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -1051,10 +1049,10 @@ _proc()
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -1075,7 +1073,6 @@ _proc()
 	s_col << v_gis.collections[:open_trenching]
 	table_list << rope.new()
 	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -1133,10 +1130,10 @@ _proc()
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -1157,7 +1154,6 @@ _proc()
 	s_col << v_gis.collections[:tali_pancing]
 	table_list << rope.new()
 	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -1214,10 +1210,10 @@ _proc()
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -1238,7 +1234,6 @@ _proc()
 	s_col << v_gis.collections[:sewer]
 	table_list << rope.new()
 	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -1295,10 +1290,10 @@ _proc()
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -1317,10 +1312,6 @@ $
 _global get_count_cable_feeder <<
 _proc()
 
-	v_gis << gis_program_manager.databases[:gis]
-	table_list << rope.new()
-	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	table_list << rope.new()
 	
 	s << swg_dsn_admin_engine.get_current_job()
@@ -1380,14 +1371,14 @@ _proc()
 		_then
 			y << p.route_sectors()
 			
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p1 << 	p1 + y_sec #p.calculated_sheath_length.value_in(:m).as_number()
 		
 		_elif p.spec_id="SM G652D-ADSS 36C"
 		_then
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p2 << 	p2 + y_sec
 			#p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
@@ -1397,7 +1388,7 @@ _proc()
 		_elif p.spec_id="SM G652D-ADSS 48C"
 		_then
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p3 << 	p3 + y_sec
 		
@@ -1405,21 +1396,21 @@ _proc()
 		_then
 
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p4 << 	p4 + y_sec
 			#p4 << 	p4 + p.calculated_sheath_length.value_in(:m).as_number()
 		_elif p.spec_id="SM G652D-ADSS 96C" 
 		_then
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p5 << 	p5 + y_sec
 			#p5 << 	p5 + p.calculated_sheath_length.value_in(:m).as_number()
 		_elif p.spec_id="SM G652D-ADSS 144C" 
 		_then
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p6 << 	p6 + y_sec
 			#p6 << 	p6 + p.calculated_sheath_length.value_in(:m).as_number()
@@ -1427,7 +1418,7 @@ _proc()
 		_then
 
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p7 << 	p7 + y_sec
 			#p7 << 	p7 + p.calculated_sheath_length.value_in(:m).as_number()
@@ -1495,10 +1486,8 @@ $
 
 _global get_count_cable <<
 _proc()
-	v_gis << gis_program_manager.databases[:gis]
+
 	table_list << rope.new()
-	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	
 	s << swg_dsn_admin_engine.get_current_job()
 	
@@ -1574,45 +1563,11 @@ _proc()
 _endproc
 $
 
-_global get_geodetic_conduit <<
-_proc(c)
-
-	v_gis << gis_program_manager.databases[:gis]
-	vc << v.collections
-	mc << vc[:mit_conduit]
-	table_list << rope.new()
-	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
-
-	l_total << 0 #0.0
-	t_pjg << 0 #0.0
-
-	_local l_length << length_value.zero
-	
-        _for mc _over c.mit_conduit_sections.fast_elements()
-        _loop
-                _if ( l_structure_route <<  mc.mit_structure_route ) _isnt _unset
-		_then
-			ge << l_structure_route.underground_route.route.geodetic_length
-			#write(ge)
-                        l_total +<< ge #l_structure_route.actual_structure.length
-                _endif
-        _endloop
-	
-        _return l_total
-_endproc
-$
 
 _global get_count_conduit <<
 _proc()
 
-
-	v_gis << gis_program_manager.databases[:gis]
-	vc << v.collections
-	mc << vc[:mit_conduit]
 	table_list << rope.new()
-	_dynamic !current_world! << v_gis.world
-	_dynamic !current_coordinate_system! << v_gis.collections[:sw_gis!world].at(0,0).coordinate_system
 	
 	s << swg_dsn_admin_engine.get_current_job()
 	
@@ -1660,58 +1615,31 @@ _proc()
 		_endif
 		_if p.spec_id="Sub Duct / HDPE 32/28" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p1 << 	p1 + y_sec
-		
+			p1 << 	p1 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Sub Duct / HDPE 40/34" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p2 << 	p2 + y_sec
-			#p2 << 	p2 + p.calculated_length.value_in(:m).as_number()
+			p2 << 	p2 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct 10 x 5 cm" #"Cable Duct� 10 x 5 cm" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p3 << 	p3 + y_sec
-			#p3 << 	p3 + p.calculated_length.value_in(:m).as_number()
+			p3 << 	p3 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct 10 x 10 cm" #"Cable Duct� 10 x 5 cm" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p4 << 	p4 + y_sec
-			#p4 << 	p4 + p.calculated_length.value_in(:m).as_number()
+			p4 << 	p4 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct TC-2" #"Cable Duct� TC-2" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p5 << 	p5 + y_sec
-			#p5 << 	p5 + p.calculated_length.value_in(:m).as_number()
+			p5 << 	p5 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct TC-3" #"Cable Duct� TC-3" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p6 << 	p6 + y_sec
-			#p6 << 	p6 + p.calculated_length.value_in(:m).as_number()
+			p6 << 	p6 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct TC-4" #"Cable Duct� TC-4" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p7 << 	p7 + y_sec
-			#p7 << 	p7 + p.calculated_length.value_in(:m).as_number()
+			p7 << 	p7 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct TC-5" #"Cable Duct� TC-5" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p8 << 	p8 + y_sec
-			#p8 << 	p8 + p.calculated_length.value_in(:m).as_number()
+			p8 << 	p8 + p.calculated_length.value_in(:m).as_number()
 		_elif p.spec_id="Cable Duct TC-6" #"Cable Duct� TC-6" 
 		_then
-			yy << get_geodetic_conduit(p)   	
-			y_sec << yy/100
-			p9 << 	p9 + y_sec
-			#p9 << 	p9 + p.calculated_length.value_in(:m).as_number()
+			p9 << 	p9 + p.calculated_length.value_in(:m).as_number()
 
 
 		_endif
@@ -2086,18 +2014,6 @@ $
 _global get_count_cable_cluster_line <<
 _proc(fdt)
 
-	v << gis_program_manager.databases[:gis]
-	a_view << gis_program_manager.ace_view
-	#mapman << .grs.plugin(:maps)
-	vc << v.collections
-	!current_dsview! << v
-
-	_dynamic !print_float_precision! << 12
-
-	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-
-
 	table_list << rope.new()
 	
 	s << swg_dsn_admin_engine.get_current_job()
@@ -2156,14 +2072,13 @@ _proc(fdt)
 		_if p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line A"
 		_then
 			y << p.route_sectors()
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p1 << 	p1 + y_sec #p.calculated_sheath_length.value_in(:m).as_number()
 		_elif p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line B"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p2 << 	p2 + y_sec
 			#p.calculated_sheath_length.value_in(:m).as_number()
@@ -2171,22 +2086,19 @@ _proc(fdt)
 		_elif p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line C"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p3 << 	p3 + y_sec
 		_elif p.spec_id="SM G652D-ADSS 24C"  _and p.line_type="Line D"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p4 << 	p4 + y_sec
 		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line A"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p5 << 	p5 + y_sec
 			#p2 << 	p2 + p.calculated_sheath_length.value_in(:m).as_number()
@@ -2194,52 +2106,45 @@ _proc(fdt)
 		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line B"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p6 << 	p6 + y_sec
 		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line C"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p7 << 	p7 + y_sec
 		_elif p.spec_id="SM G652D-ADSS 36C" _and p.line_type="Line D"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p8 << 	p8 + y_sec
 			
 		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line A"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p9 << 	p9 + y_sec
 		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line B"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p10 << 	p10 + y_sec
 			#p3 << 	p3 + p.calculated_sheath_length.value_in(:m).as_number()
 		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line C"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p11 << 	p11 + y_sec
 		_elif p.spec_id="SM G652D-ADSS 48C" _and p.line_type="Line D"
 		_then
 			y << p.route_sectors()
-			#yy << y.line_length
-			yy << y.geodetic_length
+			yy << y.line_length
 			y_sec << yy/100
 			p12 << 	p12 + y_sec
 #		_elif p.spec_id="SM G652D-ADSS 72C" 
@@ -2447,8 +2352,9 @@ _proc(fdt)
 		
 _endproc
 $
-_global print_sling_wire_length <<
+_global get_count_sling_wire_line_length <<
 _proc()
+
 	v_gis << gis_program_manager.databases[:gis]
 	s_col << v_gis.collections[:sling_wire]
 	table_list << rope.new()
@@ -2457,8 +2363,8 @@ _proc()
 	
 	_if s _is _unset
 	_then
-		write("No Design Selected")
-		_leave 
+			write("No Design Selected")
+			_leave 
 	_endif
 	
 	
@@ -2469,336 +2375,59 @@ _proc()
 	st << s.status.write_string	
 	change_set << mit_scheme_record_change_set.new(s)
 	_local area << s.project.project_areas.an_element().area
-
-
-	_for i _over change_set.fast_elements()
-	_loop	
-		name <<   i.current_record.source_collection.name
-		_if name _is :ftth!demand_point _then
-			#	r.add(i.current_record.location.coord)
-			infra_type << "cluster"
-			infra_code << i.current_record.cluster_code
-			_leave
-		_endif
-		
-	_endloop
-	it << ""
-	ic << ""
-
-	_if infra_type _isnt _unset _and infra_code _isnt _unset 
-	_then
-		it << infra_type
-		ic << infra_code
-
-	_endif
-	write(it,ic)
-	# Get user home directory
-	_local home_dir << system.getenv("USERPROFILE")  # Windows
-	_if home_dir _is _unset _orif home_dir = ""
-	_then
-		# Fallback to TEMP if USERPROFILE not available
-		home_dir << system.temp_directory_name
-	_endif
-		
-	# Create sw_kml subdirectory path
-	_local output_dir << system.pathname_from_components("sling_wire_length", home_dir)
-
-	d << date_now()
-	days_number << d.day_of_month_number
-	months_number << d.month_number
-	years_number << d.year
-
-	_if months_number.write_string.size = 1
-	_then 
-		mth << "0"+months_number.write_string
-	_endif
-
-	_if days_number.write_string.size = 1
-	_then 
-		dys << "0"+days_number.write_string
-	_else	
-		dys << days_number
-	_endif
-
-	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
-	
-	# Create directory if it doesn't exist
-	_if _not system.file_exists?(output_dir)
-	_then
-		_try
-			system.mkdir(output_dir)
-			write("Created BOQ output directory: ", output_dir)
-		_when error
-			write("WARNING: Could not create sw_kml directory, using temp instead")
-			output_dir << system.temp_directory_name
-		_endtry
-	_endif
-	
-	
 	r << rope.new()
-		
 	
-		
+#	_for i _over change_set.fast_elements()
+#	_loop
+#		
+#		name <<   i.current_record.source_collection.name
+#		_if name _is :pole _orif name _is :ftth!demand_point  _orif name _is :sheath_splice _then
+#			r.add(i.current_record.location.coord)
+#		_endif
+#		
+#	_endloop
+	
 	a_region << area #pseudo_area.new_convex_hull(r)
 	#a_region.world << v_gis.world
-	
+
 	pred_m << predicate.within(:route , {a_region})
 	table_list << s_col.select(pred_m)
-	
-	
+
+
 	a_ff << float_format.new_with_properties(
-			:float_format,:fixed,
-			:float_decimal_places,3)
-	q_ff << float_format.new_with_properties(
-			:float_format,:fixed,
-			:float_decimal_places,0)
-	
+			      :float_format,:fixed,
+			      :float_decimal_places,3)
+
 	
 	row << 0
 	l_total << 0 #0.0
 	t_pjg << 0 #0.0
-	
-	_if output_dir _is _unset
-	_then 
-		l_out << !terminal!
-	_else
-		write(output_dir)
-		l_out << external_text_output_stream.new(system.pathname_down(output_dir,hari+"_"+it+"_"+ic+"_"+"sling_wire.csv"))
-		#	l_out << external_text_output_stream.new(output_dir+"sling.csv")
-	_endif 
-	
-	_protect
-		
-		_for su _over table_list.fast_elements()
-		_loop
-			_if su.construction_status="In Service" #_orif s.ring_name <> fdt
-			_then
-				_continue
-			_endif
-			row +<< 1		
-			#write(row)
-			
-			pjg << su.route.line_length/100     #.value_in(:m).as_number()
-			a_pjg << a_ff.format(pjg).write_string+"  m"
-			
-			l_total << l_total + su.route.line_length
-			write("ID :",su.id," name :",su.name,"    Folder :",su.line_type,"    Length :",a_pjg)
-			dd << q_ff.format(su.id).write_string
-			l_out.write(#dd,%,,
-				    su.name,%,,
-				    su.line_type,%,,
-				    a_pjg,%,,
-				    "" )
-			l_out.write(newline_char)
-		_endloop
-		
-		
-		t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
-		t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
-		
-		write(t_a_pjg)
 
-
-	_protection 
-
-	#	_if p_dir _isnt _unset
-	#	_then
-			l_out.close()
-	#	_endif 
-	_endprotect
-
-	write("finished.")
-
-
-
-		
-	>> t_pjg
-_endproc
-$
-
-_global print_cable_length <<
-_proc()
-	v_gis << gis_program_manager.databases[:gis]
-	s_col << v_gis.collections[:sheath_with_loc]
-	table_list << rope.new()
-	_dynamic !current_world! << v_gis.world
-	s << swg_dsn_admin_engine.get_current_job()
-	
-	_if s _is _unset
-	_then
-		write("No Design Selected")
-		_leave 
-	_endif
-	
-	
-	id << s.id.write_string 
-	nama << s.name.write_string
-	owner << s.owner.write_string
-	pj << s.inf_project.write_string
-	st << s.status.write_string	
-	change_set << mit_scheme_record_change_set.new(s)
-	_local area << s.project.project_areas.an_element().area
-
-
-	_for i _over change_set.fast_elements()
-	_loop	
-		name <<   i.current_record.source_collection.name
-		_if name _is :ftth!demand_point _then
-			#	r.add(i.current_record.location.coord)
-			infra_type << "cluster"
-			infra_code << i.current_record.cluster_code
-			_leave
+	_for s _over table_list.fast_elements()
+	_loop
+		_if s.construction_status="In Service" #_orif s.ring_name <> fdt
+		_then
+			_continue
 		_endif
-		
+		row +<< 1		
+		#write(row)
+	
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
+		a_pjg << a_ff.format(pjg).write_string+"  m"
+
+		l_total << l_total + s.route.line_length
+		write("name :",s.name,"    Folder :",s.line_type,"    pjg :",a_pjg)
 	_endloop
-	it << ""
-	ic << ""
 
-	_if infra_type _isnt _unset _and infra_code _isnt _unset 
-	_then
-		it << infra_type
-		ic << infra_code
 
-	_endif
-	write(it,ic)
-	# Get user home directory
-	_local home_dir << system.getenv("USERPROFILE")  # Windows
-	_if home_dir _is _unset _orif home_dir = ""
-	_then
-		# Fallback to TEMP if USERPROFILE not available
-		home_dir << system.temp_directory_name
-	_endif
-		
-	# Create sw_kml subdirectory path
-	_local output_dir << system.pathname_from_components("cable_length", home_dir)
-
-	d << date_now()
-	days_number << d.day_of_month_number
-	months_number << d.month_number
-	years_number << d.year
-
-	_if months_number.write_string.size = 1
-	_then 
-		mth << "0"+months_number.write_string
-	_endif
-
-	_if days_number.write_string.size = 1
-	_then 
-		dys << "0"+days_number.write_string
-	_else	
-		dys << days_number
-	_endif
-
-	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
+	t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
+	t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
 	
-	# Create directory if it doesn't exist
-	_if _not system.file_exists?(output_dir)
-	_then
-		_try
-			system.mkdir(output_dir)
-			write("Created BOQ output directory: ", output_dir)
-		_when error
-			write("WARNING: Could not create sw_kml directory, using temp instead")
-			output_dir << system.temp_directory_name
-		_endtry
-	_endif
-	
-	
-	r << rope.new()
-		
-	
-		
-	a_region << area #pseudo_area.new_convex_hull(r)
-	#a_region.world << v_gis.world
-	
-	pred_m << predicate.within(:route , {a_region})
-	table_list << s_col.select(pred_m)
-	
-	
-	a_ff << float_format.new_with_properties(
-			:float_format,:fixed,
-			:float_decimal_places,3)
-	q_ff << float_format.new_with_properties(
-			:float_format,:fixed,
-			:float_decimal_places,0)
-	
-	
-	row << 0
-	l_total << 0 #0.0
-	t_pjg << 0 #0.0
-	
-	_if output_dir _is _unset
-	_then 
-		l_out << !terminal!
-	_else
-		write(output_dir)
-		l_out << external_text_output_stream.new(system.pathname_down(output_dir,hari+"_"+it+"_"+ic+"_"+"cable.csv"))
-		#	l_out << external_text_output_stream.new(output_dir+"sling.csv")
-	_endif 
-	
-	_protect
-		
-		#_for su _over table_list.fast_elements()
-		#_loop
+	write(t_a_pjg)
 
-		_for i _over change_set.fast_elements()
-		_loop	
-			name <<   i.current_record.source_collection.name
-			_if name _is :sheath_with_loc _then
-				su << i.current_record
-				_if su.construction_status="In Service" #_orif s.ring_name <> fdt
-				_then
-					_continue
-				_endif
-				row +<< 1		
-				#write(row)
-				
-				pjg << su.calculated_length     #.value_in(:m).as_number()
-				a_pjg << a_ff.format(pjg).write_string+"  m"
-
-				y << su.route_sectors()
-			
-				yy << y.line_length
-				y_sec << yy/100
-				#p1 << 	p1 + y_sec
-				
-				l_total << l_total + y_sec
-				write("ID :",su.id," name :",su.name,"    Folder :",su.line_type,"    Length :",a_pjg)
-				dd << q_ff.format(su.id).write_string
-				l_out.write(#dd,%,,
-					su.name,%,,
-					su.line_type,%,,
-				    a_pjg,%,,
-				    "" )
-				l_out.write(newline_char)
-			_endif
-			
-		_endloop
-		
-		
-		t_pjg << l_total/100 #.value_in(:m).as_number()#.write_string
-		t_a_pjg << a_ff.format(t_pjg).write_string+"  m"
-		
-		write(t_a_pjg)
-
-
-	_protection 
-
-	#	_if p_dir _isnt _unset
-	#	_then
-			l_out.close()
-	#	_endif 
-	_endprotect
-
-	write("finished.")
-
-
-
-		
 	>> t_pjg
 _endproc
 $
-
 
 _global get_count_sling_wire_line <<
 _proc(fdt)
@@ -2860,10 +2489,10 @@ _proc(fdt)
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -2998,10 +2627,10 @@ _proc(fdt)
 		row +<< 1		
 		#write(row)
 		#write("boring  :  ",s)
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -3077,10 +2706,10 @@ _proc(fdt)
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
@@ -3157,10 +2786,10 @@ _proc(fdt)
 		row +<< 1		
 		#write(row)
 	
-		pjg << s.route.geodetic_length/100     #.value_in(:m).as_number()
+		pjg << s.route.line_length/100     #.value_in(:m).as_number()
 		a_pjg << a_ff.format(pjg).write_string+"  m"
 
-		l_total << l_total + s.route.geodetic_length
+		l_total << l_total + s.route.line_length
 
 	_endloop
 
