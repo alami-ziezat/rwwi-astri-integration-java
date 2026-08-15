@@ -1966,8 +1966,12 @@ _private _method astri_data_migrator.process_cluster_scheduled_migration(rec, ob
 			_local parser        << astri_kml_parser.new(kml_file_path)
 			_local (placemarks, topology) << parser.parse()
 
+			# Project name = WO number from fact_wo_drm_smallworld;
+			# falls back to infra_code when no matching WO is found.
+			_local wo_number << _self.lookup_wo_number("cluster", infra_code)
+
 			_local wo << property_list.new_with(
-				:wo_number,           infra_code,
+				:wo_number,           wo_number,
 				:infra_code,          infra_code,
 				:infra_name,          rec[:name].default(infra_code),
 				:topology,            topology_str,
@@ -2095,8 +2099,12 @@ _private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, 
 			_local parser        << astri_kml_parser.new(kml_file_path)
 			_local (placemarks, topology) << parser.parse()
 
+			# Project name = WO number from fact_wo_drm_smallworld;
+			# falls back to infra_code when no matching WO is found.
+			_local wo_number << _self.lookup_wo_number("subfeeder", infra_code)
+
 			_local wo << property_list.new_with(
-				:wo_number,           infra_code,
+				:wo_number,           wo_number,
 				:infra_code,          infra_code,
 				:infra_name,          rec[:name].default(infra_code),
 				:topology,            topology_str,
@@ -2224,8 +2232,12 @@ _private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj
 			_local parser        << astri_kml_parser.new(kml_file_path)
 			_local (placemarks, topology) << parser.parse()
 
+			# Project name = WO number from fact_wo_drm_smallworld;
+			# falls back to infra_code when no matching WO is found.
+			_local wo_number << _self.lookup_wo_number("feeder", infra_code)
+
 			_local wo << property_list.new_with(
-				:wo_number,           infra_code,
+				:wo_number,           wo_number,
 				:infra_code,          infra_code,
 				:infra_name,          rec[:name].default(infra_code),
 				:topology,            topology_str,
@@ -2579,6 +2591,96 @@ _private _method astri_data_migrator.process_cluster_boundary_cell(rec, obj_stat
 		obj_stats[:errors] +<< 1
 		_return _false
 	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={astri_integration})
+_private _method astri_data_migrator.lookup_wo_number(infra_type, infra_code)
+	## Resolve the DRM project name by looking up the work order number in
+	## smallworld.fact_wo_drm_smallworld, matched on
+	##   level_type = UPPER(infra_type)  AND  level_code = UPPER(infra_code)
+	## (level_type / level_code are stored upper-cased in that table).
+	##
+	## Applies to BOTH scheduler runs (manual drm_scheduler_logs and automated
+	## drm_etl_scheduler_logs) - neither carries a real WO number of its own.
+	## When several WOs match, the most recently updated one wins
+	## (ORDER BY updated_timestamp DESC).
+	##
+	## Falls back to infra_code when there is no match, the wo_number is blank,
+	## or on any error - the project name is never left empty.
+	##
+	## Parameters:
+	##   infra_type (string) - "cluster" | "subfeeder" | "feeder"
+	##   infra_code (string) - the infrastructure code
+	##
+	## Returns: the wo_number string to use as the project name, or infra_code.
+
+	_local code << infra_code.default("").write_string
+
+	_local sql << "SELECT wo_number FROM smallworld.fact_wo_drm_smallworld " +
+		"WHERE UPPER(level_type) = ? AND UPPER(level_code) = ? " +
+		"AND wo_number IS NOT NULL " +
+		"ORDER BY updated_timestamp DESC"
+
+	_local wo_num << _unset
+
+	_try _with cond
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) <<
+				rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			_if _not is_connect?
+			_then
+				write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for wo_number lookup")
+				_return code
+			_endif
+		_endif
+
+		_local recs << .db_connection.sql_select(sql,
+			infra_type.default("").write_string.uppercase,
+			code.uppercase)
+		_local rec << recs.get()
+		_if rec _isnt _unset
+		_then
+			wo_num << rec.wo_number
+		_endif
+		recs.close()
+
+		_try
+			.db_connection.commit()
+		_when error
+			.db_connection.rollback()
+		_endtry
+		extdb_java_acp.close_all()
+		.db_connection << _unset
+
+	_when error
+		write("ERROR in lookup_wo_number(): ", cond.report_contents_string)
+		_try
+			_if .db_connection _isnt _unset
+			_then
+				.db_connection.rollback()
+				extdb_java_acp.close_all()
+				.db_connection << _unset
+			_endif
+		_when error
+		_endtry
+		_return code
+	_endtry
+
+	_if wo_num _is _unset _orif wo_num.write_string.trim_spaces() = ""
+	_then
+		write("  No wo_number in fact_wo_drm_smallworld for ",
+		      infra_type.default(""), " / ", code,
+		      " - using infra_code as project name")
+		_return code
+	_endif
+
+	_local resolved << wo_num.write_string.trim_spaces()
+	write("  Project name (wo_number) for ", infra_type.default(""), " / ",
+	      code, " -> ", resolved)
+	_return resolved
 _endmethod
 $
 
