@@ -33,6 +33,7 @@ def_slotted_exemplar(:rwi_stela_integration_dialog,
 		{ :swl2,          _unset },
 		{ :swl3,          _unset },
 		{ :a_hp,          _unset },
+		{ :pending_auto_upload?, _unset },
 
 		{:engine, _unset}
 	},{:model})
@@ -82,8 +83,9 @@ _method rwi_stela_integration_dialog.init(owner, framework)
 	.records << rope.new()
 	.a_uub << _unset 
 	.a_sc << _unset
-	.a_hp << _unset 
+	.a_hp << _unset
 	.engine << ""
+	.pending_auto_upload? << _false
 
 	# Add dependent dialog to plugin
 	_self.add_dependent(.owner)
@@ -110,21 +112,33 @@ _method rwi_stela_integration_dialog.activate_in( parent )
 	menu_button_item.new( mb, "File", p )
 
 	
-	top_outer << sw_container.new( parent, _unset, 1,
+	# top_outer stacks 4 rows: first_con (toolbar), second_con (tables),
+	# third_con (upload toolbar), status_bar. row_resize_values only takes
+	# effect on a fixed-size grid, so n_rows must be declared explicitly (4)
+	# instead of _unset — same as rwwi_nisa_dialog/rwwi_astri_workorder_dialog,
+	# which both pass an explicit row count alongside row_resize_values. Only
+	# the tables row (index 1) should stretch when the dialog is resized; the
+	# toolbars and status bar stay fixed-height.
+	top_outer << sw_container.new( parent, 4, 1,
 				       :outer_spacing, 5,
 				       :row_spacing, 5,
-				       :row_resize_values, {0,1},
+				       :row_resize_values, {0,1,0,0},
 				       :width, 1400,
-				       :height, 400 )
+				       :height, 440 )
 
 	first_con << sw_border_container.new( top_outer, _unset, 1,
 					      :label, "",
 					      :row_resize_values,{0,1})
 	_self.build_toolbar( first_con )
-	second_con << sw_border_container.new( top_outer, _unset, 2,
+	# :col_resize_values makes the two table columns stretch to fill second_con
+	# instead of shrinking to their minimum width and leaving empty space after
+	# each table. Dropped the old :width,600 cap so this row fills the dialog
+	# the same as first_con/third_con. Do NOT set :row_resize_values here —
+	# with only one row it fights the tables' own :min_height and stops
+	# second_con growing to fill the leftover vertical space in top_outer.
+	second_con << sw_border_container.new( top_outer, 1, 2,
 					      :label, "",
-					      :width, 600,
-					      :row_resize_values,{0})
+					      :col_resize_values,{1,1})
 
 	_self.build_table_ur1( second_con )
 	_self.build_table_ur2( second_con )
@@ -135,12 +149,14 @@ _method rwi_stela_integration_dialog.activate_in( parent )
 #					      :row_resize_values,{0})
 #	_self.build_label_result2( thirt_con )
 
-	_self.build_toolbar_second( second_con )
-	
-#	four_con << sw_border_container.new( top_outer, _unset, 1,
-#					      :label, "",
-#					      :row_resize_values,{0,1})
-#	_self.build_toolbar_second( four_con )
+	# Upload toolbar needs its own full-width row — it was previously sharing
+	# second_con with the two tables, which clipped the Export/Auto-upload/
+	# Doc Type/Browse/Upload controls into an overflowing "..." toolbar.
+	third_con << sw_border_container.new( top_outer, _unset, 1,
+					      :label, "",
+					      :row_resize_values,{0,1})
+	_self.build_toolbar_second( third_con )
+
 	my_pane_map << property_list.new_with(
 			       :status_info, property_list.new_with(
 						     :width, 590, :style, :innie ))
@@ -249,6 +265,24 @@ _method rwi_stela_integration_dialog.build_toolbar_second( parent )
 		:selector, :generate_boq_excel|()|,
 		:tooltip, "Generate Bill of Quantities as Excel file")
 	.items[:boq_excel_btn].enabled? << _true
+
+	# --- Auto-upload Excel toggle ---
+	sw_label_item.new(file_toolbar, "  Auto-upload:  ")
+	.items[:auto_upload_excel] << sw_text_item.new(file_toolbar,
+		:model, _self,
+		:display_length, 5,
+		:editable?, _false)
+	.items[:auto_upload_excel].text_items << {"Off", "On"}
+	.items[:auto_upload_excel].value << "Off"
+
+	# --- Document type selector (defaults to selected summary row, overridable) ---
+	sw_label_item.new(file_toolbar, "  Doc Type:  ")
+	.items[:upload_doc_type] << sw_text_item.new(file_toolbar,
+		:model, _self,
+		:display_length, 10,
+		:editable?, _false)
+	.items[:upload_doc_type].text_items << {"Cluster", "FAT", "Homepass"}
+	.items[:upload_doc_type].value << "Homepass"
 
 	# --- Browse Excel + path field ---
 	sw_label_item.new(file_toolbar, "  ")
@@ -1141,7 +1175,7 @@ _method rwi_stela_integration_dialog.refresh()
 
 		_self.changed(:table_ur1, :refresh)
 		_self.changed(:table_ur2, :refresh)
-		.records.empty()		
+		.records.empty()
 _endmethod
 $
 
@@ -1537,6 +1571,16 @@ _method rwi_stela_integration_dialog.table_selected_ur1( selection )
 
 	.current_selection_ur1 << sel.selected_rows[1]
 	write(.current_selection_ur1)
+
+	# Keep the upload Doc Type dropdown in sync with the summary row that has a
+	# matching Excel export template (rows 1/2/3 only - see generate_boq_excel()).
+	_if .items[:upload_doc_type] _isnt _unset
+	_then
+		_if .current_selection_ur1 = 1 _then .items[:upload_doc_type].value << "Cluster"  _endif
+		_if .current_selection_ur1 = 2 _then .items[:upload_doc_type].value << "FAT"      _endif
+		_if .current_selection_ur1 = 3 _then .items[:upload_doc_type].value << "Homepass" _endif
+	_endif
+
 	_self.changed(:table_ur2, :refresh)
 _endmethod
 $
@@ -2350,11 +2394,164 @@ _method rwi_stela_integration_dialog.generate_boq_excel()
 		
 	WorkBook.Release_Object ()
 	Excel_Object.Release_Object ()
-		
+
+	# Auto-upload: generate_boq_excel() leaves the workbook open/unsaved (OLE
+	# automation, no SaveAs), so we can't upload immediately - guide the user
+	# through the remaining manual save + pick-the-file step instead.
+	_if .items[:auto_upload_excel] _isnt _unset _andif .items[:auto_upload_excel].value = "On"
+	_then
+		_self.prompt_and_upload_after_export()
+	_endif
+
 _endmethod
+$
 
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.browse_excel()
+	## Open a file dialog to select a local Excel file for upload to ASTRI.
 
+	_local fd << file_dialog.new(_self, :ok_browse_excel|()|)
+	fd.filter << {"Excel files (*.xlsx)", "*.xlsx"}
 
+	_local current_path << .items[:local_excel_path].value.default("")
+	_if current_path <> ""
+	_then
+		fd.directory << current_path
+	_else
+		fd.directory << system.getenv("TEMP").default("C:\")
+	_endif
+
+	fd.activate()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.ok_browse_excel(path)
+	## Callback from file_dialog — store selected Excel path and enable Upload.
+	## If this browse was triggered by the auto-upload guided flow, chain
+	## straight into upload_excel() once a file has been picked.
+
+	.items[:local_excel_path].value << path
+	.items[:upload_excel_btn].enabled? << _true
+
+	_if .pending_auto_upload?
+	_then
+		.pending_auto_upload? << _false
+		_self.upload_excel()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.prompt_and_upload_after_export()
+	## Auto-upload is On, but generate_boq_excel() leaves the workbook open and
+	## unsaved (OLE Excel automation - no SaveAs call), unlike the workorder
+	## dialog's create_boq(), which returns an already-saved path. Guide the user
+	## through the remaining manual step instead of trying to detect Excel
+	## save/close.
+
+	.owner.show_alert("Save the Excel file in Excel, then click OK to select it for upload.")
+	.pending_auto_upload? << _true
+	_self.browse_excel()
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method rwi_stela_integration_dialog.get_current_cluster_code()
+	## Resolve the cluster code for the current design job from its project's
+	## job_title, which follows the format "infra_type-infra_code" (e.g.
+	## "cluster-KDR000292") — the last "-"-separated part is the code. This
+	## avoids scanning the design's change set at all (mit_scheme_record_change_set
+	## scans have been unreliable here — see prior revisions of this method),
+	## and works regardless of what record types the job actually contains.
+
+	_local s << swg_dsn_admin_engine.get_current_job()
+	_if s _is _unset
+	_then
+		_return _unset
+	_endif
+
+	_try _with err
+		_local job_title << s.project.job_title
+		write("get_current_cluster_code: job_title = ", job_title)
+		_if job_title _is _unset
+		_then
+			_return _unset
+		_endif
+
+		_local parts << job_title.write_string.split_by("-")
+
+		_return parts[parts.size]
+	_when error
+		write("get_current_cluster_code: could not parse job_title - ", err.report_contents_string)
+	_endtry
+
+	_return _unset
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={sw2plp,api_client})
+_method rwi_stela_integration_dialog.upload_excel()
+	## Upload the browsed Excel file (Cluster/FAT/Homepass — per the Doc Type
+	## dropdown) to the ASTRI "... Database Stella" document API.
+
+	_local path << .items[:local_excel_path].value.default("")
+	_if path = ""
+	_then
+		.owner.show_alert("Select an Excel file to upload first (Browse Excel).")
+		_return
+	_endif
+
+	_local cluster_code << _self.get_current_cluster_code()
+	_if cluster_code _is _unset _orif cluster_code = ""
+	_then
+		.owner.show_alert("Could not resolve a cluster code for the current design job.")
+		_return
+	_endif
+
+	_local doc_type << .items[:upload_doc_type].value.default("Homepass")
+
+	_local path_parts << path.split_by("\")
+	_local file_name << path_parts[path_parts.size]
+
+	write("Uploading ", doc_type, " document to ASTRI: ", path, " (cluster ", cluster_code, ")")
+
+	_try _with errCond
+		_local xml_result << astri_upload_stella_document(path, cluster_code, doc_type, file_name)
+
+		_if xml_result _is _unset _orif xml_result = ""
+		_then
+			.owner.show_alert("Upload failed: no response from server")
+			_return
+		_endif
+
+		_local xml_doc      << simple_xml.read_element_string(xml_result)
+		_local success_elem << xml_doc.element_matching_name(:success)
+		_local success      << success_elem _isnt _unset _andif
+		                       success_elem.xml_result = "true"
+
+		_if success
+		_then
+			write("Upload successful: ", doc_type, " - ", file_name)
+			.owner.show_alert(write_string(doc_type, " document uploaded successfully.", newline_char,
+				"File: ", file_name))
+		_else
+			_local err_elem << xml_doc.element_matching_name(:error)
+			_local err_msg  << _if err_elem _isnt _unset
+			                   _then >> err_elem.xml_result
+			                   _else >> "Unknown error"
+			                   _endif
+			write("Upload failed: ", err_msg)
+			.owner.show_alert(write_string("Upload failed:", newline_char, err_msg))
+		_endif
+
+	_when error
+		write("Upload error: ", errCond.report_contents_string)
+		.owner.show_alert(write_string("Upload error:", newline_char,
+			errCond.report_contents_string))
+	_endtry
+_endmethod
+$
 
 _pragma(classify_level=restricted)
 _method rwi_stela_integration_dialog.table_selected_ur2( selection )

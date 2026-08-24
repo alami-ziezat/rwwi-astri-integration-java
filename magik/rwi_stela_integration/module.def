@@ -4,4 +4,9 @@ description
 	Stela Integration
 end
 
+requires
+	base
+	rwwi_astri_integration
+end
+
 
