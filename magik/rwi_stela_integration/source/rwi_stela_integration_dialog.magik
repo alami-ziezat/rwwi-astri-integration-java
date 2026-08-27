@@ -33,7 +33,6 @@ def_slotted_exemplar(:rwi_stela_integration_dialog,
 		{ :swl2,          _unset },
 		{ :swl3,          _unset },
 		{ :a_hp,          _unset },
-		{ :pending_auto_upload?, _unset },
 
 		{:engine, _unset}
 	},{:model})
@@ -83,9 +82,8 @@ _method rwi_stela_integration_dialog.init(owner, framework)
 	.records << rope.new()
 	.a_uub << _unset 
 	.a_sc << _unset
-	.a_hp << _unset
+	.a_hp << _unset 
 	.engine << ""
-	.pending_auto_upload? << _false
 
 	# Add dependent dialog to plugin
 	_self.add_dependent(.owner)
@@ -112,33 +110,21 @@ _method rwi_stela_integration_dialog.activate_in( parent )
 	menu_button_item.new( mb, "File", p )
 
 	
-	# top_outer stacks 4 rows: first_con (toolbar), second_con (tables),
-	# third_con (upload toolbar), status_bar. row_resize_values only takes
-	# effect on a fixed-size grid, so n_rows must be declared explicitly (4)
-	# instead of _unset — same as rwwi_nisa_dialog/rwwi_astri_workorder_dialog,
-	# which both pass an explicit row count alongside row_resize_values. Only
-	# the tables row (index 1) should stretch when the dialog is resized; the
-	# toolbars and status bar stay fixed-height.
-	top_outer << sw_container.new( parent, 4, 1,
+	top_outer << sw_container.new( parent, _unset, 1,
 				       :outer_spacing, 5,
 				       :row_spacing, 5,
-				       :row_resize_values, {0,1,0,0},
+				       :row_resize_values, {0,1},
 				       :width, 1400,
-				       :height, 440 )
+				       :height, 400 )
 
 	first_con << sw_border_container.new( top_outer, _unset, 1,
 					      :label, "",
 					      :row_resize_values,{0,1})
 	_self.build_toolbar( first_con )
-	# :col_resize_values makes the two table columns stretch to fill second_con
-	# instead of shrinking to their minimum width and leaving empty space after
-	# each table. Dropped the old :width,600 cap so this row fills the dialog
-	# the same as first_con/third_con. Do NOT set :row_resize_values here —
-	# with only one row it fights the tables' own :min_height and stops
-	# second_con growing to fill the leftover vertical space in top_outer.
-	second_con << sw_border_container.new( top_outer, 1, 2,
+	second_con << sw_border_container.new( top_outer, _unset, 2,
 					      :label, "",
-					      :col_resize_values,{1,1})
+					      :width, 600,
+					      :row_resize_values,{0})
 
 	_self.build_table_ur1( second_con )
 	_self.build_table_ur2( second_con )
@@ -149,14 +135,12 @@ _method rwi_stela_integration_dialog.activate_in( parent )
 #					      :row_resize_values,{0})
 #	_self.build_label_result2( thirt_con )
 
-	# Upload toolbar needs its own full-width row — it was previously sharing
-	# second_con with the two tables, which clipped the Export/Auto-upload/
-	# Doc Type/Browse/Upload controls into an overflowing "..." toolbar.
-	third_con << sw_border_container.new( top_outer, _unset, 1,
-					      :label, "",
-					      :row_resize_values,{0,1})
-	_self.build_toolbar_second( third_con )
-
+	_self.build_toolbar_second( second_con )
+	
+#	four_con << sw_border_container.new( top_outer, _unset, 1,
+#					      :label, "",
+#					      :row_resize_values,{0,1})
+#	_self.build_toolbar_second( four_con )
 	my_pane_map << property_list.new_with(
 			       :status_info, property_list.new_with(
 						     :width, 590, :style, :innie ))
@@ -265,24 +249,6 @@ _method rwi_stela_integration_dialog.build_toolbar_second( parent )
 		:selector, :generate_boq_excel|()|,
 		:tooltip, "Generate Bill of Quantities as Excel file")
 	.items[:boq_excel_btn].enabled? << _true
-
-	# --- Auto-upload Excel toggle ---
-	sw_label_item.new(file_toolbar, "  Auto-upload:  ")
-	.items[:auto_upload_excel] << sw_text_item.new(file_toolbar,
-		:model, _self,
-		:display_length, 5,
-		:editable?, _false)
-	.items[:auto_upload_excel].text_items << {"Off", "On"}
-	.items[:auto_upload_excel].value << "Off"
-
-	# --- Document type selector (defaults to selected summary row, overridable) ---
-	sw_label_item.new(file_toolbar, "  Doc Type:  ")
-	.items[:upload_doc_type] << sw_text_item.new(file_toolbar,
-		:model, _self,
-		:display_length, 10,
-		:editable?, _false)
-	.items[:upload_doc_type].text_items << {"Cluster", "FAT", "Homepass"}
-	.items[:upload_doc_type].value << "Homepass"
 
 	# --- Browse Excel + path field ---
 	sw_label_item.new(file_toolbar, "  ")
@@ -491,43 +457,61 @@ _method rwi_stela_integration_dialog.populate_ur1( a_table )
 		row << 1
 
 		a_table.add_cell( 1, 1, {}, {:label, "Cluster" })
-		pl_pole << "1" #_self.get_data_cell()
-		a_table.add_cell( 1, 2, {}, {:label, pl_pole.size.write_string })
+		pl_cell << _self.get_data_cell()
 	
-		a_table.add_cell( 2, 1, {}, {:label, "FAT" })
+		_if pl_cell.size = 0 _then
+			jml_cell << 1
+		_else
+			jml_cell << pl_cell.size
+		_endif
+#		
+#		pl_pole << _self.get_data_fdt()
+#		
+#		dt_c << jml_cell.write_string+" Cluster  "+ pl_pole.size.write_string+"   FDT" 
+		a_table.add_cell( 1, 2, {}, {:label, jml_cell.write_string })
+
+		a_table.add_cell( 2, 1, {}, {:label, "FDT" })
+		pl_fdt << _self.get_data_fdt()
+
+		_if pl_fdt _isnt _unset  
+		_then
+			a_table.add_cell( 2, 2, {}, {:label, pl_fdt.size.write_string })
+		_endif
+	
+		a_table.add_cell( 3, 1, {}, {:label, "FAT" })
 		pl_odp << _self.get_data_odp()
-		write("pll",pl_odp)
+	
 		_if pl_odp _isnt _unset  
 		_then
-			a_table.add_cell( 2, 2, {}, {:label, pl_odp.size.write_string })
+			a_table.add_cell( 3, 2, {}, {:label, pl_odp.size.write_string })
 		_endif
 		
-		a_table.add_cell( 3, 1, {}, {:label, "Homepass" })
+		a_table.add_cell( 4, 1, {}, {:label, "Homepass" })
 		pl_otb << _self.get_data_homepass()
 		_if pl_otb _isnt _unset 
 		_then
-			a_table.add_cell( 3, 2, {}, {:label, pl_otb.size.write_string })
+			a_table.add_cell( 4, 2, {}, {:label, pl_otb.size.write_string })
 		_endif
 
-		a_table.add_cell( 4, 1, {}, {:label, "FAT Need To Check" })
+		a_table.add_cell( 5, 1, {}, {:label, "FAT Need To Check" })
 		pl_fat << _self.get_data_fat_not_valid()
 		_if pl_fat _isnt _unset 
 		_then
-			a_table.add_cell( 4, 2, {}, {:label, pl_fat.size.write_string })
+			a_table.add_cell( 5, 2, {}, {:label, pl_fat.size.write_string })
 		_endif
 
-		a_table.add_cell( 5, 1, {}, {:label, "Homepass Need To Check" })
+		a_table.add_cell( 6, 1, {}, {:label, "Homepass Need To Check" })
 		pl_hp << _self.get_data_homepass_not_valid()
 		_if pl_hp _isnt _unset 
 		_then
-			a_table.add_cell( 5, 2, {}, {:label, pl_hp.size.write_string })
+			a_table.add_cell( 6, 2, {}, {:label, pl_hp.size.write_string })
 		_endif
 
-		a_table.add_cell( 6, 1, {}, {:label, "Boundary FAT Need To Check" })
+		a_table.add_cell( 7, 1, {}, {:label, "Boundary FAT Need To Check" })
 		pl_hp << _self.get_data_boundary_fat_not_valid()
 		_if pl_hp _isnt _unset 
 		_then
-			a_table.add_cell( 6, 2, {}, {:label, pl_hp.size.write_string })
+			a_table.add_cell( 7, 2, {}, {:label, pl_hp.size.write_string })
 		_endif
 				
 _endmethod
@@ -771,7 +755,7 @@ _method rwi_stela_integration_dialog.get_data_micro_cell(dp)
 	mm << app.plugin(:map_plugin)
 		
 
-	write(dp)
+	write(dp.id)
 	geo << dp.location.coord
 	a_point << pseudo_point.new( geo )
 	a_point.world << v.world
@@ -785,7 +769,7 @@ _method rwi_stela_integration_dialog.get_data_micro_cell(dp)
 		s_predicate << predicate.interacts(:location, p_area)
 		s_predicate_fat << predicate.eq(:sheath_splice_object_type, "FAT")
 		sc_pol << sc_col.Select(s_predicate _and s_predicate_fat)
-		write("jumlah fat : ",sc_pol.size)
+	#	write("jumlah fat : ",sc_pol.size)
 		_if sc_pol.size > 0
 		_then
 			fat << sc_pol.an_element()
@@ -878,6 +862,7 @@ _endmethod
 $
 
 
+
 _pragma(classify_level=restricted)
 _method rwi_stela_integration_dialog.get_fat_cell(cell)
 
@@ -963,7 +948,7 @@ _method rwi_stela_integration_dialog.get_fat_cell(cell)
 
 	_endloop
 
-	write(p.size)
+
 	_if p.size > 0 
 	_then
 		_for pp _over p.fast_elements()
@@ -975,11 +960,11 @@ _method rwi_stela_integration_dialog.get_fat_cell(cell)
 			
 			a_buffe << pa.buffer(1000)
 			a_buffe.world << !current_world!
-			write("sc id:", pp.id,"vs  :",cell.id)
+		
 			pred << predicate.interacts(:location , {a_buffe})
 			pred_nm << predicate.eq(:id , cell.id)
 			g << pol_col.select(pred _and pred_nm)
-			write("ggggg :", g.size)
+		
 			_if g.size > 0
 			_then
 				j << pp
@@ -1172,10 +1157,10 @@ $
 
 
 _method rwi_stela_integration_dialog.refresh()
-
+	
 		_self.changed(:table_ur1, :refresh)
 		_self.changed(:table_ur2, :refresh)
-		.records.empty()
+		.records.empty()		
 _endmethod
 $
 
@@ -1254,7 +1239,176 @@ _method rwi_stela_integration_dialog.get_data_homepass()
 _endmethod
 $
 
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_homepass_fat_comment(fat)
 
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!demand_point]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+
+
+	p << rope.new()
+	write(fat)
+	_for i _over change_set.fast_elements()
+	_loop
+	#	write("start")
+		_try _with err
+		
+		ob << i.current_record
+
+		ex_name <<   ob.source_collection.name.write_string
+		
+		
+		_if ex_name ="Conduit Route Face" _then
+			_continue
+		_endif
+		
+		_if ex_name ="ftth!demand_point"  _then
+			nt << ob.notes
+			_if nt _is _unset _orif nt = ""
+			_then
+				_continue
+			_else
+				a_nt << nt.split_by("|")
+			#	write(a_nt.size)
+				_if a_nt.size > 0 _then
+					d_nt << a_nt[1].write_string+"."+a_nt[a_nt.size].write_string
+				#	write(d_nt,"  :  ",fat)
+					_if d_nt = fat _then
+						write(ob.name)
+						p.add(ob)
+						count +<< 1
+					_endif
+				_endif
+				
+			_endif 
+		_endif
+		
+		_when error
+			_continue
+		_endtry
+
+	_endloop
+	
+	>> p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.get_data_homepass_fat_cell(fat)
+
+	#c_ur1 << ur1.conduits
+	#cbl_ur1 << ur1.cables
+
+	v << gis_program_manager.databases[:gis]
+	vc << v.collections
+	c_ur1 << vc[:ftth!demand_point]
+	count << 0
+
+	app << smallworld_product.pni_application() 
+	mm << app.plugin(:map_plugin)
+		
+	s << swg_dsn_admin_engine.get_current_job()
+
+	_if s _is _unset
+	_then
+		write("No Design")
+		_leave 
+	_endif
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	#pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+		
+	dm << gis_program_manager.databases[:design_admin]
+	val << s.inf_project.write_string
+	c << dm.collections[:swg_dsn_project].select(predicate.eq(:name,val))
+	cur_rec << c.an_element()
+	project_id << cur_rec.id.write_string 
+	nama << cur_rec.name.write_string
+	owner << s.owner.write_string
+	#write(project_id,nama)
+	p << rope.new()
+	
+	_for i _over change_set.fast_elements()
+	_loop
+
+		_try _with err
+		
+		ob << i.current_record
+
+		ex_name <<   ob.source_collection.name.write_string
+		
+	#	write(ex_name)
+		_if ex_name ="Conduit Route Face" _then
+			_continue
+		_endif
+		
+		_if ex_name ="ftth!demand_point"  _then
+
+			a_rec << i.current_record
+
+			(d_cell, d_fat) << _self.get_data_micro_cell(a_rec)
+
+			_if d_fat _isnt _unset _then
+
+				fnm << d_fat.name
+				_if fnm = fat _then
+					p.add(ob)
+					count +<< 1
+				_endif
+				
+			_endif 
+
+
+		_endif
+		
+		_when error
+			_continue
+		_endtry
+
+	_endloop
+	
+	>> p
+
+_endmethod
+$
 
 
 _pragma(classify_level=restricted)
@@ -1490,9 +1644,9 @@ _method rwi_stela_integration_dialog.get_data_boundary_fat_not_valid()
 			_endif
 		
 			_if ex_name ="ftth!zone"  _then
-				write(ob.type)
+			
 				_if  ob.type ="Micro Cell" _then 
-					write("opk")
+				
 					geo << ob.location  #.sectors
 					#a_point << pseudo_area.new( geo )
 					#a_point.world << v.world
@@ -1500,7 +1654,7 @@ _method rwi_stela_integration_dialog.get_data_boundary_fat_not_valid()
 					p_predicate << predicate.interacts(:location, (geo)) #{a_point} )
 					p_predicate_type << predicate.eq(:sheath_splice_object_type, "FAT")
 					s_pol << sc_col.select( p_predicate _and p_predicate_type )
-					write(s_pol.size)
+				
 					_if s_pol.size = 0 _then
 						p.add(ob)
 					_elif s_pol.size >1 
@@ -1548,22 +1702,27 @@ _method rwi_stela_integration_dialog.table_selected_ur1( selection )
 		.table_list2.empty()
 		.table_list2 << _self.get_data_cell()
 	_elif sel.selected_rows[1] = 2 _then
+	#	write("Cluster")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_fdt()	
+		
+	_elif sel.selected_rows[1] = 3 _then
 	#	write("FAT")
 		.table_list2.empty()
 		.table_list2 << _self.get_data_odp()
-	_elif sel.selected_rows[1] = 3 _then
-	#	write("Homepass")
-		.table_list2.empty()
-		.table_list2 << _self.get_data_homepass()
 	_elif sel.selected_rows[1] = 4 _then
 	#	write("Homepass")
 		.table_list2.empty()
-		.table_list2 << _self.get_data_fat_not_valid()
+		.table_list2 << _self.get_data_homepass()
 	_elif sel.selected_rows[1] = 5 _then
 	#	write("Homepass")
 		.table_list2.empty()
-		.table_list2 << _self.get_data_homepass_not_valid()
+		.table_list2 << _self.get_data_fat_not_valid()
 	_elif sel.selected_rows[1] = 6 _then
+	#	write("Homepass")
+		.table_list2.empty()
+		.table_list2 << _self.get_data_homepass_not_valid()
+	_elif sel.selected_rows[1] = 7 _then
 	#	write("Homepass")
 		.table_list2.empty()
 		.table_list2 << _self.get_data_boundary_fat_not_valid()
@@ -1571,16 +1730,6 @@ _method rwi_stela_integration_dialog.table_selected_ur1( selection )
 
 	.current_selection_ur1 << sel.selected_rows[1]
 	write(.current_selection_ur1)
-
-	# Keep the upload Doc Type dropdown in sync with the summary row that has a
-	# matching Excel export template (rows 1/2/3 only - see generate_boq_excel()).
-	_if .items[:upload_doc_type] _isnt _unset
-	_then
-		_if .current_selection_ur1 = 1 _then .items[:upload_doc_type].value << "Cluster"  _endif
-		_if .current_selection_ur1 = 2 _then .items[:upload_doc_type].value << "FAT"      _endif
-		_if .current_selection_ur1 = 3 _then .items[:upload_doc_type].value << "Homepass" _endif
-	_endif
-
 	_self.changed(:table_ur2, :refresh)
 _endmethod
 $
@@ -1656,10 +1805,121 @@ _method rwi_stela_integration_dialog.cek_ae()
 _endmethod
 $
 
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.seq_fdt()
+	# Create a sequence
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	t << rope.new()
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			_if i.current_record.sheath_splice_object_type="FDT"
+			_then
+				_if i.current_record.construction_status="In Service"
+				_then
+					_continue
+				_else
+
+					t.add(i.current_record.name)
+
+				_endif
+
+			_endif
+			#table_list.add(i.current_record)
+		_endif
+		
+	_endloop
+
+	#my_seq << equality_set.new_from(t) #{"FDT 1 003", "FDT 1 001", "FDT 1 002"})
+	my_seq << sorted_collection.new_from(t)
+	# Iterate through the sequence
+#	_for i _over my_seq.fast_elements()
+#	_loop
+#		write(i)
+#	_endloop
+
+	>> my_seq
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method rwi_stela_integration_dialog.seq_fat(fdt)
+	# Create a sequence
+	table_list << rope.new()
+	
+	s << swg_dsn_admin_engine.get_current_job()
+	
+	_if s _is _unset
+	_then
+			write("No Design Selected")
+			_leave 
+	_endif
+	
+	t << rope.new()
+	
+	id << s.id.write_string 
+	nama << s.name.write_string
+	owner << s.owner.write_string
+	pj << s.inf_project.write_string
+	st << s.status.write_string	
+	change_set << mit_scheme_record_change_set.new(s)
+	
+	_for i _over change_set.fast_elements()
+	_loop
+		
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			_if i.current_record.sheath_splice_object_type="FAT" 
+			_then
+				_if i.current_record.construction_status="In Service"
+				_then
+					_continue
+				_else
+					_if i.current_record.ring_name = fdt
+					_then 
+						t.add(i.current_record.name)
+					_endif
+				_endif
+			_endif
+			#table_list.add(i.current_record)
+		_endif
+	_endloop
+	
+	my_seq << sorted_collection.new_from(t)
+	# Iterate through the sequence
+#	_for i _over my_seq.fast_elements()
+#	_loop
+#		write(i)
+#	_endloop
+
+	>> my_seq
+_endmethod
+$
+
+
 _global datalake_stella_by_cluster_code <<
 _proc(cluster_code)
 
-	write("  Input cluster_code: ", cluster_code)
+
 
 	_local db_conn << _unset
 	_local result   << 0
@@ -1673,8 +1933,7 @@ _proc(cluster_code)
 			
 			_if _not is_connect?
 			_then
-				write("  ERROR: Failed to connect to POSTGRESQL_ASTRI_DB")
-				#result << "{\"success\":false,\"error\":\"Failed to connect to PostgreSQL\"}"
+			
 				_return
 			_endif
 			write("  Connected to POSTGRESQL_ASTRI_DB")
@@ -1686,7 +1945,7 @@ _proc(cluster_code)
 			_local recs << db_conn.sql_select(sql_query, cluster_code)
 			_local rec  << recs.get()
 			recs.close()
-			write("ssd")
+		
 #			# Clean transaction state after SELECT
 #			_try
 #				db_conn.commit()
@@ -1694,14 +1953,14 @@ _proc(cluster_code)
 #				db_conn.rollback()
 #			_endtry
 
-			write("sd  :  ",rec)
+		
 			_if rec _is _unset
 			_then
 				write("  ERROR: No record found for cluster_code_astri = ", cluster_code)
 				#result << "{\"success\":false,\"error\":\"Cluster not found: " + cluster_code + "\"}"
 				_return result
 			_else
-				write(rec)
+			
 				_local olt_code << rec.olt_code
 				_if olt_code _is _unset 
 				_then
@@ -1713,7 +1972,7 @@ _proc(cluster_code)
 				result << j
 			_endif
 
-write("result  :",result)
+
 		_when error
 			write("  ERROR: ", errCon.report_contents_string)
 			#result << "{\"success\":false,\"error\":\"" + errCon.report_contents_string + "\"}"
@@ -1738,8 +1997,11 @@ write("result  :",result)
 _endproc
 $
 
+
+
+
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.generate_boq_excel()
+_method rwi_stela_integration_dialog.generate_boq_excel_b4()
 
 	s << swg_dsn_admin_engine.get_current_job()
 	nama << s.name.write_string
@@ -1751,6 +2013,11 @@ _method rwi_stela_integration_dialog.generate_boq_excel()
 	geo << area.bounds.centre
 	change_set << mit_scheme_record_change_set.new(s)
 
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	vc << v.collections
+	pol_col << vc[:pol_boundary]
 
 	ug << _self.cek_ug()
 	ae << _self.cek_ae()
@@ -1782,129 +2049,191 @@ _method rwi_stela_integration_dialog.generate_boq_excel()
 			sf_code << i.current_record.subfeeder_code
 			cl_code << i.current_record.cluster_code
 			olt_code << ""
-			write("b4 : ",cl_code)
+		
 			olt_code << datalake_stella_by_cluster_code(cl_code)
-			write("gfd  :",olt_code)
+		
 			_if olt_code = "" _orif olt_code _is _unset 
 			_then
 				olt_code << i.current_record.olt_code
 			_endif
 
-			write("next")
+		
 			_leave
 		_endif
 		
 	_endloop
 
-
-
-	_if .current_selection_ur1 = 1
+	y_prj << s.project
+	jb << y_prj.job_title
+	j << jb.split_by("-")
+	#	write(j.size)
+	_if j.size > 1 
 	_then
-
-
-		a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\cluster-template (4).xlsx"
-		#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
-		sht << "Template"
-		
-		Excel_Object << OLE_Client.Create_Object("Excel.Application")
-		Excel_Object.Visible << _True
-		write(a_filename,"  :  ",sht)
-		Workbooks << Excel_Object.Workbooks ()
-		WorkBook << Workbooks.add(a_filename)
-		
-		Sheet << Excel_Object.Sheets (sht)
-		#Sheet1 << Excel_Object.Sheets ("Sheet1")
-		
-		
-		a_ff << float_format.new_with_properties(
-				:float_format,:fixed,
-				:float_decimal_places,3)
-		
-		start << date_time_now()
-		
-		v << gis_program_manager.databases[:gis]
-		a_view << gis_program_manager.ace_view
-		#mapman << .grs.plugin(:maps)
-		vc << v.collections
-		pol_col << vc[:pol_boundary]
-		!current_dsview! << v
-		
-		_dynamic !print_float_precision! << 12
-		
-		_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-		_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-		
-		
-		count      << 2
-		dtn        << date_time_now()
-		
-		
-		cs1 <<  v.world.coordinate_system 
-		cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-		t << transform.new_converting_cs_to_cs(cs1,cs2)
-
-		w_conv << t.convert(geo)
-		latitud << w_conv.y.write_string
-		longitud << w_conv.x.write_string
 	
-		
-		#	a_table.add_cell( row, 1, {}, {:label, nama })
-		#	a_table.add_cell( row, 2, {}, {:label, latitud })
-		#	a_table.add_cell( row, 3, {}, {:label, longitud })
+		j_tp << j[1]
+		j_cd << j[2].write_string
 
-		e_fdt << _self.get_data_fdt()
-		_if e_fdt.size > 0
+		_if fd_code = "" _orif fd_code _is _unset
 		_then
-			a_fdt << e_fdt.an_element()
-			nm_fdt << a_fdt.name
-			nm_olt <<a_fdt.olt_code
-		_else
-			nm_fdt << ""
-			nm_olt << ""
+			fd_code << j_cd
 		_endif
 
+		_if sf_code = "" _orif sf_code _is _unset
+		_then
+			sf_code << j_cd
+		_endif
 		
+		_if cl_code = "" _orif cl_code _is _unset
+		_then
+			cl_code << j_cd
+		_endif
+		
+	_endif
+
+	grs << smallworld_product.pni_application() 
+	grs.show_message("Pastikan semua aplikasi Excel lainnya sudah ditutup!")
+	system.do_command("taskkill /IM excel.exe /f")
+	system.do_command("taskkill /IM et.exe /f") 
+
+
+	_if s _is _unset
+	_then
+		write("No Design Selected")
+		_leave 
+	_endif
+
+	h_path << system.getenv("pni")
+	a_filename << h_path + "\pni_custom\modules\rwi_stela_integration\resources\template HPDB astri.xlsx"
+
+
+
+#	_if .current_selection_ur1 = 1
+#	_then
+#	h_path << system.getenv("pni")
+#		a_filename << h_path + "\pni_custom\modules\rwi_stela_integration\resources\template HPDB astri.xlsx"
+
+	#	a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\cluster-template (4).xlsx"
+	#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+	sht << "CLUSTER" #"Template"
 	
-		a_point << pseudo_point.new( geo )
-		a_point.world << v.world
-		p_predicate << predicate.interacts(:boundary, {a_point} )
-		p_predicate_town << predicate.eq(:type, "Town")
-		s_pol << pol_col.select( p_predicate _and p_predicate_town )
-		
-		_if s_pol.size > 0 _then
-			a_pol << s_pol.an_element()	
-			propinsi << a_pol.provinsi
-			kabupaten << a_pol.kabupaten
-			kecamatan << a_pol.kecamatan
-			desa << a_pol.desa	
-		_endif
-		
-		Cell_a << Sheet.Range ("A"+count.write_string)
-		Cell_b << Sheet.Range ("B"+count.write_string)
-		Cell_c << Sheet.Range ("C"+count.write_string)
-		Cell_f << Sheet.Range ("F"+count.write_string)
-		Cell_g << Sheet.Range ("G"+count.write_string)
-		Cell_i << Sheet.Range ("I"+count.write_string)
-		Cell_m << Sheet.Range ("M"+count.write_string)
-		Cell_n << Sheet.Range ("N"+count.write_string)
-		Cell_s << Sheet.Range ("S"+count.write_string)
-		Cell_t << Sheet.Range ("T"+count.write_string)
-		Cell_q << Sheet.Range ("Q"+count.write_string)
-		Cell_u << Sheet.Range ("U"+count.write_string)
+	Excel_Object << OLE_Client.Create_Object("Excel.Application")
+	Excel_Object.Visible << _True
+	
+	Workbooks << Excel_Object.Workbooks ()
+	WorkBook << Workbooks.add(a_filename)
+	
+	Sheet << Excel_Object.Sheets (sht)
+	#Sheet1 << Excel_Object.Sheets ("Sheet1")
+	
+	
+	a_ff << float_format.new_with_properties(
+			:float_format,:fixed,
+			:float_decimal_places,3)
+	
+	start << date_time_now()
+	
+#	v << gis_program_manager.databases[:gis]
+#	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	#	vc << v.collections
+	#	pol_col << vc[:pol_boundary]
+	!current_dsview! << v
+	
+	_dynamic !print_float_precision! << 12
+	
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+	
+	
+	count      << 2
+	dtn        << date_time_now()
+	
+	
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+	
+	w_conv << t.convert(geo)
+	latitud << w_conv.y.write_string
+	longitud << w_conv.x.write_string
+	
+	
+	#	a_table.add_cell( row, 1, {}, {:label, nama })
+	#	a_table.add_cell( row, 2, {}, {:label, latitud })
+	#	a_table.add_cell( row, 3, {}, {:label, longitud })
+	
+	e_fdt << _self.get_data_fdt()
+	_if e_fdt.size > 0
+	_then
+		a_fdt << e_fdt.an_element()
+		nm_fdt << a_fdt.name
+		nm_olt <<a_fdt.olt_code
+	_else
+		nm_fdt << ""
+		nm_olt << ""
+	_endif
+	
+	
 
+	a_point << pseudo_point.new( geo )
+	a_point.world << v.world
+	p_predicate << predicate.interacts(:boundary, {a_point} )
+	p_predicate_town << predicate.eq(:type, "Town")
+	s_pol << pol_col.select( p_predicate _and p_predicate_town )
+	
+	_if s_pol.size > 0 _then
+		a_pol << s_pol.an_element()	
+		propinsi << a_pol.provinsi
+		kabupaten << a_pol.kabupaten
+		kecamatan << a_pol.kecamatan
+		desa << a_pol.desa	
+	_endif
 
-		cell_a.value << nama.write_string
+	e_fdt << _self.seq_fdt()
+	write("count fdt :",e_fdt.size)
+	count_fdt << 1
+	c_fdt << 0
+	_for fd _over e_fdt.fast_elements()
+	_loop 
+		write(fd)
+		count_fdt +<< 1
+		c_fdt +<< 1
+		Cell_a << Sheet.Range ("A"+count_fdt.write_string)
+		Cell_b << Sheet.Range ("B"+count_fdt.write_string)
+		Cell_c << Sheet.Range ("C"+count_fdt.write_string)
+		Cell_d << Sheet.Range ("D"+count_fdt.write_string)
+		Cell_f << Sheet.Range ("F"+count_fdt.write_string)
+		Cell_g << Sheet.Range ("G"+count_fdt.write_string)
+		Cell_i << Sheet.Range ("I"+count_fdt.write_string)
+		Cell_m << Sheet.Range ("M"+count_fdt.write_string)
+		Cell_n << Sheet.Range ("N"+count_fdt.write_string)
+		Cell_s << Sheet.Range ("S"+count_fdt.write_string)
+		Cell_t << Sheet.Range ("T"+count_fdt.write_string)
+		Cell_q << Sheet.Range ("Q"+count_fdt.write_string)
+		Cell_u << Sheet.Range ("U"+count_fdt.write_string)
+		
+		cl_nm << nama+" - FDT "+c_fdt.write_string
+		cell_a.value << cl_nm.write_string
 		cell_a.entirecolumn.autofit
-		cell_b.value << nm_fdt.write_string
+		
+		cell_b.value << fd.write_string
 		cell_b.entirecolumn.autofit
-		cell_c.value << nama.write_string
+		
+		cell_c.value << cl_nm.write_string
 		cell_c.entirecolumn.autofit
+
+		cell_d.value << propinsi.write_string
+		cell_d.entirecolumn.autofit
+		
 		cell_f.value << kabupaten.write_string
 		cell_f.entirecolumn.autofit
+		
 		cell_g.value << propinsi.write_string
 		cell_g.entirecolumn.autofit
+		
 		cell_i.value << propinsi.write_string
 		cell_i.entirecolumn.autofit
+		
 		cell_m.value << desa.write_string
 		cell_m.entirecolumn.autofit
 		cell_n.value << nm_olt.write_string
@@ -1918,233 +2247,280 @@ _method rwi_stela_integration_dialog.generate_boq_excel()
 		cell_u.value << nm_cls.write_string
 		cell_u.entirecolumn.autofit
 		
-
-
-
-		
-	_elif .current_selection_ur1 = 2
-	_then
-		a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\fat-template (9).xlsx"
-		#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
-		sht << "Sheet1"
-		
-		
-		Excel_Object << OLE_Client.Create_Object("Excel.Application")
-		Excel_Object.Visible << _True
-		write(a_filename,"  :  ",sht)
-		Workbooks << Excel_Object.Workbooks ()
-		WorkBook << Workbooks.add(a_filename)
-		
-		Sheet << Excel_Object.Sheets (sht)
-		#Sheet1 << Excel_Object.Sheets ("Sheet1")
-		
-		
-		a_ff << float_format.new_with_properties(
-				:float_format,:fixed,
-				:float_decimal_places,3)
-		
-		start << date_time_now()
-		
-		v << gis_program_manager.databases[:gis]
-		a_view << gis_program_manager.ace_view
-		#mapman << .grs.plugin(:maps)
-		vc << v.collections
-		!current_dsview! << v
-		
-		_dynamic !print_float_precision! << 12
-		
-		_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-		_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-		
-		
-		count      << 1
-		dtn        << date_time_now()
-		
-		
-		cs1 <<  v.world.coordinate_system 
-		cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-		t << transform.new_converting_cs_to_cs(cs1,cs2)
-		
-		_for a_rec  _over .table_list2.fast_elements()
-		_loop
-			#	write(a_rec.external_name)
-			_if a_rec.external_name = "Sheath Splice"
-			_then
-				#count +<< 1
-				_if a_rec.location _isnt _unset _then
-					#	write("here")
-					count +<< 1
-					h << a_rec.location.coord
-					w_conv << t.convert(h)
-					
-					latitud << w_conv.y
-					longitud << w_conv.x
-					
-					Cell_a << Sheet.Range ("A"+count.write_string)
-					Cell_b << Sheet.Range ("B"+count.write_string)
-					Cell_c << Sheet.Range ("C"+count.write_string)
-					Cell_d << Sheet.Range ("D"+count.write_string)
-					Cell_e << Sheet.Range ("E"+count.write_string)
-					Cell_f << Sheet.Range ("F"+count.write_string)
-					Cell_g << Sheet.Range ("G"+count.write_string)
-					
-					
-					cell_a.value << a_rec.name.write_string
-					cell_a.entirecolumn.autofit
-					cell_b.value << a_rec.cluster.write_string
-					cell_b.entirecolumn.autofit
-					cell_c.value << a_rec.name.write_string
-					cell_c.entirecolumn.autofit
-					cell_d.value << a_rec.ring_name.write_string
-					cell_d.entirecolumn.autofit
-					cell_e.value << "16"#a_rec.ring_name.write_string
-					cell_e.entirecolumn.autofit
-					cell_f.value << latitud # a_ff.format(latitud).write_string
-					cell_f.entirecolumn.autofit
-					cell_f.numberformat << "general"
-					cell_g.value << longitud #a_ff.format(longitud).write_string
-					cell_g.entirecolumn.autofit
-					cell_g.numberformat << "general"
-					
-					
-				_else 
-					write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
-				_endif
-				
-			_endif
-			_if count > 40
-			_then
-				_leave
-			_endif
-		_endloop
-
-	_elif .current_selection_ur1 = 3
-	_then
+	_endloop
+	
 
 	
-		a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\homepass-template (5).xlsx"
-		#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
-		sht << "Sheet1"
-		
-		
-		Excel_Object << OLE_Client.Create_Object("Excel.Application")
-		Excel_Object.Visible << _True
-		write(a_filename,"  :  ",sht)
-		Workbooks << Excel_Object.Workbooks ()
-		WorkBook << Workbooks.add(a_filename)
-		
-		
-		Sheet << Excel_Object.Sheets (sht)
-		#Sheet1 << Excel_Object.Sheets ("Sheet1")
-		
-		
-		a_ff << float_format.new_with_properties(
-				:float_format,:fixed,
-				:float_decimal_places,3)
-		
-		start << date_time_now()
-		
-		v << gis_program_manager.databases[:gis]
-		a_view << gis_program_manager.ace_view
-		#mapman << .grs.plugin(:maps)
-		vc << v.collections
-		pol_col << vc[:pol_boundary]
-		!current_dsview! << v
-		
-		_dynamic !print_float_precision! << 12
-		
-		_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
-		_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
-		
-		
-		count      << 1
-		dtn        << date_time_now()
-		
-		
-		cs1 <<  v.world.coordinate_system 
-		cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
-		t << transform.new_converting_cs_to_cs(cs1,cs2)
-		
-		_for a_rec  _over .table_list2.fast_elements()
-		_loop
-			#	write(a_rec.external_name)
-			_if a_rec.external_name = "Demand point"
+	#		
+	#	_elif .current_selection_ur1 = 2
+	#	_then
+	#		h_path << system.getenv("pni")
+	#		a_filename << h_path + "\pni_custom\modules\rwi_stela_integration\resources\fat-template (9).xlsx"
+	#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+	#	sht << "FAT"
+	
+#	write("FAT")
+	#Excel_Object << OLE_Client.Create_Object("Excel.Application")
+	#Excel_Object.Visible << _True
+	#write(a_filename,"  :  ",sht)
+	#Workbooks << Excel_Object.Workbooks ()
+	#WorkBook << Workbooks.add(a_filename)
+	
+	#Sheet << Excel_Object.Sheets (sht)
+	Sheet1 << Excel_Object.Sheets ("FAT")
+	
+	
+	a_ff << float_format.new_with_properties(
+			:float_format,:fixed,
+			:float_decimal_places,3)
+	
+	start << date_time_now()
+	
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	vc << v.collections
+	!current_dsview! << v
+	
+
+	count      << 1
+	dtn        << date_time_now()
+	
+	
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+	
+	#_for a_rec  _over .table_list2.fast_elements()
+	#_loop
+	_for i _over change_set.fast_elements()
+	_loop
+			
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_splice _then
+			a_rec << i.current_record
+		#	write(a_rec.external_name)
+		#_if a_rec.external_name = "Sheath Splice"
+		#_then
+		#	count +<< 1
+			_if a_rec.construction_status="In Service"
 			_then
-				#count +<< 1
-				_if a_rec.location _isnt _unset _then
+				_continue
+			_endif
+			_if a_rec.location _isnt _unset _and a_rec.sheath_splice_object_type= "FAT"
+			_then
+				write("here")
+				count +<< 1
 				
-					a_point << a_rec.location
-					p_predicate << predicate.interacts(:boundary, {a_point} )
-					p_predicate_town << predicate.eq(:type, "Town")
-					s_pol << pol_col.select( p_predicate _and p_predicate_town )
+				a_point << a_rec.location
+				p_predicate << predicate.interacts(:boundary, {a_point} )
+				p_predicate_town << predicate.eq(:type, "Town")
+				s_pol << pol_col.select( p_predicate _and p_predicate_town )
+				write("fd")
+				_if s_pol.size > 0 _then
+					a_pol << s_pol.an_element()	
+					propinsi << a_pol.provinsi
+					kabupaten << a_pol.kabupaten
+					kecamatan << a_pol.kecamatan
+					desa << a_pol.desa
+					
+				_endif
+
+
+				h << a_rec.location.coord
+				w_conv << t.convert(h)
 				
-					_if s_pol.size > 0 _then
-						a_pol << s_pol.an_element()	
-						propinsi << a_pol.provinsi
-						kabupaten << a_pol.kabupaten
-						kecamatan << a_pol.kecamatan
-						desa << a_pol.desa
+				latitud << w_conv.y
+				longitud << w_conv.x
+				
+				Cell_a1 << Sheet1.Range ("A"+count.write_string)
+				Cell_b1 << Sheet1.Range ("B"+count.write_string)
+				Cell_c1 << Sheet1.Range ("C"+count.write_string)
+				Cell_d1 << Sheet1.Range ("D"+count.write_string)
+				Cell_e1 << Sheet1.Range ("E"+count.write_string)
+				Cell_f1 << Sheet1.Range ("F"+count.write_string)
+				Cell_g1 << Sheet1.Range ("G"+count.write_string)
+				
+				_if kabupaten _isnt _unset _then
+					cell_a1.value << kabupaten.uppercase.write_string
+					cell_a1.entirecolumn.autofit
+				_else
 					
-					_endif
+					cell_a1.value << a_rec.name.write_string
+					cell_a1.entirecolumn.autofit
+				_endif
+				
+				
+				cell_b1.value << a_rec.cluster.write_string
+				cell_b1.entirecolumn.autofit
+
+				f_nm << a_rec.name.split_by(".")
+				_if f_nm.size > 0 _then
+					cell_c1.value << f_nm[f_nm.size].write_string
+					cell_c1.entirecolumn.autofit
+				_else 
+					cell_c1.value << a_rec.name.write_string
+					cell_c1.entirecolumn.autofit
+				_endif
+				
+				
+				cell_d1.value << a_rec.ring_name.write_string
+				cell_d1.entirecolumn.autofit
+				cell_e1.value << "16"#a_rec.ring_name.write_string
+				cell_e1.entirecolumn.autofit
+				cell_f1.value << latitud # a_ff.format(latitud).write_string
+				cell_f1.entirecolumn.autofit
+				cell_f1.numberformat << "general"
+				cell_g1.value << longitud #a_ff.format(longitud).write_string
+				cell_g1.entirecolumn.autofit
+				cell_g1.numberformat << "general"
+				
+				
+			_else 
+				write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
+			_endif
+			
+		_endif
+#		_if count > 40
+#		_then
+#			_leave
+#		_endif
+	_endloop
+	
+	#	_elif .current_selection_ur1 = 3
+	#	_then
+	
+	#		h_path << system.getenv("pni")
+	#		a_filename << h_path + "\pni_custom\modules\rwi_stela_integration\resources\homepass-template (5).xlsx"
+	#	a_filename << "C:\SW5\PNI_FTTH536\pni_custom\modules\rwi_stela_integration\resources\homepass-template (5).xlsx"
+	#system.getenv("TEMPLATE_BOQ_CLUSTER_AEUG")
+	sht << "HOMEPASS"
+	
+	
+	#Excel_Object << OLE_Client.Create_Object("Excel.Application")
+	#Excel_Object.Visible << _True
+	#write(a_filename,"  :  ",sht)
+	#Workbooks << Excel_Object.Workbooks ()
+	#WorkBook << Workbooks.add(a_filename)
+	
+	
+	#Sheet << Excel_Object.Sheets (sht)
+	Sheet2 << Excel_Object.Sheets ("HOMEPASS")
+	
+	
+	a_ff << float_format.new_with_properties(
+			:float_format,:fixed,
+			:float_decimal_places,3)
+	
+	start << date_time_now()
+	
+#	v << gis_program_manager.databases[:gis]
+#	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	#	vc << v.collections
+	#pol_col << vc[:pol_boundary]
+	!current_dsview! << v
+	
+	#	_dynamic !print_float_precision! << 12
+	
+	#	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	#	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+	
+	
+	count      << 1
+	dtn        << date_time_now()
+	
+	
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+
+	_for i _over change_set.fast_elements()
+	_loop
+			
+		name <<   i.current_record.source_collection.name
+		_if name _is :ftth!demand_point _then
+			a_rec << i.current_record
+	#_for a_rec  _over .table_list2.fast_elements()
+	#_loop
+		#	write(a_rec.external_name)
+		#	_if a_rec.external_name = "Demand point"
+		#_then
+			#count +<< 1
+			_if a_rec.location _isnt _unset _then
+				
+				a_point << a_rec.location
+				p_predicate << predicate.interacts(:boundary, {a_point} )
+				p_predicate_town << predicate.eq(:type, "Town")
+				s_pol << pol_col.select( p_predicate _and p_predicate_town )
+				
+				_if s_pol.size > 0 _then
+					a_pol << s_pol.an_element()	
+					propinsi << a_pol.provinsi
+					kabupaten << a_pol.kabupaten
+					kecamatan << a_pol.kecamatan
+					desa << a_pol.desa
 					
-					count +<< 1
-					h << a_rec.location.coord
-					w_conv << t.convert(h)
-					
-					latitud << w_conv.y
-					longitud << w_conv.x
-
-					(d_cell, d_fat) << _self.get_data_micro_cell(a_rec)
-					write(d_cell.identification, d_fat)
-
-					Cell_a << Sheet.Range ("A"+count.write_string)
-					Cell_b << Sheet.Range ("B"+count.write_string)
-					Cell_c << Sheet.Range ("C"+count.write_string)
-					Cell_d << Sheet.Range ("D"+count.write_string)
-					Cell_e << Sheet.Range ("E"+count.write_string)
-					Cell_f << Sheet.Range ("F"+count.write_string)
-					Cell_g << Sheet.Range ("G"+count.write_string)
-					Cell_h << Sheet.Range ("H"+count.write_string)
-					Cell_i << Sheet.Range ("I"+count.write_string)
-					Cell_j << Sheet.Range ("J"+count.write_string)
-					Cell_k << Sheet.Range ("K"+count.write_string)
-					Cell_l << Sheet.Range ("L"+count.write_string)
-					Cell_m << Sheet.Range ("M"+count.write_string)
-					Cell_n << Sheet.Range ("N"+count.write_string)
-					Cell_o << Sheet.Range ("O"+count.write_string)
-					Cell_p << Sheet.Range ("P"+count.write_string)
-					Cell_q << Sheet.Range ("Q"+count.write_string)
-					Cell_r << Sheet.Range ("R"+count.write_string)
-					Cell_s << Sheet.Range ("S"+count.write_string)
-					Cell_t << Sheet.Range ("T"+count.write_string)
-					Cell_u << Sheet.Range ("U"+count.write_string)
-					Cell_v << Sheet.Range ("V"+count.write_string)
-					Cell_w << Sheet.Range ("W"+count.write_string)
-					Cell_x << Sheet.Range ("X"+count.write_string)
-					Cell_y << Sheet.Range ("Y"+count.write_string)
-					Cell_z << Sheet.Range ("Z"+count.write_string)
-					Cell_aa << Sheet.Range ("AA"+count.write_string)
-					Cell_ab << Sheet.Range ("AB"+count.write_string)
-					Cell_ac << Sheet.Range ("AC"+count.write_string)
-					Cell_ad << Sheet.Range ("AD"+count.write_string)
-					Cell_ae << Sheet.Range ("AE"+count.write_string)
-					Cell_af << Sheet.Range ("AF"+count.write_string)
-					Cell_ag << Sheet.Range ("AG"+count.write_string)
-					Cell_ah << Sheet.Range ("AH"+count.write_string)
-					Cell_ai << Sheet.Range ("AI"+count.write_string)
-					Cell_aj << Sheet.Range ("AJ"+count.write_string)
-					Cell_ak << Sheet.Range ("AK"+count.write_string)
-					Cell_al << Sheet.Range ("AL"+count.write_string)
-					Cell_am << Sheet.Range ("AM"+count.write_string)
-					Cell_an << Sheet.Range ("AN"+count.write_string)
-					Cell_ao << Sheet.Range ("AO"+count.write_string)
-					Cell_ap << Sheet.Range ("AP"+count.write_string)
-					Cell_aq << Sheet.Range ("AQ"+count.write_string)
-					Cell_ar << Sheet.Range ("AR"+count.write_string)
-					Cell_as << Sheet.Range ("AS"+count.write_string)
-					Cell_at << Sheet.Range ("AT"+count.write_string)
-					Cell_au << Sheet.Range ("AU"+count.write_string)
-
+				_endif
+				
+				count +<< 1
+				h << a_rec.location.coord
+				w_conv << t.convert(h)
+				
+				latitud << w_conv.y
+				longitud << w_conv.x
+				
+				(d_cell, d_fat) << _self.get_data_micro_cell(a_rec)
+				#write("cell : ",d_cell.identification, d_fat)
+				
+				Cell_a << Sheet2.Range ("A"+count.write_string)
+				Cell_b << Sheet2.Range ("B"+count.write_string)
+				Cell_c << Sheet2.Range ("C"+count.write_string)
+				Cell_d << Sheet2.Range ("D"+count.write_string)
+				Cell_e << Sheet2.Range ("E"+count.write_string)
+				Cell_f << Sheet2.Range ("F"+count.write_string)
+				Cell_g << Sheet2.Range ("G"+count.write_string)
+				Cell_h << Sheet2.Range ("H"+count.write_string)
+				Cell_i << Sheet2.Range ("I"+count.write_string)
+				Cell_j << Sheet2.Range ("J"+count.write_string)
+				Cell_k << Sheet2.Range ("K"+count.write_string)
+				Cell_l << Sheet2.Range ("L"+count.write_string)
+				Cell_m << Sheet2.Range ("M"+count.write_string)
+				Cell_n << Sheet2.Range ("N"+count.write_string)
+				Cell_o << Sheet2.Range ("O"+count.write_string)
+				Cell_p << Sheet2.Range ("P"+count.write_string)
+				Cell_q << Sheet2.Range ("Q"+count.write_string)
+				Cell_r << Sheet2.Range ("R"+count.write_string)
+				Cell_s << Sheet2.Range ("S"+count.write_string)
+				Cell_t << Sheet2.Range ("T"+count.write_string)
+				Cell_u << Sheet2.Range ("U"+count.write_string)
+				Cell_v << Sheet2.Range ("V"+count.write_string)
+				Cell_w << Sheet2.Range ("W"+count.write_string)
+				Cell_x << Sheet2.Range ("X"+count.write_string)
+				Cell_y << Sheet2.Range ("Y"+count.write_string)
+				Cell_z << Sheet2.Range ("Z"+count.write_string)
+				Cell_aa << Sheet2.Range ("AA"+count.write_string)
+				Cell_ab << Sheet2.Range ("AB"+count.write_string)
+				Cell_ac << Sheet2.Range ("AC"+count.write_string)
+				Cell_ad << Sheet2.Range ("AD"+count.write_string)
+				Cell_ae << Sheet2.Range ("AE"+count.write_string)
+				Cell_af << Sheet2.Range ("AF"+count.write_string)
+				Cell_ag << Sheet2.Range ("AG"+count.write_string)
+				Cell_ah << Sheet2.Range ("AH"+count.write_string)
+				Cell_ai << Sheet2.Range ("AI"+count.write_string)
+				Cell_aj << Sheet2.Range ("AJ"+count.write_string)
+				Cell_ak << Sheet2.Range ("AK"+count.write_string)
+				Cell_al << Sheet2.Range ("AL"+count.write_string)
+				Cell_am << Sheet2.Range ("AM"+count.write_string)
+				Cell_an << Sheet2.Range ("AN"+count.write_string)
+				Cell_ao << Sheet2.Range ("AO"+count.write_string)
+				Cell_ap << Sheet2.Range ("AP"+count.write_string)
+				Cell_aq << Sheet2.Range ("AQ"+count.write_string)
+				Cell_ar << Sheet2.Range ("AR"+count.write_string)
+				Cell_as << Sheet2.Range ("AS"+count.write_string)
+				Cell_at << Sheet2.Range ("AT"+count.write_string)
+				Cell_au << Sheet2.Range ("AU"+count.write_string)
+				
 				
 #					Cell_a.Borders(:xlEdgeTop).LineStyle << :xlContinuous
 #					Cell_a.Borders(:xlEdgeLeft).LineStyle << :xlContinuous
@@ -2350,208 +2726,656 @@ _method rwi_stela_integration_dialog.generate_boq_excel()
 					#Cell_i.Borders(:xlEdgeRight).Weight << :xlThick
 					
 
-					cell_g.value << "General Retail" #pj.write_string
-					cell_g.entirecolumn.autofit
-					cell_i.value << a_rec.cluster_code.write_string
-					cell_i.entirecolumn.autofit
-					cell_j.value << nama.write_string
-					cell_j.entirecolumn.autofit
-					cell_k.value << nama.write_string
-					cell_k.entirecolumn.autofit
-					cell_ac.value << olt_code.write_string
-					cell_ac.entirecolumn.autofit
-					cell_ad.value << olt_nm.write_string
-					cell_ad.entirecolumn.autofit
-					cell_ae.value << d_fat.ring_name.write_string
-					cell_ae.entirecolumn.autofit
-					cell_af.value << d_fat.name.write_string
-					cell_af.entirecolumn.autofit
-					cell_au.value << a_rec.name.write_string
-					cell_au.entirecolumn.autofit
-					cell_aj.value << a_rec.name.write_string
-					cell_aj.entirecolumn.autofit
-					cell_ah.value << latitud # a_ff.format(latitud).write_string
-					cell_ah.entirecolumn.autofit
-					cell_ah.numberformat << "general"
-					cell_ai.value << longitud #a_ff.format(longitud).write_string
-					cell_ai.entirecolumn.autofit
-					cell_ai.numberformat << "general"
-					cell_an.value << nt.write_string
-					cell_an.entirecolumn.autofit
-					
-				_else 
-					write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
-				_endif
+				cell_g.value << "General Retail" #pj.write_string
+				cell_g.entirecolumn.autofit
+				cell_i.value << a_rec.cluster_code.write_string
+				cell_i.entirecolumn.autofit
+				cell_j.value << nama.write_string
+				cell_j.entirecolumn.autofit
+				cell_k.value << nama.write_string
+				cell_k.entirecolumn.autofit
+				cell_ac.value << olt_code.write_string
+				cell_ac.entirecolumn.autofit
+				cell_ad.value << olt_nm.write_string
+				cell_ad.entirecolumn.autofit
 				
+				_if d_fat _isnt _unset _then
+					rm << d_fat.ring_name
+					_if rm _isnt _unset _then 
+						cell_ae.value << d_fat.ring_name.write_string
+						cell_ae.entirecolumn.autofit
+					_endif
+					
+					fnm << d_fat.name
+					_if fnm _isnt _unset _then 
+						cell_af.value << d_fat.name.write_string
+						cell_af.entirecolumn.autofit
+					_endif
+					
+					
+				_endif 
+				cell_au.value << a_rec.name.write_string
+				cell_au.entirecolumn.autofit
+				cell_aj.value << a_rec.name.write_string
+				cell_aj.entirecolumn.autofit
+				cell_ah.value << latitud # a_ff.format(latitud).write_string
+				cell_ah.entirecolumn.autofit
+				cell_ah.numberformat << "general"
+				cell_ai.value << longitud #a_ff.format(longitud).write_string
+				cell_ai.entirecolumn.autofit
+				cell_ai.numberformat << "general"
+				cell_an.value << nt.write_string
+				cell_an.entirecolumn.autofit
+				
+			_else 
+				write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
 			_endif
-			_if count > 40
+			
+		_endif
+			_if count > 4
 			_then
 				_leave
 			_endif
-		_endloop
+	_endloop
+	#	_endif
+	# Get user home directory
+	_local home_dir << system.getenv("USERPROFILE")  # Windows
+	_if home_dir _is _unset _orif home_dir = ""
+	_then
+		# Fallback to TEMP if USERPROFILE not available
+		home_dir << system.temp_directory_name
 	_endif
 	
+	# Create sw_kml subdirectory path
+	_local output_dir << system.pathname_from_components("sw_stella", home_dir)
+	
+	# Create directory if it doesn't exist
+	_if _not system.file_exists?(output_dir)
+	_then
+		_try
+			system.mkdir(output_dir)
+			write("Created BOQ output directory: ", output_dir)
+		_when error
+			write("WARNING: Could not create sw_kml directory, using temp instead")
+			output_dir << system.temp_directory_name
+		_endtry
+	_endif
+	
+	#ex << Excel_Object.save_file( output_dir,"test.xls")
+	#ex << Excel_Object.save_as( "test.xlsx")
+	
+	d << date_now()
+	days_number << d.day_of_month_number
+	months_number << d.month_number
+	years_number << d.year
+	
+	_if months_number.write_string.size = 1
+	_then 
+		mth << "0"+months_number.write_string
+	_endif
+	
+	_if days_number.write_string.size = 1
+	_then 
+		dys << "0"+days_number.write_string
+	_else	
+		dys << days_number
+	_endif
+	
+	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
+	fl_ex << "\HPDB astri "+cl_code+".xlsx"
+	ad << output_dir+fl_ex  #"\HPDB astri .xlsx"
+	write(ad)
+	_if system.file_exists?( ad )
+	_then
+		system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
+	_endif
+	
+	WorkBook.saveas(ad)	
 		
 	WorkBook.Release_Object ()
 	Excel_Object.Release_Object ()
-
-	# Auto-upload: generate_boq_excel() leaves the workbook open/unsaved (OLE
-	# automation, no SaveAs), so we can't upload immediately - guide the user
-	# through the remaining manual save + pick-the-file step instead.
-	_if .items[:auto_upload_excel] _isnt _unset _andif .items[:auto_upload_excel].value = "On"
-	_then
-		_self.prompt_and_upload_after_export()
-	_endif
-
+		
 _endmethod
 $
 
-_pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.browse_excel()
-	## Open a file dialog to select a local Excel file for upload to ASTRI.
-
-	_local fd << file_dialog.new(_self, :ok_browse_excel|()|)
-	fd.filter << {"Excel files (*.xlsx)", "*.xlsx"}
-
-	_local current_path << .items[:local_excel_path].value.default("")
-	_if current_path <> ""
-	_then
-		fd.directory << current_path
-	_else
-		fd.directory << system.getenv("TEMP").default("C:\")
-	_endif
-
-	fd.activate()
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.ok_browse_excel(path)
-	## Callback from file_dialog — store selected Excel path and enable Upload.
-	## If this browse was triggered by the auto-upload guided flow, chain
-	## straight into upload_excel() once a file has been picked.
-
-	.items[:local_excel_path].value << path
-	.items[:upload_excel_btn].enabled? << _true
-
-	_if .pending_auto_upload?
-	_then
-		.pending_auto_upload? << _false
-		_self.upload_excel()
-	_endif
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.prompt_and_upload_after_export()
-	## Auto-upload is On, but generate_boq_excel() leaves the workbook open and
-	## unsaved (OLE Excel automation - no SaveAs call), unlike the workorder
-	## dialog's create_boq(), which returns an already-saved path. Guide the user
-	## through the remaining manual step instead of trying to detect Excel
-	## save/close.
-
-	.owner.show_alert("Save the Excel file in Excel, then click OK to select it for upload.")
-	.pending_auto_upload? << _true
-	_self.browse_excel()
-_endmethod
-$
 
 _pragma(classify_level=restricted)
-_private _method rwi_stela_integration_dialog.get_current_cluster_code()
-	## Resolve the cluster code for the current design job from its project's
-	## job_title, which follows the format "infra_type-infra_code" (e.g.
-	## "cluster-KDR000292") — the last "-"-separated part is the code. This
-	## avoids scanning the design's change set at all (mit_scheme_record_change_set
-	## scans have been unreliable here — see prior revisions of this method),
-	## and works regardless of what record types the job actually contains.
+_method rwi_stela_integration_dialog.generate_boq_excel()
 
-	_local s << swg_dsn_admin_engine.get_current_job()
+	s << swg_dsn_admin_engine.get_current_job()
+	nama << s.name.write_string
+	y << s.project.job_title
+	yy << y.split_by("-")
+	nm_cls << yy[2]
+	pj << s.inf_project.write_string
+	_local area << s.project.project_areas.an_element().area
+	geo << area.bounds.centre
+	change_set << mit_scheme_record_change_set.new(s)
+
+	v << gis_program_manager.databases[:gis]
+	a_view << gis_program_manager.ace_view
+	#mapman << .grs.plugin(:maps)
+	vc << v.collections
+	pol_col << vc[:pol_boundary]
+	sc_col << vc[:sheath_splice]
+
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+
+	ug << _self.cek_ug()
+	ae << _self.cek_ae()
+
+	_if ug _is _true _and ae _is _false 
+	_then
+		nt << "UG"
+	_elif ae _is _true _and ug _is _false
+	_then 
+		nt << "AE"
+	_elif ae _is _true _and ug _is _true
+	_then 
+		nt << "AE & UG"	
+	_endif
+
+	olt_nm << ""
+	#clr_nm << ""
+	_for i _over change_set.fast_elements()
+	_loop
+			
+		name <<   i.current_record.source_collection.name
+		_if name _is :sheath_with_loc _then
+			olt_nm << i.current_record.olt
+			_if olt_nm _is _unset
+			_then
+				olt_nm << ""
+			_endif
+			
+			sf_code << i.current_record.subfeeder_code
+			cl_code << i.current_record.cluster_code
+			olt_code << ""
+		
+			olt_code << datalake_stella_by_cluster_code(cl_code)
+		
+			_if olt_code = "" _orif olt_code _is _unset 
+			_then
+				olt_code << i.current_record.olt_code
+			_endif
+
+		
+			_leave
+		_endif
+		
+	_endloop
+
+	y_prj << s.project
+	jb << y_prj.job_title
+	j << jb.split_by("-")
+	#	write(j.size)
+	_if j.size > 1 
+	_then
+	
+		j_tp << j[1]
+		j_cd << j[2].write_string
+
+		_if fd_code = "" _orif fd_code _is _unset
+		_then
+			fd_code << j_cd
+		_endif
+
+		_if sf_code = "" _orif sf_code _is _unset
+		_then
+			sf_code << j_cd
+		_endif
+		
+		_if cl_code = "" _orif cl_code _is _unset
+		_then
+			cl_code << j_cd
+		_endif
+		
+	_endif
+
+	grs << smallworld_product.pni_application() 
+	grs.show_message("Pastikan semua aplikasi Excel lainnya sudah ditutup!")
+	system.do_command("taskkill /IM excel.exe /f")
+	system.do_command("taskkill /IM et.exe /f") 
+
+
 	_if s _is _unset
 	_then
-		_return _unset
+		write("No Design Selected")
+		_leave 
 	_endif
 
-	_try _with err
-		_local job_title << s.project.job_title
-		write("get_current_cluster_code: job_title = ", job_title)
-		_if job_title _is _unset
-		_then
-			_return _unset
-		_endif
+	h_path << system.getenv("pni")
+	a_filename << h_path + "\pni_custom\modules\rwi_stela_integration\resources\template HPDB astri.xlsx"
 
-		_local parts << job_title.write_string.split_by("-")
 
-		_return parts[parts.size]
-	_when error
-		write("get_current_cluster_code: could not parse job_title - ", err.report_contents_string)
-	_endtry
+	sht << "CLUSTER" #"Template"
+	
+	Excel_Object << OLE_Client.Create_Object("Excel.Application")
+	Excel_Object.Visible << _True
+	
+	Workbooks << Excel_Object.Workbooks ()
+	WorkBook << Workbooks.add(a_filename)
+	
+	Sheet << Excel_Object.Sheets (sht)
+	Sheet1 << Excel_Object.Sheets ("FAT")
+	Sheet2 << Excel_Object.Sheets ("HOMEPASS")
+	
+	a_ff << float_format.new_with_properties(
+			:float_format,:fixed,
+			:float_decimal_places,3)
+	
+	start << date_time_now()
 
-	_return _unset
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.upload_excel()
-	## Upload the browsed Excel file (Cluster/FAT/Homepass — per the Doc Type
-	## dropdown) to the ASTRI "... Database Stella" document API.
-
-	_local path << .items[:local_excel_path].value.default("")
-	_if path = ""
+	!current_dsview! << v
+	
+	_dynamic !print_float_precision! << 12
+	
+	_dynamic !current_world! << v.collections[:sw_gis!world].at(0,0)
+	_dynamic !current_coordinate_system! << v.collections[:sw_gis!world].at(0,0).coordinate_system
+	
+	
+	count      << 2
+	dtn        << date_time_now()
+	
+	
+	cs1 <<  v.world.coordinate_system 
+	cs2 << a_view.collections[:sw_gis!coordinate_system].at(:world_longlat_wgs84_degree)
+	t << transform.new_converting_cs_to_cs(cs1,cs2)
+	
+	w_conv << t.convert(geo)
+	latitud << w_conv.y.write_string
+	longitud << w_conv.x.write_string
+		
+	e_fdt << _self.get_data_fdt()
+	_if e_fdt.size > 0
 	_then
-		.owner.show_alert("Select an Excel file to upload first (Browse Excel).")
-		_return
+		a_fdt << e_fdt.an_element()
+		nm_fdt << a_fdt.name
+		nm_olt <<a_fdt.olt_code
+	_else
+		nm_fdt << ""
+		nm_olt << ""
+	_endif
+		
+
+	a_point << pseudo_point.new( geo )
+	a_point.world << v.world
+	p_predicate << predicate.interacts(:boundary, {a_point} )
+	p_predicate_town << predicate.eq(:type, "Town")
+	s_pol << pol_col.select( p_predicate _and p_predicate_town )
+	
+	_if s_pol.size > 0 _then
+		a_pol << s_pol.an_element()	
+		propinsi << a_pol.provinsi
+		kabupaten << a_pol.kabupaten
+		kecamatan << a_pol.kecamatan
+		desa << a_pol.desa	
 	_endif
 
-	_local cluster_code << _self.get_current_cluster_code()
-	_if cluster_code _is _unset _orif cluster_code = ""
+	e_fdt << _self.seq_fdt()
+	#write("count fdt :",e_fdt.size)
+	count_fdt << 1
+	c_fdt << 0
+	count_fat << 1
+	count_dp << 1
+	_for fd _over e_fdt.fast_elements()
+	_loop 
+		#write(fd)
+		count_fdt +<< 1
+		c_fdt +<< 1
+		Cell_a << Sheet.Range ("A"+count_fdt.write_string)
+		Cell_b << Sheet.Range ("B"+count_fdt.write_string)
+		Cell_c << Sheet.Range ("C"+count_fdt.write_string)
+		Cell_d << Sheet.Range ("D"+count_fdt.write_string)
+		Cell_f << Sheet.Range ("F"+count_fdt.write_string)
+		Cell_g << Sheet.Range ("G"+count_fdt.write_string)
+		Cell_i << Sheet.Range ("I"+count_fdt.write_string)
+		Cell_m << Sheet.Range ("M"+count_fdt.write_string)
+		Cell_n << Sheet.Range ("N"+count_fdt.write_string)
+		Cell_s << Sheet.Range ("S"+count_fdt.write_string)
+		Cell_t << Sheet.Range ("T"+count_fdt.write_string)
+		Cell_q << Sheet.Range ("Q"+count_fdt.write_string)
+		Cell_u << Sheet.Range ("U"+count_fdt.write_string)
+		
+		cl_nm << nama+" - FDT "+c_fdt.write_string
+		cell_a.value << cl_nm.write_string
+		cell_a.entirecolumn.autofit
+		
+		cell_b.value << fd.write_string
+		cell_b.entirecolumn.autofit
+		
+		cell_c.value << cl_nm.write_string
+		cell_c.entirecolumn.autofit
+
+		cell_d.value << propinsi.write_string
+		cell_d.entirecolumn.autofit
+		
+		cell_f.value << kabupaten.write_string
+		cell_f.entirecolumn.autofit
+		
+		cell_g.value << propinsi.write_string
+		cell_g.entirecolumn.autofit
+		
+		cell_i.value << propinsi.write_string
+		cell_i.entirecolumn.autofit
+		
+		cell_m.value << desa.write_string
+		cell_m.entirecolumn.autofit
+		cell_n.value << nm_olt.write_string
+		cell_n.entirecolumn.autofit
+		cell_s.value << latitud.write_string
+		cell_s.entirecolumn.autofit
+		cell_t.value << longitud.write_string
+		cell_t.entirecolumn.autofit
+		cell_q.value << pj.write_string
+		cell_q.entirecolumn.autofit
+		cell_u.value << nm_cls.write_string
+		cell_u.entirecolumn.autofit
+
+		#loop fat
+		e_fat << _self.seq_fat(fd)
+		#write("count fdt :",e_fdt.size)
+		
+		c_fat << 0
+		_for fa _over e_fat.fast_elements()
+		_loop
+		
+			p_predicate_fat << predicate.eq(:name, fa )
+			sc_pol << sc_col.select( p_predicate_fat)
+			_if sc_col.size > 0 _then
+				a_rec_fat << sc_pol.an_element()
+			_else
+				_continue
+			_endif
+			
+			count_fat  +<< 1
+			
+			a_point_fat << a_rec_fat.location
+			p_predicate << predicate.interacts(:boundary, {a_point_fat} )
+			p_predicate_town << predicate.eq(:type, "Town")
+			s_pol << pol_col.select( p_predicate _and p_predicate_town )
+		
+			_if s_pol.size > 0 _then
+				a_pol << s_pol.an_element()	
+				propinsi << a_pol.provinsi
+					kabupaten << a_pol.kabupaten
+					kecamatan << a_pol.kecamatan
+					desa << a_pol.desa
+					
+			_endif
+			
+			
+			h << a_rec_fat.location.coord
+			w_conv << t.convert(h)
+			
+			latitud << w_conv.y
+			longitud << w_conv.x
+			
+			Cell_a1 << Sheet1.Range ("A"+count_fat.write_string)
+			Cell_b1 << Sheet1.Range ("B"+count_fat.write_string)
+			Cell_c1 << Sheet1.Range ("C"+count_fat.write_string)
+			Cell_d1 << Sheet1.Range ("D"+count_fat.write_string)
+			Cell_e1 << Sheet1.Range ("E"+count_fat.write_string)
+			Cell_f1 << Sheet1.Range ("F"+count_fat.write_string)
+			Cell_g1 << Sheet1.Range ("G"+count_fat.write_string)
+			
+			_if kabupaten _isnt _unset _then
+				cell_a1.value << kabupaten.uppercase.write_string
+				cell_a1.entirecolumn.autofit
+			_else
+					
+				cell_a1.value << a_rec_fat.name.write_string
+				cell_a1.entirecolumn.autofit
+			_endif
+			
+				
+			cell_b1.value << cl_nm.write_string #a_rec_fat.cluster.write_string
+			cell_b1.entirecolumn.autofit
+			
+			f_nm << a_rec_fat.name.split_by(".")
+			_if f_nm.size > 0 _then
+				cell_c1.value << f_nm[f_nm.size].write_string
+				cell_c1.entirecolumn.autofit
+			_else 
+				cell_c1.value << a_rec_fat.name.write_string
+				cell_c1.entirecolumn.autofit
+			_endif
+			
+			
+			cell_d1.value << a_rec_fat.ring_name.write_string
+			cell_d1.entirecolumn.autofit
+			cell_e1.value << "16"#a_rec.ring_name.write_string
+			cell_e1.entirecolumn.autofit
+			cell_f1.value << latitud # a_ff.format(latitud).write_string
+			cell_f1.entirecolumn.autofit
+			cell_f1.numberformat << "general"
+			cell_g1.value << longitud #a_ff.format(longitud).write_string
+			cell_g1.entirecolumn.autofit
+			cell_g1.numberformat << "general"
+			
+			
+		#	_else 
+		#		write("Data Dont have Location  :") #,a_rec.telco_pole_tag)
+	#		_endif
+			
+	#	_endif
+#		_if count > 40
+#		_then
+#			_leave
+#		_endif
+
+			#loop demand point
+			
+			dbc << _self.get_data_homepass_fat_comment(fa)
+
+			_if dbc.size = 0 _then
+				dbc << _self.get_data_homepass_fat_cell(fa)
+			_endif
+			
+		
+		#	write("df :",dbc.size) 
+		#	_if dpc.size >= dbf.size _then
+
+			_for a_dp _over dbc.fast_elements()
+			_loop
+				count_dp +<< 1
+		#		write(a_dp)
+				h << a_dp.location.coord
+				w_conv << t.convert(h)
+				
+				latitud << w_conv.y
+				longitud << w_conv.x
+				
+				Cell_a << Sheet2.Range ("A"+count_dp.write_string)
+				Cell_b << Sheet2.Range ("B"+count_dp.write_string)
+				Cell_c << Sheet2.Range ("C"+count_dp.write_string)
+				Cell_d << Sheet2.Range ("D"+count_dp.write_string)
+				Cell_e << Sheet2.Range ("E"+count_dp.write_string)
+				Cell_f << Sheet2.Range ("F"+count_dp.write_string)
+				Cell_g << Sheet2.Range ("G"+count_dp.write_string)
+				Cell_h << Sheet2.Range ("H"+count_dp.write_string)
+				Cell_i << Sheet2.Range ("I"+count_dp.write_string)
+				Cell_j << Sheet2.Range ("J"+count_dp.write_string)
+				Cell_k << Sheet2.Range ("K"+count_dp.write_string)
+				Cell_l << Sheet2.Range ("L"+count_dp.write_string)
+				Cell_m << Sheet2.Range ("M"+count_dp.write_string)
+				Cell_n << Sheet2.Range ("N"+count_dp.write_string)
+				Cell_o << Sheet2.Range ("O"+count_dp.write_string)
+				Cell_p << Sheet2.Range ("P"+count_dp.write_string)
+				Cell_q << Sheet2.Range ("Q"+count_dp.write_string)
+				Cell_r << Sheet2.Range ("R"+count_dp.write_string)
+				Cell_s << Sheet2.Range ("S"+count_dp.write_string)
+				Cell_t << Sheet2.Range ("T"+count_dp.write_string)
+				Cell_u << Sheet2.Range ("U"+count_dp.write_string)
+				Cell_v << Sheet2.Range ("V"+count_dp.write_string)
+				Cell_w << Sheet2.Range ("W"+count_dp.write_string)
+				Cell_x << Sheet2.Range ("X"+count_dp.write_string)
+				Cell_y << Sheet2.Range ("Y"+count_dp.write_string)
+				Cell_z << Sheet2.Range ("Z"+count_dp.write_string)
+				Cell_aa << Sheet2.Range ("AA"+count_dp.write_string)
+				Cell_ab << Sheet2.Range ("AB"+count_dp.write_string)
+				Cell_ac << Sheet2.Range ("AC"+count_dp.write_string)
+				Cell_ad << Sheet2.Range ("AD"+count_dp.write_string)
+				Cell_ae << Sheet2.Range ("AE"+count_dp.write_string)
+				Cell_af << Sheet2.Range ("AF"+count_dp.write_string)
+				Cell_ag << Sheet2.Range ("AG"+count_dp.write_string)
+				Cell_ah << Sheet2.Range ("AH"+count_dp.write_string)
+				Cell_ai << Sheet2.Range ("AI"+count_dp.write_string)
+				Cell_aj << Sheet2.Range ("AJ"+count_dp.write_string)
+				Cell_ak << Sheet2.Range ("AK"+count_dp.write_string)
+				Cell_al << Sheet2.Range ("AL"+count_dp.write_string)
+				Cell_am << Sheet2.Range ("AM"+count_dp.write_string)
+				Cell_an << Sheet2.Range ("AN"+count_dp.write_string)
+				Cell_ao << Sheet2.Range ("AO"+count_dp.write_string)
+				Cell_ap << Sheet2.Range ("AP"+count_dp.write_string)
+				Cell_aq << Sheet2.Range ("AQ"+count_dp.write_string)
+				Cell_ar << Sheet2.Range ("AR"+count_dp.write_string)
+				Cell_as << Sheet2.Range ("AS"+count_dp.write_string)
+				Cell_at << Sheet2.Range ("AT"+count_dp.write_string)
+				Cell_au << Sheet2.Range ("AU"+count_dp.write_string)
+
+			#	write(a_dp)
+				cell_g.value << "General Retail" #pj.write_string
+				cell_g.entirecolumn.autofit
+				cell_i.value << cl_code.write_string
+				cell_i.entirecolumn.autofit
+			#	write(a_dp)
+				cell_j.value << cl_nm.write_string #nama.write_string
+				cell_j.entirecolumn.autofit
+			#	write("2")
+				cell_k.value << cl_nm.write_string #nama.write_string
+				cell_k.entirecolumn.autofit
+
+
+				cell_u.value << a_dp.name.write_string
+				cell_u.entirecolumn.autofit
+				
+				cell_ac.value << olt_code.write_string
+				cell_ac.entirecolumn.autofit
+			#	write("3")
+				cell_ad.value << olt_nm.write_string
+				cell_ad.entirecolumn.autofit
+				
+			
+				cell_ae.value <<  fd.write_string
+				cell_ae.entirecolumn.autofit
+		
+				cell_af.value << f_nm[f_nm.size].write_string 
+				cell_af.entirecolumn.autofit
+			
+			#	cell_au.value << a_dp.name.write_string
+			#	cell_au.entirecolumn.autofit
+				cell_aj.value << a_dp.name.write_string
+				cell_aj.entirecolumn.autofit
+				cell_ah.value << latitud # a_ff.format(latitud).write_string
+				cell_ah.entirecolumn.autofit
+				cell_ah.numberformat << "general"
+				cell_ai.value << longitud #a_ff.format(longitud).write_string
+				cell_ai.entirecolumn.autofit
+				cell_ai.numberformat << "general"
+				cell_an.value << nt.write_string
+				cell_an.entirecolumn.autofit
+				
+				
+			_endloop
+			
+			#	_else
+			
+			
+
+			#	_endif
+			
+				
+				
+		_endloop
+
+
+
+			
+			
+			
+
+			
+
+
+
+	_endloop
+		
+		
+
+
+
+		
+		
+#	_endloop
+	
+
+	
+
+	#	_endif
+	# Get user home directory
+	_local home_dir << system.getenv("USERPROFILE")  # Windows
+	_if home_dir _is _unset _orif home_dir = ""
 	_then
-		.owner.show_alert("Could not resolve a cluster code for the current design job.")
-		_return
+		# Fallback to TEMP if USERPROFILE not available
+		home_dir << system.temp_directory_name
 	_endif
-
-	_local doc_type << .items[:upload_doc_type].value.default("Homepass")
-
-	_local path_parts << path.split_by("\")
-	_local file_name << path_parts[path_parts.size]
-
-	write("Uploading ", doc_type, " document to ASTRI: ", path, " (cluster ", cluster_code, ")")
-
-	_try _with errCond
-		_local xml_result << astri_upload_stella_document(path, cluster_code, doc_type, file_name)
-
-		_if xml_result _is _unset _orif xml_result = ""
-		_then
-			.owner.show_alert("Upload failed: no response from server")
-			_return
-		_endif
-
-		_local xml_doc      << simple_xml.read_element_string(xml_result)
-		_local success_elem << xml_doc.element_matching_name(:success)
-		_local success      << success_elem _isnt _unset _andif
-		                       success_elem.xml_result = "true"
-
-		_if success
-		_then
-			write("Upload successful: ", doc_type, " - ", file_name)
-			.owner.show_alert(write_string(doc_type, " document uploaded successfully.", newline_char,
-				"File: ", file_name))
-		_else
-			_local err_elem << xml_doc.element_matching_name(:error)
-			_local err_msg  << _if err_elem _isnt _unset
-			                   _then >> err_elem.xml_result
-			                   _else >> "Unknown error"
-			                   _endif
-			write("Upload failed: ", err_msg)
-			.owner.show_alert(write_string("Upload failed:", newline_char, err_msg))
-		_endif
-
-	_when error
-		write("Upload error: ", errCond.report_contents_string)
-		.owner.show_alert(write_string("Upload error:", newline_char,
-			errCond.report_contents_string))
-	_endtry
+	
+	# Create sw_kml subdirectory path
+	_local output_dir << system.pathname_from_components("sw_stella", home_dir)
+	
+	# Create directory if it doesn't exist
+	_if _not system.file_exists?(output_dir)
+	_then
+		_try
+			system.mkdir(output_dir)
+			write("Created BOQ output directory: ", output_dir)
+		_when error
+			write("WARNING: Could not create sw_kml directory, using temp instead")
+			output_dir << system.temp_directory_name
+		_endtry
+	_endif
+	
+	#ex << Excel_Object.save_file( output_dir,"test.xls")
+	#ex << Excel_Object.save_as( "test.xlsx")
+	
+	d << date_now()
+	days_number << d.day_of_month_number
+	months_number << d.month_number
+	years_number << d.year
+	
+	_if months_number.write_string.size = 1
+	_then 
+		mth << "0"+months_number.write_string
+	_endif
+	
+	_if days_number.write_string.size = 1
+	_then 
+		dys << "0"+days_number.write_string
+	_else	
+		dys << days_number
+	_endif
+	
+	hari << dys.write_string+"-"+mth.write_string+"-"+years_number.write_string
+	fl_ex << "\HPDB astri "+cl_code+".xlsx"
+	ad << output_dir+fl_ex  #"\HPDB astri .xlsx"
+	write(ad)
+	_if system.file_exists?( ad )
+	_then
+		system.do_command( write_string( "cmd /c del ", %",ad, %" ) )
+	_endif
+	
+	WorkBook.saveas(ad)	
+		
+	WorkBook.Release_Object ()
+	Excel_Object.Release_Object ()
+		
 _endmethod
-$
+
+
+
 
 _pragma(classify_level=restricted)
 _method rwi_stela_integration_dialog.table_selected_ur2( selection )

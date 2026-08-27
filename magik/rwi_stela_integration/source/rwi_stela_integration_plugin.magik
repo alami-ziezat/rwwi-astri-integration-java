@@ -70,7 +70,7 @@ _method rwi_stela_integration_plugin.init_actions()
 	## 
 	##
 	
-	_self.add_action( sw_action.new( :activate_get_fat,
+	_self.add_action( sw_action.new( :activate_rwi_stela_integration,
 					 :caption,         "Stela Integration",
 					 :engine, _self,
 					 :image, {:associate, :mit_base_gui},

@@ -45,6 +45,11 @@ public class AstriConfig {
             "http://172.17.75.22/astri-dm/v4");
     }
 
+    public String getStellaBaseUrl() {
+        return props.getProperty("astri.stella.base.url",
+            "http://172.17.52.160/astri-api-v2/v4");
+    }
+
     public String getUsername() {
         return props.getProperty("astri.username", "smallworld");
     }

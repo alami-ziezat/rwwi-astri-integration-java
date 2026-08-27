@@ -281,6 +281,204 @@ _global nisa_massproblem_parsed << _proc(cluster_code)
 _endproc
 $
 
+_pragma(classify_level=basic, topic={nisa_integration})
+_global nisa_parse_fat_loss_detection_response << _proc(json_string)
+	## Parse raw NISA fat-loss-detection API response JSON into Magik property_lists.
+	##
+	## Parameters:
+	##   json_string - Raw JSON string from nisa_fat_loss_detection()
+	##
+	## Returns:
+	##   property_list with:
+	##     :success               - Boolean (_true/_false)
+	##     :msg                   - String message from API
+	##     :is_fat_loss_detected  - Boolean (_true/_false)
+	##     :active_ticket_count   - Integer
+	##     :active_tickets        - Rope of property_lists, each with:
+	##                              :ticket_number, :tlop_status, :status_name,
+	##                              :tlop_created_date, :affected_customer
+
+	_local result << property_list.new()
+	result[:success]              << _false
+	result[:msg]                  << ""
+	result[:is_fat_loss_detected] << _false
+	result[:active_ticket_count]  << 0
+	result[:active_tickets]       << rope.new()
+
+	_if json_string _is _unset _orif json_string.empty?
+	_then
+		result[:msg] << "No response"
+		_return result
+	_endif
+
+	_try
+		_local json_obj << json_parser.parse(json_string)
+
+		result[:success] << json_obj[:success].default(_false)
+		result[:msg]     << json_obj[:msg].default("").write_string
+
+		_local json_data << json_obj[:data]
+		_if json_data _is _unset
+		_then
+			_return result
+		_endif
+
+		result[:is_fat_loss_detected] << json_data[:is_fat_loss_detected].default(_false)
+		result[:active_ticket_count]  << json_data[:active_ticket_count].default(0)
+
+		_local json_tickets << json_data[:active_tickets]
+		_local tickets_rope << rope.new()
+
+		_if json_tickets _isnt _unset
+		_then
+			_for ticket_item _over json_tickets.fast_elements()
+			_loop
+				_local ticket_pl << property_list.new()
+				ticket_pl[:ticket_number]     << ticket_item[:ticket_number].default("").write_string
+				ticket_pl[:tlop_status]       << ticket_item[:tlop_status].default("").write_string
+				ticket_pl[:status_name]       << ticket_item[:status_name].default("").write_string
+				ticket_pl[:tlop_created_date] << ticket_item[:tlop_created_date].default("").write_string
+				ticket_pl[:affected_customer] << ticket_item[:affected_customer].default("").write_string
+				tickets_rope.add_last(ticket_pl)
+			_endloop
+		_endif
+
+		result[:active_tickets] << tickets_rope
+
+	_when error
+		write("  [nisa_parse_fat_loss_detection_response] Parse error: ", condition.report_contents_string)
+		result[:msg] << "Parse error: " + condition.report_contents_string
+	_endtry
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_global nisa_parse_segment_problem_detail_response << _proc(json_string)
+	## Parse raw NISA segment-problem-detail API response JSON into Magik property_lists.
+	##
+	## Parameters:
+	##   json_string - Raw JSON string from nisa_segment_problem_detail(area, hostname, fat)
+	##
+	## Returns:
+	##   property_list with:
+	##     :success - Boolean (_true/_false)
+	##     :msg     - String message from API (validation failures use "message" instead -
+	##                also captured here under :msg for a single consistent field)
+	##     :total   - Integer
+	##     :data    - Rope of property_lists, each with:
+	##                :ticket_number, :tlop_status, :status_name, :tlop_created_date,
+	##                :tlop_area_name, :tlop_cluster_name, :fdt_code, :fat_code, :hostname
+
+	_local result << property_list.new()
+	result[:success] << _false
+	result[:msg]     << ""
+	result[:total]   << 0
+	result[:data]    << rope.new()
+
+	_if json_string _is _unset _orif json_string.empty?
+	_then
+		result[:msg] << "No response"
+		_return result
+	_endif
+
+	_try
+		_local json_obj << json_parser.parse(json_string)
+
+		result[:success] << json_obj[:success].default(_false)
+		# Validation failures use "message" (singular request-level error) instead of "msg" -
+		# fold both into :msg so callers only need to check one field.
+		result[:msg]     << json_obj[:msg].default(json_obj[:message].default("")).write_string
+		result[:total]   << json_obj[:total].default(0)
+
+		_local json_data << json_obj[:data]
+		_if json_data _is _unset
+		_then
+			_return result
+		_endif
+
+		_local data_rope << rope.new()
+
+		_for item _over json_data.fast_elements()
+		_loop
+			_local item_pl << property_list.new()
+			item_pl[:ticket_number]     << item[:ticket_number].default("").write_string
+			item_pl[:tlop_status]       << item[:tlop_status].default("").write_string
+			item_pl[:status_name]       << item[:status_name].default("").write_string
+			item_pl[:tlop_created_date] << item[:tlop_created_date].default("").write_string
+			item_pl[:tlop_area_name]    << item[:tlop_area_name].default("").write_string
+			item_pl[:tlop_cluster_name] << item[:tlop_cluster_name].default("").write_string
+			item_pl[:fdt_code]          << item[:fdt_code].default("").write_string
+			item_pl[:fat_code]          << item[:fat_code].default("").write_string
+			item_pl[:hostname]          << item[:hostname].default("").write_string
+			data_rope.add_last(item_pl)
+		_endloop
+
+		result[:data] << data_rope
+
+	_when error
+		write("  [nisa_parse_segment_problem_detail_response] Parse error: ", condition.report_contents_string)
+		result[:msg] << "Parse error: " + condition.report_contents_string
+	_endtry
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=debug, topic={nisa_integration})
+_global test_nisa_fat_loss_detection << _proc()
+	## Test: call nisa_fat_loss_detection() directly and print the parsed result.
+
+	write("=" * 60)
+	write("Testing NISA FAT Loss Detection API")
+	write("=" * 60)
+
+	_local result << _unset
+	_try
+		_local json_result << nisa_fat_loss_detection()
+		write("Response:")
+		write(json_result)
+		write("")
+		result << nisa_parse_fat_loss_detection_response(json_result)
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	>> result
+_endproc
+$
+
+_pragma(classify_level=debug, topic={nisa_integration})
+_global test_nisa_segment_problem_detail << _proc(area, hostname, fat)
+	## Test: call nisa_segment_problem_detail(area, hostname, fat) directly and
+	## print the parsed result.
+	##
+	## Parameters:
+	##   area     - Area name (e.g. "JAKARTA")
+	##   hostname - OLT hostname (e.g. "OLT-JKT-01")
+	##   fat      - FAT code (e.g. "FAT001")
+
+	write("=" * 60)
+	write("Testing NISA Segment Problem Detail API")
+	write("=" * 60)
+	write("  area: ", area, ", hostname: ", hostname, ", fat: ", fat)
+
+	_local result << _unset
+	_try
+		_local json_result << nisa_segment_problem_detail(area, hostname, fat)
+		write("Response:")
+		write(json_result)
+		write("")
+		result << nisa_parse_segment_problem_detail_response(json_result)
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	>> result
+_endproc
+$
+
 ## Usage Examples:
 ##
 ## Production - resolve cluster_code -> cluster_id_stella via DB, then call NISA:
@@ -298,3 +496,12 @@ $
 ##
 ## Default test:
 ##   test_nisa_massproblem_default()
+##
+## FAT Loss Detection:
+##   test_nisa_fat_loss_detection()
+##   result[:is_fat_loss_detected]        # _true/_false
+##   result[:active_tickets][1][:ticket_number]
+##
+## Segment Problem Detail:
+##   test_nisa_segment_problem_detail("JAKARTA", "OLT-JKT-01", "FAT001")
+##   result[:data][1][:ticket_number]

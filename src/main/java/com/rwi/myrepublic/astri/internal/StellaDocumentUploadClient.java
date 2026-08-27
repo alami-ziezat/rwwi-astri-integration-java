@@ -19,7 +19,8 @@ import java.util.Base64;
  * AstriStellaDocumentUploadProcs.
  *
  * API (currently, all doc types): POST /v4/osp/cluster/document/homepass-database/stella/upload
- * Base: astri-api-v2 (AstriConfig.getApiBaseUrl())
+ * Base: AstriConfig.getStellaBaseUrl() (dedicated to this endpoint, independent of
+ * the shared astri-api-v2 base used by other callers such as BoqClient)
  * Content-Type: application/json   Body: {cluster_code, file_name, file_base64}
  *
  * Cluster/FAT are provisionally routed to the same endpoint as Homepass pending
@@ -84,7 +85,7 @@ public class StellaDocumentUploadClient {
             + "\"file_base64\":\"" + base64 + "\""
             + "}";
 
-        String url = config.getApiBaseUrl() + resolveRoute(docType);
+        String url = config.getStellaBaseUrl() + resolveRoute(docType);
         System.out.println("POST URL: " + url);
         // Log the request body with file_base64 redacted to a length marker -
         // logging the full base64 blob would flood the console for real files.
