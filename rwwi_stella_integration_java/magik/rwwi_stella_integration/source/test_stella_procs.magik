@@ -1,0 +1,45 @@
+#% text_encoding = iso8859_1
+
+_package sw
+$
+
+## Stella Document Upload API - Procedures
+##
+## Global procedure (Java-backed, from the rwwi.stella.integration OSGi bundle):
+##
+##   stella_upload_document(file_path, cluster_code, doc_type, _optional file_name)
+##     Uploads a Cluster/FAT/Homepass Excel file to the Stella document API.
+##     doc_type is "cluster", "fat" or "homepass" - routing only, not sent to
+##     Stella (all three currently share the same route - see
+##     StellaDocumentUploadClient.resolveRoute()).
+##     Returns an XML string: <response><success>.../<error>...</response>,
+##     parsed by callers via simple_xml.read_element_string(...).
+##
+## Called from: rwi_stela_integration_dialog.magik#upload_excel()
+##
+## Usage:
+##   test_stella_upload_document("C:\\temp\\homepass-template.xlsx", "CLUSTER-001", "homepass")
+
+_pragma(classify_level=debug, topic={stella_integration})
+_global test_stella_upload_document << _proc(file_path, cluster_code, doc_type)
+	## Test helper: calls stella_upload_document(...) directly and prints the result.
+
+	write("=" * 60)
+	write("Testing Stella Document Upload API")
+	write("=" * 60)
+	write("  file_path:    ", file_path)
+	write("  cluster_code: ", cluster_code)
+	write("  doc_type:     ", doc_type)
+
+	_local result << _unset
+	_try
+		result << stella_upload_document(file_path, cluster_code, doc_type)
+		write("Response:")
+		write(result)
+	_when error
+		write("ERROR: ", condition.report_contents_string)
+	_endtry
+
+	>> result
+_endproc
+$

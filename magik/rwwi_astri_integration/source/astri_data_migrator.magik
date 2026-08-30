@@ -1970,6 +1970,11 @@ _private _method astri_data_migrator.process_cluster_scheduled_migration(rec, ob
 			# falls back to infra_code when no matching WO is found.
 			_local wo_number << _self.lookup_wo_number("cluster", infra_code)
 
+			# Cluster/subfeeder/feeder/OLT codes from the dim master tables,
+			# so this scheduled/ETL pipeline stamps equipment with the same
+			# codes as the WO-API-driven "Migrate to Design" pipeline.
+			_local codes_db << _self.lookup_infra_codes_db("cluster", infra_code)
+
 			_local wo << property_list.new_with(
 				:wo_number,           wo_number,
 				:infra_code,          infra_code,
@@ -1980,7 +1985,11 @@ _private _method astri_data_migrator.process_cluster_scheduled_migration(rec, ob
 				:olt_label,           "",
 				:olt_name,            "",
 				:area,                "",
-				:area_plant_code,     "")
+				:area_plant_code,     "",
+				:cluster_code_db,     codes_db[:cluster_code_db],
+				:subfeeder_code_db,   codes_db[:subfeeder_code_db],
+				:feeder_code_db,      codes_db[:feeder_code_db],
+				:olt_code,            codes_db[:olt_code])
 
 			_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, "cluster", topology)
 			_if mig_stats _isnt _unset
@@ -2103,6 +2112,11 @@ _private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, 
 			# falls back to infra_code when no matching WO is found.
 			_local wo_number << _self.lookup_wo_number("subfeeder", infra_code)
 
+			# Cluster/subfeeder/feeder/OLT codes from the dim master tables,
+			# so this scheduled/ETL pipeline stamps equipment with the same
+			# codes as the WO-API-driven "Migrate to Design" pipeline.
+			_local codes_db << _self.lookup_infra_codes_db("subfeeder", infra_code)
+
 			_local wo << property_list.new_with(
 				:wo_number,           wo_number,
 				:infra_code,          infra_code,
@@ -2113,7 +2127,11 @@ _private _method astri_data_migrator.process_subfeeder_scheduled_migration(rec, 
 				:olt_label,           "",
 				:olt_name,            "",
 				:area,                "",
-				:area_plant_code,     "")
+				:area_plant_code,     "",
+				:cluster_code_db,     codes_db[:cluster_code_db],
+				:subfeeder_code_db,   codes_db[:subfeeder_code_db],
+				:feeder_code_db,      codes_db[:feeder_code_db],
+				:olt_code,            codes_db[:olt_code])
 
 			_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, "subfeeder", topology)
 			_if mig_stats _isnt _unset
@@ -2236,6 +2254,11 @@ _private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj
 			# falls back to infra_code when no matching WO is found.
 			_local wo_number << _self.lookup_wo_number("feeder", infra_code)
 
+			# Cluster/subfeeder/feeder/OLT codes from the dim master tables,
+			# so this scheduled/ETL pipeline stamps equipment with the same
+			# codes as the WO-API-driven "Migrate to Design" pipeline.
+			_local codes_db << _self.lookup_infra_codes_db("feeder", infra_code)
+
 			_local wo << property_list.new_with(
 				:wo_number,           wo_number,
 				:infra_code,          infra_code,
@@ -2246,7 +2269,11 @@ _private _method astri_data_migrator.process_feeder_scheduled_migration(rec, obj
 				:olt_label,           "",
 				:olt_name,            "",
 				:area,                "",
-				:area_plant_code,     "")
+				:area_plant_code,     "",
+				:cluster_code_db,     codes_db[:cluster_code_db],
+				:subfeeder_code_db,   codes_db[:subfeeder_code_db],
+				:feeder_code_db,      codes_db[:feeder_code_db],
+				:olt_code,            codes_db[:olt_code])
 
 			_local mig_stats << _self.migrate_to_sw_design(wo, placemarks, "feeder", topology)
 			_if mig_stats _isnt _unset
@@ -2595,6 +2622,130 @@ _endmethod
 $
 
 _pragma(classify_level=restricted, topic={astri_integration})
+_private _method astri_data_migrator.lookup_infra_codes_db(infra_type, infra_code)
+	## Resolve cluster/subfeeder/feeder/OLT codes from the dim master tables for
+	## the given infrastructure code, so the scheduled/ETL migration pipeline
+	## (drm_scheduler_logs and drm_etl_scheduler_logs) stamps the same
+	## olt_code / feeder_code / subfeeder_code / cluster_code onto migrated
+	## equipment as the WO-API-driven "Migrate to Design" pipeline does
+	## (mirrors rwwi_astri_workorder_engine.get_kmz_uuid_from_db()).
+	##
+	## Database Tables:
+	##   cluster:   dim_cluster_master_smallworld.cluster_code
+	##   subfeeder: dim_subfeeder_master_smallworld.subfeeder_code
+	##   feeder:    dim_feeder_master_smallworld.feeder_code
+	##
+	## Parameters:
+	##   infra_type (string) - "cluster" | "subfeeder" | "feeder"
+	##   infra_code (string) - the infrastructure code
+	##
+	## Returns: property_list with :cluster_code_db, :subfeeder_code_db,
+	##          :feeder_code_db, :olt_code (all "" when no match/error).
+
+	_local itype << infra_type.default("").lowercase
+	_local code  << infra_code.default("").write_string
+
+	_local empty_result << property_list.new_with(
+		:cluster_code_db, "", :subfeeder_code_db, "", :feeder_code_db, "", :olt_code, "")
+
+	_if code = ""
+	_then
+		_return empty_result
+	_endif
+
+	# infra_type -> {dim table, code col, select col list} - column lists mirror
+	# rwwi_astri_workorder_engine.sql_for_kmz_uuid exactly: subfeeder/feeder dim
+	# tables do NOT carry the upstream cluster_code/subfeeder_code columns.
+	_local cfg << property_list.new_with(
+		:cluster,   {"dim_cluster_master_smallworld",   "cluster_code",
+		             "cluster_code, subfeeder_code, feeder_code, olt_code"},
+		:subfeeder, {"dim_subfeeder_master_smallworld", "subfeeder_code",
+		             "subfeeder_code, feeder_code, olt_code"},
+		:feeder,    {"dim_feeder_master_smallworld",    "feeder_code",
+		             "feeder_code, olt_code"})
+
+	_local c << cfg[itype.as_symbol()]
+	_if c _is _unset
+	_then
+		write("ERROR lookup_infra_codes_db: invalid infra_type: ", infra_type)
+		_return empty_result
+	_endif
+
+	_local dim_table  << c[1]
+	_local code_col   << c[2]
+	_local select_cols << c[3]
+
+	_local sql << "SELECT " + select_cols +
+		" FROM smallworld." + dim_table + " WHERE " + code_col + " = ? LIMIT 1"
+
+	_try _with cond
+		_if .db_connection _is _unset
+		_then
+			_local is_connect?
+			(is_connect?, .db_connection) <<
+				rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+			_if _not is_connect?
+			_then
+				write("ERROR: Cannot connect to POSTGRESQL_ASTRI_DB for infra code lookup")
+				_return empty_result
+			_endif
+		_endif
+
+		_local recs << .db_connection.sql_select(sql, code)
+		_local rec << recs.get()
+		_local result << empty_result
+
+		_if rec _isnt _unset
+		_then
+			# Only read columns actually present in this infra_type's SELECT list.
+			_if itype = "cluster"
+			_then
+				result[:cluster_code_db]   << rec.cluster_code.default("")
+				result[:subfeeder_code_db] << rec.subfeeder_code.default("")
+				result[:feeder_code_db]    << rec.feeder_code.default("")
+				result[:olt_code]          << rec.olt_code.default("")
+			_elif itype = "subfeeder"
+			_then
+				result[:subfeeder_code_db] << rec.subfeeder_code.default("")
+				result[:feeder_code_db]    << rec.feeder_code.default("")
+				result[:olt_code]          << rec.olt_code.default("")
+			_elif itype = "feeder"
+			_then
+				result[:feeder_code_db]    << rec.feeder_code.default("")
+				result[:olt_code]          << rec.olt_code.default("")
+			_endif
+		_else
+			write("  WARNING: No ", itype, " master record found for code: ", code)
+		_endif
+		recs.close()
+
+		_try
+			.db_connection.commit()
+		_when error
+			.db_connection.rollback()
+		_endtry
+		extdb_java_acp.close_all()
+		.db_connection << _unset
+
+		_return result
+
+	_when error
+		write("ERROR in lookup_infra_codes_db(): ", cond.report_contents_string)
+		_try
+			_if .db_connection _isnt _unset
+			_then
+				.db_connection.rollback()
+				extdb_java_acp.close_all()
+				.db_connection << _unset
+			_endif
+		_when error
+		_endtry
+		_return empty_result
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted)
 _private _method astri_data_migrator.lookup_wo_number(infra_type, infra_code)
 	## Resolve the DRM project name by looking up the work order number in
 	## smallworld.fact_wo_drm_smallworld, matched on

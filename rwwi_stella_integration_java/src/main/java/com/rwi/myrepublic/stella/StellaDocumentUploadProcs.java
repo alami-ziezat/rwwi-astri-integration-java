@@ -1,25 +1,25 @@
-package com.rwi.myrepublic.astri;
+package com.rwi.myrepublic.stella;
 
 import com.gesmallworld.magik.commons.interop.annotations.MagikProc;
 import com.gesmallworld.magik.commons.interop.annotations.Name;
 import com.gesmallworld.magik.commons.interop.annotations.Optional;
 import com.gesmallworld.magik.interop.MagikInteropUtils;
-import com.rwi.myrepublic.astri.internal.StellaDocumentUploadClient;
+import com.rwi.myrepublic.stella.internal.StellaDocumentUploadClient;
 
 /**
- * ASTRI Stella document upload procedures exposed to Magik - Cluster/FAT/Homepass
+ * Stella document upload procedures exposed to Magik - Cluster/FAT/Homepass
  * Excel uploads for the Stela Integration dialog.
  * Uses @MagikProc annotation to automatically create a global Magik procedure.
  *
  * Exposes:
- *   astri_upload_stella_document(file_path, cluster_code, doc_type, _optional file_name)
+ *   stella_upload_document(file_path, cluster_code, doc_type, _optional file_name)
  *
  * Returns an XML string parsed by Magik via simple_xml.read_element_string().
  */
-public class AstriStellaDocumentUploadProcs {
+public class StellaDocumentUploadProcs {
 
     /**
-     * Upload a Cluster/FAT/Homepass Excel file to the ASTRI Stella document API.
+     * Upload a Cluster/FAT/Homepass Excel file to the Stella document API.
      *
      * @param proc        Magik proc object (required by framework)
      * @param filePath    Absolute path to the local .xlsx file (Magik string)
@@ -29,13 +29,13 @@ public class AstriStellaDocumentUploadProcs {
      *                    local file's own name)
      * @return XML string response
      */
-    @MagikProc(@Name("astri_upload_stella_document"))
+    @MagikProc(@Name("stella_upload_document"))
     public static Object uploadStellaDocument(Object proc,
                                                Object filePath,
                                                Object clusterCode,
                                                Object docType,
                                                @Optional Object fileName) {
-        System.out.println("=== DEBUG: astri_upload_stella_document called ===");
+        System.out.println("=== DEBUG: stella_upload_document called ===");
 
         StellaDocumentUploadClient client = null;
         try {
@@ -52,11 +52,11 @@ public class AstriStellaDocumentUploadProcs {
             client = new StellaDocumentUploadClient();
             String xmlResponse = client.uploadDocument(filePathStr, clusterCodeStr, docTypeStr, fileNameStr);
 
-            System.out.println("=== DEBUG: astri_upload_stella_document successful ===");
+            System.out.println("=== DEBUG: stella_upload_document successful ===");
             return MagikInteropUtils.toMagikString(xmlResponse);
 
         } catch (Exception e) {
-            System.err.println("=== ERROR in astri_upload_stella_document ===");
+            System.err.println("=== ERROR in stella_upload_document ===");
             System.err.println("Error type: " + e.getClass().getName());
             System.err.println("Error message: " + e.getMessage());
             e.printStackTrace();
@@ -70,7 +70,7 @@ public class AstriStellaDocumentUploadProcs {
             if (client != null) {
                 try { client.close(); } catch (Exception e) { /* ignore */ }
             }
-            System.out.println("=== DEBUG: astri_upload_stella_document completed ===");
+            System.out.println("=== DEBUG: stella_upload_document completed ===");
         }
     }
 

@@ -4,4 +4,7 @@ description
 	Stela Integration
 end
 
-
+requires
+	base
+	rwwi_stella_integration
+end

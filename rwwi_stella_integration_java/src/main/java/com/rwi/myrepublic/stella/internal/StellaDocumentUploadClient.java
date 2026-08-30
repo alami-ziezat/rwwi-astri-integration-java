@@ -1,6 +1,6 @@
-package com.rwi.myrepublic.astri.internal;
+package com.rwi.myrepublic.stella.internal;
 
-import com.rwi.myrepublic.astri.AstriConfig;
+import com.rwi.myrepublic.stella.StellaConfig;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,30 +14,30 @@ import java.time.Duration;
 import java.util.Base64;
 
 /**
- * Internal HTTP client for the ASTRI "... Database Stella" document upload APIs
+ * Internal HTTP client for the Stella "... Database Stella" document upload APIs
  * (Cluster / FAT / Homepass). NOT exposed to Magik - used only by
- * AstriStellaDocumentUploadProcs.
+ * StellaDocumentUploadProcs.
  *
  * API (currently, all doc types): POST /v4/osp/cluster/document/homepass-database/stella/upload
- * Base: AstriConfig.getStellaBaseUrl() (dedicated to this endpoint, independent of
- * the shared astri-api-v2 base used by other callers such as BoqClient)
+ * Base: StellaConfig.getBaseUrl() (own dedicated host, independent of ASTRI's
+ * own base URLs used by other callers such as BoqClient)
  * Content-Type: application/json   Body: {cluster_code, file_name, file_base64}
  *
  * Cluster/FAT are provisionally routed to the same endpoint as Homepass pending
  * confirmation from the API developer of separate routes - see resolveRoute().
  *
- * ASTRI returns HTTP 200 even for logical failures (e.g. an exception raised
+ * Stella returns HTTP 200 even for logical failures (e.g. an exception raised
  * while processing the request) - the response body's own "success" field is
  * the real indicator, so it's inspected in addition to the HTTP status code.
  */
 public class StellaDocumentUploadClient {
 
     private final HttpClient client;
-    private final AstriConfig config;
+    private final StellaConfig config;
     private final String authHeader;
 
     public StellaDocumentUploadClient() {
-        this.config = AstriConfig.getInstance();
+        this.config = StellaConfig.getInstance();
 
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(config.getConnectionTimeout()))
@@ -48,12 +48,12 @@ public class StellaDocumentUploadClient {
     }
 
     /**
-     * Upload a Cluster/FAT/Homepass Excel file to the ASTRI Stella document API.
+     * Upload a Cluster/FAT/Homepass Excel file to the Stella document API.
      *
      * @param filePath    Absolute path to the local .xlsx file
      * @param clusterCode Cluster code for the current design job
      * @param docType     "cluster", "fat" or "homepass" (case-insensitive) - routing only,
-     *                    not sent to ASTRI (the spec has no type field)
+     *                    not sent to Stella (the spec has no type field)
      * @param fileName    File name to send - falls back to filePath's own file name if blank
      * @return XML string:
      *   success: {@code <response><success>true</success><message>...</message></response>}
@@ -85,7 +85,7 @@ public class StellaDocumentUploadClient {
             + "\"file_base64\":\"" + base64 + "\""
             + "}";
 
-        String url = config.getStellaBaseUrl() + resolveRoute(docType);
+        String url = config.getBaseUrl() + resolveRoute(docType);
         System.out.println("POST URL: " + url);
         // Log the request body with file_base64 redacted to a length marker -
         // logging the full base64 blob would flood the console for real files.
@@ -116,7 +116,7 @@ public class StellaDocumentUploadClient {
     }
 
     /**
-     * ASTRI's own response body carries a top-level "success" boolean that can
+     * Stella's own response body carries a top-level "success" boolean that can
      * be false even on HTTP 200 (e.g. an exception raised server-side while
      * processing an otherwise well-formed request) - treat that as failure too.
      * No JSON library in this project, so this is a deliberately crude check
@@ -145,7 +145,7 @@ public class StellaDocumentUploadClient {
     }
 
     // -------------------------------------------------------------------------
-    // XML response builders (same envelope as DocumentUploadClient)
+    // XML response builders
     // -------------------------------------------------------------------------
 
     private String buildSuccessXml(String rawBody, int httpStatus) {
