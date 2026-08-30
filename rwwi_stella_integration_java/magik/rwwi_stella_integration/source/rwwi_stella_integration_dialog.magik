@@ -9,11 +9,11 @@
 _package sw
 $
 
-remex(:rwi_stela_integration_dialog)
+remex(:rwwi_stella_integration_dialog)
 $
 
 _pragma(classify_level=restricted)
-def_slotted_exemplar(:rwi_stela_integration_dialog,
+def_slotted_exemplar(:rwwi_stella_integration_dialog,
 	{
 		{ :current_selection_ur1,_unset },
 		{ :current_selection_ur2,_unset },
@@ -41,18 +41,18 @@ def_slotted_exemplar(:rwi_stela_integration_dialog,
 $
 
 _pragma(classify_level=restricted)
-rwi_stela_integration_dialog.define_shared_constant( :databus_consumer_data_types,
+rwwi_stella_integration_dialog.define_shared_constant( :databus_consumer_data_types,
     { :map_selection },
     :public )
 
 $
-#rwi_stela_integration_dialog.define_shared_variable(
+#rwwi_stella_integration_dialog.define_shared_variable(
 #                 :items,_unset,:public)
 #$
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.new(_optional owner, framework)
+_method rwwi_stella_integration_dialog.new(_optional owner, framework)
 	## 
 	## 
 	>> _clone.init(owner, framework)
@@ -60,7 +60,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.init(owner, framework)
+_method rwwi_stella_integration_dialog.init(owner, framework)
 	## 
 	##
 	_super.init()
@@ -96,7 +96,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.activate_in( parent )
+_method rwwi_stella_integration_dialog.activate_in( parent )
 	## 
 	##
 	parent.title << "Stella Integration"
@@ -155,7 +155,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.build_toolbar( parent )
+_method rwwi_stella_integration_dialog.build_toolbar( parent )
 	## 
 	##
 	toolbar << sw_container.new( parent, 1, _unset,
@@ -213,7 +213,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.build_toolbar_second( parent )
+_method rwwi_stella_integration_dialog.build_toolbar_second( parent )
 	## 
 	##
 	toolbar << sw_container.new( parent, 1, _unset,
@@ -267,16 +267,6 @@ _method rwi_stela_integration_dialog.build_toolbar_second( parent )
 	.items[:auto_upload_excel].text_items << {"Off", "On"}
 	.items[:auto_upload_excel].value << "Off"
 
-	# --- Document type selector (defaults to selected summary row, overridable) ---
-	sw_label_item.new(file_toolbar, "  Doc Type:  ")
-	.items[:upload_doc_type] << sw_text_item.new(file_toolbar,
-		:model, _self,
-		:display_length, 10,
-		:editable?, _false)
-	.items[:upload_doc_type].text_items << {"Cluster", "FAT", "Homepass"}
-	.items[:upload_doc_type].value << "Homepass"
-
-
 	# --- Browse Excel + path field ---
 	sw_label_item.new(file_toolbar, "  ")
 
@@ -304,7 +294,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.build_label_result2( parent )
+_method rwwi_stella_integration_dialog.build_label_result2( parent )
 	## 
 	##
 	
@@ -321,7 +311,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.build_label_result( parent )
+_method rwwi_stella_integration_dialog.build_label_result( parent )
 	## 
 	##
 	
@@ -338,7 +328,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.build_table_ur1( parent )
+_method rwwi_stella_integration_dialog.build_table_ur1( parent )
 	## 
 	##
 	.items[:table] << a_table << sw_table.new( parent,
@@ -367,7 +357,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.build_table_ur2( parent )
+_method rwwi_stella_integration_dialog.build_table_ur2( parent )
 	## 
 	##
 	.items[:table2] << a_table2 << sw_table.new( parent,
@@ -397,7 +387,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_result()
+_method rwwi_stella_integration_dialog.get_result()
 #	write("result  :",.items[:method].value)
 #	_if .items[:method].value ="kml"
 #	_then
@@ -413,7 +403,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_validation()
+_method rwwi_stella_integration_dialog.get_validation()
 
 
 	
@@ -428,7 +418,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_ur1()
+_method rwwi_stella_integration_dialog.get_ur1()
 	##
 	##
 	#write("here")
@@ -456,7 +446,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_ur1()
+_method rwwi_stella_integration_dialog.get_data_ur1()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -478,7 +468,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.populate_ur1( a_table )
+_method rwwi_stella_integration_dialog.populate_ur1( a_table )
 	## 
 	##
 		row << 1
@@ -546,7 +536,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_ur2()
+_method rwwi_stella_integration_dialog.get_ur2()
 	##
 	##
 
@@ -556,7 +546,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_ur2()
+_method rwwi_stella_integration_dialog.get_data_ur2()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -579,7 +569,7 @@ $
 
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.populate_ur2( a_table )
+_method rwwi_stella_integration_dialog.populate_ur2( a_table )
 	## 
 	##
 
@@ -664,7 +654,7 @@ $
 	
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.clear()
+_method rwwi_stella_integration_dialog.clear()
 #	## 
 #	##
 #
@@ -693,7 +683,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_cell()
+_method rwwi_stella_integration_dialog.get_data_cell()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -767,7 +757,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_micro_cell(dp)
+_method rwwi_stella_integration_dialog.get_data_micro_cell(dp)
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -816,7 +806,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_odp()
+_method rwwi_stella_integration_dialog.get_data_odp()
 
 	#write("hereODP")
 	#c_ur1 << ur1.conduits
@@ -891,7 +881,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_fat_cell(cell)
+_method rwwi_stella_integration_dialog.get_fat_cell(cell)
 
 	#write("hereODP")
 	#c_ur1 << ur1.conduits
@@ -1013,7 +1003,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.scan_fat( c , buf_ti )
+_method rwwi_stella_integration_dialog.scan_fat( c , buf_ti )
 	## 
 	##
 
@@ -1077,7 +1067,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_fdt()
+_method rwwi_stella_integration_dialog.get_data_fdt()
 
 	#write("hereODP")
 	#c_ur1 << ur1.conduits
@@ -1152,7 +1142,7 @@ $
 
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.populate_ur1_clear( a_table )
+_method rwwi_stella_integration_dialog.populate_ur1_clear( a_table )
 	## 
 	##
 
@@ -1183,7 +1173,7 @@ $
 
 
 
-_method rwi_stela_integration_dialog.refresh()
+_method rwwi_stella_integration_dialog.refresh()
 	
 		_self.changed(:table_ur1, :refresh)
 		_self.changed(:table_ur2, :refresh)
@@ -1192,7 +1182,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_homepass()
+_method rwwi_stella_integration_dialog.get_data_homepass()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1267,7 +1257,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_homepass_fdt(fdt)
+_method rwwi_stella_integration_dialog.get_data_homepass_fdt(fdt)
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1336,7 +1326,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_homepass_fat_comment(fat)
+_method rwwi_stella_integration_dialog.get_data_homepass_fat_comment(fat)
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1429,7 +1419,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_homepass_fat_cell(fat)
+_method rwwi_stella_integration_dialog.get_data_homepass_fat_cell(fat)
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1513,7 +1503,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_homepass_not_valid()
+_method rwwi_stella_integration_dialog.get_data_homepass_not_valid()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1600,7 +1590,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_fat_not_valid()
+_method rwwi_stella_integration_dialog.get_data_fat_not_valid()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1689,7 +1679,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.get_data_boundary_fat_not_valid()
+_method rwwi_stella_integration_dialog.get_data_boundary_fat_not_valid()
 
 	#c_ur1 << ur1.conduits
 	#cbl_ur1 << ur1.cables
@@ -1787,7 +1777,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.table_selected_ur1( selection )
+_method rwwi_stella_integration_dialog.table_selected_ur1( selection )
 	## 
 	##
 
@@ -1832,19 +1822,13 @@ _method rwi_stela_integration_dialog.table_selected_ur1( selection )
 	.current_selection_ur1 << sel.selected_rows[1]
 	write(.current_selection_ur1)
 
-	_if .items[:upload_doc_type] _isnt _unset
-	_then
-		_if .current_selection_ur1 = 1 _then .items[:upload_doc_type].value << "Cluster"  _endif
-		_if .current_selection_ur1 = 2 _then .items[:upload_doc_type].value << "FAT"      _endif
-		_if .current_selection_ur1 = 3 _then .items[:upload_doc_type].value << "Homepass" _endif
-	_endif
 	_self.changed(:table_ur2, :refresh)
 _endmethod
 $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.cek_ug()
+_method rwwi_stella_integration_dialog.cek_ug()
 	s << swg_dsn_admin_engine.get_current_job()
 	
 	_if s _is _unset
@@ -1879,7 +1863,7 @@ $
 
 #line
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.cek_ae()
+_method rwwi_stella_integration_dialog.cek_ae()
 
 	s << swg_dsn_admin_engine.get_current_job()
 	
@@ -1914,7 +1898,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.seq_fdt()
+_method rwwi_stella_integration_dialog.seq_fdt()
 	# Create a sequence
 	table_list << rope.new()
 	
@@ -1970,7 +1954,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.seq_fat(fdt)
+_method rwwi_stella_integration_dialog.seq_fat(fdt)
 	# Create a sequence
 	table_list << rope.new()
 	
@@ -2233,7 +2217,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.generate_boq_excel()
+_method rwwi_stella_integration_dialog.generate_boq_excel()
 
 	s << swg_dsn_admin_engine.get_current_job()
 	nama << s.name.write_string
@@ -2360,7 +2344,7 @@ _method rwi_stela_integration_dialog.generate_boq_excel()
 		_endif
 		
 		h_path << system.getenv("pni")
-		a_filename << h_path + "\pni_custom\modules\rwi_stela_integration\resources\template HPDB astri.xlsx"
+		a_filename << h_path + "\pni_custom\modules\rwwi_stella_integration\resources\template HPDB astri.xlsx"
 		
 		
 		sht << "CLUSTER" #"Template"
@@ -2891,7 +2875,7 @@ _endmethod
 $
 
 #_pragma(classify_level=restricted)
-#_method rwi_stela_integration_dialog.browse_excel()
+#_method rwwi_stella_integration_dialog.browse_excel()
 #
 #
 #	_local fd << file_dialog.new(_self, :ok_excel|()|)
@@ -2912,7 +2896,7 @@ $
 #$
 #
 #_pragma(classify_level=restricted)
-#_method rwi_stela_integration_dialog.ok_excel(path)
+#_method rwwi_stella_integration_dialog.ok_excel(path)
 #
 #
 #	.items[:local_excel_path].value << path
@@ -2922,7 +2906,7 @@ $
 #$
 #
 #_pragma(classify_level=restricted)
-#_method rwi_stela_integration_dialog.upload_excel()
+#_method rwwi_stella_integration_dialog.upload_excel()
 #
 #
 #	_local path << .items[:local_excel_path].value.default("")
@@ -2939,7 +2923,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.table_selected_ur2( selection )
+_method rwwi_stella_integration_dialog.table_selected_ur2( selection )
 	## 
 	##
 	v << gis_program_manager.databases[:gis]
@@ -2986,7 +2970,7 @@ $
 
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.browse_excel()
+_method rwwi_stella_integration_dialog.browse_excel()
 	## Open a file dialog to select a local Excel file for upload to ASTRI.
 
 	_local fd << file_dialog.new(_self, :ok_browse_excel|()|)
@@ -3005,7 +2989,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.ok_browse_excel(path)
+_method rwwi_stella_integration_dialog.ok_browse_excel(path)
 	## Callback from file_dialog — store selected Excel path and enable Upload.
 	## If this browse was triggered by the auto-upload guided flow, chain
 	## straight into upload_excel() once a file has been picked.
@@ -3022,7 +3006,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.prompt_and_upload_after_export()
+_method rwwi_stella_integration_dialog.prompt_and_upload_after_export()
 	## Auto-upload is On, but generate_boq_excel() leaves the workbook open and
 	## unsaved (OLE Excel automation - no SaveAs call), unlike the workorder
 	## dialog's create_boq(), which returns an already-saved path. Guide the user
@@ -3036,7 +3020,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_private _method rwi_stela_integration_dialog.get_current_cluster_code()
+_private _method rwwi_stella_integration_dialog.get_current_cluster_code()
 	## Resolve the cluster code for the current design job from its project's
 	## job_title, which follows the format "infra_type-infra_code" (e.g.
 	## "cluster-KDR000292") — the last "-"-separated part is the code. This
@@ -3070,9 +3054,9 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={sw2plp,api_client})
-_method rwi_stela_integration_dialog.upload_excel()
-	## Upload the browsed Excel file (Cluster/FAT/Homepass — per the Doc Type
-	## dropdown) to the Stella document API.
+_method rwwi_stella_integration_dialog.upload_excel()
+	## Upload the browsed Excel file (Cluster/FAT/Homepass now live as sheets
+	## inside one combined workbook) to the Stella document API.
 
 	_local path << .items[:local_excel_path].value.default("")
 	_if path = ""
@@ -3088,12 +3072,15 @@ _method rwi_stela_integration_dialog.upload_excel()
 		_return
 	_endif
 
-	_local doc_type << .items[:upload_doc_type].value.default("Homepass")
-
 	_local path_parts << path.split_by("\")
 	_local file_name << path_parts[path_parts.size]
 
-	write("Uploading ", doc_type, " document to Stella: ", path, " (cluster ", cluster_code, ")")
+	# Cluster/FAT/Homepass are now sheets inside one combined workbook - there's
+	# no per-type selection any more, so a fixed type is sent (routing-only on
+	# the Java side; not sent to Stella - see StellaDocumentUploadClient).
+	_local doc_type << "combined"
+
+	write("Uploading document to Stella: ", path, " (cluster ", cluster_code, ")")
 
 	_try _with errCond
 
@@ -3112,8 +3099,8 @@ _method rwi_stela_integration_dialog.upload_excel()
 
 		_if success
 		_then
-			write("Upload successful: ", doc_type, " - ", file_name)
-			.owner.show_alert(write_string(doc_type, " document uploaded successfully.", newline_char,
+			write("Upload successful: ", file_name)
+			.owner.show_alert(write_string("Document uploaded successfully.", newline_char,
 				"File: ", file_name))
 		_else
 			_local err_elem << xml_doc.element_matching_name(:error)
@@ -3135,7 +3122,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_dialog.wm_close()
+_method rwwi_stella_integration_dialog.wm_close()
 	## 
 	## 
 	#	_self.clear()

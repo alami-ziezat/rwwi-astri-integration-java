@@ -8,11 +8,11 @@
 _package sw
 $
 
-remex(:rwi_stela_integration_plugin)
+remex(:rwwi_stella_integration_plugin)
 $
 
 _pragma(classify_level=restricted)
-def_slotted_exemplar(:rwi_stela_integration_plugin,
+def_slotted_exemplar(:rwwi_stella_integration_plugin,
 	##
 	##
 	{
@@ -23,7 +23,7 @@ def_slotted_exemplar(:rwi_stela_integration_plugin,
 $
 
 _pragma(classify_level=advanced)
-rwi_stela_integration_plugin.define_shared_constant(:databus_producer_data_types,
+rwwi_stella_integration_plugin.define_shared_constant(:databus_producer_data_types,
 				      {
 					      :goto_request,
 					      :geometry_to_draw,
@@ -34,14 +34,14 @@ rwi_stela_integration_plugin.define_shared_constant(:databus_producer_data_types
 $
 
 _pragma(classify_level=advanced)
-rwi_stela_integration_plugin.define_shared_constant(:post_render_sets,
+rwwi_stella_integration_plugin.define_shared_constant(:post_render_sets,
 				      equality_geometry_set.new(),
 				      :private
 	       )
 $
 
 
-rwi_stela_integration_plugin.define_shared_constant( :l_line_style,
+rwwi_stella_integration_plugin.define_shared_constant( :l_line_style,
 	line_style.new(colour.new_rgb(0.69412,  0.01098 , 0.00412),2,dash_pattern.solid),
 	
 	:private )
@@ -49,7 +49,7 @@ $
 
 
 
-rwi_stela_integration_plugin.define_shared_constant( :l_point_style,
+rwwi_stella_integration_plugin.define_shared_constant( :l_point_style,
 	line_style.new_with_properties(:foreground_colour,colour.new_with_properties(:red,0,:green,0,:blue,1),
 				       :width,8),
 
@@ -57,7 +57,7 @@ rwi_stela_integration_plugin.define_shared_constant( :l_point_style,
 $
 
 
-rwi_stela_integration_plugin.define_shared_constant( :l_text_style,
+rwwi_stella_integration_plugin.define_shared_constant( :l_text_style,
 	text_style.new_with_properties(:foreground_colour,colour.new_with_properties(:red,1,:green,0,:blue,1),
 				       :width,3),
 	:private )
@@ -66,31 +66,31 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_plugin.init_actions()
+_method rwwi_stella_integration_plugin.init_actions()
 	## 
 	##
 	
-	_self.add_action( sw_action.new( :activate_rwi_stela_integration,
-					 :caption,         "Stela Integration",
+	_self.add_action( sw_action.new( :activate_rwwi_stella_integration,
+					 :caption,         "Stella Integration",
 					 :engine, _self,
 					 :image, {:associate, :mit_base_gui},
-					 :action_message, :|activate_rwi_stela_integration()|,
+					 :action_message, :|activate_rwwi_stella_integration()|,
 					 :help_id, 5030 ) )
 _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_plugin.activate_rwi_stela_integration()
+_method rwwi_stella_integration_plugin.activate_rwwi_stella_integration()
 	## 
 	## Activate
 
 	
-	d << _self.get_dialog( :stela_integration )
+	d << _self.get_dialog( :stella_integration )
 	
 	_if  d  _is _unset
 	_then
-		d << rwi_stela_integration_dialog.new( _self, _self.application )
-		_self.cache_dialog( :rwi_stela_integration, d )
+		d << rwwi_stella_integration_dialog.new( _self, _self.application )
+		_self.cache_dialog( :rwwi_stella_integration, d )
 
 	_endif
 	
@@ -102,7 +102,7 @@ $
 
 
 _pragma(classify_level=advanced)
-_method rwi_stela_integration_plugin.sw_databus_data_requested(data_type, _gather args)
+_method rwwi_stella_integration_plugin.sw_databus_data_requested(data_type, _gather args)
 	## 
 	## 
 	

@@ -1,7 +1,7 @@
 # Plan: Separate the Stella API caller into its own project (`rwwi_stella_integration_java`)
 
-**Date:** 2026-08-30
-**Status:** Proposed — not yet implemented (plan only, per request)
+**Date:** 2026-08-30 (plan) / updated 2026-08-30 (implemented, including a follow-up Magik module rename — see §8)
+**Status:** Implemented. §§1-7 below are the original plan as written/approved; §8 records what was actually done, including one change beyond the original plan (the Magik dialog module was ultimately moved and renamed too, not left in place as §3/§5 step 7 originally said).
 
 ## 0. Context
 
@@ -149,3 +149,60 @@ Renaming the Magik global proc means **one call site to update** (`rwi_stela_int
 ## 7. Rollback
 
 Since nothing is deleted until the new project builds cleanly, rollback is just: don't wire `rwwi_stella_integration` into `pni_custom/modules/pni_custom/module.def`, don't remove the two files from the `astri` package, and don't redeploy. Low risk overall — one call site, one proc, no data migration involved.
+
+## 8. Implementation record
+
+### 8.1 §6 open questions — answers received
+
+1. **`datalake_stella_by_cluster_code`** — left in place, pure-Magik, not moved. (It now lives in `rwwi_stella_integration_dialog.magik`, having moved along with the whole dialog file per §8.2 below, but it was not otherwise touched.)
+2. **Credentials** — confirmed intentional: Stella uses the same username/password as ASTRI, only the host differs. `StellaConfig`/`stella_config.properties` were seeded with the values from §5 step 3 as planned.
+3. **Proc rename** — confirmed: `stella_upload_document(...)`, dropping the `astri_upload_` prefix, as planned.
+4. **Old `astri_config.properties` key** — removed immediately (not left for a release cycle): `astri.stella.base.url` deleted along with `AstriConfig.getStellaBaseUrl()`, since nothing in the `astri` package referenced either any more.
+
+§§1-7's Java-layer steps (1-6, 10 partially) were executed as written: `StellaConfig.java`, `StellaDocumentUploadProcs.java`, `internal/StellaDocumentUploadClient.java` created under `rwwi_stella_integration_java/src/main/java/com/rwi/myrepublic/stella/`; the two old files deleted from `astri`; both `pom.xml`s built clean (`mvn package`); both jars copied to `pni_custom/libs/` (confirmed as the real deployed classpath, not `core/libs/` — the old duplicate `pni_custom.rwi.astri.integration.1.jar`, unrelated stale bundle found during this work, was removed separately). `gis.exe` restarted and the upload flow was confirmed working end-to-end by the user before §8.2 below.
+
+### 8.2 Beyond the original plan: the Magik dialog module was moved and renamed too
+
+After testing confirmed the Java-layer split worked, a follow-up request asked to also move the Magik dialog module itself — `rwi_stela_integration` (note the pre-existing "rwi_"/single-L "stela" spelling) — into the new project and rename it to match, superseding §3's "No new Magik *dialog* module... stays exactly where it is" and §5 step 7's "just call a renamed global proc in place."
+
+**What moved**, from `pni_custom/rwwi_astri_integration_java/magik/rwi_stela_integration/` to `pni_custom/rwwi_astri_integration_java/rwwi_stella_integration_java/magik/rwwi_stella_integration/` (merged into the module already scaffolded in §5 step 6, rather than living as a separate module — one module now covers both the `requires_java` wiring and the dialog/plugin/engine logic):
+
+| Old | New |
+|---|---|
+| `source/rwi_stela_integration_dialog.magik` | `source/rwwi_stella_integration_dialog.magik` |
+| `source/rwi_stela_integration_engine.magik` | `source/rwwi_stella_integration_engine.magik` |
+| `source/rwi_stela_integration_plugin.magik` | `source/rwwi_stella_integration_plugin.magik` |
+| `resources/*.xlsx` (BOQ export templates) | same files, same flat `resources/` layout (unchanged — these are read via hardcoded absolute paths today, not module resource lookup, so relocating them doesn't change runtime behavior; see the pre-existing hardcoded-path issue noted in `stela_integration_module_assessment_2026-08-15.md` §5.3) |
+
+Every occurrence of the identifier `rwi_stela_integration` (exemplar names `rwi_stela_integration_dialog`/`_engine`/`_plugin`, all their methods, the module name itself) was substituted to `rwwi_stella_integration` throughout, plus human-readable "Stela Integration"/"Stela" text (button caption, comments) to "Stella Integration"/"Stella". Verified with a clean repo-wide grep afterward — no live-code references to the old name remain (only the two dated, pre-existing docs from 2026-08-15 still describe the old name, as historical snapshots of that point in time — not updated, since they document what was true then).
+
+`module.def` was merged (not left as two separate modules, to avoid a Smallworld duplicate-module-name situation now that both would be called `rwwi_stella_integration`):
+
+```
+rwwi_stella_integration	1
+
+description
+	Stella Integration - FTTH design-QA summary/reporting dialog (Cluster/FAT/
+	Homepass counts and validity checks) with Excel BOQ export and Stella
+	document upload. Carries the rwwi.stella.integration Java OSGi bundle
+	(document upload API caller).
+end
+
+requires
+	base
+end
+
+requires_java
+	rwwi.stella.integration
+end
+```
+
+`source/load_list.txt` now lists `test_stella_procs`, `rwwi_stella_integration_dialog`, `rwwi_stella_integration_engine`, `rwwi_stella_integration_plugin` (same relative dialog→engine→plugin order as the original, test file first).
+
+`pni_custom/modules/pni_custom/module.def`'s requires list now has a single `rwwi_stella_integration` line (the separate `rwi_stela_integration` line was removed — the module no longer exists under that name).
+
+The old `magik/rwi_stela_integration/` directory was deleted entirely after everything was copied and verified. One pre-existing, unrelated leftover was noticed but intentionally not touched: `magik/rwi_stela_integration_20260815.zip`, a dated backup archive sitting alongside the module folders — not part of the loaded product either way.
+
+**Known pre-existing issue carried over, not introduced by this rename:** `rwwi_stella_integration_plugin.magik`'s `activate_rwwi_stella_integration()` caches the dialog under `:rwwi_stella_integration` but looks it up under `:stella_integration` (`get_dialog(:stella_integration)` vs `cache_dialog(:rwwi_stella_integration, d)`) — a symbol mismatch that means the cache lookup never hits and a new dialog instance is created on every activation. This mismatch already existed before the rename (`:stela_integration` vs `:rwi_stela_integration` in the original file) and was preserved as-is since fixing it wasn't part of what was asked — flagging here in case it's worth a follow-up.
+
+**Verification still needed:** `mvn package` was already re-run for the Java layer in the prior step (§8.1) and is unaffected by this Magik-only rename. This step itself needs `gis.exe` restarted (module load order changed) and the Stela/Stella Integration dialog manually re-tested — action, dialog open, BOQ export, and the upload flow (already working pre-rename per §8.1) should all be re-confirmed post-rename.

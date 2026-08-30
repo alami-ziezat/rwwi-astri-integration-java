@@ -15,7 +15,7 @@ $
 ##     Returns an XML string: <response><success>.../<error>...</response>,
 ##     parsed by callers via simple_xml.read_element_string(...).
 ##
-## Called from: rwi_stela_integration_dialog.magik#upload_excel()
+## Called from: rwwi_stella_integration_dialog.magik#upload_excel()
 ##
 ## Usage:
 ##   test_stella_upload_document("C:\\temp\\homepass-template.xlsx", "CLUSTER-001", "homepass")

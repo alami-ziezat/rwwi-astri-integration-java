@@ -1,10 +1,10 @@
 rwwi_stella_integration	1
 
 description
-	Stella document upload API integration - Cluster/FAT/Homepass Excel
-	uploads via Basic Auth, JSON body. Split out of rwwi_astri_integration:
-	Stella is a separate external system (own host), it only shared the
-	astri jar/config for convenience originally.
+	Stella Integration - FTTH design-QA summary/reporting dialog (Cluster/FAT/
+	Homepass counts and validity checks) with Excel BOQ export and Stella
+	document upload. Carries the rwwi.stella.integration Java OSGi bundle
+	(document upload API caller).
 end
 
 requires

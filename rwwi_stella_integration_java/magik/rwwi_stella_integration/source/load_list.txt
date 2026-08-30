@@ -1,1 +1,4 @@
 test_stella_procs
+rwwi_stella_integration_dialog
+rwwi_stella_integration_engine
+rwwi_stella_integration_plugin

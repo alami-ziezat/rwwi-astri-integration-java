@@ -8,11 +8,11 @@
 _package sw
 $
 
-remex(:rwi_stela_integration_engine)
+remex(:rwwi_stella_integration_engine)
 $
 
 _pragma(classify_level=restricted)
-def_slotted_exemplar(:rwi_stela_integration_engine,
+def_slotted_exemplar(:rwwi_stella_integration_engine,
 	{
 		{ :current_selection_ur1,_unset },
 		{ :current_selection_ur2,_unset },
@@ -39,14 +39,14 @@ def_slotted_exemplar(:rwi_stela_integration_engine,
 $
 
 _pragma(classify_level=restricted)
-rwi_stela_integration_engine.define_shared_constant( :databus_consumer_data_types,
+rwwi_stella_integration_engine.define_shared_constant( :databus_consumer_data_types,
     { :map_selection },
     :public )
 
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.new(_optional owner, framework)
+_method rwwi_stella_integration_engine.new(_optional owner, framework)
 	## 
 	## 
 	_return _clone.init(owner, framework)
@@ -54,7 +54,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.init( owner , framework )
+_method rwwi_stella_integration_engine.init( owner , framework )
 	## 
 	## 
 
@@ -81,7 +81,7 @@ _method rwi_stela_integration_engine.init( owner , framework )
 _endmethod
 $
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.get_ur1(items, records)
+_method rwwi_stella_integration_engine.get_ur1(items, records)
 	##
 	##
 	
@@ -108,7 +108,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.get_ur2(items, records)
+_method rwwi_stella_integration_engine.get_ur2(items, records)
 	##
 	##
 	
@@ -153,7 +153,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.int!get_result(items, records, a_dialog)
+_method rwwi_stella_integration_engine.int!get_result(items, records, a_dialog)
 	##
 	##
 	
@@ -246,7 +246,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.get_data_ur(ur1, ur2, table_list, table_list2, a_dialog)
+_method rwwi_stella_integration_engine.get_data_ur(ur1, ur2, table_list, table_list2, a_dialog)
 	##
 	##
 	
@@ -287,7 +287,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.get_data_ur2(ur2, table_list2, a_dialog)
+_method rwwi_stella_integration_engine.get_data_ur2(ur2, table_list2, a_dialog)
 	##
 	##
 	
@@ -311,7 +311,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.goto1(items, records)
+_method rwwi_stella_integration_engine.goto1(items, records)
 	## 
 	##
 
@@ -332,7 +332,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.goto2(items, records)
+_method rwwi_stella_integration_engine.goto2(items, records)
 	## 
 	##
 
@@ -351,7 +351,7 @@ _endmethod
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.goto_int1(items, records)
+_method rwwi_stella_integration_engine.goto_int1(items, records)
 	## 
 	##
 
@@ -371,7 +371,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.goto_int2(items, records)
+_method rwwi_stella_integration_engine.goto_int2(items, records)
 	## 
 	##
 
@@ -390,7 +390,7 @@ $
 $
 
 _pragma(classify_level=restricted)
-_method rwi_stela_integration_engine.check_merge(items, current_selection_ur1, current_selection_ur2, a_dialog)
+_method rwwi_stella_integration_engine.check_merge(items, current_selection_ur1, current_selection_ur2, a_dialog)
 	##
 	##
 

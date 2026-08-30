@@ -8,7 +8,7 @@ import com.rwi.myrepublic.stella.internal.StellaDocumentUploadClient;
 
 /**
  * Stella document upload procedures exposed to Magik - Cluster/FAT/Homepass
- * Excel uploads for the Stela Integration dialog.
+ * Excel uploads for the Stella Integration dialog.
  * Uses @MagikProc annotation to automatically create a global Magik procedure.
  *
  * Exposes:
