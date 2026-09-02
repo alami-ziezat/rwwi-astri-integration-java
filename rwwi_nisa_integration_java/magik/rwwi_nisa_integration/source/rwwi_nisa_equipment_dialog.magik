@@ -30,9 +30,10 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
-	## Build Equipment tab toolbar: object selector + Get Selected Object,
-	## Area / OLT Code / Hostname / FAT Code fields, Run / Reset / Navigate /
-	## Start / Stop buttons.
+	## Build Equipment tab's FIRST toolbar: object selector + Get Selected Object,
+	## Area / OLT Code / FAT Code fields, Run / Reset, count label.
+	## Hostname / Navigate / Highlight / Start / Stop live on the second toolbar -
+	## see build_equipment_toolbar2().
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type,     :button_group,
@@ -71,13 +72,6 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 		:value,           "",
 		:change_selector, :eq_olt_code_changed|()|)
 
-	sw_label_item.new(tb, "  Hostname: ")
-	.items[:eq_hostname_field] << sw_text_item.new(tb,
-		:model,          _self,
-		:display_length, 18,
-		:editable?,      _false,
-		:value,          "")
-
 	sw_label_item.new(tb, "  FAT Code: ")
 	.items[:eq_fat_code_field] << sw_text_item.new(tb,
 		:model,          _self,
@@ -97,6 +91,31 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 		:selector, :eq_reset|()|,
 		:tooltip,  "Clear fields and results")
 
+	.items[:eq_count_label] << sw_label_item.new(tb, "  0 results  ")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.build_equipment_toolbar2(parent)
+	## Build Equipment tab's SECOND toolbar (directly below the first): Hostname
+	## (read-only), Navigate, Highlight (toggle - shows/highlights the selected
+	## ticket's FAT on the map, mirrors the Cluster tab's highlight_btn), and
+	## Start / Stop blink.
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type,     :button_group,
+		:show_separators?,   _true,
+		:enable_action_menu?, _false)
+
+	tb << toolbar_con.create_toolbar()
+
+	sw_label_item.new(tb, "  Hostname: ")
+	.items[:eq_hostname_field] << sw_text_item.new(tb,
+		:model,          _self,
+		:display_length, 18,
+		:editable?,      _false,
+		:value,          "")
+
 	.items[:eq_goto_btn] << sw_button_item.new(tb,
 		:image,    {:goto_object, :ui_resources},
 		:model,    _self,
@@ -104,7 +123,13 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 		:tooltip,  "Navigate map to selected ticket's FAT")
 	.items[:eq_goto_btn].enabled? << _false
 
-	.items[:eq_count_label] << sw_label_item.new(tb, "  0 results  ")
+	.items[:eq_highlight_btn] << sw_image_toggle_item.new(tb,
+		:image,    {:highlight, :ui_resources},
+		:model,    _self,
+		:change_selector, :eq_show_map|()|,
+		:value,    _false,
+		:tooltip,  "Show/highlight selected ticket's FAT on map")
+	.items[:eq_highlight_btn].enabled? << _false
 
 	sw_label_item.new(tb, "  |  ")
 
@@ -544,6 +569,8 @@ _method rwwi_nisa_dialog.eq_reset()
 	## Clear Equipment tab fields, results, and selection state.
 
 	_self.eq_stop()
+	_self.eq_show_map(_false)
+	.items[:eq_highlight_btn].value << _false
 
 	.eq_selected_object << _unset
 	.eq_result_rows.empty()
@@ -619,6 +646,12 @@ _method rwwi_nisa_dialog.eq_result_selected(table, selection)
 	_endif
 
 	_self.eq_manage_actions()
+
+	# Refresh highlight immediately when active so the displayed FAT tracks selection
+	_if .items[:eq_highlight_btn].value _is _true
+	_then
+		_self.changed(:eq_show_map, _true)
+	_endif
 _endmethod
 $
 
@@ -687,6 +720,78 @@ _method rwwi_nisa_dialog.eq_goto_selected()
 	_when error
 		_self.log_error("eq_goto_selected error: " + errCon.report_contents_string)
 	_endtry
+_endmethod
+$
+
+##
+## Highlight (toggle) - shows/highlights the currently selected ticket's FAT on
+## the map. Mirrors the Cluster tab's show_map()/highlight_btn, but scoped to the
+## single selected row (the Equipment result table is single-selection).
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_show_map(toggled?)
+	## Toggle highlight of the currently selected ticket's FAT on the map.
+	## Fires :eq_show_map, consumed by the plugin (separate from the Cluster tab's
+	## :show_map so the two highlight sessions don't collide).
+
+	_if toggled? _andif .eq_selected_row _is _unset
+	_then
+		_self.log_warning("No result row selected. Select a row in the table first.")
+		.items[:eq_highlight_btn].value << _false
+		_return
+	_endif
+	_self.changed(:eq_show_map, toggled?)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_highlight_record()
+	## Return a rope with 0 or 1 property_list {:pseudo_point, :result_pl} for the
+	## currently selected result row - used by the plugin's eq_show_mode rendering.
+	## Mirrors records() for the Cluster tab, scoped to a single selection.
+
+	_local result << rope.new()
+
+	_if .eq_selected_row _is _unset _then >> result _endif
+
+	_local pl     << .eq_selected_row
+	_local splice << _self.int!eq_resolve_splice(pl[:fdt_code], pl[:fat_code])
+	_if splice _is _unset _then >> result _endif
+
+	_try
+		_local pp << pseudo_point.new(splice.location.coord)
+		pp.world << _self.database.world
+		result.add_last(property_list.new_with(:pseudo_point, pp, :result_pl, pl))
+	_when error
+	_endtry
+
+	>> result
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_highlight_tooltip_for(pl)
+	## Build the tooltip text shown when highlighting a ticket's FAT on the map.
+
+	_local lines << rope.new()
+	lines.add_last(write_string("-- SEGMENT PROBLEM DETAIL --"))
+	lines.add_last(write_string("Ticket Number: ", pl[:ticket_number]))
+	lines.add_last(write_string("Status: ", pl[:status_name], " (", pl[:tlop_status], ")"))
+	lines.add_last(write_string("Area: ", pl[:tlop_area_name]))
+	lines.add_last(write_string("Hostname: ", pl[:hostname]))
+	lines.add_last(write_string("FDT Code: ", pl[:fdt_code]))
+	lines.add_last(write_string("FAT Code: ", pl[:fat_code]))
+	lines.add_last(write_string("Cluster: ", pl[:tlop_cluster_name]))
+	lines.add_last(write_string("Created: ", pl[:tlop_created_date]))
+
+	_local tooltip << ""
+	_for i _over 1.upto(lines.size)
+	_loop
+		_if i > 1 _then tooltip << tooltip + %newline.write_string _endif
+		tooltip << tooltip + lines[i]
+	_endloop
+	>> tooltip
 _endmethod
 $
 
@@ -762,8 +867,9 @@ _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.eq_manage_actions()
 	## Enable/disable Equipment tab buttons based on current state.
 
-	.items[:eq_goto_btn].enabled?  << .eq_selected_row _isnt _unset
-	.items[:eq_start_btn].enabled? << (_not .eq_result_rows.empty?) _andif (_not .eq_blink_active)
-	.items[:eq_stop_btn].enabled?  << .eq_blink_active _is _true
+	.items[:eq_goto_btn].enabled?      << .eq_selected_row _isnt _unset
+	.items[:eq_highlight_btn].enabled? << .eq_selected_row _isnt _unset
+	.items[:eq_start_btn].enabled?     << (_not .eq_result_rows.empty?) _andif (_not .eq_blink_active)
+	.items[:eq_stop_btn].enabled?      << .eq_blink_active _is _true
 _endmethod
 $

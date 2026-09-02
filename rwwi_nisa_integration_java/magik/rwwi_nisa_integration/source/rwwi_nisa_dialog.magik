@@ -105,11 +105,13 @@ _method rwwi_nisa_dialog.activate_in(frame)
 	_self.build_toolbar(cluster_inner)
 	_self.build_table(cluster_inner)
 
-	# Tab 2 - Equipment (new - Segment Problem Detail). Same wrapper requirement.
+	# Tab 2 - Equipment (new - Segment Problem Detail). Same wrapper requirement,
+	# 3 rows: first toolbar, second toolbar (Hostname/Navigate/Highlight/blink), table.
 	equipment_tab   << tab_con.new_tab("Equipment")
-	equipment_inner << sw_container.new(equipment_tab, 2, 1,
-		:row_resize_values, {0, 1})
+	equipment_inner << sw_container.new(equipment_tab, 3, 1,
+		:row_resize_values, {0, 0, 1})
 	_self.build_equipment_toolbar(equipment_inner)
+	_self.build_equipment_toolbar2(equipment_inner)
 	_self.build_equipment_table(equipment_inner)
 
 	# Shared log window - outside the tab container so both tabs log to the same place

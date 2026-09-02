@@ -20,9 +20,16 @@ def_slotted_exemplar(:rwwi_nisa_plugin,
 	{:current_doc_gui, _unset},   # Current map document GUI
 	{:current_doc,     _unset},   # Current map document (map view)
 	{:geoms,           _unset},   # Rope of property_lists {local_coord, cluster_pl}
-	{:render_status,     _unset},   # :enable or :disable
+	{:render_status,     _unset},   # :enable or :disable (Cluster tab highlight)
 	{:zone_pseudo_areas, _unset},   # Rope of pseudo_areas published via :geometry_to_draw
-	{:animator,          _unset}    # map_animator instance for blink animations
+	{:animator,          _unset},   # map_animator instance for blink animations
+
+	## Equipment tab highlight (separate from Cluster's render_status/geoms above,
+	## but both share the single :transient_drawer post-renderer registration -
+	## see int!ensure_post_renderer / int!maybe_remove_post_renderer)
+	{:eq_geoms,               _unset},   # Rope of property_lists {pseudo_point, result_pl} (0 or 1 elements)
+	{:eq_render_status,       _unset},   # :enable or :disable (Equipment tab highlight)
+	{:post_renderer_active?,  _false}    # _true once :transient_drawer is registered with the map manager
 }, :plugin)
 $
 
@@ -37,19 +44,21 @@ $
 _pragma(classify_level=basic, topic={nisa_integration}) 
 rwwi_nisa_plugin.define_shared_constant(:text_style,
 	property_list.new_with(
-		:outage,  text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("bold", 10)),
-		:ok,      text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("plain", 10)),
-		:unknown, text_style.new_with_properties(:colour, colour.called(:black), :font,font.new_logical("plain", 10))),
+		:outage,    text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("bold", 10)),
+		:ok,        text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("plain", 10)),
+		:unknown,   text_style.new_with_properties(:colour, colour.called(:black), :font,font.new_logical("plain", 10)),
+		:equipment, text_style.new_with_properties(:colour, colour.called(:white), :font,font.new_logical("bold", 10))),
 	:private)
 $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 rwwi_nisa_plugin.define_shared_constant(:fill_style,
 	property_list.new_with(
-		:outage,  fill_style.new_with_properties(:foreground_colour, colour.called(:red)),
-		:ok,      fill_style.new_with_properties(:foreground_colour, colour.called(:green)),
-		:unknown, fill_style.new_with_properties(:foreground_colour,
-			colour.new_with_properties(:red, 0.6, :green, 0.6, :blue, 0.6))),
+		:outage,    fill_style.new_with_properties(:foreground_colour, colour.called(:red)),
+		:ok,        fill_style.new_with_properties(:foreground_colour, colour.called(:green)),
+		:unknown,   fill_style.new_with_properties(:foreground_colour,
+			colour.new_with_properties(:red, 0.6, :green, 0.6, :blue, 0.6)),
+		:equipment, fill_style.new_with_properties(:foreground_colour, colour.called(:blue))),
 	:private)
 $
 
@@ -170,6 +179,10 @@ _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.note_change(who, what, data)
 	## Handle change notifications from the dialog.
 	## :show_map     -> build geoms and enable static tooltip rendering (Cluster tab).
+	## :eq_show_map  -> build eq_geoms and enable static tooltip rendering for the
+	##                   Equipment tab's single selected ticket (separate render
+	##                   status from Cluster's :show_map, but they share the one
+	##                   :transient_drawer post-renderer registration).
 	## :blink_mode   -> start or stop Cluster tab blink animations (independent of show/hide).
 	## :eq_blink_mode -> start or stop Equipment tab blink animations. Kept separate
 	##                   from :blink_mode so Cluster/Equipment blink don't collide -
@@ -182,6 +195,9 @@ _method rwwi_nisa_plugin.note_change(who, what, data)
 	_if what _is :show_map
 	_then
 		_self.show_mode(data)
+	_elif what _is :eq_show_map
+	_then
+		_self.eq_show_mode(data)
 	_elif what _is :blink_mode
 	_then
 		_if data
@@ -215,19 +231,20 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.show_mode(enable?)
-	## Enable or disable map rendering of outage clusters.
+	## Enable or disable map rendering of outage clusters (Cluster tab).
 	## Mirrors rwwi_bulk_search_plugin.show_mode pattern.
 	## enable? - _true to show clusters on map, _false to hide.
+	##
+	## Shares the single :transient_drawer post-renderer registration with the
+	## Equipment tab's eq_show_mode() - see int!ensure_post_renderer /
+	## int!maybe_remove_post_renderer - so disabling this tab's highlight doesn't
+	## tear down rendering the other tab may still need.
 
 	_if enable?
 	_then
 		.render_status << :enable
-		a_map_manager << _self.get_service_provider(:map_manager)
-		_if a_map_manager _isnt _unset
-		_then
-			a_map_manager.add_post_renderer(_self, _self.render_priority, :transient_drawer)
-			_self.show_records()
-		_endif
+		_self.int!ensure_post_renderer()
+		_self.show_records()
 	_else
 		.render_status << :disable
 		# Undraw each zone geometry that was previously published
@@ -239,12 +256,8 @@ _method rwwi_nisa_plugin.show_mode(enable?)
 			_endloop
 			.zone_pseudo_areas << _unset
 		_endif
-		a_map_manager << _self.get_service_provider(:map_manager)
-		_if a_map_manager _isnt _unset
-		_then
-			_self.refresh_maps()
-			a_map_manager.remove_post_renderer(_self, :transient_drawer)
-		_endif
+		_self.refresh_maps()
+		_self.int!maybe_remove_post_renderer()
 	_endif
 _endmethod
 $
@@ -260,6 +273,103 @@ _method rwwi_nisa_plugin.show_records()
 		_self.build_rwo_cache()
 		_self.publish_zone_geometries()
 		_self.refresh_maps()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.eq_show_mode(enable?)
+	## Enable or disable map highlight of the currently selected Equipment tab
+	## ticket's FAT. No zone geometry involved (FATs are points, not zone
+	## polygons) - just the tooltip rendering, scoped to a single record.
+
+	_if enable?
+	_then
+		.eq_render_status << :enable
+		_self.int!ensure_post_renderer()
+		_self.eq_show_records()
+	_else
+		.eq_render_status << :disable
+		_self.refresh_maps()
+		_self.int!maybe_remove_post_renderer()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.eq_show_records()
+	## Build eq_geoms from dialog.eq_highlight_record, then trigger a map redraw.
+
+	_if .eq_render_status _is :enable
+	_then
+		_self.eq_build_rwo_cache()
+		_self.refresh_maps()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.eq_build_rwo_cache()
+	## Populate .eq_geoms from dialog.eq_highlight_record (0 or 1 records).
+
+	.eq_geoms << rope.new()
+
+	_if .dialog _is _unset _then _return _endif
+	_if (a_map_view << .current_doc) _is _unset _then _return _endif
+
+	_local a << pseudo_area.new_for_world(a_map_view.current_view_bounds.sectors, a_map_view.world)
+	_try _with errCon
+		_for rec _over .dialog.eq_highlight_record().fast_elements()
+		_loop
+			_local pp << rec[:pseudo_point]
+			_if pp.within?(a)
+			_then
+				.eq_geoms.add_last(rec)
+			_endif
+		_endloop
+	_when error
+		#write("NISA plugin: eq_build_rwo_cache error - ", errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.int!ensure_post_renderer()
+	## Register the shared :transient_drawer post-renderer if not already active.
+	## Both show_mode (Cluster) and eq_show_mode (Equipment) call this - the
+	## registration is only actually made once, on whichever fires first.
+
+	_if .post_renderer_active? _isnt _true
+	_then
+		_local a_map_manager << _self.get_service_provider(:map_manager)
+		_if a_map_manager _isnt _unset
+		_then
+			a_map_manager.add_post_renderer(_self, _self.render_priority, :transient_drawer)
+			.post_renderer_active? << _true
+		_endif
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.int!maybe_remove_post_renderer()
+	## Unregister the shared :transient_drawer post-renderer only once BOTH the
+	## Cluster and Equipment tab highlights are disabled - so turning one off
+	## doesn't stop rendering the other tab may still need.
+
+	_if .render_status _is :enable _orif .eq_render_status _is :enable
+	_then
+		_return
+	_endif
+
+	_if .post_renderer_active? _is _true
+	_then
+		_local a_map_manager << _self.get_service_provider(:map_manager)
+		_if a_map_manager _isnt _unset
+		_then
+			a_map_manager.remove_post_renderer(_self, :transient_drawer)
+		_endif
+		.post_renderer_active? << _false
 	_endif
 _endmethod
 $
@@ -314,12 +424,21 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.map_damage_notify(gc, a_map_view)
 	## Post-renderer callback  -  called each time the map redraws.
-	
-	_if a_map_view _is .current_doc _andif
-	    .render_status _is :enable
+	## Draws both Cluster tab highlights and Equipment tab highlight - whichever
+	## is currently enabled - since both share one :transient_drawer registration.
+
+	_if a_map_view _isnt .current_doc _then _return _endif
+
+	_if .render_status _is :enable
 	_then
 		_self.build_rwo_cache()  # Rebuild cache on each redraw to ensure it stays in sync with dialog records
 		_self.draw_all_clusters(gc)
+	_endif
+
+	_if .eq_render_status _is :enable
+	_then
+		_self.eq_build_rwo_cache()
+		_self.draw_all_equipment_highlights(gc)
 	_endif
 _endmethod
 $
@@ -501,6 +620,40 @@ _private _method rwwi_nisa_plugin.draw_all_clusters(gc)
 		_local local_coord  << rec[:pseudo_point].coordinate
 
 		_self.draw_cluster(gc, local_coord, cluster_code, :outage)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_plugin.draw_all_equipment_highlights(gc)
+	## Draw the Equipment tab's highlighted ticket (0 or 1 record) onto the map gc.
+	## No zone areas involved - just the tooltip, reusing the same draw_point
+	## mechanics as draw_cluster with the :equipment style.
+
+	_if .eq_geoms _is _unset _orif .eq_geoms.empty? _then _return _endif
+
+	_for rec _over .eq_geoms.fast_elements()
+	_loop
+		_local result_pl   << rec[:result_pl]
+		_local local_coord << rec[:pseudo_point].coordinate
+		_local text << _if .dialog _isnt _unset
+		               _then >> .dialog.eq_highlight_tooltip_for(result_pl)
+		               _else >> result_pl[:ticket_number]
+		               _endif
+		_if text _is _unset _orif text.empty? _then _continue _endif
+
+		_local line_gc << _unset
+		_local text_gc << _unset
+		_protect
+			line_gc << gc.create_graphics_context(:classic_text_drawing)
+			text_gc << gc.create_graphics_context(:classic_drawing)
+
+			_self.int!draw_cluster(line_gc, text_gc, local_coord, text, :equipment)
+
+		_protection
+			_if text_gc _isnt _unset _then text_gc.destroy() _endif
+			_if line_gc _isnt _unset _then line_gc.destroy() _endif
+		_endprotect
 	_endloop
 _endmethod
 $
