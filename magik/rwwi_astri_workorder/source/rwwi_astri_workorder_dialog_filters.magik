@@ -6,9 +6,12 @@ _package user
 ## Handles data filtering and refreshing operations
 
 _method rwwi_astri_workorder_dialog.refresh_data()
-	## Refresh table data from current source
+	## Refresh table data from current source.
+	## Marks the dialog as having explicitly requested data, so
+	## workorder_list_data() is now allowed to call the ASTRI API.
 
 	write("Refreshing work order data...")
+	.data_loaded? << _true
 	_self.changed(:workorder_list, :renew)
 _endmethod
 $

@@ -407,8 +407,8 @@ _global nisa_parse_segment_problem_detail_response << _proc(json_string)
 			item_pl[:tlop_status]       << item[:tlop_status].default("").write_string
 			item_pl[:status_name]       << item[:status_name].default("").write_string
 			item_pl[:tlop_created_date] << item[:tlop_created_date].default("").write_string
-			item_pl[:tlop_area_name]    << item[:tlop_area_name].default("").write_string
-			item_pl[:tlop_cluster_name] << item[:tlop_cluster_name].default("").write_string
+			item_pl[:tlop_area_name]    << item[:area].default("").write_string
+			item_pl[:tlop_cluster_name] << item[:cluster_name].default("").write_string
 			item_pl[:fdt_code]          << item[:fdt_code].default("").write_string
 			item_pl[:fat_code]          << item[:fat_code].default("").write_string
 			item_pl[:hostname]          << item[:hostname].default("").write_string

@@ -24,7 +24,16 @@ def_slotted_exemplar(:rwwi_nisa_dialog,
 	{:view,             _unset},              # ACE view (gis_program_manager.ace_view)
 	{:cs_transform,     _unset},              # WGS84 -> local CS transform (built once, reused)
 	{:search_mode,      _unset, :writable},   # :cluster_code (default) or :area
-	{:blink_active,     _false}               # _true when blink animation is running
+	{:blink_active,     _false},              # _true when blink animation is running
+
+	## Equipment tab (Segment Problem Detail) - see rwwi_nisa_equipment_dialog.magik
+	{:eq_mode,            _unset, :writable}, # :fat or :cable
+	{:eq_selected_object, _unset, :writable}, # resolved sheath_splice (FAT mode) or cable (Cable mode)
+	{:eq_result_rows,     _unset, :writable}, # rope of pl from nisa_parse_segment_problem_detail_response[:data]
+	{:eq_row_cache,       _unset, :writable}, # row number -> result pl (survives table sort, like cluster_cache)
+	{:eq_selected_row,    _unset, :writable}, # currently selected result pl (single-selection table)
+	{:eq_splice_cache,    _unset, :writable}, # splice_name -> sheath_splice rwo (resolved lazily for goto/blink)
+	{:eq_blink_active,    _false}             # _true when equipment blink animation is running
 }, :model)
 $
 
@@ -48,6 +57,14 @@ _private _method rwwi_nisa_dialog.init(owner)
 	.selected_clusters  << rope.new()
 	.blink_active       << _false
 
+	.eq_mode            << :fat
+	.eq_selected_object << _unset
+	.eq_result_rows     << rope.new()
+	.eq_row_cache       << equality_hash_table.new()
+	.eq_selected_row    << _unset
+	.eq_splice_cache    << equality_hash_table.new()
+	.eq_blink_active    << _false
+
 	_self.add_dependent(.owner)
 	>> _super.init()
 _endmethod
@@ -55,9 +72,12 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.activate_in(frame)
-	## Build and activate Mass Problem Monitoring UI in frame
+	## Build and activate NISA Integration UI in frame.
+	## Two tabs sharing this one model: "Cluster" (existing mass problem monitoring,
+	## unchanged apart from its parent container) and "Equipment" (new - segment
+	## problem detail, see rwwi_nisa_equipment_dialog.magik).
 
-	frame.title << "Mass Problem Monitoring (NISA)"
+	frame.title << "NISA Integration"
 
 	# Top-level canvas container (SWIFT requirement)
 	.items[:top] << top_c << sw_canvas_container.new(
@@ -69,16 +89,35 @@ _method rwwi_nisa_dialog.activate_in(frame)
 		:identifier,     :nisa_top_container,
 		:model,          _self)
 
-	# Outer container: 4 rows - toolbar, table, actions, log
+	# Outer container: 4 rows - tabs, (spare), (spare), log
 	.items[:outer] << outer << sw_container.new(top_c, 4, 1,
 		:row_resize_values, {0, 1, 0, 1})
 
-	_self.build_toolbar(outer)
-	_self.build_table(outer)
+	.items[:tabs] << tab_con << sw_tab_container.new(outer,
+		:min_height, 500)
+
+	# Tab 1 - Cluster (existing content, unchanged - only its parent changes).
+	# A tab pane holds exactly one direct child (like a card_stack card), so wrap
+	# the toolbar + table in their own 2-row container.
+	cluster_tab   << tab_con.new_tab("Cluster")
+	cluster_inner << sw_container.new(cluster_tab, 2, 1,
+		:row_resize_values, {0, 1})
+	_self.build_toolbar(cluster_inner)
+	_self.build_table(cluster_inner)
+
+	# Tab 2 - Equipment (new - Segment Problem Detail). Same wrapper requirement.
+	equipment_tab   << tab_con.new_tab("Equipment")
+	equipment_inner << sw_container.new(equipment_tab, 2, 1,
+		:row_resize_values, {0, 1})
+	_self.build_equipment_toolbar(equipment_inner)
+	_self.build_equipment_table(equipment_inner)
+
+	# Shared log window - outside the tab container so both tabs log to the same place
 	_self.build_log(outer)
 
-	_self.log_info("Mass Problem Monitoring (NISA) - Ready")
-	_self.log_info("Enter a cluster code and click Search to begin.")
+	_self.log_info("NISA Integration - Ready")
+	_self.log_info("Cluster tab: enter a cluster code and click Search to begin.")
+	_self.log_info("Equipment tab: select a FAT or Cable object on the map and click Get Selected Object.")
 
 	_return top_c
 _endmethod

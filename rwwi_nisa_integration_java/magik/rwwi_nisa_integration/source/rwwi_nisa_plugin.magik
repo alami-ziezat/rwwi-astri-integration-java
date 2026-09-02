@@ -169,9 +169,14 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_plugin.note_change(who, what, data)
 	## Handle change notifications from the dialog.
-	## :show_map    -> build geoms and enable static tooltip rendering.
-	## :blink_mode  -> start or stop blink animations (independent of show/hide).
-	## :goto_request -> navigate map to the given cluster property_list.
+	## :show_map     -> build geoms and enable static tooltip rendering (Cluster tab).
+	## :blink_mode   -> start or stop Cluster tab blink animations (independent of show/hide).
+	## :eq_blink_mode -> start or stop Equipment tab blink animations. Kept separate
+	##                   from :blink_mode so Cluster/Equipment blink don't collide -
+	##                   both still share the plugin's single .animator slot (only one
+	##                   blink session runs at a time; starting one stops the other).
+	## :goto_request -> navigate map to the given pseudo_point (used by both tabs -
+	##                   Cluster's goto_selected() and Equipment's eq_goto_selected()).
 
 	#write("NISA plugin note_change: ", what, " from ", who, " with data: ", data, " (current_doc=", .current_doc, ")")
 	_if what _is :show_map
@@ -184,6 +189,14 @@ _method rwwi_nisa_plugin.note_change(who, what, data)
 			_self.start_blink_animations()
 		_else
 			_self.stop_blink_animations()
+		_endif
+	_elif what _is :eq_blink_mode
+	_then
+		_if data
+		_then
+			_self.start_equipment_blink_animations()
+		_else
+			_self.stop_equipment_blink_animations()
 		_endif
 	_elif what _is :goto_request
 	_then
@@ -394,6 +407,83 @@ _method rwwi_nisa_plugin.stop_blink_animations()
 		.animator << _unset
 	_endif
 	_self.refresh_maps()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.start_equipment_blink_animations()
+	## Create a map_animator and add a map_blink_animation for every resolved FAT
+	## location from dialog.equipment_blink_records (Equipment tab). Copy of
+	## start_blink_animations() with the record source swapped - shares the same
+	## .animator slot, so this stops any running Cluster tab blink first.
+
+	_self.stop_blink_animations()
+
+	_if .dialog _is _unset
+	_then
+		write("NISA plugin: start_equipment_blink_animations - dialog is unset")
+		_return
+	_endif
+	_if .current_doc _is _unset
+	_then
+		write("NISA plugin: start_equipment_blink_animations - current_doc is unset (no map view yet)")
+		_return
+	_endif
+
+	_local all_records << .dialog.equipment_blink_records()
+	_if all_records _is _unset _orif all_records.empty?
+	_then
+		write("NISA plugin: start_equipment_blink_animations - no resolvable FAT locations")
+		_return
+	_endif
+
+	# Only animate FATs visible in the current viewport - same reasoning as
+	# start_blink_animations() (off-screen points break image.copy_from_canvas()).
+	_local view_area << pseudo_area.new_for_world(
+		.current_doc.current_view_bounds.sectors,
+		.current_doc.world)
+	_local visible << rope.new()
+	_try
+		_for rec _over all_records.fast_elements()
+		_loop
+			_if rec[:pseudo_point].within?(view_area)
+			_then
+				visible.add_last(rec)
+			_endif
+		_endloop
+	_when error
+		visible << all_records
+	_endtry
+
+	_if visible.empty?
+	_then
+		write("NISA plugin: start_equipment_blink_animations - no FATs in current viewport")
+		_return
+	_endif
+
+	_try _with errCon
+		.animator << map_animator.new(.current_doc)
+		.animator.run()
+		_for rec _over visible.fast_elements()
+		_loop
+			_local coord << rec[:pseudo_point].coordinate
+			_local ani   << map_blink_animation.new(.current_doc, coord)
+			.animator.add(ani)
+		_endloop
+		write("NISA plugin: equipment blink started: ", visible.size, " FAT(s) in viewport (", all_records.size, " total)")
+	_when error
+		write("NISA plugin: start_equipment_blink_animations error - ", errCon.report_contents_string)
+		.animator << _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_plugin.stop_equipment_blink_animations()
+	## Stop equipment blink animation. Shares the same stop mechanics as the
+	## Cluster tab's stop_blink_animations() (same .animator slot).
+
+	_self.stop_blink_animations()
 _endmethod
 $
 

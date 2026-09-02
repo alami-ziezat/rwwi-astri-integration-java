@@ -1,0 +1,769 @@
+#% text_encoding = iso8859_1
+_package user
+$
+
+## NISA Equipment Tab (Segment Problem Detail)
+## Adds all "Equipment" tab methods to the rwwi_nisa_dialog exemplar (defined in
+## rwwi_nisa_dialog.magik - slots for this tab are declared there too).
+##
+## Flow:
+##   1. User picks Object Type (FAT or Cable) and clicks Get Selected Object.
+##      - FAT mode expects a Pole or UUB selected on the map; finds its FAT
+##        sheath_splice, fills Area / OLT Code / FAT Code (editable).
+##      - Cable mode expects an Aerial Route or Underground Route selected; finds
+##        its cable, fills Area / OLT Code, and populates FAT Code as a dropdown of
+##        FAT codes sharing the cable's ring_name.
+##   2. Hostname is resolved eagerly (never typed) from dim_olt_master_smallworld by
+##      OLT Code - both right after Get Selected Object and on every manual OLT Code
+##      edit - so it is always ready before Run is pressed.
+##   3. Run calls nisa_segment_problem_detail(area, hostname, fat_code) and shows the
+##      parsed tickets in a table.
+##   4. Navigate resolves the selected ticket's FAT (fdt_code + "." + fat_code) to a
+##      sheath_splice and goes to its location on the map (reuses the existing
+##      :goto_request databus message the plugin already handles).
+##   5. Start/Stop blink all resolved FAT locations for the current result set
+##      (mirrors the Cluster tab's blink, via a separate :eq_blink_mode message).
+
+##
+## Toolbar / table construction
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
+	## Build Equipment tab toolbar: object selector + Get Selected Object,
+	## Area / OLT Code / Hostname / FAT Code fields, Run / Reset / Navigate /
+	## Start / Stop buttons.
+
+	toolbar_con << sw_toolbar_container.new(parent, _false,
+		:background_type,     :button_group,
+		:show_separators?,   _true,
+		:enable_action_menu?, _false)
+
+	tb << toolbar_con.create_toolbar()
+
+	sw_label_item.new(tb, "  Object: ")
+	.items[:eq_mode_selector] << sw_text_item.new(tb,
+		:model,           _self,
+		:display_length,  8,
+		:editable?,       _false,
+		:change_selector, {:|eq_mode_changed()|})
+	.items[:eq_mode_selector].text_items << {"FAT", "Cable"}
+	.items[:eq_mode_selector].value      << "FAT"
+
+	.items[:eq_get_obj_btn] << sw_button_item.new(tb,
+		:image,    {:find, :ui_resources},
+		:model,    _self,
+		:selector, :eq_get_selected_object|()|,
+		:tooltip,  "Get selected FAT (Pole/UUB) or Cable (Aerial/Underground Route) object from the map")
+
+	sw_label_item.new(tb, "  Area: ")
+	.items[:eq_area_field] << sw_text_item.new(tb,
+		:model,          _self,
+		:display_length, 14,
+		:editable?,      _true,
+		:value,          "")
+
+	sw_label_item.new(tb, "  OLT Code: ")
+	.items[:eq_olt_code_field] << sw_text_item.new(tb,
+		:model,           _self,
+		:display_length,  14,
+		:editable?,       _true,
+		:value,           "",
+		:change_selector, :eq_olt_code_changed|()|)
+
+	sw_label_item.new(tb, "  Hostname: ")
+	.items[:eq_hostname_field] << sw_text_item.new(tb,
+		:model,          _self,
+		:display_length, 18,
+		:editable?,      _false,
+		:value,          "")
+
+	sw_label_item.new(tb, "  FAT Code: ")
+	.items[:eq_fat_code_field] << sw_text_item.new(tb,
+		:model,          _self,
+		:display_length, 14,
+		:editable?,      _true,
+		:value,          "")
+
+	.items[:eq_run_btn] << sw_button_item.new(tb,
+		:image,    {:run, :ui_resources},
+		:model,    _self,
+		:selector, :eq_run|()|,
+		:tooltip,  "Get Segment Problem Detail")
+
+	.items[:eq_reset_btn] << sw_button_item.new(tb,
+		:image,    {:clear, :ui_resources},
+		:model,    _self,
+		:selector, :eq_reset|()|,
+		:tooltip,  "Clear fields and results")
+
+	.items[:eq_goto_btn] << sw_button_item.new(tb,
+		:image,    {:goto_object, :ui_resources},
+		:model,    _self,
+		:selector, :eq_goto_selected|()|,
+		:tooltip,  "Navigate map to selected ticket's FAT")
+	.items[:eq_goto_btn].enabled? << _false
+
+	.items[:eq_count_label] << sw_label_item.new(tb, "  0 results  ")
+
+	sw_label_item.new(tb, "  |  ")
+
+	.items[:eq_start_btn] << sw_button_item.new(tb,
+		:image,    {:run, :ui_resources},
+		:model,    _self,
+		:selector, :eq_go|()|,
+		:tooltip,  "Start blink animation")
+	.items[:eq_start_btn].enabled? << _false
+
+	.items[:eq_stop_btn] << sw_button_item.new(tb,
+		:image,    {:stop, :ui_resources},
+		:model,    _self,
+		:selector, :eq_stop|()|,
+		:tooltip,  "Stop blink animation")
+	.items[:eq_stop_btn].enabled? << _false
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.build_equipment_table(parent)
+	## Build Equipment tab result table (Segment Problem Detail tickets).
+
+	.items[:eq_table] << a_table << sw_table.new(parent,
+		:row_height,                   22,
+		:selection_type,               :row,
+		:selection_mode,               :one,
+		:model,                        _self,
+		:aspect,                       :eq_result_list,
+		:row_lines?,                   _true,
+		:column_lines?,                _true,
+		:row_stripes?,                 _true,
+		:enable_horizontal_scrollbar?, _true,
+		:data_selector,                :|eq_result_list_data()|,
+		:selection_notifier,           :eq_result_selected|()|,
+		:enable_manage_columns?,       _true,
+		:min_height,                   250)
+
+	a_table.set_column_labels({
+		"#", "Ticket Number", "Status", "Status Name", "Area", "Hostname",
+		"FDT Code", "FAT Code", "Cluster Name", "Created Date"})
+
+	a_table.col_resize_values << {0, 1.5, 0.8, 1, 1, 1.5, 1.2, 1, 2, 1.5}
+
+	a_table.enable_column_filter(2, _true)   # Ticket Number
+	a_table.enable_column_filter(5, _true)   # Hostname
+	a_table.enable_column_filter(7, _true)   # FDT Code
+	a_table.enable_column_filter(8, _true)   # FAT Code
+	a_table.enable_sort? << _true
+_endmethod
+$
+
+##
+## Object Type selector
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_mode_changed(selected_value)
+	## Handle Object Type dropdown change ("FAT" or "Cable") - resets the tab so
+	## stale fields/results from the previous mode aren't left showing.
+
+	.eq_mode << _if selected_value = "Cable" _then >> :cable _else >> :fat _endif
+	_self.eq_reset()
+_endmethod
+$
+
+##
+## Get Selected Object
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_selected_str()
+	## Return the currently selected map object's rwo, or _unset if nothing is
+	## selected (or the map/selection can't be reached). Mirrors
+	## rwwi_mancore_plan_dialog.selected_str(), but defensive so a stale/missing
+	## map reference produces _unset (and a logged reason) instead of an
+	## uncaught error.
+
+	_try _with errCon
+		_local grs << smallworld_product.application(:pni)
+		_if grs _is _unset
+		_then
+			_self.log_warning("eq_selected_str: smallworld_product.application(:pni) is unset.")
+			_return _unset
+		_endif
+
+		_local mapman << grs.plugin(:map_plugin)
+		_if mapman _is _unset _orif mapman.current_map _is _unset
+		_then
+			_self.log_warning("eq_selected_str: no current map view found.")
+			_return _unset
+		_endif
+
+		_local sel << mapman.current_map.current_selection
+		_self.log_info(write_string("eq_selected_str: current_selection size = ", sel.size))
+
+		_if sel.size > 0
+		_then
+			_return sel.an_element().rwo
+		_endif
+		_return _unset
+
+	_when error
+		_self.log_error("eq_selected_str error: " + errCon.report_contents_string)
+		_return _unset
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_get_selected_object()
+	## Get the currently selected FAT (Pole/UUB) or Cable (Aerial/Underground Route)
+	## object from the map, based on the Object Type selector, and populate the
+	## Area / OLT Code (and FAT Code where applicable) fields.
+
+	_try _with errCon
+		_local rwo << _self.eq_selected_str()
+
+		_if rwo _is _unset
+		_then
+			_self.log_warning("No object selected on the map.")
+			_return
+		_endif
+
+		_self.log_info(write_string("Selected object external_name: ", rwo.external_name.default("?")))
+
+		_if .eq_mode _is :fat
+		_then
+			_self.int!eq_get_fat_object(rwo)
+		_else
+			_self.int!eq_get_cable_object(rwo)
+		_endif
+	_when error
+		_self.log_error("Get Selected Object error: " + errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.int!eq_get_fat_object(rwo)
+	## FAT mode: rwo can be EITHER a FAT sheath_splice selected directly (the
+	## splice icon is usually what's actually clickable on the map), OR a Pole /
+	## UUB structure - in which case its FAT sheath_splice is looked up via
+	## get_equipment(). Either way, ends up populating Area / OLT Code / FAT Code
+	## from the resolved splice.
+
+	_local splice << _unset
+
+	_if rwo.responds_to?(:sheath_splice_object_type)
+	_then
+		# A sheath_splice (or equipment wrapper for one) was selected directly.
+		_local splice_type << rwo.sheath_splice_object_type.default("")
+		_if splice_type.uppercase <> "FAT"
+		_then
+			_self.log_warning("Selected sheath_splice is type '" + splice_type +
+				"', not FAT.")
+			_return
+		_endif
+		splice << rwo
+
+	_elif rwo.external_name = "Pole" _orif rwo.external_name = "UUB"
+	_then
+		_local equipment << rwo.get_equipment()
+		_local splices << equipment.select(
+			predicate.navigate({:source_collection}, predicate.eq(:name, :sheath_splice)))
+		_local fat_splices << splices.select(predicate.eq(:sheath_splice_object_type, "FAT"))
+
+		_if fat_splices.empty?
+		_then
+			_self.log_warning("No FAT sheath_splice found on the selected structure.")
+			_return
+		_endif
+
+		_if fat_splices.size > 1
+		_then
+			_self.log_warning(write_string("Multiple (", fat_splices.size,
+				") FAT splices found on this structure - using the first."))
+		_endif
+
+		splice << fat_splices.an_element()
+
+	_else
+		_self.log_warning("Select a FAT sheath_splice, or a Pole/UUB that hosts one (selected: " +
+			rwo.external_name.default("?") + ").")
+		_return
+	_endif
+
+	.eq_selected_object << splice
+
+	.items[:eq_area_field].value     << splice.region.default("").write_string
+	.items[:eq_olt_code_field].value << splice.olt_code.default("").write_string
+
+	_local splice_name << splice.name.default("").write_string
+	_local parts        << splice_name.split_by(".")
+	_local fat_code      << _if parts.size > 0
+	                       _then >> parts[parts.size].write_string
+	                       _else >> splice_name
+	                       _endif
+
+	.items[:eq_fat_code_field].text_items << {}
+	.items[:eq_fat_code_field].editable?  << _true
+	.items[:eq_fat_code_field].value      << fat_code
+
+	_self.log_success("FAT selected: " + splice_name)
+	_self.eq_lookup_hostname()
+	_self.eq_manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.int!eq_get_cable_object(rwo)
+	## Cable mode: rwo can be EITHER a cable (sheath_with_loc) selected directly,
+	## OR an Aerial Route / Underground Route - in which case its cable is looked
+	## up via .cables() (same call as rwwi_mancore_plan_dialog.get_rwo()). Either
+	## way, ends up populating Area / OLT Code, plus a FAT Code dropdown of FAT
+	## codes sharing the cable's ring_name.
+
+	_local cable << _unset
+
+	_if rwo.responds_to?(:cables)
+	_then
+		# Aerial/Underground route selected - derive its cable
+		_local cables << rwo.cables()
+		_if cables.empty?
+		_then
+			_self.log_warning("No cable found on the selected route.")
+			_return
+		_endif
+		cable << cables.an_element()
+
+	_elif rwo.responds_to?(:fiber_count)
+	_then
+		# Cable (sheath_with_loc) selected directly
+		cable << rwo
+
+	_else
+		_self.log_warning("Select a Cable, or an Aerial/Underground Route that hosts one (selected: " +
+			rwo.external_name.default("?") + ").")
+		_return
+	_endif
+
+	.eq_selected_object << cable
+
+	.items[:eq_area_field].value     << cable.region.default("").write_string
+	.items[:eq_olt_code_field].value << cable.olt_code.default("").write_string
+
+	_self.int!eq_populate_fat_code_dropdown(cable)
+
+	_self.log_success("Cable selected: " + cable.name.default("").write_string)
+	_self.eq_lookup_hostname()
+	_self.eq_manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.int!eq_populate_fat_code_dropdown(cable)
+	## Populate FAT Code as a non-editable dropdown of FAT codes (dot-split, last
+	## segment of the splice name) sharing the cable's ring_name.
+
+	.items[:eq_fat_code_field].editable? << _false
+	.items[:eq_fat_code_field].value     << ""
+	.items[:eq_fat_code_field].text_items << {}
+
+	_local ring_name << cable.ring_name.default("")
+	_if ring_name = ""
+	_then
+		_self.log_warning("Selected cable has no ring_name - cannot list FAT codes.")
+		_return
+	_endif
+
+	_local sc_col << _self.database.collections[:sheath_splice]
+	_local pred   << predicate.eq(:sheath_splice_object_type, "FAT") _and
+	                 predicate.eq(:ring_name, ring_name)
+	_local fats   << sc_col.select(pred)
+
+	_local names << equality_hash_table.new()
+	_for splice _over fats.fast_elements()
+	_loop
+		_local parts    << splice.name.default("").split_by(".")
+		_local fat_code << _if parts.size > 0
+		                   _then >> parts[parts.size].write_string
+		                   _else >> splice.name.default("").write_string
+		                   _endif
+		_if fat_code <> "" _then names[fat_code] << _true _endif
+	_endloop
+
+	_local fat_list << rope.new()
+	_for n _over names.keys.as_sorted_collection().fast_elements()
+	_loop
+		fat_list.add_last(n)
+	_endloop
+
+	.items[:eq_fat_code_field].text_items << fat_list.as_simple_vector()
+	_if _not fat_list.empty?
+	_then
+		.items[:eq_fat_code_field].value << fat_list[1]
+	_endif
+
+	_self.log_info(write_string("Found ", fat_list.size, " FAT code(s) for ring_name '", ring_name, "'"))
+_endmethod
+$
+
+##
+## Hostname lookup (eager - fires from Get Selected Object and from manual OLT
+## Code edits, never deferred to Run)
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_olt_code_changed(new_value)
+	## change_selector for the OLT Code field - lets the user manually type or
+	## override an OLT code (with or without a selected map object) and still get
+	## Hostname resolved immediately, before Run is ever reachable.
+
+	_self.eq_lookup_hostname()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_lookup_hostname()
+	## Look up Hostname from dim_olt_master_smallworld using the current OLT Code
+	## field value. Read-only field - this is the only thing that ever sets it.
+
+	_local olt_code << .items[:eq_olt_code_field].value.default("").trim_spaces()
+
+	_if olt_code = ""
+	_then
+		.items[:eq_hostname_field].value << ""
+		_self.eq_manage_actions()
+		_return
+	_endif
+
+	_local db_conn << _unset
+	_protect
+		_try _with errCon
+			_local is_connect?
+			(is_connect?, db_conn) << user:rwwi_external_ds_manager.open_connection_for("[POSTGRESQL_ASTRI_DB]")
+
+			_if _not is_connect?
+			_then
+				_self.log_error("Failed to connect to POSTGRESQL_ASTRI_DB")
+				.items[:eq_hostname_field].value << ""
+				_return
+			_endif
+
+			_local sql  << "SELECT olt_hostname FROM smallworld.dim_olt_master_smallworld WHERE olt_code = ? LIMIT 1"
+			_local recs << db_conn.sql_select(sql, olt_code)
+			_local rec  << recs.get()
+			recs.close()
+
+			_try
+				db_conn.commit()
+			_when error
+				db_conn.rollback()
+			_endtry
+
+			_if rec _is _unset
+			_then
+				_self.log_warning("No OLT hostname found for olt_code: " + olt_code)
+				.items[:eq_hostname_field].value << ""
+			_else
+				.items[:eq_hostname_field].value << rec.olt_hostname.default("").write_string
+			_endif
+
+		_when error
+			_self.log_error("Hostname lookup error: " + errCon.report_contents_string)
+			.items[:eq_hostname_field].value << ""
+		_endtry
+
+	_protection
+		_if db_conn _isnt _unset
+		_then
+			_try
+				db_conn.rollback()
+				db_conn.close()
+			_when error
+			_endtry
+		_endif
+	_endprotect
+
+	_self.eq_manage_actions()
+_endmethod
+$
+
+##
+## Run / Reset
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_run()
+	## Call nisa_segment_problem_detail(area, hostname, fat_code) with the current
+	## field values and populate the result table. Hostname is already resolved
+	## (§ eq_lookup_hostname) - this method does no database work of its own.
+
+	_local area     << .items[:eq_area_field].value.default("").trim_spaces()
+	_local hostname << .items[:eq_hostname_field].value.default("").trim_spaces()
+	_local fat_code << .items[:eq_fat_code_field].value.default("").trim_spaces()
+
+	_if area = "" _orif hostname = "" _orif fat_code = ""
+	_then
+		_self.log_separator()
+		_self.show_alert("Area, Hostname and FAT Code are all required.")
+		_return
+	_endif
+
+	_self.log_separator()
+	_self.log_info(write_string("Segment Problem Detail: area='", area,
+		"' hostname='", hostname, "' fat='", fat_code, "'"))
+
+	_try _with errCon
+		_local json_result << nisa_segment_problem_detail(area, hostname, fat_code)
+		_local result       << nisa_parse_segment_problem_detail_response(json_result)
+
+		_if _not result[:success]
+		_then
+			_self.log_warning("NISA segment-problem-detail: " + result[:msg])
+		_endif
+
+		.eq_result_rows << result[:data]
+		.eq_splice_cache.empty()
+		.eq_selected_row << _unset
+
+		_local n << .eq_result_rows.size
+		.items[:eq_count_label].value << write_string("  ", n, " results  ")
+		_self.log_success(write_string("Found ", n, " segment problem ticket(s)"))
+
+		_self.changed(:eq_result_list, :renew)
+		_self.eq_manage_actions()
+
+	_when error
+		_self.log_error("Segment Problem Detail error: " + errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_reset()
+	## Clear Equipment tab fields, results, and selection state.
+
+	_self.eq_stop()
+
+	.eq_selected_object << _unset
+	.eq_result_rows.empty()
+	.eq_row_cache.empty()
+	.eq_selected_row << _unset
+	.eq_splice_cache.empty()
+
+	.items[:eq_area_field].value     << ""
+	.items[:eq_olt_code_field].value << ""
+	.items[:eq_hostname_field].value << ""
+	.items[:eq_fat_code_field].text_items << {}
+	.items[:eq_fat_code_field].editable?  << (.eq_mode _is :fat)
+	.items[:eq_fat_code_field].value      << ""
+
+	.items[:eq_count_label].value << "  0 results  "
+
+	_self.changed(:eq_result_list, :renew)
+	_self.eq_manage_actions()
+	_self.log_info("Equipment tab reset.")
+_endmethod
+$
+
+##
+## Table data selector and selection handler
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_result_list_data()
+	## Data selector: populate the equipment result table from eq_result_rows.
+
+	_try
+		.eq_row_cache.empty()
+		_local row << 0
+
+		_for pl _over .eq_result_rows.fast_elements()
+		_loop
+			row +<< 1
+			.items[:eq_table].add_label(row, 1, row.write_string)
+			.items[:eq_table].add_label(row, 2, pl[:ticket_number])
+			.items[:eq_table].add_label(row, 3, pl[:tlop_status])
+			.items[:eq_table].add_label(row, 4, pl[:status_name])
+			.items[:eq_table].add_label(row, 5, pl[:tlop_area_name])
+			.items[:eq_table].add_label(row, 6, pl[:hostname])
+			.items[:eq_table].add_label(row, 7, pl[:fdt_code])
+			.items[:eq_table].add_label(row, 8, pl[:fat_code])
+			.items[:eq_table].add_label(row, 9, pl[:tlop_cluster_name])
+			.items[:eq_table].add_label(row, 10, pl[:tlop_created_date])
+
+			.eq_row_cache[row] << pl
+		_endloop
+	_when error
+		write("ERROR in eq_result_list_data: ", condition.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_result_selected(table, selection)
+	## Handle row selection in the equipment result table (single-selection).
+	## Reads the "#" column back (like cluster_selected) so selection survives sort.
+
+	.eq_selected_row << _unset
+
+	_if selection _isnt _unset _andif selection.size > 0
+	_then
+		_local row      << selection.an_element()
+		_local orig_row << row
+		_try
+			orig_row << table.cell(row, 1).value.as_number()
+		_when error
+		_endtry
+		.eq_selected_row << .eq_row_cache[orig_row]
+	_endif
+
+	_self.eq_manage_actions()
+_endmethod
+$
+
+##
+## FAT resolution helper (shared by Navigate and Blink)
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_private _method rwwi_nisa_dialog.int!eq_resolve_splice(fdt_code, fat_code)
+	## Resolve a sheath_splice rwo by name = fdt_code + "." + fat_code, caching
+	## results (including misses) in .eq_splice_cache.
+
+	_local splice_name << write_string(fdt_code, ".", fat_code)
+	_local cached << .eq_splice_cache[splice_name]
+
+	_if cached _isnt _unset
+	_then
+		_if cached _is :not_found _then _return _unset _endif
+		_return cached
+	_endif
+
+	_local result << _unset
+	_try
+		_local sc_col << _self.database.collections[:sheath_splice]
+		result << sc_col.select(predicate.eq(:name, splice_name)).an_element()
+	_when error
+		result << _unset
+	_endtry
+
+	.eq_splice_cache[splice_name] << _if result _is _unset _then >> :not_found _else >> result _endif
+	>> result
+_endmethod
+$
+
+##
+## Navigate
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_goto_selected()
+	## Navigate the map to the FAT splice for the currently selected result row.
+	## No WGS84<->local transform needed - sheath_splice.location is already a
+	## native GIS geometry in the database's local coordinate system.
+
+	_if .eq_selected_row _is _unset
+	_then
+		_self.log_warning("No result row selected.")
+		_return
+	_endif
+
+	_local pl     << .eq_selected_row
+	_local splice << _self.int!eq_resolve_splice(pl[:fdt_code], pl[:fat_code])
+
+	_if splice _is _unset
+	_then
+		_self.log_warning(write_string("No sheath_splice found for FAT '",
+			pl[:fdt_code], ".", pl[:fat_code], "'"))
+		_return
+	_endif
+
+	_try _with errCon
+		_local pp << pseudo_point.new(splice.location.coord)
+		pp.world << _self.database.world
+		_self.log_info("Going to FAT: " + splice.name.default("").write_string)
+		_self.changed(:goto_request, pp)   # reuses the existing plugin handler verbatim
+	_when error
+		_self.log_error("eq_goto_selected error: " + errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+##
+## Blink (start/stop) - separate :eq_blink_mode message so it doesn't collide with
+## the Cluster tab's :blink_mode
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_go()
+	## Start equipment blink animation over all resolved FAT locations in the
+	## current result set.
+
+	_if .eq_result_rows.empty?
+	_then
+		_self.log_warning("No results to animate. Run a query first.")
+		_return
+	_endif
+
+	.eq_blink_active << _true
+	_self.changed(:eq_blink_mode, _true)
+	_self.log_info("[Equipment Blink] Started.")
+	_self.eq_manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_stop()
+	## Stop equipment blink animation.
+
+	.eq_blink_active << _false
+	_self.changed(:eq_blink_mode, _false)
+	_self.log_info("[Equipment Blink] Stopped.")
+	_self.eq_manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.equipment_blink_records()
+	## Return a rope of property_lists {:pseudo_point, :result_pl} for every result
+	## row whose FAT splice can be resolved - used by the plugin's equipment blink.
+	## Deduped by splice name. Mirrors all_outage_records() for the Cluster tab.
+
+	_local result << rope.new()
+	_local seen   << equality_hash_table.new()
+
+	_for pl _over .eq_result_rows.fast_elements()
+	_loop
+		_local splice_name << write_string(pl[:fdt_code], ".", pl[:fat_code])
+		_if seen[splice_name] _isnt _unset _then _continue _endif
+
+		_local splice << _self.int!eq_resolve_splice(pl[:fdt_code], pl[:fat_code])
+		_if splice _is _unset _then _continue _endif
+
+		_try
+			_local pp << pseudo_point.new(splice.location.coord)
+			pp.world << _self.database.world
+			result.add_last(property_list.new_with(:pseudo_point, pp, :result_pl, pl))
+			seen[splice_name] << _true
+		_when error
+		_endtry
+	_endloop
+
+	>> result
+_endmethod
+$
+
+##
+## Button state management
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_manage_actions()
+	## Enable/disable Equipment tab buttons based on current state.
+
+	.items[:eq_goto_btn].enabled?  << .eq_selected_row _isnt _unset
+	.items[:eq_start_btn].enabled? << (_not .eq_result_rows.empty?) _andif (_not .eq_blink_active)
+	.items[:eq_stop_btn].enabled?  << .eq_blink_active _is _true
+_endmethod
+$

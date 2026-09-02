@@ -1,3 +1,4 @@
 test_nisa_procs
 rwwi_nisa_dialog
+rwwi_nisa_equipment_dialog
 rwwi_nisa_plugin

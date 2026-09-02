@@ -20,7 +20,8 @@ def_slotted_exemplar(:rwwi_astri_workorder_dialog,
 	{:last_kmz_path,    _unset, :writable},    # Path of most recently exported KMZ
 	{:last_boq_path,    _unset, :writable},    # Path of most recently saved BOQ document
 	{:last_excel_path,  _unset, :writable},    # Path of manually selected Excel file for upload
-	{:batch_sections,   _unset, :writable}     # Ordered rope of batch sections {:infra_type, :codes}, or _unset when no batch loaded
+	{:batch_sections,   _unset, :writable},    # Ordered rope of batch sections {:infra_type, :codes}, or _unset when no batch loaded
+	{:data_loaded?,     _false, :writable}     # _true once the user has explicitly requested a work order fetch (Apply Filters / Load WO List)
 }, :model)
 $
 
@@ -40,6 +41,7 @@ _private _method rwwi_astri_workorder_dialog.init(owner, framework)
 	.items << property_list.new()
 	.filters << property_list.new()
 	.wo_cache << equality_hash_table.new()
+	.data_loaded? << _false
 
 	# Initialize default filters
 	.filters[:source] << :api
@@ -102,7 +104,10 @@ _method rwwi_astri_workorder_dialog.activate_in(frame)
 	# Apply per-role toolbar visibility (root: all, admin: batch only, user: all but batch)
 	_self.apply_role_visibility()
 
-	# Initial data load
+	# Render the (empty) table immediately - no API call is made here.
+	# workorder_list_data() only fetches once .data_loaded? is _true, which
+	# happens when the user clicks "Apply Filters" / "Load WO List", so the
+	# dialog opens instantly instead of blocking on the ASTRI API.
 	_self.changed(:workorder_list, :refresh)
 
 	# Return the top-level container (required)
@@ -857,30 +862,40 @@ _method rwwi_astri_workorder_dialog.workorder_list_data()
 		# Clear cache before populating new data
 		.wo_cache.empty()
 
-		# Determine batch mode: multi-section import active?
-		_local batch_mode? << .batch_sections _isnt _unset _andif _not .batch_sections.empty?
-
 		_local workorders
-		_if batch_mode?
+		_local batch_mode? << _false
+		_if _not .data_loaded?
 		_then
-			# Batch mode: one API fetch per section, match by infra_code,
-			# tag each WO with its OWN infra_type (supports mixed types).
-			workorders << _self.fetch_batch_workorders()
-
-			# Also fetch donation values as part of Load WO List (per-WO type,
-			# feeder skipped) so the Donation column is populated in one pass.
-			_self.apply_batch_donations(workorders)
+			# Dialog just opened (or list explicitly cleared) - do NOT call the
+			# ASTRI API yet. Leave the table empty; the real fetch happens once
+			# the user requests it via "Apply Filters" / "Load WO List", which
+			# set .data_loaded? to _true before triggering this refresh.
+			workorders << rope.new()
 		_else
-			# Get data from engine based on current source
-			workorders << _if .filters[:source] _is :api
+			# Determine batch mode: multi-section import active?
+			batch_mode? << .batch_sections _isnt _unset _andif _not .batch_sections.empty?
+
+			_if batch_mode?
 			_then
-				>> .engine.get_workorders_from_api(
-					.filters[:infrastructure_type].default("cluster"),
-					.filters[:limit],
-					.filters[:offset],
-					_self.build_filter_params())
+				# Batch mode: one API fetch per section, match by infra_code,
+				# tag each WO with its OWN infra_type (supports mixed types).
+				workorders << _self.fetch_batch_workorders()
+
+				# Also fetch donation values as part of Load WO List (per-WO type,
+				# feeder skipped) so the Donation column is populated in one pass.
+				_self.apply_batch_donations(workorders)
 			_else
-				>> .engine.get_workorders_from_db(_self.build_filter_params())
+				# Get data from engine based on current source
+				workorders << _if .filters[:source] _is :api
+				_then
+					>> .engine.get_workorders_from_api(
+						.filters[:infrastructure_type].default("cluster"),
+						.filters[:limit],
+						.filters[:offset],
+						_self.build_filter_params())
+				_else
+					>> .engine.get_workorders_from_db(_self.build_filter_params())
+				_endif
 			_endif
 		_endif
 
@@ -955,9 +970,13 @@ $
 
 _pragma(classify_level=debug, topic={astri_integration})
 _method rwwi_astri_workorder_dialog.refresh_data()
-	## Refresh table data from current source
+	## Refresh table data from current source.
+	## NOTE: the active version of this method is in
+	## rwwi_astri_workorder_dialog_filters.magik (loaded later). Kept in sync
+	## here for consistency.
 
 	write("Refreshing work order data...")
+	.data_loaded? << _true
 	_self.changed(:workorder_list, :renew)
 _endmethod
 $
