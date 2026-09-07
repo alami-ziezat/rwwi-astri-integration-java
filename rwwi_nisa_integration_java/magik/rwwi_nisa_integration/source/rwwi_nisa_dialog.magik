@@ -27,6 +27,7 @@ def_slotted_exemplar(:rwwi_nisa_dialog,
 	{:blink_active,     _false},              # _true when blink animation is running
 
 	## Equipment tab (Segment Problem Detail) - see rwwi_nisa_equipment_dialog.magik
+	{:eq_find_by,         _unset, :writable}, # :fat_loss (default) or :segment - see §2j
 	{:eq_mode,            _unset, :writable}, # :fat or :cable
 	{:eq_selected_object, _unset, :writable}, # resolved sheath_splice (FAT mode) or cable (Cable mode)
 	{:eq_result_rows,     _unset, :writable}, # rope of pl from nisa_parse_segment_problem_detail_response[:data]
@@ -57,6 +58,7 @@ _private _method rwwi_nisa_dialog.init(owner)
 	.selected_clusters  << rope.new()
 	.blink_active       << _false
 
+	.eq_find_by         << :fat_loss
 	.eq_mode            << :fat
 	.eq_selected_object << _unset
 	.eq_result_rows     << rope.new()
@@ -114,12 +116,16 @@ _method rwwi_nisa_dialog.activate_in(frame)
 	_self.build_equipment_toolbar2(equipment_inner)
 	_self.build_equipment_table(equipment_inner)
 
+	# Apply the default Find By mode's widget visibility/tooltip/column labels
+	# (§2j) - must run after build_equipment_table since it sets column labels.
+	_self.eq_apply_find_by_mode()
+
 	# Shared log window - outside the tab container so both tabs log to the same place
 	_self.build_log(outer)
 
 	_self.log_info("NISA Integration - Ready")
 	_self.log_info("Cluster tab: enter a cluster code and click Search to begin.")
-	_self.log_info("FAT Loss tab: select a FAT or Cable object on the map and click Get Selected Object.")
+	_self.log_info("FAT Loss tab: pick Find by, then click Run (Fat Loss Detection) or select a FAT/Cable object and click Get Selected Object (Segment Problem Detail).")
 
 	_return top_c
 _endmethod

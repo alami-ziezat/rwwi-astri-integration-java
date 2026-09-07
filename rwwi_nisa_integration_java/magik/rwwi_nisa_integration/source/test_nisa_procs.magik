@@ -296,7 +296,11 @@ _global nisa_parse_fat_loss_detection_response << _proc(json_string)
 	##     :active_ticket_count   - Integer
 	##     :active_tickets        - Rope of property_lists, each with:
 	##                              :ticket_number, :tlop_status, :status_name,
-	##                              :tlop_created_date, :affected_customer
+	##                              :tlop_created_date, :affected_customer,
+	##                              :tlop_area_name, :hostname, :fdt_code, :fat_code
+	##                              (the last four use the same key names as
+	##                              nisa_parse_segment_problem_detail_response so a
+	##                              ticket row from either endpoint is interchangeable)
 
 	_local result << property_list.new()
 	result[:success]              << _false
@@ -339,6 +343,10 @@ _global nisa_parse_fat_loss_detection_response << _proc(json_string)
 				ticket_pl[:status_name]       << ticket_item[:status_name].default("").write_string
 				ticket_pl[:tlop_created_date] << ticket_item[:tlop_created_date].default("").write_string
 				ticket_pl[:affected_customer] << ticket_item[:affected_customer].default("").write_string
+				ticket_pl[:tlop_area_name]    << ticket_item[:area].default("").write_string
+				ticket_pl[:hostname]          << ticket_item[:hostname].default("").write_string
+				ticket_pl[:fdt_code]          << ticket_item[:fdt_code].default("").write_string
+				ticket_pl[:fat_code]          << ticket_item[:fat_code].default("").write_string
 				tickets_rope.add_last(ticket_pl)
 			_endloop
 		_endif

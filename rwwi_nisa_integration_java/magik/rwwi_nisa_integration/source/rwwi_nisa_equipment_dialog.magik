@@ -2,26 +2,35 @@
 _package user
 $
 
-## NISA Equipment Tab (Segment Problem Detail)
+## NISA Equipment Tab (FAT Loss Detection / Segment Problem Detail)
 ## Adds all "Equipment" tab methods to the rwwi_nisa_dialog exemplar (defined in
 ## rwwi_nisa_dialog.magik - slots for this tab are declared there too).
 ##
 ## Flow:
-##   1. User picks Object Type (FAT or Cable) and clicks Get Selected Object.
+##   0. "Find by" (first item, Toolbar 1) picks the mode - "Fat Loss Detection"
+##      (default) or "Segment Problem Detail". Switching modes hides/shows the
+##      Segment-only widgets via .managed? (eq_apply_find_by_mode()), retargets
+##      the Run button's tooltip, and relabels the shared result table's one
+##      differing column (Cluster Name vs Affected Customer).
+##   1. Segment Problem Detail mode: pick Object Type (FAT or Cable) and click
+##      Get Selected Object.
 ##      - FAT mode expects a Pole or UUB selected on the map; finds its FAT
 ##        sheath_splice, fills Area / OLT Code / FAT Code (editable).
 ##      - Cable mode expects an Aerial Route or Underground Route selected; finds
 ##        its cable, fills Area / OLT Code, and populates FAT Code as a dropdown of
 ##        FAT codes sharing the cable's ring_name.
-##   2. Hostname is resolved eagerly (never typed) from dim_olt_master_smallworld by
-##      OLT Code - both right after Get Selected Object and on every manual OLT Code
-##      edit - so it is always ready before Run is pressed.
-##   3. Run calls nisa_segment_problem_detail(area, hostname, fat_code) and shows the
-##      parsed tickets in a table.
-##   4. Navigate resolves the selected ticket's FAT (fdt_code + "." + fat_code) to a
-##      sheath_splice and goes to its location on the map (reuses the existing
-##      :goto_request databus message the plugin already handles).
-##   5. Start/Stop blink all resolved FAT locations for the current result set
+##      Hostname is resolved eagerly (never typed) from dim_olt_master_smallworld
+##      by OLT Code - both right after Get Selected Object and on every manual
+##      OLT Code edit - so it is always ready before Run is pressed.
+##      Run calls nisa_segment_problem_detail(area, hostname, fat_code).
+##   1b. Fat Loss Detection mode: Run calls nisa_fat_loss_detection() - no
+##       parameters at all - directly.
+##   2. Navigate resolves the selected ticket's FAT (fdt_code + "." + fat_code) to
+##      a sheath_splice and goes to its location on the map (reuses the existing
+##      :goto_request databus message the plugin already handles) - identical
+##      logic for both Find By modes, since both response shapes carry
+##      fdt_code/fat_code under the same property_list keys.
+##   3. Start/Stop blink all resolved FAT locations for the current result set
 ##      (mirrors the Cluster tab's blink, via a separate :eq_blink_mode message).
 
 ##
@@ -30,20 +39,56 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
-	## Build Equipment tab's FIRST toolbar: object selector + Get Selected Object,
-	## Area / OLT Code / FAT Code / Hostname fields, Run / Reset, count label.
-	## Navigate / Highlight / Start / Stop live on the second toolbar -
-	## see build_equipment_toolbar2().
+	## Build Equipment tab's FIRST toolbar row as two side-by-side toolbar
+	## containers: an always-visible one (Find By selector, Run, Reset, result
+	## count - the count must stay always-visible so it updates for BOTH Find By
+	## modes, not just Segment) and a Segment-only one (Source selector, Get
+	## Selected Object, Area, OLT Code, FAT Code). The Segment-only container's .managed? is toggled
+	## as a WHOLE by eq_apply_find_by_mode() (§2j) - toggling .managed? on
+	## individual items inside an already-realised toolbar's flow does not
+	## reliably reflow the display, but toggling a whole container does (same
+	## mechanism as rwwi_astri_workorder_dialog.set_toolbar_visible). Hostname
+	## lives on the second toolbar - see build_equipment_toolbar2().
 
-	toolbar_con << sw_toolbar_container.new(parent, _false,
+	row << sw_container.new(parent, 1, 2, :col_resize_values, {0, 1})
+
+	main_con << sw_toolbar_container.new(row, _false,
 		:background_type,     :button_group,
 		:show_separators?,   _true,
 		:enable_action_menu?, _false)
+	main_tb << main_con.create_toolbar()
 
-	tb << toolbar_con.create_toolbar()
+	sw_label_item.new(main_tb, "  Find by ")
+	.items[:eq_find_by_selector] << sw_text_item.new(main_tb,
+		:model,           _self,
+		:display_length,  20,
+		:editable?,       _false,
+		:change_selector, {:|eq_find_by_changed()|})
+	.items[:eq_find_by_selector].text_items << {"Fat Loss Detection", "Segment Problem Detail"}
+	.items[:eq_find_by_selector].value      << "Fat Loss Detection"
 
-	sw_label_item.new(tb, "  Source ")
-	.items[:eq_mode_selector] << sw_text_item.new(tb,
+	.items[:eq_run_btn] << sw_button_item.new(main_tb,
+		:image,    {:run, :ui_resources},
+		:model,    _self,
+		:selector, :eq_run|()|,
+		:tooltip,  "Get FAT Loss Detection")
+
+	.items[:eq_reset_btn] << sw_button_item.new(main_tb,
+		:image,    {:clear, :ui_resources},
+		:model,    _self,
+		:selector, :eq_reset|()|,
+		:tooltip,  "Clear fields and results")
+
+	.items[:eq_count_label] << sw_label_item.new(main_tb, "  0 results  ")
+
+	.items[:eq_segment_toolbar_con] << segment_con << sw_toolbar_container.new(row, _false,
+		:background_type,     :button_group,
+		:show_separators?,   _true,
+		:enable_action_menu?, _false)
+	seg_tb << segment_con.create_toolbar()
+
+	sw_label_item.new(seg_tb, "  Source ")
+	.items[:eq_mode_selector] << sw_text_item.new(seg_tb,
 		:model,           _self,
 		:display_length,  8,
 		:editable?,       _false,
@@ -51,70 +96,64 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 	.items[:eq_mode_selector].text_items << {"FAT", "Cable"}
 	.items[:eq_mode_selector].value      << "FAT"
 
-	.items[:eq_get_obj_btn] << sw_button_item.new(tb,
+	.items[:eq_get_obj_btn] << sw_button_item.new(seg_tb,
 		:image,    {:find, :ui_resources},
 		:model,    _self,
 		:selector, :eq_get_selected_object|()|,
 		:tooltip,  "Get selected FAT (Pole/UUB) or Cable (Aerial/Underground Route) object from the map")
 
-	sw_label_item.new(tb, "  Area ")
-	.items[:eq_area_field] << sw_text_item.new(tb,
+	sw_label_item.new(seg_tb, "  Area ")
+	.items[:eq_area_field] << sw_text_item.new(seg_tb,
 		:model,          _self,
 		:display_length, 14,
 		:editable?,      _true,
 		:value,          "")
 
-	sw_label_item.new(tb, "  OLT Code ")
-	.items[:eq_olt_code_field] << sw_text_item.new(tb,
+	sw_label_item.new(seg_tb, "  OLT Code ")
+	.items[:eq_olt_code_field] << sw_text_item.new(seg_tb,
 		:model,           _self,
 		:display_length,  14,
 		:editable?,       _true,
 		:value,           "",
 		:change_selector, :eq_olt_code_changed|()|)
 
-	sw_label_item.new(tb, "  FAT Code ")
-	.items[:eq_fat_code_field] << sw_text_item.new(tb,
+	sw_label_item.new(seg_tb, "  FAT Code ")
+	.items[:eq_fat_code_field] << sw_text_item.new(seg_tb,
 		:model,          _self,
 		:display_length, 14,
 		:editable?,      _true,
 		:value,          "")
-
-	sw_label_item.new(tb, "  Hostname ")
-	.items[:eq_hostname_field] << sw_text_item.new(tb,
-		:model,          _self,
-		:display_length, 24,
-		:editable?,      _false,
-		:value,          "")
-
-	.items[:eq_run_btn] << sw_button_item.new(tb,
-		:image,    {:run, :ui_resources},
-		:model,    _self,
-		:selector, :eq_run|()|,
-		:tooltip,  "Get Segment Problem Detail")
-
-	.items[:eq_reset_btn] << sw_button_item.new(tb,
-		:image,    {:clear, :ui_resources},
-		:model,    _self,
-		:selector, :eq_reset|()|,
-		:tooltip,  "Clear fields and results")
-
-	.items[:eq_count_label] << sw_label_item.new(tb, "  0 results  ")
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.build_equipment_toolbar2(parent)
-	## Build Equipment tab's SECOND toolbar (directly below the first): Navigate,
-	## Highlight (toggle - shows/highlights the selected ticket's FAT on the map,
-	## mirrors the Cluster tab's highlight_btn), and Start / Stop blink - all
-	## under one "Navigation" label, with no separator between them.
+	## Build Equipment tab's SECOND toolbar row as two side-by-side toolbar
+	## containers: Hostname (Segment-only, .managed? toggled as a WHOLE
+	## container - same reasoning as build_equipment_toolbar()) and Navigation
+	## (Navigate, Highlight, Start/Stop - always visible regardless of Find By
+	## mode, unchanged).
 
-	toolbar_con << sw_toolbar_container.new(parent, _false,
+	row << sw_container.new(parent, 1, 2, :col_resize_values, {0, 1})
+
+	.items[:eq_hostname_toolbar_con] << hostname_con << sw_toolbar_container.new(row, _false,
 		:background_type,     :button_group,
 		:show_separators?,   _true,
 		:enable_action_menu?, _false)
+	host_tb << hostname_con.create_toolbar()
 
-	tb << toolbar_con.create_toolbar()
+	sw_label_item.new(host_tb, "  Hostname ")
+	.items[:eq_hostname_field] << sw_text_item.new(host_tb,
+		:model,          _self,
+		:display_length, 24,
+		:editable?,      _false,
+		:value,          "")
+
+	nav_con << sw_toolbar_container.new(row, _false,
+		:background_type,     :button_group,
+		:show_separators?,   _true,
+		:enable_action_menu?, _false)
+	tb << nav_con.create_toolbar()
 
 	sw_label_item.new(tb, "  Navigation ")
 
@@ -182,6 +221,55 @@ _private _method rwwi_nisa_dialog.build_equipment_table(parent)
 	a_table.enable_column_filter(8, _true)    # Created Date (tlop_created_date)
 	a_table.enable_column_filter(10, _true)   # Status Name
 	a_table.enable_sort? << _true
+_endmethod
+$
+
+##
+## Find By selector (Fat Loss Detection vs Segment Problem Detail)
+##
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_find_by_changed(selected_value)
+	## Handle Find By dropdown change - "Fat Loss Detection" (default) or
+	## "Segment Problem Detail". Resets the tab (stale fields/results from the
+	## other mode shouldn't linger) then reapplies the mode's widget layout.
+
+	.eq_find_by << _if selected_value = "Segment Problem Detail"
+	              _then >> :segment
+	              _else >> :fat_loss
+	              _endif
+	_self.eq_apply_find_by_mode()
+	_self.eq_reset()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_apply_find_by_mode()
+	## Show/hide the Segment-only Toolbar 1 widgets, retarget the Run button's
+	## tooltip, and relabel the shared result table's column 7 - based on the
+	## current .eq_find_by mode. Uses .managed? (not .visible?, which doesn't
+	## exist) - same mechanism as rwwi_astri_workorder_dialog's infrastructure
+	## selector (infrastructure_type_changed()).
+
+	_local segment? << .eq_find_by _is :segment
+
+	# Toggle .managed? on the two WHOLE Segment-only toolbar containers, not on
+	# individual items inside an already-realised toolbar's flow - the latter
+	# does not reliably reflow the display without some unrelated trigger
+	# (observed bug); toggling a whole container's .managed? does, matching
+	# rwwi_astri_workorder_dialog.set_toolbar_visible's proven pattern.
+	.items[:eq_segment_toolbar_con].managed?  << segment?
+	.items[:eq_hostname_toolbar_con].managed? << segment?
+
+	.items[:eq_run_btn].tooltip << _if segment?
+	                              _then >> "Get Segment Problem Detail"
+	                              _else >> "Get FAT Loss Detection"
+	                              _endif
+
+	.items[:eq_table].set_column_labels({
+		"#", "Ticket Number", "Area", "Hostname", "FDT Code", "FAT Code",
+		_if segment? _then >> "Cluster Name" _else >> "Affected Customer" _endif,
+		"Created Date", "Status", "Status Name"})
 _endmethod
 $
 
@@ -566,6 +654,19 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.eq_run()
+	## Dispatch to the selected Find By mode's Run handler (§2j).
+
+	_if .eq_find_by _is :fat_loss
+	_then
+		_self.eq_run_fat_loss_detection()
+	_else
+		_self.eq_run_segment_problem_detail()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_run_segment_problem_detail()
 	## Call nisa_segment_problem_detail(area, hostname, fat_code) with the current
 	## field values and populate the result table. Hostname is already resolved
 	## (§ eq_lookup_hostname) - this method does no database work of its own.
@@ -607,6 +708,41 @@ _method rwwi_nisa_dialog.eq_run()
 
 	_when error
 		_self.log_error("Segment Problem Detail error: " + errCon.report_contents_string)
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={nisa_integration})
+_method rwwi_nisa_dialog.eq_run_fat_loss_detection()
+	## Call nisa_fat_loss_detection() - no parameters at all - and populate the
+	## result table from the parsed active_tickets.
+
+	_self.log_separator()
+	_self.log_info("FAT Loss Detection: querying active tickets (no parameters)...")
+
+	_try _with errCon
+		_local json_result << nisa_fat_loss_detection()
+		_local result       << nisa_parse_fat_loss_detection_response(json_result)
+
+		_if _not result[:success]
+		_then
+			_self.log_warning("NISA fat-loss-detection: " + result[:msg])
+		_endif
+
+		.eq_result_rows << result[:active_tickets]
+		.eq_splice_cache.empty()
+		.eq_selected_row << _unset
+
+		_local n << .eq_result_rows.size
+		.items[:eq_count_label].value << write_string("  ", n, " results  ")
+		_self.log_success(write_string("Found ", n, " FAT loss ticket(s) - is_fat_loss_detected: ",
+			result[:is_fat_loss_detected]))
+
+		_self.changed(:eq_result_list, :renew)
+		_self.eq_manage_actions()
+
+	_when error
+		_self.log_error("FAT Loss Detection error: " + errCon.report_contents_string)
 	_endtry
 _endmethod
 $
@@ -661,7 +797,8 @@ _method rwwi_nisa_dialog.eq_result_list_data()
 			.items[:eq_table].add_label(row, 4, pl[:hostname])
 			.items[:eq_table].add_label(row, 5, pl[:fdt_code])
 			.items[:eq_table].add_label(row, 6, pl[:fat_code])
-			.items[:eq_table].add_label(row, 7, pl[:tlop_cluster_name])
+			.items[:eq_table].add_label(row, 7,
+				_if .eq_find_by _is :fat_loss _then >> pl[:affected_customer] _else >> pl[:tlop_cluster_name] _endif)
 			.items[:eq_table].add_label(row, 8, pl[:tlop_created_date])
 			.items[:eq_table].add_label(row, 9, pl[:tlop_status])
 			.items[:eq_table].add_label(row, 10, pl[:status_name])
@@ -821,15 +958,23 @@ _pragma(classify_level=basic, topic={nisa_integration})
 _method rwwi_nisa_dialog.eq_highlight_tooltip_for(pl)
 	## Build the tooltip text shown when highlighting a ticket's FAT on the map.
 
+	_local segment? << .eq_find_by _is :segment
+
 	_local lines << rope.new()
-	lines.add_last(write_string("-- SEGMENT PROBLEM DETAIL --"))
+	lines.add_last(_if segment?
+	               _then >> "-- SEGMENT PROBLEM DETAIL --"
+	               _else >> "-- FAT LOSS DETECTION --"
+	               _endif)
 	lines.add_last(write_string("Ticket Number: ", pl[:ticket_number]))
 	lines.add_last(write_string("Status: ", pl[:status_name], " (", pl[:tlop_status], ")"))
 	lines.add_last(write_string("Area: ", pl[:tlop_area_name]))
 	lines.add_last(write_string("Hostname: ", pl[:hostname]))
 	lines.add_last(write_string("FDT Code: ", pl[:fdt_code]))
 	lines.add_last(write_string("FAT Code: ", pl[:fat_code]))
-	lines.add_last(write_string("Cluster: ", pl[:tlop_cluster_name]))
+	lines.add_last(_if segment?
+	               _then >> write_string("Cluster: ", pl[:tlop_cluster_name])
+	               _else >> write_string("Affected Customer: ", pl[:affected_customer])
+	               _endif)
 	lines.add_last(write_string("Created: ", pl[:tlop_created_date]))
 
 	_local tooltip << ""

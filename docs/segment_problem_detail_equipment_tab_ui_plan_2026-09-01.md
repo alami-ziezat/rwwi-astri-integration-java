@@ -1,9 +1,10 @@
 # Segment Problem Detail — Equipment Tab UI Plan
 
-**Date:** 2026-09-01 (last updated 2026-09-07 — see §8 for what changed after implementation started)
+**Date:** 2026-09-01 (last updated 2026-09-08 — see §8 for what changed after implementation started)
 **Author:** Claude Code
 **Status:** IMPLEMENTED — reflects the built UI, kept as the as-built reference for this feature
-(§2c's connectivity-traced Cable-mode FAT Code lookup was executed 2026-09-07)
+(§2j's "Find by" selector, defaulting to FAT Loss Detection, was executed 2026-09-08; §2c's
+connectivity-traced Cable-mode FAT Code lookup was executed 2026-09-07)
 **Naming note (last renamed 2026-09-08):** the tab's visible label has been renamed twice since it was
 built — "Equipment" → "Segment" → **"FAT Loss"** (`tab_con.new_tab("FAT Loss")` in
 `rwwi_nisa_dialog.magik`, plus the two user-facing log lines that originally said "Equipment tab").
@@ -28,16 +29,26 @@ current mass-problem/outage UI.
 
 - Tab 1 — **"Cluster"**: the dialog's current content (search by cluster code/area, outage check,
   map highlight, blink), unchanged, just re-parented under a tab.
-- Tab 2 — **"Equipment"** (new): pick a FAT or Cable object on the map, auto-derive Area / OLT Code /
-  Hostname / FAT Code, call `nisa_segment_problem_detail`, show results in a table, navigate the map
-  to a selected ticket's FAT, highlight it, and blink all resolved FAT locations.
+- Tab 2 — **"Equipment"** (new): pick a **Find by** mode — **FAT Loss Detection** (default, §2j; no
+  parameters at all — Run just calls `nisa_fat_loss_detection()`) or **Segment Problem Detail** (pick a
+  FAT or Cable object on the map, auto-derive Area / OLT Code / Hostname / FAT Code, call
+  `nisa_segment_problem_detail`) — show results in a table, navigate the map to a selected ticket's
+  FAT, highlight it, and blink all resolved FAT locations. Both modes share one result table and the
+  same Navigate/Highlight/Blink logic (§2j).
 
-The Equipment tab uses **two stacked toolbars** (§2 diagram below) rather than one long row:
-- **Toolbar 1**: "Source" label + FAT/Cable selector, Get Selected Object, Area, OLT Code, FAT Code,
-  Hostname (read-only), Run, Reset, result count.
-- **Toolbar 2**: a "Navigation" label followed by Navigate, **Highlight** (new toggle, positioned
-  right after Navigate — mirrors the Cluster tab's highlight button), and Start/Stop blink — no
-  separators between these four (moved 2026-09-08, see §8).
+The Equipment tab uses **two stacked toolbar rows** (§2 diagram below), each actually built as two
+side-by-side toolbar containers (§2j) so the Segment-only half of each row can be hidden as one unit:
+- **Toolbar 1**: always-visible **Find by** selector (new, §2j — first item) + Run + Reset, side by
+  side with a Segment-only container holding FAT/Cable "Source" selector, Get Selected Object, Area,
+  OLT Code, FAT Code, and result count.
+- **Toolbar 2**: a Segment-only container holding Hostname (read-only — moved here 2026-09-09, see
+  §8), side by side with the always-visible "Navigation" container (Navigate, **Highlight** — new
+  toggle, positioned right after Navigate, mirrors the Cluster tab's highlight button — and Start/Stop
+  blink, no separators between those four, moved here 2026-09-08).
+
+Everything in either row's Segment-only container is shown only for Segment Problem Detail mode and
+hidden for FAT Loss Detection (§2j); Find By/Run/Reset and the Navigation container are always visible
+regardless of mode.
 
 All field labels on this tab are plain text with no trailing colon (e.g. "Area", not "Area:") and the
 Object Type dropdown's label reads "Source" rather than "Object" (renamed 2026-09-08, see §8).
@@ -107,16 +118,17 @@ user looks at the dialog — Get Selected Object never leaves Hostname stale.
 
 Four `sw_text_item` fields, populated from the resolved object (FAT splice or cable — both expose
 the same field names per `astri_splice_migrator.magik:261-286` and `rwwi_mancore_plan_query.magik`).
-**All four fields live on Toolbar 1** (with Get Selected Object, Run, Reset — see §4 for the full
-toolbar layout), in the order Area → OLT Code → FAT Code → Hostname (Hostname moved here from
-Toolbar 2 on 2026-09-08, see §8):
+Area / OLT Code / FAT Code live on **Toolbar 1**'s Segment-only container (with Get Selected Object
+and the result count — see §4 for the full layout); **Hostname lives on Toolbar 2**'s Segment-only
+container instead (moved there **2026-09-09**, after first moving to Toolbar 1 on 2026-09-08 — see
+§8; Toolbar 1 got too long once Find By was added):
 
 | Field | Toolbar | Editable? | Source | Notes |
 |-------|---------|-----------|--------|-------|
 | **Area** | 1 | Yes | `.region` on the FAT splice or the cable | direct copy, editable afterwards in case of mismatch |
 | **OLT Code** | 1 | Yes | `.olt_code` on the FAT splice or the cable | **new field** — also fully manual-entry capable, so the user can run a query for an OLT code that has no map object selected at all |
 | **FAT Code** | 1 | Depends on mode | see below | FAT mode: editable text. Cable mode: dropdown (unchanged from before) |
-| **Hostname** | 1 | **No** (`:editable?, _false`) | `dim_olt_master_smallworld.olt_hostname` where `olt_code = <OLT Code field value>` | read-only — always derived, never typed; see lookup trigger below |
+| **Hostname** | 2 | **No** (`:editable?, _false`) | `dim_olt_master_smallworld.olt_hostname` where `olt_code = <OLT Code field value>` | read-only — always derived, never typed; see lookup trigger below |
 
 **Hostname is looked up eagerly, not deferred to Run** — it must already be resolved (and is
 read-only, so there's nothing else to fill it) by the time the user can press Run. The lookup
@@ -349,6 +361,164 @@ now do that registration/deregistration instead of `show_mode()` calling `add_po
 for why that's still safe). `map_damage_notify` now checks both `.render_status` and
 `.eq_render_status` each redraw and draws whichever (or both) are active.
 
+### 2j. Find By selector — FAT Loss Detection vs Segment Problem Detail (new, 2026-09-08)
+
+A new dropdown, **positioned first in Toolbar 1** (before the "Source" FAT/Cable selector), lets the
+user pick which NISA API this tab drives:
+
+- **"FAT Loss Detection"** (default) — a different NISA endpoint that takes **no parameters at all**
+  (confirmed in the 2026-08-24 plan §1: `GET /fatlossticketing/fat-loss-detection`), so none of the
+  Source/Area/OLT Code/FAT Code/Hostname machinery applies. Toolbar 1 collapses down to just the
+  Find By selector itself plus **Run** and **Reset**.
+- **"Segment Problem Detail"** — everything above in §2 unchanged, exactly as it works today.
+
+**New state**: `.eq_find_by` slot, `:fat_loss` (default) or `:segment`.
+
+**New dropdown** (mirrors the existing `:eq_mode_selector` FAT/Cable pattern exactly):
+```magik
+.items[:eq_find_by_selector] << sw_text_item.new(tb,
+    :model,           _self,
+    :display_length,  20,
+    :editable?,       _false,
+    :change_selector, {:|eq_find_by_changed()|})
+.items[:eq_find_by_selector].text_items << {"Fat Loss Detection", "Segment Problem Detail"}
+.items[:eq_find_by_selector].value      << "Fat Loss Detection"
+```
+`eq_find_by_changed(selected_value)` sets `.eq_find_by`, then calls `eq_apply_find_by_mode()`
+**before** `eq_reset()` (order corrected by the user directly, 2026-09-09 — applying the mode's
+column-label/container changes first means `eq_reset()`'s own `changed(:eq_result_list, :renew)`
+redraws the table under its correct, already-updated column labels instead of momentarily stale ones).
+
+**Hiding the Segment-only widgets in FAT Loss Detection mode — using `.managed?` on WHOLE toolbar
+containers, not on individual items (revised 2026-09-09 — see §8).** The first attempt toggled
+`.managed?` on each individual label/field directly inside the shared Toolbar 1/2 `tb` flow —
+per the pointer to check how the Workorder dialog hides fields via its infrastructure-type selector
+(`rwwi_astri_workorder_dialog.magik`'s `filter_infrastructure` dropdown, lines 204-210, `change_selector`
+→ `infrastructure_type_changed()`, toggling `.managed?` in `rwwi_astri_workorder_dialog_filters.magik:38-78`).
+That compiled and ran, but **didn't visually update until some unrelated action nudged the toolbar to
+reflow** — toggling `.managed?` on an item already living inside a realised `sw_toolbar_container`'s
+flow doesn't reliably trigger a re-layout on its own. The Workorder dialog's OTHER pattern —
+`set_toolbar_visible()` (`rwwi_astri_workorder_dialog.magik:140-152`) toggling `.managed?` on a whole
+**stored toolbar container**, used for role-based show/hide of entire toolbar rows — does not have
+this problem, because the change is caught by the *parent* `sw_container`'s grid layout recompute,
+not by the toolbar's own internal flow layout.
+
+Fixed by restructuring both Toolbar 1 and Toolbar 2 into **two side-by-side toolbar containers each**,
+built inside a 1-row/2-column `sw_container` wrapper (`:col_resize_values, {0, 1}`), and toggling
+`.managed?` on the whole Segment-only container rather than on anything inside it:
+- **Toolbar 1** = `sw_container` with column 1 = always-visible `main_con` (Find By selector, Run,
+  Reset) and column 2 = `:eq_segment_toolbar_con` (Source selector, Get Selected Object, Area, OLT
+  Code, FAT Code, count label) — the whole of column 2 is what gets `.managed?` toggled.
+- **Toolbar 2** = `sw_container` with column 1 = `:eq_hostname_toolbar_con` (just the Hostname
+  label+field — moved back here, see below) and column 2 = the unchanged, always-visible Navigation
+  toolbar (Navigate, Highlight, Start, Stop) — again, the whole of column 1 is what gets toggled.
+
+`eq_apply_find_by_mode()` is now just two lines for the show/hide part:
+```magik
+.items[:eq_segment_toolbar_con].managed?  << segment?
+.items[:eq_hostname_toolbar_con].managed? << segment?
+```
+No more per-label `.items[...]` captures are needed for this purpose — the five
+previously-planned `:eq_source_label`/`:eq_area_label`/`:eq_olt_code_label`/`:eq_fat_code_label`/
+`:eq_hostname_label` keys were removed again; the labels are just anonymous `sw_label_item.new(...)`
+calls inside whichever of the two containers they belong to, same as before this feature existed.
+
+**Hostname moved back to Toolbar 2 (Segment-only there too).** With Find By plus all the
+Segment-mode fields crammed into Toolbar 1, that row got too long. Hostname now lives in its own
+`:eq_hostname_toolbar_con` on Toolbar 2 (column 1, before Navigation), toggled by the exact same
+`segment?` flag as `:eq_segment_toolbar_con` — Navigation itself (column 2) stays always visible in
+both modes, since Navigate/Highlight/Blink already work identically for both Find By modes (§2j,
+Navigate/Highlight/Blink paragraph below). **The results count label moved to the always-visible main
+container on Toolbar 1 (resolved 2026-09-09, was §7 item 8; see §8)** — it originally lived in the
+Segment-only container per a literal reading of "just show button Run and Clear", but that meant it
+stayed hidden (and its `.value` updates invisible) while running FAT Loss Detection, which defeats the
+purpose of a *results* count. It's needed in both modes, so it's always visible now.
+
+**Run button retargeting.** `eq_run()` becomes a two-line dispatcher:
+```magik
+_method rwwi_nisa_dialog.eq_run()
+    _if .eq_find_by _is :fat_loss
+    _then
+        _self.eq_run_fat_loss_detection()
+    _else
+        _self.eq_run_segment_problem_detail()   # today's eq_run() body, renamed verbatim
+    _endif
+_endmethod
+```
+`eq_run_fat_loss_detection()` is new — no field validation (there's nothing to validate), just:
+```magik
+json    << nisa_fat_loss_detection()
+result  << nisa_parse_fat_loss_detection_response(json)
+.eq_result_rows << result[:active_tickets]
+```
+`eq_apply_find_by_mode()` also updates `.items[:eq_run_btn].tooltip` — `"Get FAT Loss Detection"` in
+that mode, restored to `"Get Segment Problem Detail"` for Segment mode. (These are icon-only buttons
+with no visible text caption today — matching the existing convention across this whole file — so
+"caption" isn't a separate thing to change; only the tooltip text moves.)
+
+**Required parser fix — `nisa_parse_fat_loss_detection_response` is missing four fields.** The sample
+response the user gave for this endpoint —
+```json
+"ticket_number": "FT260911060", "tlop_status": "1", "area": "Tangerang",
+"hostname": "TNG-PSP-OLT1-FH", "fdt_code": "CCLK-03-PGD.129", "fat_code": "B05",
+"status_name": "Open", "tlop_created_date": "2026-09-07 18:42:28", "affected_customer": "18"
+```
+— has **9** fields per ticket, but `nisa_parse_fat_loss_detection_response`
+(`test_nisa_procs.magik:284-353`) currently only extracts 5 (`ticket_number`, `tlop_status`,
+`status_name`, `tlop_created_date`, `affected_customer`) — `area`, `hostname`, `fdt_code`, `fat_code`
+are silently dropped. Fix: add the four missing extractions, and — important for reusing all the
+existing Segment-mode logic unchanged — **store them under the same property_list keys the Segment
+parser already uses** (`:tlop_area_name`, `:hostname`, `:fdt_code`, `:fat_code`), not
+literally-named `:area` etc.:
+```magik
+ticket_pl[:tlop_area_name] << ticket_item[:area].default("").write_string
+ticket_pl[:hostname]       << ticket_item[:hostname].default("").write_string
+ticket_pl[:fdt_code]       << ticket_item[:fdt_code].default("").write_string
+ticket_pl[:fat_code]       << ticket_item[:fat_code].default("").write_string
+```
+With this fix, a FAT Loss Detection ticket row and a Segment Problem Detail ticket row share **every**
+key except one: Segment has `:tlop_cluster_name`, FAT Loss Detection has `:affected_customer` instead.
+
+**Result table — one shared table, one column swap.** Rather than two different table schemas, column
+7 (currently "Cluster Name", §2f) just relabels and re-sources itself per mode:
+```magik
+.items[:eq_table].set_column_labels({
+    "#", "Ticket Number", "Area", "Hostname", "FDT Code", "FAT Code",
+    _if .eq_find_by _is :fat_loss _then >> "Affected Customer" _else >> "Cluster Name" _endif,
+    "Created Date", "Status", "Status Name"})
+```
+called from `eq_apply_find_by_mode()` (full relabel is simplest and safe — `set_column_labels` is
+already proven at build time). `eq_result_list_data()`'s column 7 population becomes the one
+mode-dependent line:
+```magik
+.items[:eq_table].add_label(row, 7,
+    _if .eq_find_by _is :fat_loss _then >> pl[:affected_customer] _else >> pl[:tlop_cluster_name] _endif)
+```
+All other columns (1–6, 8–10) read identical keys regardless of mode, thanks to the parser fix above.
+
+**Navigate/Highlight/Blink — "behaviour for both", achieved by not special-casing anything.** Because
+the parser fix makes FAT Loss Detection rows carry `:fdt_code`/`:fat_code` under the same keys as
+Segment rows, `eq_goto_selected()`, `int!eq_resolve_splice()`, and `equipment_blink_records()` (§2g,
+§2h) need **zero changes** — they already just read `pl[:fdt_code]`/`pl[:fat_code]` off whatever row is
+selected, regardless of which API produced it. The one thing that does need a small branch is
+`eq_highlight_tooltip_for(pl)` (§2i), since its last line currently always reads
+`pl[:tlop_cluster_name]`:
+```magik
+_if .eq_find_by _is :fat_loss
+_then
+    lines.add_last(write_string("Affected Customer: ", pl[:affected_customer]))
+_else
+    lines.add_last(write_string("Cluster: ", pl[:tlop_cluster_name]))
+_endif
+```
+
+**Files touched by §2j**: `rwwi_nisa_dialog.magik` (new `:eq_find_by` slot), `rwwi_nisa_equipment_dialog.magik`
+(new dropdown + `eq_find_by_changed`/`eq_apply_find_by_mode`, `eq_run` split into
+`eq_run_segment_problem_detail`/`eq_run_fat_loss_detection`, `eq_result_list_data`'s column 7 branch,
+`eq_highlight_tooltip_for`'s branch, and capturing the five previously-anonymous labels into `.items`),
+`test_nisa_procs.magik` (the four-field parser fix above). No plugin change — Navigate/Highlight/Blink
+are untouched.
+
 ---
 
 ## 3. Why one model, two source files (not two dialog classes)
@@ -370,6 +540,7 @@ multiple source files/modules, so this is purely an organisational split, not a 
 Slots added to `rwwi_nisa_dialog`'s `def_slotted_exemplar` (as built — two more than originally
 planned, `eq_row_cache` and `eq_selected_row`, added for sort-safe single-row selection per §2f):
 ```magik
+{:eq_find_by,         _unset, :writable},   # :fat_loss (default) or :segment - see §2j
 {:eq_mode,            _unset, :writable},   # :fat or :cable
 {:eq_selected_object, _unset, :writable},   # resolved sheath_splice (FAT mode) or cable (Cable mode)
 {:eq_result_rows,     _unset, :writable},   # rope of pl from nisa_parse_segment_problem_detail_response[:data]
@@ -427,10 +598,10 @@ container so both tabs log to the same place, consistent with how the Cluster ta
 
 | File | Change |
 |------|--------|
-| `rwwi_nisa_dialog.magik` | Add 7 new slots to `def_slotted_exemplar` (§3); rewrite `activate_in` to build a `sw_tab_container` with Cluster + Equipment tabs, each wrapped in its own row container (§4) |
-| `rwwi_nisa_equipment_dialog.magik` (new) | All Equipment-tab UI build + logic methods (§2), split across two toolbar builders (`build_equipment_toolbar` / `build_equipment_toolbar2`), including the OLT Code field's `:eq_olt_code_changed()` change_selector, the eager `eq_lookup_hostname()`, and the Highlight toggle (`eq_show_map`, `eq_highlight_record`, `eq_highlight_tooltip_for` — §2i). `int!eq_populate_fat_code_dropdown` rewritten (§2c) to trace cable connectivity (`get_upstream_connector()`/`get_downstream_connector()` across all same-name/same-ring_name segments, deduped via `equality_set`, then FAT codes deduped/sorted via a second `equality_set`) instead of a flat `ring_name` match on `sheath_splice`. `eq_lookup_hostname()`'s `_protection` block now also calls `extdb_java_acp.close_all()` after closing its own connection (2026-09-07), matching the existing `extdb_java_acp.close_all()` convention used elsewhere in this codebase (e.g. the Cluster tab's `search_by_area` at `rwwi_nisa_dialog.magik:1463`) so the underlying JDBC connection pool doesn't accumulate stale connections across repeated OLT Code lookups. |
-| `rwwi_nisa_plugin.magik` | Add `:eq_blink_mode` and `:eq_show_map` branches to `note_change`; add `start_equipment_blink_animations()` / `stop_equipment_blink_animations()` (blink), `eq_show_mode()` / `eq_show_records()` / `eq_build_rwo_cache()` / `draw_all_equipment_highlights()` (highlight, §2i); add an `:equipment` style to the shared `:fill_style`/`:text_style` constants; add `int!ensure_post_renderer()` / `int!maybe_remove_post_renderer()` and route `show_mode()`'s post-renderer add/remove through them so Cluster and Equipment highlighting can share one `:transient_drawer` registration safely (no change needed for Navigate — reuses `:goto_request`) |
-| `test_nisa_procs.magik` | Fix `nisa_parse_segment_problem_detail_response`'s `:tlop_area_name`/`:tlop_cluster_name` → `:area`/`:cluster_name` field lookups (§2e) |
+| `rwwi_nisa_dialog.magik` | Add 8 new slots to `def_slotted_exemplar` (§3, includes `:eq_find_by` — §2j); rewrite `activate_in` to build a `sw_tab_container` with Cluster + Equipment tabs, each wrapped in its own row container (§4) |
+| `rwwi_nisa_equipment_dialog.magik` (new) | All Equipment-tab UI build + logic methods (§2), split across two toolbar builders (`build_equipment_toolbar` / `build_equipment_toolbar2`), including the OLT Code field's `:eq_olt_code_changed()` change_selector, the eager `eq_lookup_hostname()`, and the Highlight toggle (`eq_show_map`, `eq_highlight_record`, `eq_highlight_tooltip_for` — §2i). `int!eq_populate_fat_code_dropdown` rewritten (§2c) to trace cable connectivity (`get_upstream_connector()`/`get_downstream_connector()` across all same-name/same-ring_name segments, deduped via `equality_set`, then FAT codes deduped/sorted via a second `equality_set`) instead of a flat `ring_name` match on `sheath_splice`. `eq_lookup_hostname()`'s `_protection` block now also calls `extdb_java_acp.close_all()` after closing its own connection (2026-09-07), matching the existing `extdb_java_acp.close_all()` convention used elsewhere in this codebase (e.g. the Cluster tab's `search_by_area` at `rwwi_nisa_dialog.magik:1463`) so the underlying JDBC connection pool doesn't accumulate stale connections across repeated OLT Code lookups. **§2j executed 2026-09-08:** new `:eq_find_by_selector` dropdown + `eq_find_by_changed`/`eq_apply_find_by_mode`; captured the five previously-anonymous Toolbar 1 labels into `.items`; split `eq_run` into `eq_run_segment_problem_detail`/`eq_run_fat_loss_detection`; branched `eq_result_list_data`'s column 7 and `eq_highlight_tooltip_for`'s header line + last line on `.eq_find_by`. |
+| `rwwi_nisa_plugin.magik` | Add `:eq_blink_mode` and `:eq_show_map` branches to `note_change`; add `start_equipment_blink_animations()` / `stop_equipment_blink_animations()` (blink), `eq_show_mode()` / `eq_show_records()` / `eq_build_rwo_cache()` / `draw_all_equipment_highlights()` (highlight, §2i); add an `:equipment` style to the shared `:fill_style`/`:text_style` constants; add `int!ensure_post_renderer()` / `int!maybe_remove_post_renderer()` and route `show_mode()`'s post-renderer add/remove through them so Cluster and Equipment highlighting can share one `:transient_drawer` registration safely (no change needed for Navigate — reuses `:goto_request`). §2j needs no plugin change at all. |
+| `test_nisa_procs.magik` | Fix `nisa_parse_segment_problem_detail_response`'s `:tlop_area_name`/`:tlop_cluster_name` → `:area`/`:cluster_name` field lookups (§2e). **§2j executed 2026-09-08:** `nisa_parse_fat_loss_detection_response` was missing `area`/`hostname`/`fdt_code`/`fat_code` extraction per ticket — added, stored under the same keys the Segment parser uses (`:tlop_area_name`, `:hostname`, `:fdt_code`, `:fat_code`). |
 | `source/load_list.txt` | Add `rwwi_nisa_equipment_dialog` after `rwwi_nisa_dialog` |
 
 No `module.def` change — same module, same Java jar, no new dependencies.
@@ -527,13 +698,16 @@ session, not just a code read-through):
    joint closure — the `responds_to?(:sheath_splice_object_type)` + type-check guard in §2c should
    handle that regardless, but worth watching the log output (`Found N FAT code(s)...`) the first time
    this runs against a real cable to sanity-check the count looks right.
+(Items 8-9 that used to be here — whether `.visible?` exists, whether hiding an item reflows the
+toolbar, and whether the results count label should be hidden in FAT Loss Detection mode — are all
+resolved: see §8, items 5 and 6.)
 
 ---
 
 ## 8. As-built deviations from the original 2026-09-01 plan
 
 Logged here rather than silently editing history, since this doc doubles as the as-built reference.
-All four were found by actually running the dialog in `gis.exe`, not by re-reading the plan.
+All six were found by actually running the dialog in `gis.exe`, not by re-reading the plan.
 
 1. **Tab pane holds one child, not many (§4).** The original plan's `activate_in` sketch added a
    toolbar and a table straight into each `new_tab()` result. That crashes at realise time
@@ -563,6 +737,24 @@ All four were found by actually running the dialog in `gis.exe`, not by re-readi
    declared size (950×650) nominally already being larger than Mancore's (900×600). Fixed by raising
    the canvas to **1050×800** — comfortable headroom over both the actual content height and
    Mancore's dialog on both axes.
+5. **Toggling `.managed?` on individual items inside a live toolbar doesn't reflow the display
+   (2026-09-09, §2j).** §2j's first implementation toggled `.managed?` directly on each Segment-only
+   label/field inside Toolbar 1/2's shared `tb` — it compiled and the state changed correctly
+   underneath, but the toolbar didn't visually update until some unrelated action (e.g. resizing) nudged
+   it to relayout. Toggling `.managed?` on a whole *container* (as `rwwi_astri_workorder_dialog`'s
+   `set_toolbar_visible()` does for entire toolbar rows) doesn't have this problem — the change is
+   caught by the parent `sw_container`'s grid relayout instead of depending on the toolbar's own
+   internal flow layout to notice. Fixed by restructuring both toolbar rows into two side-by-side
+   toolbar containers each (§2j), and toggling `.managed?` on the whole Segment-only container rather
+   than on anything inside it. Also moved Hostname from Toolbar 1 to its own Segment-only container on
+   Toolbar 2 in the same pass, since Toolbar 1 (Find By + all the Segment fields) had grown too long.
+6. **Results count label was hidden along with the Segment-only container in FAT Loss Detection mode
+   (2026-09-09).** It had been placed inside `:eq_segment_toolbar_con` (built in the same pass as fix
+   5 above), so running FAT Loss Detection correctly updated `.items[:eq_count_label].value` under the
+   hood, but the label itself was invisible — the user saw "0 results" never change after clicking
+   Run. Fixed by moving the count label into the always-visible main container on Toolbar 1 (next to
+   Find By/Run/Reset), so it updates and displays correctly in both Find By modes. This also resolves
+   what was open item 8 (§7) about whether the count label should be Segment-only — it shouldn't.
 
 The Highlight button (§2i), the two-toolbar layout (§1), the tab renames (naming note
 above), the result table's filterable-column set (§2f), the Toolbar 1/2 field reshuffle — Hostname
