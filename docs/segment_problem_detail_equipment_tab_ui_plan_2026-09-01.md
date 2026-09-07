@@ -4,13 +4,14 @@
 **Author:** Claude Code
 **Status:** IMPLEMENTED — reflects the built UI, kept as the as-built reference for this feature
 (§2c's connectivity-traced Cable-mode FAT Code lookup was executed 2026-09-07)
-**Naming note (2026-09-08):** the tab's visible label was renamed from "Equipment" to **"Segment"**
-(`tab_con.new_tab("Segment")` in `rwwi_nisa_dialog.magik`, plus the two user-facing log lines that
-said "Equipment tab"). This doc, the source file name (`rwwi_nisa_equipment_dialog.magik`), and all
-internal identifiers (`eq_*` slots/methods, `equipment_tab`/`equipment_inner` locals, `build_equipment_*`
-method names) were deliberately left as "Equipment" — purely a code-organisation name, invisible to the
-user — to avoid a large, purely cosmetic rename across two files. Read "Equipment tab" everywhere below
-as "the tab currently labeled Segment in the UI".
+**Naming note (last renamed 2026-09-08):** the tab's visible label has been renamed twice since it was
+built — "Equipment" → "Segment" → **"FAT Loss"** (`tab_con.new_tab("FAT Loss")` in
+`rwwi_nisa_dialog.magik`, plus the two user-facing log lines that originally said "Equipment tab").
+This doc, the source file name (`rwwi_nisa_equipment_dialog.magik`), and all internal identifiers
+(`eq_*` slots/methods, `equipment_tab`/`equipment_inner` locals, `build_equipment_*` method names)
+were deliberately left as "Equipment" throughout every rename — purely a code-organisation name,
+invisible to the user — to avoid a large, purely cosmetic rename across two files every time the
+label changes. Read "Equipment tab" everywhere below as "the tab currently labeled FAT Loss in the UI".
 **Related:** [fat_loss_detection_nisa_api_plan_2026-08-24.md](./fat_loss_detection_nisa_api_plan_2026-08-24.md)
 (that plan added the `nisa_segment_problem_detail(area, hostname, fat)` Java caller and the
 `nisa_parse_segment_problem_detail_response(json_string)` Magik parser this UI consumes — both are
@@ -32,10 +33,14 @@ current mass-problem/outage UI.
   to a selected ticket's FAT, highlight it, and blink all resolved FAT locations.
 
 The Equipment tab uses **two stacked toolbars** (§2 diagram below) rather than one long row:
-- **Toolbar 1**: Object Type selector, Get Selected Object, Area, OLT Code, FAT Code, Run, Reset,
-  result count.
-- **Toolbar 2**: Hostname (read-only), Navigate, **Highlight** (new toggle, positioned right after
-  Navigate — mirrors the Cluster tab's highlight button), Start/Stop blink.
+- **Toolbar 1**: "Source" label + FAT/Cable selector, Get Selected Object, Area, OLT Code, FAT Code,
+  Hostname (read-only), Run, Reset, result count.
+- **Toolbar 2**: a "Navigation" label followed by Navigate, **Highlight** (new toggle, positioned
+  right after Navigate — mirrors the Cluster tab's highlight button), and Start/Stop blink — no
+  separators between these four (moved 2026-09-08, see §8).
+
+All field labels on this tab are plain text with no trailing colon (e.g. "Area", not "Area:") and the
+Object Type dropdown's label reads "Source" rather than "Object" (renamed 2026-09-08, see §8).
 
 Both tabs live in the **same `rwwi_nisa_dialog` model** (see §3 for why) and the same
 `rwwi_nisa_plugin`. No new module, no `module.def` change.
@@ -102,15 +107,16 @@ user looks at the dialog — Get Selected Object never leaves Hostname stale.
 
 Four `sw_text_item` fields, populated from the resolved object (FAT splice or cable — both expose
 the same field names per `astri_splice_migrator.magik:261-286` and `rwwi_mancore_plan_query.magik`).
-**Area / OLT Code / FAT Code live on Toolbar 1** (with Get Selected Object, Run, Reset); **Hostname
-lives on Toolbar 2** (with Navigate, Highlight, Start/Stop) — see §4 for the full toolbar layout:
+**All four fields live on Toolbar 1** (with Get Selected Object, Run, Reset — see §4 for the full
+toolbar layout), in the order Area → OLT Code → FAT Code → Hostname (Hostname moved here from
+Toolbar 2 on 2026-09-08, see §8):
 
 | Field | Toolbar | Editable? | Source | Notes |
 |-------|---------|-----------|--------|-------|
 | **Area** | 1 | Yes | `.region` on the FAT splice or the cable | direct copy, editable afterwards in case of mismatch |
 | **OLT Code** | 1 | Yes | `.olt_code` on the FAT splice or the cable | **new field** — also fully manual-entry capable, so the user can run a query for an OLT code that has no map object selected at all |
 | **FAT Code** | 1 | Depends on mode | see below | FAT mode: editable text. Cable mode: dropdown (unchanged from before) |
-| **Hostname** | 2 | **No** (`:editable?, _false`) | `dim_olt_master_smallworld.olt_hostname` where `olt_code = <OLT Code field value>` | read-only — always derived, never typed; see lookup trigger below |
+| **Hostname** | 1 | **No** (`:editable?, _false`) | `dim_olt_master_smallworld.olt_hostname` where `olt_code = <OLT Code field value>` | read-only — always derived, never typed; see lookup trigger below |
 
 **Hostname is looked up eagerly, not deferred to Run** — it must already be resolved (and is
 read-only, so there's nothing else to fill it) by the time the user can press Run. The lookup
@@ -263,7 +269,7 @@ original row number through a sort, and `eq_result_selected()` reads it back to 
 
 ### 2g. Navigate button
 
-Lives on **Toolbar 2**. Enabled only when exactly one row is selected (mirrors `goto_selected()` /
+Lives on **Toolbar 2**, first under the "Navigation" label. Enabled only when exactly one row is selected (mirrors `goto_selected()` /
 `single_selected?` in `manage_actions()`). Resolve the row's FAT splice by name and go to it — **no
 WGS84↔local coordinate
 transform needed here**, unlike the Cluster tab: `sheath_splice.location` is already a native GIS
@@ -303,12 +309,14 @@ sourced from the equipment result rows instead of outage clusters:
 
 ### 2i. Highlight (toggle) — new, added 2026-09-03
 
-Lives on **Toolbar 2**, positioned right after Navigate. An `sw_image_toggle_item` (`eq_highlight_btn`)
-mirroring the Cluster tab's `highlight_btn` exactly: toggling it on/off shows/hides a persistent
-tooltip-style highlight for the **currently selected result row's FAT** on the map (independent of
-Navigate, which moves the view; Highlight just marks the spot and can stay on while the user pans
-around). Since the Equipment table is single-selection, this always highlights at most one FAT — no
-multi-row highlighting like the Cluster tab's `:show_map`.
+Lives on **Toolbar 2**, positioned right after Navigate, immediately followed by Start/Stop — no
+separators between any of the four (Navigate/Highlight/Start/Stop all sit under the same
+"Navigation" label, per the 2026-09-08 layout change, §8). An `sw_image_toggle_item`
+(`eq_highlight_btn`) mirroring the Cluster tab's `highlight_btn` exactly: toggling it on/off
+shows/hides a persistent tooltip-style highlight for the **currently selected result row's FAT** on
+the map (independent of Navigate, which moves the view; Highlight just marks the spot and can stay on
+while the user pans around). Since the Equipment table is single-selection, this always highlights at
+most one FAT — no multi-row highlighting like the Cluster tab's `:show_map`.
 
 - `eq_show_map(toggled?)` — same shape as the Cluster tab's `show_map()`: warns and resets the toggle
   if nothing is selected, otherwise fires a new `:eq_show_map` databus message (kept separate from
@@ -396,7 +404,7 @@ _method rwwi_nisa_dialog.activate_in(frame)
     _self.build_table(cluster_inner)        # existing method, unchanged
 
     # Tab 2 - Equipment (new). 3-row wrapper: toolbar 1, toolbar 2, table.
-    equipment_tab   << tab_con.new_tab("Segment")   # visible label - see naming note above
+    equipment_tab   << tab_con.new_tab("FAT Loss")   # visible label - see naming note above
     equipment_inner << sw_container.new(equipment_tab, 3, 1, :row_resize_values, {0, 0, 1})
     _self.build_equipment_toolbar(equipment_inner)    # new - Object/Get/Area/OLT Code/FAT Code/Run/Reset
     _self.build_equipment_toolbar2(equipment_inner)   # new - Hostname/Navigate/Highlight/Start/Stop
@@ -520,7 +528,7 @@ session, not just a code read-through):
 ## 8. As-built deviations from the original 2026-09-01 plan
 
 Logged here rather than silently editing history, since this doc doubles as the as-built reference.
-All three were found by actually running the dialog in `gis.exe`, not by re-reading the plan.
+All four were found by actually running the dialog in `gis.exe`, not by re-reading the plan.
 
 1. **Tab pane holds one child, not many (§4).** The original plan's `activate_in` sketch added a
    toolbar and a table straight into each `new_tab()` result. That crashes at realise time
@@ -540,11 +548,27 @@ All three were found by actually running the dialog in `gis.exe`, not by re-read
    distinguishing field) and only fall back to the structure/route drilldown if something else was
    selected — see the open item 5 above for the residual risk in that heuristic.
 
-The Highlight button (§2i) and the two-toolbar layout (§1) were requested as follow-up adjustments
-after the initial implementation and are documented in place above, not listed separately here since
-they were planned (as a doc update) before being built, unlike the three fixes above.
+4. **Dialog canvas outgrew its declared size once the second toolbar was added (2026-09-08).**
+   `rwwi_nisa_dialog.magik`'s top-level `sw_canvas_container` is a fixed-pixel canvas, not an
+   auto-growing one (the same reason §8.1's tab-pane crash happened) — declaring `:width`/`:height`
+   really does hard-cap the dialog's pixel size. Content demand had grown to roughly `tab_con`'s
+   `:min_height, 500` + two FAT Loss toolbars (~35px each) + the shared log's `:min_height, 120` +
+   spacing ≈ 730px, against a canvas still declared at the original 650px tall — everything got
+   squeezed to fit, which is what read as "smaller than the Mancore Plan dialog" despite NISA's
+   declared size (950×650) nominally already being larger than Mancore's (900×600). Fixed by raising
+   the canvas to **1050×800** — comfortable headroom over both the actual content height and
+   Mancore's dialog on both axes.
+
+The Highlight button (§2i), the two-toolbar layout (§1), the tab renames (naming note
+above), the result table's filterable-column set (§2f), the Toolbar 1/2 field reshuffle — Hostname
+moved next to FAT Code, Toolbar 2 collapsed under one "Navigation" label with Navigate/Highlight/
+Start/Stop and no separators between them (§1, §2g, §2i) — the Hostname field's `:display_length`
+bump to 24, and the FAT Loss tab's label wording (Object → Source, and dropping the trailing `:` from
+every label on this tab, §1) were all requested as follow-up adjustments after the initial
+implementation and are documented in place above, not listed separately
+here since each was a direct, low-risk UI tweak rather than a bug found by running the dialog, unlike
+the three fixes above.
 
 ---
 
-*Plan created: 2026-09-01. Updated 2026-09-03 to match the as-built UI (two toolbars, Highlight
-button, and the fixes in §8).*
+*Plan created: 2026-09-01. Last content update 2026-09-08 (Toolbar 1/2 field reshuffle — see §8).*

@@ -31,8 +31,8 @@ $
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 	## Build Equipment tab's FIRST toolbar: object selector + Get Selected Object,
-	## Area / OLT Code / FAT Code fields, Run / Reset, count label.
-	## Hostname / Navigate / Highlight / Start / Stop live on the second toolbar -
+	## Area / OLT Code / FAT Code / Hostname fields, Run / Reset, count label.
+	## Navigate / Highlight / Start / Stop live on the second toolbar -
 	## see build_equipment_toolbar2().
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
@@ -42,7 +42,7 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 
 	tb << toolbar_con.create_toolbar()
 
-	sw_label_item.new(tb, "  Object: ")
+	sw_label_item.new(tb, "  Source ")
 	.items[:eq_mode_selector] << sw_text_item.new(tb,
 		:model,           _self,
 		:display_length,  8,
@@ -57,14 +57,14 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 		:selector, :eq_get_selected_object|()|,
 		:tooltip,  "Get selected FAT (Pole/UUB) or Cable (Aerial/Underground Route) object from the map")
 
-	sw_label_item.new(tb, "  Area: ")
+	sw_label_item.new(tb, "  Area ")
 	.items[:eq_area_field] << sw_text_item.new(tb,
 		:model,          _self,
 		:display_length, 14,
 		:editable?,      _true,
 		:value,          "")
 
-	sw_label_item.new(tb, "  OLT Code: ")
+	sw_label_item.new(tb, "  OLT Code ")
 	.items[:eq_olt_code_field] << sw_text_item.new(tb,
 		:model,           _self,
 		:display_length,  14,
@@ -72,11 +72,18 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar(parent)
 		:value,           "",
 		:change_selector, :eq_olt_code_changed|()|)
 
-	sw_label_item.new(tb, "  FAT Code: ")
+	sw_label_item.new(tb, "  FAT Code ")
 	.items[:eq_fat_code_field] << sw_text_item.new(tb,
 		:model,          _self,
 		:display_length, 14,
 		:editable?,      _true,
+		:value,          "")
+
+	sw_label_item.new(tb, "  Hostname ")
+	.items[:eq_hostname_field] << sw_text_item.new(tb,
+		:model,          _self,
+		:display_length, 24,
+		:editable?,      _false,
 		:value,          "")
 
 	.items[:eq_run_btn] << sw_button_item.new(tb,
@@ -97,10 +104,10 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.build_equipment_toolbar2(parent)
-	## Build Equipment tab's SECOND toolbar (directly below the first): Hostname
-	## (read-only), Navigate, Highlight (toggle - shows/highlights the selected
-	## ticket's FAT on the map, mirrors the Cluster tab's highlight_btn), and
-	## Start / Stop blink.
+	## Build Equipment tab's SECOND toolbar (directly below the first): Navigate,
+	## Highlight (toggle - shows/highlights the selected ticket's FAT on the map,
+	## mirrors the Cluster tab's highlight_btn), and Start / Stop blink - all
+	## under one "Navigation" label, with no separator between them.
 
 	toolbar_con << sw_toolbar_container.new(parent, _false,
 		:background_type,     :button_group,
@@ -109,12 +116,7 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar2(parent)
 
 	tb << toolbar_con.create_toolbar()
 
-	sw_label_item.new(tb, "  Hostname: ")
-	.items[:eq_hostname_field] << sw_text_item.new(tb,
-		:model,          _self,
-		:display_length, 18,
-		:editable?,      _false,
-		:value,          "")
+	sw_label_item.new(tb, "  Navigation ")
 
 	.items[:eq_goto_btn] << sw_button_item.new(tb,
 		:image,    {:goto_object, :ui_resources},
@@ -130,8 +132,6 @@ _private _method rwwi_nisa_dialog.build_equipment_toolbar2(parent)
 		:value,    _false,
 		:tooltip,  "Show/highlight selected ticket's FAT on map")
 	.items[:eq_highlight_btn].enabled? << _false
-
-	sw_label_item.new(tb, "  |  ")
 
 	.items[:eq_start_btn] << sw_button_item.new(tb,
 		:image,    {:run, :ui_resources},
@@ -174,10 +174,11 @@ _private _method rwwi_nisa_dialog.build_equipment_table(parent)
 
 	a_table.col_resize_values << {0, 1.5, 0.8, 1, 1, 1.5, 1.2, 1, 2, 1.5}
 
-	a_table.enable_column_filter(2, _true)   # Ticket Number
-	a_table.enable_column_filter(5, _true)   # Hostname
-	a_table.enable_column_filter(7, _true)   # FDT Code
-	a_table.enable_column_filter(8, _true)   # FAT Code
+	a_table.enable_column_filter(2, _true)    # Ticket Number
+	a_table.enable_column_filter(5, _true)    # Area
+	a_table.enable_column_filter(7, _true)    # FDT Code
+	a_table.enable_column_filter(8, _true)    # FAT Code
+	a_table.enable_column_filter(10, _true)   # Created Date (tlop_created_date)
 	a_table.enable_sort? << _true
 _endmethod
 $
@@ -633,7 +634,7 @@ _method rwwi_nisa_dialog.eq_reset()
 
 	_self.changed(:eq_result_list, :renew)
 	_self.eq_manage_actions()
-	_self.log_info("Segment tab reset.")
+	_self.log_info("FAT Loss tab reset.")
 _endmethod
 $
 

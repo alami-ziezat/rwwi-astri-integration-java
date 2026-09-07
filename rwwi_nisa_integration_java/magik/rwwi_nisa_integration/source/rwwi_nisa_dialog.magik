@@ -82,8 +82,8 @@ _method rwwi_nisa_dialog.activate_in(frame)
 	# Top-level canvas container (SWIFT requirement)
 	.items[:top] << top_c << sw_canvas_container.new(
 		frame, 4, 1,
-		:width,          950,
-		:height,         650,
+		:width,          1050,
+		:height,         800,
 		:outer_spacing,  5,
 		:row_spacing,    5,
 		:identifier,     :nisa_top_container,
@@ -107,7 +107,7 @@ _method rwwi_nisa_dialog.activate_in(frame)
 
 	# Tab 2 - Equipment (new - Segment Problem Detail). Same wrapper requirement,
 	# 3 rows: first toolbar, second toolbar (Hostname/Navigate/Highlight/blink), table.
-	equipment_tab   << tab_con.new_tab("Segment")
+	equipment_tab   << tab_con.new_tab("FAT Loss")
 	equipment_inner << sw_container.new(equipment_tab, 3, 1,
 		:row_resize_values, {0, 0, 1})
 	_self.build_equipment_toolbar(equipment_inner)
@@ -119,7 +119,7 @@ _method rwwi_nisa_dialog.activate_in(frame)
 
 	_self.log_info("NISA Integration - Ready")
 	_self.log_info("Cluster tab: enter a cluster code and click Search to begin.")
-	_self.log_info("Segment tab: select a FAT or Cable object on the map and click Get Selected Object.")
+	_self.log_info("FAT Loss tab: select a FAT or Cable object on the map and click Get Selected Object.")
 
 	_return top_c
 _endmethod
