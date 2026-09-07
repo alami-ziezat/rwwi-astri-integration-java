@@ -386,49 +386,89 @@ $
 
 _pragma(classify_level=basic, topic={nisa_integration})
 _private _method rwwi_nisa_dialog.int!eq_populate_fat_code_dropdown(cable)
-	## Populate FAT Code as a non-editable dropdown of FAT codes (dot-split, last
-	## segment of the splice name) sharing the cable's ring_name.
+	## Populate FAT Code as a non-editable dropdown of FAT codes connected to the
+	## selected cable's run - traces connectivity rather than a flat ring_name
+	## match on sheath_splice:
+	##   1. Find every sheath_with_loc segment sharing this cable's name AND
+	##      ring_name (a physical cable run is often split into multiple segment
+	##      records, one per route).
+	##   2. Walk each segment's two ends via get_upstream_connector() /
+	##      get_downstream_connector() (called directly on the cable; each
+	##      returns a single object or _unset - never a collection, never raises
+	##      on an unconnected end).
+	##   3. Collect FAT sheath_splice connectors into an equality_set, deduping by
+	##      identity (the same splice is often the shared connector between two
+	##      adjacent segments).
+	##   4. Derive FAT codes (dot-split, last segment), dedupe by text, and sort.
 
 	.items[:eq_fat_code_field].editable? << _false
 	.items[:eq_fat_code_field].value     << ""
 	.items[:eq_fat_code_field].text_items << {}
 
-	_local ring_name << cable.ring_name.default("")
-	_if ring_name = ""
+	_local cable_name << cable.name.default("")
+	_local ring_name  << cable.ring_name.default("")
+
+	_if cable_name = "" _orif ring_name = ""
 	_then
-		_self.log_warning("Selected cable has no ring_name - cannot list FAT codes.")
+		_self.log_warning("Selected cable has no name/ring_name - cannot trace connectivity for FAT codes.")
 		_return
 	_endif
 
-	_local sc_col << _self.database.collections[:sheath_splice]
-	_local pred   << predicate.eq(:sheath_splice_object_type, "FAT") _and
-	                 predicate.eq(:ring_name, ring_name)
-	_local fats   << sc_col.select(pred)
+	_try _with errCon
+		_local sheath_col  << _self.database.collections[:sheath_with_loc]
+		_local pred        << predicate.eq(:name, cable_name) _and predicate.eq(:ring_name, ring_name)
+		_local same_cables << sheath_col.select(pred)
 
-	_local names << equality_hash_table.new()
-	_for splice _over fats.fast_elements()
-	_loop
-		_local parts    << splice.name.default("").split_by(".")
-		_local fat_code << _if parts.size > 0
-		                   _then >> parts[parts.size].write_string
-		                   _else >> splice.name.default("").write_string
-		                   _endif
-		_if fat_code <> "" _then names[fat_code] << _true _endif
-	_endloop
+		_local fat_splices << equality_set.new()
 
-	_local fat_list << rope.new()
-	_for n _over names.keys.as_sorted_collection().fast_elements()
-	_loop
-		fat_list.add_last(n)
-	_endloop
+		_for seg _over same_cables.fast_elements()
+		_loop
+			_local ends << {_unset, _unset}
+			_try
+				ends << {seg.get_upstream_connector(), seg.get_downstream_connector()}
+			_when error
+			_endtry
 
-	.items[:eq_fat_code_field].text_items << fat_list.as_simple_vector()
-	_if _not fat_list.empty?
-	_then
-		.items[:eq_fat_code_field].value << fat_list[1]
-	_endif
+			_for conn _over ends.fast_elements()
+			_loop
+				_if conn _isnt _unset _andif conn.responds_to?(:sheath_splice_object_type) _andif
+				    conn.sheath_splice_object_type.default("").uppercase = "FAT"
+				_then
+					fat_splices.add(conn)
+				_endif
+			_endloop
+		_endloop
 
-	_self.log_info(write_string("Found ", fat_list.size, " FAT code(s) for ring_name '", ring_name, "'"))
+		_local fat_code_set << equality_set.new()
+		_for splice _over fat_splices.fast_elements()
+		_loop
+			_local parts    << splice.name.default("").split_by(".")
+			_local fat_code << _if parts.size > 0
+			                   _then >> parts[parts.size].write_string
+			                   _else >> splice.name.default("").write_string
+			                   _endif
+			_if fat_code <> "" _then fat_code_set.add(fat_code) _endif
+		_endloop
+
+		_local fat_list << rope.new()
+		_for n _over fat_code_set.as_sorted_collection().fast_elements()
+		_loop
+			fat_list.add_last(n)
+		_endloop
+
+		.items[:eq_fat_code_field].text_items << fat_list.as_simple_vector()
+		_if _not fat_list.empty?
+		_then
+			.items[:eq_fat_code_field].value << fat_list[1]
+		_endif
+
+		_self.log_info(write_string("Found ", fat_list.size, " FAT code(s) (", fat_splices.size,
+			" splice(s)) across ", same_cables.size, " cable segment(s) for '", cable_name,
+			"' / ring_name '", ring_name, "'"))
+
+	_when error
+		_self.log_error("FAT code connectivity lookup error: " + errCon.report_contents_string)
+	_endtry
 _endmethod
 $
 
@@ -507,6 +547,10 @@ _method rwwi_nisa_dialog.eq_lookup_hostname()
 			_when error
 			_endtry
 		_endif
+		_try
+			extdb_java_acp.close_all()
+		_when error
+		_endtry
 	_endprotect
 
 	_self.eq_manage_actions()
@@ -589,7 +633,7 @@ _method rwwi_nisa_dialog.eq_reset()
 
 	_self.changed(:eq_result_list, :renew)
 	_self.eq_manage_actions()
-	_self.log_info("Equipment tab reset.")
+	_self.log_info("Segment tab reset.")
 _endmethod
 $
 

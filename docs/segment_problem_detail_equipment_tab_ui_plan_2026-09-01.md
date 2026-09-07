@@ -1,8 +1,16 @@
 # Segment Problem Detail — Equipment Tab UI Plan
 
-**Date:** 2026-09-01 (last updated 2026-09-03 — see §8 for what changed after implementation started)
+**Date:** 2026-09-01 (last updated 2026-09-07 — see §8 for what changed after implementation started)
 **Author:** Claude Code
 **Status:** IMPLEMENTED — reflects the built UI, kept as the as-built reference for this feature
+(§2c's connectivity-traced Cable-mode FAT Code lookup was executed 2026-09-07)
+**Naming note (2026-09-08):** the tab's visible label was renamed from "Equipment" to **"Segment"**
+(`tab_con.new_tab("Segment")` in `rwwi_nisa_dialog.magik`, plus the two user-facing log lines that
+said "Equipment tab"). This doc, the source file name (`rwwi_nisa_equipment_dialog.magik`), and all
+internal identifiers (`eq_*` slots/methods, `equipment_tab`/`equipment_inner` locals, `build_equipment_*`
+method names) were deliberately left as "Equipment" — purely a code-organisation name, invisible to the
+user — to avoid a large, purely cosmetic rename across two files. Read "Equipment tab" everywhere below
+as "the tab currently labeled Segment in the UI".
 **Related:** [fat_loss_detection_nisa_api_plan_2026-08-24.md](./fat_loss_detection_nisa_api_plan_2026-08-24.md)
 (that plan added the `nisa_segment_problem_detail(area, hostname, fat)` Java caller and the
 `nisa_parse_segment_problem_detail_response(json_string)` Magik parser this UI consumes — both are
@@ -141,20 +149,68 @@ either way, same as OLT Code, the field stays editable so the user can type/corr
 hand when the selected object is a FAT (mirrors the OLT Code field's manual-entry behaviour, per the
 user's explicit request).
 
-**FAT Code field — Cable mode**: becomes a non-editable dropdown (`.text_items`, mirroring the
-existing `:mode_selector` toggle pattern in this same file at `rwwi_nisa_dialog.magik:97-104`),
-populated from all FAT splices sharing the cable's `ring_name` (unchanged from the previous version
-of this plan — a single cable has no one obvious FAT code, hence a pick-list instead of free text):
+**FAT Code field — Cable mode** (revised 2026-09-07 — see rationale below): a non-editable dropdown
+(`.text_items`, mirroring the existing `:mode_selector` toggle pattern in this same file at
+`rwwi_nisa_dialog.magik:97-104`) — a single cable has no one obvious FAT code, hence a pick-list
+instead of free text — but now populated by **tracing cable connectivity** instead of a flat
+`ring_name` match on `sheath_splice` directly:
 
-```magik
-sc_col  << .database.collections[:sheath_splice]
-pred    << predicate.eq(:sheath_splice_object_type, "FAT") _and predicate.eq(:ring_name, cable.ring_name)
-fats    << sc_col.select(pred)
-fat_names << fats.fast_elements().map(_proc(s) >> s.name.split_by(".").last.default(s.name) _endproc)
-```
-This mirrors the ring_name-grouping query already used in `rwwi_astri_boq_generator.magik:1359-1389`
-(FAT/FDT counted per `ring_name`), just narrowed to a name list instead of a count. Distinct/sort the
-list before assigning to `.text_items`.
+1. **Find all segments of the same logical cable** — a physical cable run is often split into
+   multiple `sheath_with_loc` records (one per route segment); the selected cable is just one segment.
+   Match on **both** `name` and `ring_name` together to gather every segment of that same run:
+   ```magik
+   sheath_col   << .database.collections[:sheath_with_loc]
+   pred         << predicate.eq(:name, cable.name) _and predicate.eq(:ring_name, cable.ring_name)
+   same_cables  << sheath_col.select(pred)
+   ```
+   (`:sheath_with_loc` is the confirmed collection key — see `astri_design_migrator.magik:156`. The
+   combined `name` + `ring_name` predicate itself is new; nothing in the codebase already does this,
+   so it's worth confirming against real multi-segment cable data during implementation.)
+2. **Walk each segment's two ends** via `get_upstream_connector()` / `get_downstream_connector()` —
+   called directly on the cable object, per the confirmed pattern at
+   `pni\modules\pni_quality_manager\source\unconnected_cable_qm_routine.magik:62-66`
+   (`conn1 << p_cable.get_upstream_connector()`, `conn2 << p_cable.get_downstream_connector()`). Each
+   call returns a **single object or `_unset`** — never a collection, never an exception on an
+   unconnected end (callers there just check `_is _unset`), so no `_try` is needed around the calls
+   themselves, only around checking whether the result is a FAT splice at all.
+3. **Collect FAT sheath_splice connectors, deduped by identity, using `equality_set`** — the same
+   splice is frequently the shared connector between two adjacent segments (segment 1's downstream
+   end = segment 2's upstream end), so the same splice would otherwise show up twice:
+   ```magik
+   fat_splices << equality_set.new()
+   _for seg _over same_cables.fast_elements()
+   _loop
+       _for conn _over {seg.get_upstream_connector(), seg.get_downstream_connector()}.fast_elements()
+       _loop
+           _if conn _isnt _unset _andif conn.responds_to?(:sheath_splice_object_type) _andif
+               conn.sheath_splice_object_type.default("").uppercase = "FAT"
+           _then
+               fat_splices.add(conn)
+           _endif
+       _endloop
+   _endloop
+   ```
+   (`equality_set.new()` + `.add()` + `.fast_elements()` mirrors the existing dedup pattern at
+   `rwi_export_to_aerial_kmz.magik:1807-1819`, which dedupes cables the same way.) The
+   `responds_to?(:sheath_splice_object_type)` guard matters here because a connector can be something
+   other than a `sheath_splice` (another cable's termination, a different equipment type, etc.).
+4. **Derive FAT codes and sort** — same dot-split-last-segment logic as before, applied to the deduped
+   `fat_splices` set, then sorted so the dropdown always presents FAT codes in a stable order:
+   ```magik
+   fat_names << rope.new()
+   _for splice _over fat_splices.fast_elements()
+   _loop
+       parts << splice.name.default("").split_by(".")
+       fat_names.add_last(_if parts.size > 0 _then >> parts[parts.size].write_string _else >> splice.name.default("") _endif)
+   _endloop
+   fat_names << fat_names.as_sorted_collection()   # ordering, per the user's requirement
+   ```
+
+**Why this replaced the flat `ring_name` match**: the original version queried `sheath_splice` for
+`sheath_splice_object_type = "FAT" _and ring_name = cable.ring_name` directly — simple, but returns
+every FAT sharing that ring_name across the whole FDT group, not specifically the FATs actually
+connected to *this* cable's run. Tracing `get_upstream_connector()`/`get_downstream_connector()` across
+every segment of the same logical cable instead ties the dropdown to genuine physical connectivity.
 
 ### 2d/2e. Run / Reset
 
@@ -340,7 +396,7 @@ _method rwwi_nisa_dialog.activate_in(frame)
     _self.build_table(cluster_inner)        # existing method, unchanged
 
     # Tab 2 - Equipment (new). 3-row wrapper: toolbar 1, toolbar 2, table.
-    equipment_tab   << tab_con.new_tab("Equipment")
+    equipment_tab   << tab_con.new_tab("Segment")   # visible label - see naming note above
     equipment_inner << sw_container.new(equipment_tab, 3, 1, :row_resize_values, {0, 0, 1})
     _self.build_equipment_toolbar(equipment_inner)    # new - Object/Get/Area/OLT Code/FAT Code/Run/Reset
     _self.build_equipment_toolbar2(equipment_inner)   # new - Hostname/Navigate/Highlight/Start/Stop
@@ -361,7 +417,7 @@ container so both tabs log to the same place, consistent with how the Cluster ta
 | File | Change |
 |------|--------|
 | `rwwi_nisa_dialog.magik` | Add 7 new slots to `def_slotted_exemplar` (§3); rewrite `activate_in` to build a `sw_tab_container` with Cluster + Equipment tabs, each wrapped in its own row container (§4) |
-| `rwwi_nisa_equipment_dialog.magik` (new) | All Equipment-tab UI build + logic methods (§2), split across two toolbar builders (`build_equipment_toolbar` / `build_equipment_toolbar2`), including the OLT Code field's `:eq_olt_code_changed()` change_selector, the eager `eq_lookup_hostname()`, and the Highlight toggle (`eq_show_map`, `eq_highlight_record`, `eq_highlight_tooltip_for` — §2i) |
+| `rwwi_nisa_equipment_dialog.magik` (new) | All Equipment-tab UI build + logic methods (§2), split across two toolbar builders (`build_equipment_toolbar` / `build_equipment_toolbar2`), including the OLT Code field's `:eq_olt_code_changed()` change_selector, the eager `eq_lookup_hostname()`, and the Highlight toggle (`eq_show_map`, `eq_highlight_record`, `eq_highlight_tooltip_for` — §2i). `int!eq_populate_fat_code_dropdown` rewritten (§2c) to trace cable connectivity (`get_upstream_connector()`/`get_downstream_connector()` across all same-name/same-ring_name segments, deduped via `equality_set`, then FAT codes deduped/sorted via a second `equality_set`) instead of a flat `ring_name` match on `sheath_splice`. `eq_lookup_hostname()`'s `_protection` block now also calls `extdb_java_acp.close_all()` after closing its own connection (2026-09-07), matching the existing `extdb_java_acp.close_all()` convention used elsewhere in this codebase (e.g. the Cluster tab's `search_by_area` at `rwwi_nisa_dialog.magik:1463`) so the underlying JDBC connection pool doesn't accumulate stale connections across repeated OLT Code lookups. |
 | `rwwi_nisa_plugin.magik` | Add `:eq_blink_mode` and `:eq_show_map` branches to `note_change`; add `start_equipment_blink_animations()` / `stop_equipment_blink_animations()` (blink), `eq_show_mode()` / `eq_show_records()` / `eq_build_rwo_cache()` / `draw_all_equipment_highlights()` (highlight, §2i); add an `:equipment` style to the shared `:fill_style`/`:text_style` constants; add `int!ensure_post_renderer()` / `int!maybe_remove_post_renderer()` and route `show_mode()`'s post-renderer add/remove through them so Cluster and Equipment highlighting can share one `:transient_drawer` registration safely (no change needed for Navigate — reuses `:goto_request`) |
 | `test_nisa_procs.magik` | Fix `nisa_parse_segment_problem_detail_response`'s `:tlop_area_name`/`:tlop_cluster_name` → `:area`/`:cluster_name` field lookups (§2e) |
 | `source/load_list.txt` | Add `rwwi_nisa_equipment_dialog` after `rwwi_nisa_dialog` |
@@ -446,6 +502,18 @@ session, not just a code read-through):
    "something else" — if a non-cable object also happens to respond to `:fiber_count`, Cable mode
    could mis-accept it. Same caveat, lower risk, for `rwo.responds_to?(:sheath_splice_object_type)` in
    FAT mode. Revisit if either misfires against real data.
+6. The combined `name` + `ring_name` predicate for "all segments of the same logical cable" (§2c,
+   Cable mode FAT Code) doesn't exist anywhere else in the codebase — it's a new pattern for this
+   feature, not a reuse of a proven query. Confirm against a real multi-segment cable that this
+   actually returns every segment of the run (and not, say, zero rows because `name` isn't in fact
+   shared across segments — only `ring_name` was previously assumed to be the stable/shared field).
+7. `get_upstream_connector()`/`get_downstream_connector()` (§2c) are confirmed to exist and to be
+   called directly on the cable, but the only reference usage found
+   (`unconnected_cable_qm_routine.magik:62-66`) doesn't specifically confirm they return a
+   `sheath_splice` at a FAT/FDT boundary as opposed to some other connector type at, e.g., a mid-span
+   joint closure — the `responds_to?(:sheath_splice_object_type)` + type-check guard in §2c should
+   handle that regardless, but worth watching the log output (`Found N FAT code(s)...`) the first time
+   this runs against a real cable to sanity-check the count looks right.
 
 ---
 
