@@ -135,7 +135,7 @@ _private _method rwwi_nisa_dialog.build_toolbar(parent)
 
 	tb << toolbar_con.create_toolbar()
 
-	sw_label_item.new(tb, "  Search by: ")
+	sw_label_item.new(tb, "  Search by ")
 	.items[:mode_selector] << sw_text_item.new(tb,
 		:model,           _self,
 		:display_length,  14,

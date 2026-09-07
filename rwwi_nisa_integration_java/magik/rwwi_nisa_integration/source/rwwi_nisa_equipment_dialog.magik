@@ -169,16 +169,18 @@ _private _method rwwi_nisa_dialog.build_equipment_table(parent)
 		:min_height,                   250)
 
 	a_table.set_column_labels({
-		"#", "Ticket Number", "Status", "Status Name", "Area", "Hostname",
-		"FDT Code", "FAT Code", "Cluster Name", "Created Date"})
+		"#", "Ticket Number", "Area", "Hostname", "FDT Code", "FAT Code",
+		"Cluster Name", "Created Date", "Status", "Status Name"})
 
-	a_table.col_resize_values << {0, 1.5, 0.8, 1, 1, 1.5, 1.2, 1, 2, 1.5}
+	a_table.col_resize_values << {0, 1.5, 1, 1.5, 1.2, 1, 2, 1.5, 0.8, 1}
 
 	a_table.enable_column_filter(2, _true)    # Ticket Number
-	a_table.enable_column_filter(5, _true)    # Area
-	a_table.enable_column_filter(7, _true)    # FDT Code
-	a_table.enable_column_filter(8, _true)    # FAT Code
-	a_table.enable_column_filter(10, _true)   # Created Date (tlop_created_date)
+	a_table.enable_column_filter(3, _true)    # Area
+	a_table.enable_column_filter(4, _true)    # Hostname
+	a_table.enable_column_filter(5, _true)    # FDT Code
+	a_table.enable_column_filter(6, _true)    # FAT Code
+	a_table.enable_column_filter(8, _true)    # Created Date (tlop_created_date)
+	a_table.enable_column_filter(10, _true)   # Status Name
 	a_table.enable_sort? << _true
 _endmethod
 $
@@ -655,14 +657,14 @@ _method rwwi_nisa_dialog.eq_result_list_data()
 			row +<< 1
 			.items[:eq_table].add_label(row, 1, row.write_string)
 			.items[:eq_table].add_label(row, 2, pl[:ticket_number])
-			.items[:eq_table].add_label(row, 3, pl[:tlop_status])
-			.items[:eq_table].add_label(row, 4, pl[:status_name])
-			.items[:eq_table].add_label(row, 5, pl[:tlop_area_name])
-			.items[:eq_table].add_label(row, 6, pl[:hostname])
-			.items[:eq_table].add_label(row, 7, pl[:fdt_code])
-			.items[:eq_table].add_label(row, 8, pl[:fat_code])
-			.items[:eq_table].add_label(row, 9, pl[:tlop_cluster_name])
-			.items[:eq_table].add_label(row, 10, pl[:tlop_created_date])
+			.items[:eq_table].add_label(row, 3, pl[:tlop_area_name])
+			.items[:eq_table].add_label(row, 4, pl[:hostname])
+			.items[:eq_table].add_label(row, 5, pl[:fdt_code])
+			.items[:eq_table].add_label(row, 6, pl[:fat_code])
+			.items[:eq_table].add_label(row, 7, pl[:tlop_cluster_name])
+			.items[:eq_table].add_label(row, 8, pl[:tlop_created_date])
+			.items[:eq_table].add_label(row, 9, pl[:tlop_status])
+			.items[:eq_table].add_label(row, 10, pl[:status_name])
 
 			.eq_row_cache[row] << pl
 		_endloop

@@ -254,18 +254,21 @@ and `eq_selected_row` (the single selected pl, or `_unset`) — the table's "#" 
 original row number through a sort, and `eq_result_selected()` reads it back to look up
 `eq_row_cache`.
 
-| # | Label | Source field |
-|---|-------|--------------|
-| 1 | # | row number |
-| 2 | Ticket Number | `ticket_number` |
-| 3 | Status | `tlop_status` |
-| 4 | Status Name | `status_name` |
-| 5 | Area | `area` (post-fix, see above) |
-| 6 | Hostname | `hostname` |
-| 7 | FDT Code | `fdt_code` |
-| 8 | FAT Code | `fat_code` |
-| 9 | Cluster Name | `cluster_name` (post-fix, see above) |
-| 10 | Created Date | `tlop_created_date` |
+Column order and filters revised 2026-09-08 — both Status columns moved to the end, and filtering
+added to Status Name and Hostname:
+
+| # | Label | Source field | Filterable? |
+|---|-------|--------------|-------------|
+| 1 | # | row number | No |
+| 2 | Ticket Number | `ticket_number` | Yes |
+| 3 | Area | `area` (post-fix, see above) | Yes |
+| 4 | Hostname | `hostname` | Yes |
+| 5 | FDT Code | `fdt_code` | Yes |
+| 6 | FAT Code | `fat_code` | Yes |
+| 7 | Cluster Name | `cluster_name` (post-fix, see above) | No |
+| 8 | Created Date | `tlop_created_date` | Yes |
+| 9 | Status | `tlop_status` | No |
+| 10 | Status Name | `status_name` | Yes |
 
 ### 2g. Navigate button
 
@@ -453,7 +456,9 @@ near zero:
   toggles fighting over it. The externally-observable behaviour of `show_mode()` on its own is
   unchanged (registers on enable, unregisters on disable) — the only new case is Cluster disabling
   while Equipment highlight is still on, where the renderer now correctly stays registered instead of
-  being torn down out from under Equipment.
+  being torn down out from under Equipment. **A second, purely cosmetic exception (2026-09-08)**:
+  `build_toolbar()`'s `"  Search by: "` label lost its trailing colon (`"  Search by "`) to match the
+  colon-free labels applied to the FAT Loss tab — no functional change, text only.
 - **No existing `.items` keys renamed or removed.** `:search_field`, `:table`, `:log`,
   `:highlight_btn`, `:start_btn`, `:stop_btn`, etc. all keep their current keys — every existing
   method that reads `.items[:...]` keeps working unmodified. Only new `:eq_*`-prefixed keys are added
@@ -475,7 +480,7 @@ session, not just a code read-through):
 1. Open *NISA Mass Problem Monitor...* — dialog opens with **Cluster** tab active by default, title
    and layout look the same as today.
 2. Cluster tab, unchanged flows, exactly as before this change:
-   - Search by cluster code and by area (toggle the `Search by:` dropdown) both still return results.
+   - Search by cluster code and by area (toggle the `Search by` dropdown) both still return results.
    - `Check All Outages` / per-row outage check still populates the traffic-light column.
    - Select rows → `Go To Selected` still navigates the map; `Show on Map` toggle still
      highlights/tooltips selected clusters.
@@ -563,9 +568,10 @@ The Highlight button (§2i), the two-toolbar layout (§1), the tab renames (nami
 above), the result table's filterable-column set (§2f), the Toolbar 1/2 field reshuffle — Hostname
 moved next to FAT Code, Toolbar 2 collapsed under one "Navigation" label with Navigate/Highlight/
 Start/Stop and no separators between them (§1, §2g, §2i) — the Hostname field's `:display_length`
-bump to 24, and the FAT Loss tab's label wording (Object → Source, and dropping the trailing `:` from
-every label on this tab, §1) were all requested as follow-up adjustments after the initial
-implementation and are documented in place above, not listed separately
+bump to 24, the FAT Loss tab's label wording (Object → Source, and dropping the trailing `:` from
+every label on this tab and the Cluster tab's "Search by", §1/§6), and the result table's column
+reorder + added Hostname/Status Name filters (§2f) were all requested as follow-up adjustments after
+the initial implementation and are documented in place above, not listed separately
 here since each was a direct, low-risk UI tweak rather than a bug found by running the dialog, unlike
 the three fixes above.
 
